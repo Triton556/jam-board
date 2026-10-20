@@ -1,0 +1,4504 @@
+{
+  "activity": [
+    {
+      "action": "jam.updated",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T17:26:09.8336359Z",
+      "payload": {
+        "created": true,
+        "humanJoined": "01M59V5081PHY1SQS6D8CTDMQB",
+        "name": [null, "Cozy Jam 48"]
+      },
+      "seq": 1
+    },
+    {
+      "action": "member.joined",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T17:43:09.8336608Z",
+      "payload": {
+        "memberId": "01M59V50816T1CKWC5FZY96AZ2",
+        "name": "Mira"
+      },
+      "seq": 2
+    },
+    {
+      "action": "member.joined",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T18:00:09.8336743Z",
+      "payload": {
+        "memberId": "01M59V5082W1RBNM1PFHR0VRWD",
+        "name": "Alex"
+      },
+      "seq": 3
+    },
+    {
+      "action": "member.joined",
+      "actor": {
+        "color": "#9B7BE0",
+        "handle": "codex",
+        "id": "01M59V508259R08JQEA2YA3VR5",
+        "kind": "agent",
+        "name": "Codex"
+      },
+      "createdAt": "2026-10-18T18:17:09.8336846Z",
+      "payload": {
+        "handle": "codex",
+        "name": "Codex"
+      },
+      "seq": 4
+    },
+    {
+      "action": "member.joined",
+      "actor": {
+        "color": "#F07E5F",
+        "handle": "claude",
+        "id": "01M59V50821V41FAVMJCD0TGP3",
+        "kind": "agent",
+        "name": "Claude"
+      },
+      "createdAt": "2026-10-18T18:34:09.8336949Z",
+      "payload": {
+        "handle": "claude",
+        "name": "Claude"
+      },
+      "seq": 5
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T18:51:09.8337046Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Cozy cabin ending sketch"
+      },
+      "seq": 6,
+      "taskKey": "JB-1"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T19:08:09.8337145Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Optional firefly companion"
+      },
+      "seq": 7,
+      "taskKey": "JB-2"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T19:25:09.8337242Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Snow trail variations"
+      },
+      "seq": 8,
+      "taskKey": "JB-3"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T19:42:09.8337336Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Accessibility: color cues"
+      },
+      "seq": 9,
+      "taskKey": "JB-4"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T19:59:09.833743Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Weather ambience layers"
+      },
+      "seq": 10,
+      "taskKey": "JB-5"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T20:16:09.8337524Z",
+      "payload": {
+        "status": "backlog",
+        "title": "Controller rumble ideas"
+      },
+      "seq": 11,
+      "taskKey": "JB-6"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T20:33:09.8337617Z",
+      "payload": {
+        "status": "todo",
+        "title": "Player movement: coyote time & jump buffer"
+      },
+      "seq": 12,
+      "taskKey": "JB-7"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T20:50:09.8337713Z",
+      "payload": {
+        "status": "todo",
+        "title": "Lantern glow shader"
+      },
+      "seq": 13,
+      "taskKey": "JB-8"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T21:07:09.8337805Z",
+      "payload": {
+        "status": "todo",
+        "title": "Title screen layout"
+      },
+      "seq": 14,
+      "taskKey": "JB-9"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T21:24:09.8337896Z",
+      "payload": {
+        "status": "todo",
+        "title": "SFX: footsteps on snow"
+      },
+      "seq": 15,
+      "taskKey": "JB-10"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T21:41:09.8337988Z",
+      "payload": {
+        "status": "todo",
+        "title": "Save/load settings"
+      },
+      "seq": 16,
+      "taskKey": "JB-11"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T21:58:09.833808Z",
+      "payload": {
+        "status": "todo",
+        "title": "Pause menu"
+      },
+      "seq": 17,
+      "taskKey": "JB-12"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T22:15:09.8338174Z",
+      "payload": {
+        "status": "todo",
+        "title": "Particles for light pickup"
+      },
+      "seq": 18,
+      "taskKey": "JB-13"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T22:32:09.8338266Z",
+      "payload": {
+        "status": "todo",
+        "title": "Playtest round 1 notes"
+      },
+      "seq": 19,
+      "taskKey": "JB-14"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T22:49:09.8338358Z",
+      "payload": {
+        "status": "todo",
+        "title": "Tune lantern battery curve"
+      },
+      "seq": 20,
+      "taskKey": "JB-15"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T23:06:09.8338451Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Light puzzle: frozen bridge"
+      },
+      "seq": 21,
+      "taskKey": "JB-16"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T23:23:09.8338547Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Cabin interior sprites"
+      },
+      "seq": 22,
+      "taskKey": "JB-17"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T23:40:09.8338639Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Wind loop and transitions"
+      },
+      "seq": 23,
+      "taskKey": "JB-18"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-18T23:57:09.8338731Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Keyboard remapping"
+      },
+      "seq": 24,
+      "taskKey": "JB-19"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T00:14:09.8338822Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Collectible star feedback"
+      },
+      "seq": 25,
+      "taskKey": "JB-20"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T00:31:09.8338914Z",
+      "payload": {
+        "status": "in_progress",
+        "title": "Camera follow smoothing"
+      },
+      "seq": 26,
+      "taskKey": "JB-21"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T00:48:09.8339006Z",
+      "payload": {
+        "status": "review",
+        "title": "Review snow collision edges"
+      },
+      "seq": 27,
+      "taskKey": "JB-22"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T01:05:09.8339097Z",
+      "payload": {
+        "status": "review",
+        "title": "Credits screen"
+      },
+      "seq": 28,
+      "taskKey": "JB-23"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T01:22:09.8339188Z",
+      "payload": {
+        "status": "review",
+        "title": "Mix pickup chimes"
+      },
+      "seq": 29,
+      "taskKey": "JB-24"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T01:39:09.8339277Z",
+      "payload": {
+        "status": "review",
+        "title": "Checkpoint lantern animation"
+      },
+      "seq": 30,
+      "taskKey": "JB-25"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T01:56:09.8339373Z",
+      "payload": {
+        "status": "done",
+        "title": "Project scaffolding"
+      },
+      "seq": 31,
+      "taskKey": "JB-26"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T02:13:09.8339465Z",
+      "payload": {
+        "status": "done",
+        "title": "Main character silhouette"
+      },
+      "seq": 32,
+      "taskKey": "JB-27"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T02:30:09.8339554Z",
+      "payload": {
+        "status": "done",
+        "title": "Input action map"
+      },
+      "seq": 33,
+      "taskKey": "JB-28"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T02:47:09.8339643Z",
+      "payload": {
+        "status": "done",
+        "title": "First snowy level blockout"
+      },
+      "seq": 34,
+      "taskKey": "JB-29"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T03:04:09.8339734Z",
+      "payload": {
+        "status": "done",
+        "title": "UI paper palette"
+      },
+      "seq": 35,
+      "taskKey": "JB-30"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T03:21:09.8339823Z",
+      "payload": {
+        "status": "done",
+        "title": "Lantern pickup prototype"
+      },
+      "seq": 36,
+      "taskKey": "JB-31"
+    },
+    {
+      "action": "task.created",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T03:38:09.8339913Z",
+      "payload": {
+        "status": "done",
+        "title": "Export preset: Windows"
+      },
+      "seq": 37,
+      "taskKey": "JB-32"
+    },
+    {
+      "action": "task.claimed",
+      "actor": {
+        "color": "#9B7BE0",
+        "handle": "codex",
+        "id": "01M59V508259R08JQEA2YA3VR5",
+        "kind": "agent",
+        "name": "Codex"
+      },
+      "createdAt": "2026-10-19T03:55:09.8340003Z",
+      "payload": {
+        "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+        "status": ["in_progress", "in_progress"]
+      },
+      "seq": 38,
+      "taskKey": "JB-16"
+    },
+    {
+      "action": "task.claimed",
+      "actor": {
+        "color": "#F07E5F",
+        "handle": "claude",
+        "id": "01M59V50821V41FAVMJCD0TGP3",
+        "kind": "agent",
+        "name": "Claude"
+      },
+      "createdAt": "2026-10-19T04:12:09.8340093Z",
+      "payload": {
+        "assigneeId": [null, "01M59V50821V41FAVMJCD0TGP3"],
+        "status": ["in_progress", "in_progress"]
+      },
+      "seq": 39,
+      "taskKey": "JB-19"
+    },
+    {
+      "action": "task.claimed",
+      "actor": {
+        "color": "#9B7BE0",
+        "handle": "codex",
+        "id": "01M59V508259R08JQEA2YA3VR5",
+        "kind": "agent",
+        "name": "Codex"
+      },
+      "createdAt": "2026-10-19T04:29:09.8340185Z",
+      "payload": {
+        "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+        "status": ["in_progress", "in_progress"]
+      },
+      "seq": 40,
+      "taskKey": "JB-21"
+    },
+    {
+      "action": "comment.added",
+      "actor": {
+        "color": "#E0679A",
+        "handle": "mira",
+        "id": "01M59V50816T1CKWC5FZY96AZ2",
+        "kind": "human",
+        "name": "Mira"
+      },
+      "createdAt": "2026-10-19T04:46:09.8340279Z",
+      "payload": {
+        "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+        "commentId": "01M59V5090GCQZ2P13PW3HMG0X"
+      },
+      "seq": 41,
+      "taskKey": "JB-7"
+    },
+    {
+      "action": "comment.added",
+      "actor": {
+        "color": "#E0679A",
+        "handle": "mira",
+        "id": "01M59V50816T1CKWC5FZY96AZ2",
+        "kind": "human",
+        "name": "Mira"
+      },
+      "createdAt": "2026-10-19T05:03:09.8340415Z",
+      "payload": {
+        "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+        "commentId": "01M59V509119FFZSWWZ08A82HY"
+      },
+      "seq": 42,
+      "taskKey": "JB-9"
+    },
+    {
+      "action": "comment.added",
+      "actor": {
+        "color": "#E0679A",
+        "handle": "mira",
+        "id": "01M59V50816T1CKWC5FZY96AZ2",
+        "kind": "human",
+        "name": "Mira"
+      },
+      "createdAt": "2026-10-19T05:20:09.834059Z",
+      "payload": {
+        "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+        "commentId": "01M59V5091E8M9TH3Y4FBG200H"
+      },
+      "seq": 43,
+      "taskKey": "JB-22"
+    },
+    {
+      "action": "comment.added",
+      "actor": {
+        "color": "#E0679A",
+        "handle": "mira",
+        "id": "01M59V50816T1CKWC5FZY96AZ2",
+        "kind": "human",
+        "name": "Mira"
+      },
+      "createdAt": "2026-10-19T05:37:09.8340779Z",
+      "payload": {
+        "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+        "commentId": "01M59V5091AW1M0A9DQ77QBPE1"
+      },
+      "seq": 44,
+      "taskKey": "JB-26"
+    },
+    {
+      "action": "comment.added",
+      "actor": {
+        "color": "#E0679A",
+        "handle": "mira",
+        "id": "01M59V50816T1CKWC5FZY96AZ2",
+        "kind": "human",
+        "name": "Mira"
+      },
+      "createdAt": "2026-10-19T05:54:09.8340887Z",
+      "payload": {
+        "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+        "commentId": "01M59V5092XPFQAQG37NE0CBYJ"
+      },
+      "seq": 45,
+      "taskKey": "JB-31"
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T06:11:09.834098Z",
+      "payload": {
+        "assetId": "01M59V5092ACQW8Z8K8Z0JWCCS",
+        "name": "Player"
+      },
+      "seq": 46
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T06:28:09.8341073Z",
+      "payload": {
+        "assetId": "01M59V5092RJ9F9X1BD7PXT3NE",
+        "name": "Lantern"
+      },
+      "seq": 47
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T06:45:09.8341166Z",
+      "payload": {
+        "assetId": "01M59V5092JA7PDHWD39BGC6PR",
+        "name": "Cabin tiles"
+      },
+      "seq": 48
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T07:02:09.834126Z",
+      "payload": {
+        "assetId": "01M59V50932NTC3FVPWSPQXJCG",
+        "name": "Snow footsteps"
+      },
+      "seq": 49
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T07:19:09.8341354Z",
+      "payload": {
+        "assetId": "01M59V5093GNTAZGPXF898WQ3H",
+        "name": "Wind loop"
+      },
+      "seq": 50
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T07:36:09.8341445Z",
+      "payload": {
+        "assetId": "01M59V50937C6Q8KVX2DAWHT2B",
+        "name": "Frozen bridge"
+      },
+      "seq": 51
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T07:53:09.8341538Z",
+      "payload": {
+        "assetId": "01M59V5093M7DW4TWJMWRXPTN0",
+        "name": "Menu font"
+      },
+      "seq": 52
+    },
+    {
+      "action": "asset.created",
+      "actor": {
+        "color": "#3FA37A",
+        "handle": "alex",
+        "id": "01M59V5082W1RBNM1PFHR0VRWD",
+        "kind": "human",
+        "name": "Alex"
+      },
+      "createdAt": "2026-10-19T08:10:09.8341629Z",
+      "payload": {
+        "assetId": "01M59V50948D0PR4DFHCACX2DG",
+        "name": "Palette"
+      },
+      "seq": 53
+    },
+    {
+      "action": "asset.linked",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T08:27:09.8341723Z",
+      "payload": {
+        "assetId": "01M59V5092ACQW8Z8K8Z0JWCCS"
+      },
+      "seq": 54,
+      "taskKey": "JB-7"
+    },
+    {
+      "action": "asset.linked",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T08:44:09.8341815Z",
+      "payload": {
+        "assetId": "01M59V5092RJ9F9X1BD7PXT3NE"
+      },
+      "seq": 55,
+      "taskKey": "JB-8"
+    },
+    {
+      "action": "asset.linked",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T09:01:09.8341907Z",
+      "payload": {
+        "assetId": "01M59V5092JA7PDHWD39BGC6PR"
+      },
+      "seq": 56,
+      "taskKey": "JB-9"
+    },
+    {
+      "action": "task.updated",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T09:18:09.8342Z",
+      "payload": {
+        "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+      },
+      "seq": 57,
+      "taskKey": "JB-8"
+    },
+    {
+      "action": "task.updated",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T09:35:09.8342096Z",
+      "payload": {
+        "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+      },
+      "seq": 58,
+      "taskKey": "JB-9"
+    },
+    {
+      "action": "task.updated",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T09:52:09.8342188Z",
+      "payload": {
+        "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+      },
+      "seq": 59,
+      "taskKey": "JB-10"
+    },
+    {
+      "action": "task.updated",
+      "actor": {
+        "color": "#5B8DEF",
+        "handle": "danil",
+        "id": "01M59V5081PHY1SQS6D8CTDMQB",
+        "kind": "human",
+        "name": "Danil"
+      },
+      "createdAt": "2026-10-19T10:09:09.8342278Z",
+      "payload": {
+        "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+      },
+      "seq": 60,
+      "taskKey": "JB-11"
+    }
+  ],
+  "app": {
+    "currentMember": {
+      "avatar": null,
+      "client": null,
+      "color": "#5B8DEF",
+      "createdAt": "2026-10-19T10:26:09.7930863Z",
+      "handle": "danil",
+      "id": "01M59V5081PHY1SQS6D8CTDMQB",
+      "kind": "human",
+      "lastSeenAt": null,
+      "name": "Danil"
+    },
+    "hasJam": true,
+    "jam": {
+      "createdAt": "2026-10-19T10:26:09.7930863Z",
+      "endsAt": "2026-10-20T17:26:09.7928679Z",
+      "id": "01M59V5081QPYHE044R422F8J2",
+      "keyPrefix": "JB",
+      "name": "Cozy Jam 48",
+      "startsAt": "2026-10-19T10:26:09.7929415Z",
+      "taskSeq": 32,
+      "theme": "Small lights",
+      "timezone": "UTC"
+    },
+    "theme": "system"
+  },
+  "assets": [
+    {
+      "createdAt": "2026-10-19T10:26:09.8263738Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V5092ACQW8Z8K8Z0JWCCS",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "sprite",
+      "location": "assets/sprites/player.png",
+      "name": "Player",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8266333Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V5092RJ9F9X1BD7PXT3NE",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "sprite",
+      "location": "assets/sprites/lantern.png",
+      "name": "Lantern",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8269035Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V5092JA7PDHWD39BGC6PR",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "sprite",
+      "location": "assets/sprites/cabin.png",
+      "name": "Cabin tiles",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8271691Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V50932NTC3FVPWSPQXJCG",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "audio",
+      "location": "assets/audio/snow-steps.wav",
+      "name": "Snow footsteps",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8274057Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V5093GNTAZGPXF898WQ3H",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "audio",
+      "location": "assets/audio/wind.ogg",
+      "name": "Wind loop",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8276944Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V50937C6Q8KVX2DAWHT2B",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "level",
+      "location": "assets/levels/bridge.tscn",
+      "name": "Frozen bridge",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8279319Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V5093M7DW4TWJMWRXPTN0",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "font",
+      "location": "assets/fonts/menu.ttf",
+      "name": "Menu font",
+      "notes": "Demo reference path; no file is copied."
+    },
+    {
+      "createdAt": "2026-10-19T10:26:09.8281965Z",
+      "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+      "id": "01M59V50948D0PR4DFHCACX2DG",
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "kind": "other",
+      "location": "assets/palette.png",
+      "name": "Palette",
+      "notes": "Demo reference path; no file is copied."
+    }
+  ],
+  "board": {
+    "columns": [
+      {
+        "count": 6,
+        "status": "backlog"
+      },
+      {
+        "count": 9,
+        "status": "todo"
+      },
+      {
+        "count": 6,
+        "status": "in_progress"
+      },
+      {
+        "count": 4,
+        "status": "review"
+      },
+      {
+        "count": 7,
+        "status": "done"
+      }
+    ],
+    "inProgress": [
+      {
+        "assignee": {
+          "color": "#9B7BE0",
+          "handle": "codex",
+          "id": "01M59V508259R08JQEA2YA3VR5",
+          "kind": "agent",
+          "name": "Codex"
+        },
+        "key": "JB-16",
+        "priority": "high",
+        "status": "in_progress",
+        "title": "Light puzzle: frozen bridge"
+      },
+      {
+        "assignee": null,
+        "key": "JB-17",
+        "priority": "medium",
+        "status": "in_progress",
+        "title": "Cabin interior sprites"
+      },
+      {
+        "assignee": null,
+        "key": "JB-18",
+        "priority": "medium",
+        "status": "in_progress",
+        "title": "Wind loop and transitions"
+      },
+      {
+        "assignee": {
+          "color": "#F07E5F",
+          "handle": "claude",
+          "id": "01M59V50821V41FAVMJCD0TGP3",
+          "kind": "agent",
+          "name": "Claude"
+        },
+        "key": "JB-19",
+        "priority": "medium",
+        "status": "in_progress",
+        "title": "Keyboard remapping"
+      },
+      {
+        "assignee": null,
+        "key": "JB-20",
+        "priority": "medium",
+        "status": "in_progress",
+        "title": "Collectible star feedback"
+      },
+      {
+        "assignee": {
+          "color": "#9B7BE0",
+          "handle": "codex",
+          "id": "01M59V508259R08JQEA2YA3VR5",
+          "kind": "agent",
+          "name": "Codex"
+        },
+        "key": "JB-21",
+        "priority": "high",
+        "status": "in_progress",
+        "title": "Camera follow smoothing"
+      }
+    ],
+    "jam": {
+      "endsAt": "2026-10-20T17:26:09.7928679Z",
+      "name": "Cozy Jam 48",
+      "theme": "Small lights",
+      "timeLeft": 111599
+    },
+    "myTasks": [],
+    "onlineAgents": [
+      {
+        "avatar": null,
+        "client": "codex",
+        "color": "#9B7BE0",
+        "counts": {
+          "in_progress": 2
+        },
+        "createdAt": "2026-10-19T10:26:09.7946392Z",
+        "handle": "codex",
+        "id": "01M59V508259R08JQEA2YA3VR5",
+        "kind": "agent",
+        "lastSeenAt": "2026-10-19T10:26:09.7946392Z",
+        "name": "Codex",
+        "online": true,
+        "workingOn": ["JB-16", "JB-21"]
+      },
+      {
+        "avatar": null,
+        "client": "claude-code",
+        "color": "#F07E5F",
+        "counts": {
+          "in_progress": 1
+        },
+        "createdAt": "2026-10-19T10:26:09.7949208Z",
+        "handle": "claude",
+        "id": "01M59V50821V41FAVMJCD0TGP3",
+        "kind": "agent",
+        "lastSeenAt": "2026-10-19T10:26:09.7949208Z",
+        "name": "Claude",
+        "online": true,
+        "workingOn": ["JB-19"]
+      }
+    ]
+  },
+  "details": [
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T18:51:09.8337046Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Cozy cabin ending sketch"
+          },
+          "seq": 6,
+          "taskKey": "JB-1"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.7953296Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCozy cabin ending sketch. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T18:51:09.8337046Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Cozy cabin ending sketch"
+          },
+          "seq": 6,
+          "taskKey": "JB-1"
+        }
+      ],
+      "id": "01M59V5083FJZ1HPDFM9HZ8K6A",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-1",
+      "position": 1024.0,
+      "priority": "high",
+      "status": "backlog",
+      "tags": ["art"],
+      "title": "Cozy cabin ending sketch",
+      "updatedAt": "2026-10-19T10:26:09.7953296Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:08:09.8337145Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Optional firefly companion"
+          },
+          "seq": 7,
+          "taskKey": "JB-2"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.7962849Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nOptional firefly companion. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:08:09.8337145Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Optional firefly companion"
+          },
+          "seq": 7,
+          "taskKey": "JB-2"
+        }
+      ],
+      "id": "01M59V5084D6D8GEZ9S79RYM9X",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-2",
+      "position": 2048.0,
+      "priority": "medium",
+      "status": "backlog",
+      "tags": ["gameplay"],
+      "title": "Optional firefly companion",
+      "updatedAt": "2026-10-19T10:26:09.7962849Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:25:09.8337242Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Snow trail variations"
+          },
+          "seq": 8,
+          "taskKey": "JB-3"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.7971527Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nSnow trail variations. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:25:09.8337242Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Snow trail variations"
+          },
+          "seq": 8,
+          "taskKey": "JB-3"
+        }
+      ],
+      "id": "01M59V5085DXEE68EXBH5JVB6J",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-3",
+      "position": 3072.0,
+      "priority": "medium",
+      "status": "backlog",
+      "tags": ["art"],
+      "title": "Snow trail variations",
+      "updatedAt": "2026-10-19T10:26:09.7971527Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:42:09.8337336Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Accessibility: color cues"
+          },
+          "seq": 9,
+          "taskKey": "JB-4"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.797991Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nAccessibility: color cues. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:42:09.8337336Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Accessibility: color cues"
+          },
+          "seq": 9,
+          "taskKey": "JB-4"
+        }
+      ],
+      "id": "01M59V50854FBXWE1AY1G89E82",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-4",
+      "position": 4096.0,
+      "priority": "medium",
+      "status": "backlog",
+      "tags": ["ui"],
+      "title": "Accessibility: color cues",
+      "updatedAt": "2026-10-19T10:26:09.797991Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:59:09.833743Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Weather ambience layers"
+          },
+          "seq": 10,
+          "taskKey": "JB-5"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.7988401Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nWeather ambience layers. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T19:59:09.833743Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Weather ambience layers"
+          },
+          "seq": 10,
+          "taskKey": "JB-5"
+        }
+      ],
+      "id": "01M59V50860B03RZNMX84KQNN9",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-5",
+      "position": 5120.0,
+      "priority": "medium",
+      "status": "backlog",
+      "tags": ["audio"],
+      "title": "Weather ambience layers",
+      "updatedAt": "2026-10-19T10:26:09.7988401Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:16:09.8337524Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Controller rumble ideas"
+          },
+          "seq": 11,
+          "taskKey": "JB-6"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.7996835Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nController rumble ideas. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:16:09.8337524Z",
+          "payload": {
+            "status": "backlog",
+            "title": "Controller rumble ideas"
+          },
+          "seq": 11,
+          "taskKey": "JB-6"
+        }
+      ],
+      "id": "01M59V5087W25K291QCW74NWA7",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-6",
+      "position": 6144.0,
+      "priority": "high",
+      "status": "backlog",
+      "tags": ["tech"],
+      "title": "Controller rumble ideas",
+      "updatedAt": "2026-10-19T10:26:09.7996835Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:56:09.8339373Z",
+          "payload": {
+            "status": "done",
+            "title": "Project scaffolding"
+          },
+          "seq": 31,
+          "taskKey": "JB-26"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:37:09.8340779Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5091AW1M0A9DQ77QBPE1"
+          },
+          "seq": 44,
+          "taskKey": "JB-26"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 1,
+      "comments": [
+        {
+          "authorId": "01M59V50816T1CKWC5FZY96AZ2",
+          "bodyMd": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+          "createdAt": "2026-10-19T10:26:09.8256959Z",
+          "id": "01M59V5091AW1M0A9DQ77QBPE1",
+          "taskId": "01M59V508RHZJ1VT0CBW1DX3VV"
+        }
+      ],
+      "createdAt": "2026-10-19T10:26:09.8163076Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nProject scaffolding. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:56:09.8339373Z",
+          "payload": {
+            "status": "done",
+            "title": "Project scaffolding"
+          },
+          "seq": 31,
+          "taskKey": "JB-26"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:37:09.8340779Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5091AW1M0A9DQ77QBPE1"
+          },
+          "seq": 44,
+          "taskKey": "JB-26"
+        }
+      ],
+      "id": "01M59V508RHZJ1VT0CBW1DX3VV",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-26",
+      "position": 1024.0,
+      "priority": "high",
+      "status": "done",
+      "tags": ["tech"],
+      "title": "Project scaffolding",
+      "updatedAt": "2026-10-19T10:26:09.8257311Z",
+      "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:13:09.8339465Z",
+          "payload": {
+            "status": "done",
+            "title": "Main character silhouette"
+          },
+          "seq": 32,
+          "taskKey": "JB-27"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8170892Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nMain character silhouette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:13:09.8339465Z",
+          "payload": {
+            "status": "done",
+            "title": "Main character silhouette"
+          },
+          "seq": 32,
+          "taskKey": "JB-27"
+        }
+      ],
+      "id": "01M59V508S2PSM3BHHNBZXHFCM",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-27",
+      "position": 2048.0,
+      "priority": "medium",
+      "status": "done",
+      "tags": ["art"],
+      "title": "Main character silhouette",
+      "updatedAt": "2026-10-19T10:26:09.8170892Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:30:09.8339554Z",
+          "payload": {
+            "status": "done",
+            "title": "Input action map"
+          },
+          "seq": 33,
+          "taskKey": "JB-28"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8179797Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nInput action map. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:30:09.8339554Z",
+          "payload": {
+            "status": "done",
+            "title": "Input action map"
+          },
+          "seq": 33,
+          "taskKey": "JB-28"
+        }
+      ],
+      "id": "01M59V508SE48A9NYT947M8AHQ",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-28",
+      "position": 3072.0,
+      "priority": "medium",
+      "status": "done",
+      "tags": ["gameplay"],
+      "title": "Input action map",
+      "updatedAt": "2026-10-19T10:26:09.8179797Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:47:09.8339643Z",
+          "payload": {
+            "status": "done",
+            "title": "First snowy level blockout"
+          },
+          "seq": 34,
+          "taskKey": "JB-29"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8187913Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nFirst snowy level blockout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T02:47:09.8339643Z",
+          "payload": {
+            "status": "done",
+            "title": "First snowy level blockout"
+          },
+          "seq": 34,
+          "taskKey": "JB-29"
+        }
+      ],
+      "id": "01M59V508TFNH93Q1WBEXG7AY1",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-29",
+      "position": 4096.0,
+      "priority": "medium",
+      "status": "done",
+      "tags": ["art"],
+      "title": "First snowy level blockout",
+      "updatedAt": "2026-10-19T10:26:09.8187913Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:04:09.8339734Z",
+          "payload": {
+            "status": "done",
+            "title": "UI paper palette"
+          },
+          "seq": 35,
+          "taskKey": "JB-30"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8196141Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nUI paper palette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:04:09.8339734Z",
+          "payload": {
+            "status": "done",
+            "title": "UI paper palette"
+          },
+          "seq": 35,
+          "taskKey": "JB-30"
+        }
+      ],
+      "id": "01M59V508VWT3W465WZSG9GH8P",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-30",
+      "position": 5120.0,
+      "priority": "medium",
+      "status": "done",
+      "tags": ["ui"],
+      "title": "UI paper palette",
+      "updatedAt": "2026-10-19T10:26:09.8196141Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:21:09.8339823Z",
+          "payload": {
+            "status": "done",
+            "title": "Lantern pickup prototype"
+          },
+          "seq": 36,
+          "taskKey": "JB-31"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:54:09.8340887Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5092XPFQAQG37NE0CBYJ"
+          },
+          "seq": 45,
+          "taskKey": "JB-31"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 1,
+      "comments": [
+        {
+          "authorId": "01M59V50816T1CKWC5FZY96AZ2",
+          "bodyMd": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+          "createdAt": "2026-10-19T10:26:09.8260332Z",
+          "id": "01M59V5092XPFQAQG37NE0CBYJ",
+          "taskId": "01M59V508WW1J7BTVPMQ2YPRZS"
+        }
+      ],
+      "createdAt": "2026-10-19T10:26:09.8204138Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nLantern pickup prototype. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:21:09.8339823Z",
+          "payload": {
+            "status": "done",
+            "title": "Lantern pickup prototype"
+          },
+          "seq": 36,
+          "taskKey": "JB-31"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:54:09.8340887Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5092XPFQAQG37NE0CBYJ"
+          },
+          "seq": 45,
+          "taskKey": "JB-31"
+        }
+      ],
+      "id": "01M59V508WW1J7BTVPMQ2YPRZS",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-31",
+      "position": 6144.0,
+      "priority": "high",
+      "status": "done",
+      "tags": ["gameplay"],
+      "title": "Lantern pickup prototype",
+      "updatedAt": "2026-10-19T10:26:09.8260682Z",
+      "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:38:09.8339913Z",
+          "payload": {
+            "status": "done",
+            "title": "Export preset: Windows"
+          },
+          "seq": 37,
+          "taskKey": "JB-32"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8212271Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nExport preset: Windows. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T03:38:09.8339913Z",
+          "payload": {
+            "status": "done",
+            "title": "Export preset: Windows"
+          },
+          "seq": 37,
+          "taskKey": "JB-32"
+        }
+      ],
+      "id": "01M59V508XT1DA58NE1Q7DYCM9",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-32",
+      "position": 7168.0,
+      "priority": "medium",
+      "status": "done",
+      "tags": ["tech"],
+      "title": "Export preset: Windows",
+      "updatedAt": "2026-10-19T10:26:09.8212271Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:06:09.8338451Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Light puzzle: frozen bridge"
+          },
+          "seq": 21,
+          "taskKey": "JB-16"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#9B7BE0",
+            "handle": "codex",
+            "id": "01M59V508259R08JQEA2YA3VR5",
+            "kind": "agent",
+            "name": "Codex"
+          },
+          "createdAt": "2026-10-19T03:55:09.8340003Z",
+          "payload": {
+            "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 38,
+          "taskKey": "JB-16"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": "01M59V508259R08JQEA2YA3VR5",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8078031Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nLight puzzle: frozen bridge. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:06:09.8338451Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Light puzzle: frozen bridge"
+          },
+          "seq": 21,
+          "taskKey": "JB-16"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#9B7BE0",
+            "handle": "codex",
+            "id": "01M59V508259R08JQEA2YA3VR5",
+            "kind": "agent",
+            "name": "Codex"
+          },
+          "createdAt": "2026-10-19T03:55:09.8340003Z",
+          "payload": {
+            "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 38,
+          "taskKey": "JB-16"
+        }
+      ],
+      "id": "01M59V508F2X3T7QEXXFTZCCND",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-16",
+      "position": 1024.0,
+      "priority": "high",
+      "status": "in_progress",
+      "tags": ["gameplay"],
+      "title": "Light puzzle: frozen bridge",
+      "updatedAt": "2026-10-19T10:26:09.8221844Z",
+      "updatedBy": "01M59V508259R08JQEA2YA3VR5"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:23:09.8338547Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Cabin interior sprites"
+          },
+          "seq": 22,
+          "taskKey": "JB-17"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8087996Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCabin interior sprites. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:23:09.8338547Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Cabin interior sprites"
+          },
+          "seq": 22,
+          "taskKey": "JB-17"
+        }
+      ],
+      "id": "01M59V508GS5H112PQXPA5THMK",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-17",
+      "position": 2048.0,
+      "priority": "medium",
+      "status": "in_progress",
+      "tags": ["art"],
+      "title": "Cabin interior sprites",
+      "updatedAt": "2026-10-19T10:26:09.8087996Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:40:09.8338639Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Wind loop and transitions"
+          },
+          "seq": 23,
+          "taskKey": "JB-18"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8096941Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nWind loop and transitions. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:40:09.8338639Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Wind loop and transitions"
+          },
+          "seq": 23,
+          "taskKey": "JB-18"
+        }
+      ],
+      "id": "01M59V508H6WHPV8J1YFC2TNBD",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-18",
+      "position": 3072.0,
+      "priority": "medium",
+      "status": "in_progress",
+      "tags": ["audio"],
+      "title": "Wind loop and transitions",
+      "updatedAt": "2026-10-19T10:26:09.8096941Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:57:09.8338731Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Keyboard remapping"
+          },
+          "seq": 24,
+          "taskKey": "JB-19"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#F07E5F",
+            "handle": "claude",
+            "id": "01M59V50821V41FAVMJCD0TGP3",
+            "kind": "agent",
+            "name": "Claude"
+          },
+          "createdAt": "2026-10-19T04:12:09.8340093Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50821V41FAVMJCD0TGP3"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 39,
+          "taskKey": "JB-19"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": "01M59V50821V41FAVMJCD0TGP3",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8105102Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nKeyboard remapping. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T23:57:09.8338731Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Keyboard remapping"
+          },
+          "seq": 24,
+          "taskKey": "JB-19"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#F07E5F",
+            "handle": "claude",
+            "id": "01M59V50821V41FAVMJCD0TGP3",
+            "kind": "agent",
+            "name": "Claude"
+          },
+          "createdAt": "2026-10-19T04:12:09.8340093Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50821V41FAVMJCD0TGP3"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 39,
+          "taskKey": "JB-19"
+        }
+      ],
+      "id": "01M59V508J318Z7TYNW3SJBDEJ",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-19",
+      "position": 4096.0,
+      "priority": "medium",
+      "status": "in_progress",
+      "tags": ["tech"],
+      "title": "Keyboard remapping",
+      "updatedAt": "2026-10-19T10:26:09.8230094Z",
+      "updatedBy": "01M59V50821V41FAVMJCD0TGP3"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:14:09.8338822Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Collectible star feedback"
+          },
+          "seq": 25,
+          "taskKey": "JB-20"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8112895Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCollectible star feedback. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:14:09.8338822Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Collectible star feedback"
+          },
+          "seq": 25,
+          "taskKey": "JB-20"
+        }
+      ],
+      "id": "01M59V508KVDS0MZDQK7DZRB2V",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-20",
+      "position": 5120.0,
+      "priority": "medium",
+      "status": "in_progress",
+      "tags": ["polish"],
+      "title": "Collectible star feedback",
+      "updatedAt": "2026-10-19T10:26:09.8112895Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:31:09.8338914Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Camera follow smoothing"
+          },
+          "seq": 26,
+          "taskKey": "JB-21"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#9B7BE0",
+            "handle": "codex",
+            "id": "01M59V508259R08JQEA2YA3VR5",
+            "kind": "agent",
+            "name": "Codex"
+          },
+          "createdAt": "2026-10-19T04:29:09.8340185Z",
+          "payload": {
+            "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 40,
+          "taskKey": "JB-21"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": "01M59V508259R08JQEA2YA3VR5",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8121126Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCamera follow smoothing. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:31:09.8338914Z",
+          "payload": {
+            "status": "in_progress",
+            "title": "Camera follow smoothing"
+          },
+          "seq": 26,
+          "taskKey": "JB-21"
+        },
+        {
+          "action": "task.claimed",
+          "actor": {
+            "color": "#9B7BE0",
+            "handle": "codex",
+            "id": "01M59V508259R08JQEA2YA3VR5",
+            "kind": "agent",
+            "name": "Codex"
+          },
+          "createdAt": "2026-10-19T04:29:09.8340185Z",
+          "payload": {
+            "assigneeId": [null, "01M59V508259R08JQEA2YA3VR5"],
+            "status": ["in_progress", "in_progress"]
+          },
+          "seq": 40,
+          "taskKey": "JB-21"
+        }
+      ],
+      "id": "01M59V508MZPB893PVZWH63ADJ",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-21",
+      "position": 6144.0,
+      "priority": "high",
+      "status": "in_progress",
+      "tags": ["gameplay"],
+      "title": "Camera follow smoothing",
+      "updatedAt": "2026-10-19T10:26:09.8237526Z",
+      "updatedBy": "01M59V508259R08JQEA2YA3VR5"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:48:09.8339006Z",
+          "payload": {
+            "status": "review",
+            "title": "Review snow collision edges"
+          },
+          "seq": 27,
+          "taskKey": "JB-22"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:20:09.834059Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5091E8M9TH3Y4FBG200H"
+          },
+          "seq": 43,
+          "taskKey": "JB-22"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 1,
+      "comments": [
+        {
+          "authorId": "01M59V50816T1CKWC5FZY96AZ2",
+          "bodyMd": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+          "createdAt": "2026-10-19T10:26:09.8253734Z",
+          "id": "01M59V5091E8M9TH3Y4FBG200H",
+          "taskId": "01M59V508MYRDDBCCEGCZKYR3P"
+        }
+      ],
+      "createdAt": "2026-10-19T10:26:09.8129268Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nReview snow collision edges. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T00:48:09.8339006Z",
+          "payload": {
+            "status": "review",
+            "title": "Review snow collision edges"
+          },
+          "seq": 27,
+          "taskKey": "JB-22"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:20:09.834059Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5091E8M9TH3Y4FBG200H"
+          },
+          "seq": 43,
+          "taskKey": "JB-22"
+        }
+      ],
+      "id": "01M59V508MYRDDBCCEGCZKYR3P",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-22",
+      "position": 1024.0,
+      "priority": "medium",
+      "status": "review",
+      "tags": ["bug"],
+      "title": "Review snow collision edges",
+      "updatedAt": "2026-10-19T10:26:09.8254095Z",
+      "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:05:09.8339097Z",
+          "payload": {
+            "status": "review",
+            "title": "Credits screen"
+          },
+          "seq": 28,
+          "taskKey": "JB-23"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8138193Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCredits screen. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:05:09.8339097Z",
+          "payload": {
+            "status": "review",
+            "title": "Credits screen"
+          },
+          "seq": 28,
+          "taskKey": "JB-23"
+        }
+      ],
+      "id": "01M59V508NTV78F8JQ0R8BSHW6",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-23",
+      "position": 2048.0,
+      "priority": "medium",
+      "status": "review",
+      "tags": ["ui"],
+      "title": "Credits screen",
+      "updatedAt": "2026-10-19T10:26:09.8138193Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:22:09.8339188Z",
+          "payload": {
+            "status": "review",
+            "title": "Mix pickup chimes"
+          },
+          "seq": 29,
+          "taskKey": "JB-24"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8146737Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nMix pickup chimes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:22:09.8339188Z",
+          "payload": {
+            "status": "review",
+            "title": "Mix pickup chimes"
+          },
+          "seq": 29,
+          "taskKey": "JB-24"
+        }
+      ],
+      "id": "01M59V508PFBB6JQQPQ9X6ABFT",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-24",
+      "position": 3072.0,
+      "priority": "medium",
+      "status": "review",
+      "tags": ["audio"],
+      "title": "Mix pickup chimes",
+      "updatedAt": "2026-10-19T10:26:09.8146737Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:39:09.8339277Z",
+          "payload": {
+            "status": "review",
+            "title": "Checkpoint lantern animation"
+          },
+          "seq": 30,
+          "taskKey": "JB-25"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8155098Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nCheckpoint lantern animation. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T01:39:09.8339277Z",
+          "payload": {
+            "status": "review",
+            "title": "Checkpoint lantern animation"
+          },
+          "seq": 30,
+          "taskKey": "JB-25"
+        }
+      ],
+      "id": "01M59V508QDEM6KM48GPKZ8YE8",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-25",
+      "position": 4096.0,
+      "priority": "medium",
+      "status": "review",
+      "tags": ["art"],
+      "title": "Checkpoint lantern animation",
+      "updatedAt": "2026-10-19T10:26:09.8155098Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:33:09.8337617Z",
+          "payload": {
+            "status": "todo",
+            "title": "Player movement: coyote time & jump buffer"
+          },
+          "seq": 12,
+          "taskKey": "JB-7"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T04:46:09.8340279Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5090GCQZ2P13PW3HMG0X"
+          },
+          "seq": 41,
+          "taskKey": "JB-7"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T08:27:09.8341723Z",
+          "payload": {
+            "assetId": "01M59V5092ACQW8Z8K8Z0JWCCS"
+          },
+          "seq": 54,
+          "taskKey": "JB-7"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [
+        {
+          "createdAt": "2026-10-19T10:26:09.8263738Z",
+          "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+          "id": "01M59V5092ACQW8Z8K8Z0JWCCS",
+          "jamId": "01M59V5081QPYHE044R422F8J2",
+          "kind": "sprite",
+          "location": "assets/sprites/player.png",
+          "name": "Player",
+          "notes": "Demo reference path; no file is copied."
+        }
+      ],
+      "assigneeId": null,
+      "commentCount": 1,
+      "comments": [
+        {
+          "authorId": "01M59V50816T1CKWC5FZY96AZ2",
+          "bodyMd": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+          "createdAt": "2026-10-19T10:26:09.824659Z",
+          "id": "01M59V5090GCQZ2P13PW3HMG0X",
+          "taskId": "01M59V5088SV8GH0X42WFFY3XH"
+        }
+      ],
+      "createdAt": "2026-10-19T10:26:09.800448Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nPlayer movement: coyote time & jump buffer. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:33:09.8337617Z",
+          "payload": {
+            "status": "todo",
+            "title": "Player movement: coyote time & jump buffer"
+          },
+          "seq": 12,
+          "taskKey": "JB-7"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T04:46:09.8340279Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V5090GCQZ2P13PW3HMG0X"
+          },
+          "seq": 41,
+          "taskKey": "JB-7"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T08:27:09.8341723Z",
+          "payload": {
+            "assetId": "01M59V5092ACQW8Z8K8Z0JWCCS"
+          },
+          "seq": 54,
+          "taskKey": "JB-7"
+        }
+      ],
+      "id": "01M59V5088SV8GH0X42WFFY3XH",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-7",
+      "position": 1024.0,
+      "priority": "critical",
+      "status": "todo",
+      "tags": ["gameplay"],
+      "title": "Player movement: coyote time & jump buffer",
+      "updatedAt": "2026-10-19T10:26:09.8284947Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:50:09.8337713Z",
+          "payload": {
+            "status": "todo",
+            "title": "Lantern glow shader"
+          },
+          "seq": 13,
+          "taskKey": "JB-8"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T08:44:09.8341815Z",
+          "payload": {
+            "assetId": "01M59V5092RJ9F9X1BD7PXT3NE"
+          },
+          "seq": 55,
+          "taskKey": "JB-8"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:18:09.8342Z",
+          "payload": {
+            "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+          },
+          "seq": 57,
+          "taskKey": "JB-8"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [
+        {
+          "createdAt": "2026-10-19T10:26:09.8266333Z",
+          "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+          "id": "01M59V5092RJ9F9X1BD7PXT3NE",
+          "jamId": "01M59V5081QPYHE044R422F8J2",
+          "kind": "sprite",
+          "location": "assets/sprites/lantern.png",
+          "name": "Lantern",
+          "notes": "Demo reference path; no file is copied."
+        }
+      ],
+      "assigneeId": "01M59V5082W1RBNM1PFHR0VRWD",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8012372Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nLantern glow shader. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T20:50:09.8337713Z",
+          "payload": {
+            "status": "todo",
+            "title": "Lantern glow shader"
+          },
+          "seq": 13,
+          "taskKey": "JB-8"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T08:44:09.8341815Z",
+          "payload": {
+            "assetId": "01M59V5092RJ9F9X1BD7PXT3NE"
+          },
+          "seq": 55,
+          "taskKey": "JB-8"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:18:09.8342Z",
+          "payload": {
+            "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+          },
+          "seq": 57,
+          "taskKey": "JB-8"
+        }
+      ],
+      "id": "01M59V5089NBCZ17XP4FE2W056",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-8",
+      "position": 2048.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["art"],
+      "title": "Lantern glow shader",
+      "updatedAt": "2026-10-19T10:26:09.8318387Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:07:09.8337805Z",
+          "payload": {
+            "status": "todo",
+            "title": "Title screen layout"
+          },
+          "seq": 14,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:03:09.8340415Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V509119FFZSWWZ08A82HY"
+          },
+          "seq": 42,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:01:09.8341907Z",
+          "payload": {
+            "assetId": "01M59V5092JA7PDHWD39BGC6PR"
+          },
+          "seq": 56,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:35:09.8342096Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+          },
+          "seq": 58,
+          "taskKey": "JB-9"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [
+        {
+          "createdAt": "2026-10-19T10:26:09.8269035Z",
+          "createdBy": "01M59V5082W1RBNM1PFHR0VRWD",
+          "id": "01M59V5092JA7PDHWD39BGC6PR",
+          "jamId": "01M59V5081QPYHE044R422F8J2",
+          "kind": "sprite",
+          "location": "assets/sprites/cabin.png",
+          "name": "Cabin tiles",
+          "notes": "Demo reference path; no file is copied."
+        }
+      ],
+      "assigneeId": "01M59V50816T1CKWC5FZY96AZ2",
+      "commentCount": 1,
+      "comments": [
+        {
+          "authorId": "01M59V50816T1CKWC5FZY96AZ2",
+          "bodyMd": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+          "createdAt": "2026-10-19T10:26:09.8250062Z",
+          "id": "01M59V509119FFZSWWZ08A82HY",
+          "taskId": "01M59V508AGZ3HZ2JMRAAM1RFJ"
+        }
+      ],
+      "createdAt": "2026-10-19T10:26:09.8020257Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nTitle screen layout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:07:09.8337805Z",
+          "payload": {
+            "status": "todo",
+            "title": "Title screen layout"
+          },
+          "seq": 14,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "comment.added",
+          "actor": {
+            "color": "#E0679A",
+            "handle": "mira",
+            "id": "01M59V50816T1CKWC5FZY96AZ2",
+            "kind": "human",
+            "name": "Mira"
+          },
+          "createdAt": "2026-10-19T05:03:09.8340415Z",
+          "payload": {
+            "body": "Playtested the latest build. The light cue feels good; please keep the transition gentle.",
+            "commentId": "01M59V509119FFZSWWZ08A82HY"
+          },
+          "seq": 42,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "asset.linked",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:01:09.8341907Z",
+          "payload": {
+            "assetId": "01M59V5092JA7PDHWD39BGC6PR"
+          },
+          "seq": 56,
+          "taskKey": "JB-9"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:35:09.8342096Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+          },
+          "seq": 58,
+          "taskKey": "JB-9"
+        }
+      ],
+      "id": "01M59V508AGZ3HZ2JMRAAM1RFJ",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-9",
+      "position": 3072.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["ui"],
+      "title": "Title screen layout",
+      "updatedAt": "2026-10-19T10:26:09.8323609Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:24:09.8337896Z",
+          "payload": {
+            "status": "todo",
+            "title": "SFX: footsteps on snow"
+          },
+          "seq": 15,
+          "taskKey": "JB-10"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:52:09.8342188Z",
+          "payload": {
+            "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+          },
+          "seq": 59,
+          "taskKey": "JB-10"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": "01M59V5082W1RBNM1PFHR0VRWD",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8028143Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nSFX: footsteps on snow. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:24:09.8337896Z",
+          "payload": {
+            "status": "todo",
+            "title": "SFX: footsteps on snow"
+          },
+          "seq": 15,
+          "taskKey": "JB-10"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T09:52:09.8342188Z",
+          "payload": {
+            "assigneeId": [null, "01M59V5082W1RBNM1PFHR0VRWD"]
+          },
+          "seq": 59,
+          "taskKey": "JB-10"
+        }
+      ],
+      "id": "01M59V508AWQ8PJSSNX4KXE041",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-10",
+      "position": 4096.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["audio"],
+      "title": "SFX: footsteps on snow",
+      "updatedAt": "2026-10-19T10:26:09.8328032Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:41:09.8337988Z",
+          "payload": {
+            "status": "todo",
+            "title": "Save/load settings"
+          },
+          "seq": 16,
+          "taskKey": "JB-11"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T10:09:09.8342278Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+          },
+          "seq": 60,
+          "taskKey": "JB-11"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": "01M59V50816T1CKWC5FZY96AZ2",
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8036391Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nSave/load settings. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 1,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:41:09.8337988Z",
+          "payload": {
+            "status": "todo",
+            "title": "Save/load settings"
+          },
+          "seq": 16,
+          "taskKey": "JB-11"
+        },
+        {
+          "action": "task.updated",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-19T10:09:09.8342278Z",
+          "payload": {
+            "assigneeId": [null, "01M59V50816T1CKWC5FZY96AZ2"]
+          },
+          "seq": 60,
+          "taskKey": "JB-11"
+        }
+      ],
+      "id": "01M59V508B2MARCPFVCFHN6SCP",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-11",
+      "position": 5120.0,
+      "priority": "high",
+      "status": "todo",
+      "tags": ["tech"],
+      "title": "Save/load settings",
+      "updatedAt": "2026-10-19T10:26:09.8332335Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:58:09.833808Z",
+          "payload": {
+            "status": "todo",
+            "title": "Pause menu"
+          },
+          "seq": 17,
+          "taskKey": "JB-12"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8044328Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nPause menu. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 2,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T21:58:09.833808Z",
+          "payload": {
+            "status": "todo",
+            "title": "Pause menu"
+          },
+          "seq": 17,
+          "taskKey": "JB-12"
+        }
+      ],
+      "id": "01M59V508CJV0RGH208QPZ8BHV",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-12",
+      "position": 6144.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["ui"],
+      "title": "Pause menu",
+      "updatedAt": "2026-10-19T10:26:09.8044328Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:15:09.8338174Z",
+          "payload": {
+            "status": "todo",
+            "title": "Particles for light pickup"
+          },
+          "seq": 18,
+          "taskKey": "JB-13"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8052634Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nParticles for light pickup. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 3,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:15:09.8338174Z",
+          "payload": {
+            "status": "todo",
+            "title": "Particles for light pickup"
+          },
+          "seq": 18,
+          "taskKey": "JB-13"
+        }
+      ],
+      "id": "01M59V508D5FMZTH5S71S2W2JN",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-13",
+      "position": 7168.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["polish"],
+      "title": "Particles for light pickup",
+      "updatedAt": "2026-10-19T10:26:09.8052634Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:32:09.8338266Z",
+          "payload": {
+            "status": "todo",
+            "title": "Playtest round 1 notes"
+          },
+          "seq": 19,
+          "taskKey": "JB-14"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.8060794Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nPlaytest round 1 notes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 5,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:32:09.8338266Z",
+          "payload": {
+            "status": "todo",
+            "title": "Playtest round 1 notes"
+          },
+          "seq": 19,
+          "taskKey": "JB-14"
+        }
+      ],
+      "id": "01M59V508EKBJQPCYAJJFTFMT9",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-14",
+      "position": 8192.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["bug"],
+      "title": "Playtest round 1 notes",
+      "updatedAt": "2026-10-19T10:26:09.8060794Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    },
+    {
+      "activity": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:49:09.8338358Z",
+          "payload": {
+            "status": "todo",
+            "title": "Tune lantern battery curve"
+          },
+          "seq": 20,
+          "taskKey": "JB-15"
+        }
+      ],
+      "archivedAt": null,
+      "assets": [],
+      "assigneeId": null,
+      "commentCount": 0,
+      "comments": [],
+      "createdAt": "2026-10-19T10:26:09.806874Z",
+      "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+      "descriptionMd": "## Goal\n\nTune lantern battery curve. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "dueAt": null,
+      "estimate": 8,
+      "history": [
+        {
+          "action": "task.created",
+          "actor": {
+            "color": "#5B8DEF",
+            "handle": "danil",
+            "id": "01M59V5081PHY1SQS6D8CTDMQB",
+            "kind": "human",
+            "name": "Danil"
+          },
+          "createdAt": "2026-10-18T22:49:09.8338358Z",
+          "payload": {
+            "status": "todo",
+            "title": "Tune lantern battery curve"
+          },
+          "seq": 20,
+          "taskKey": "JB-15"
+        }
+      ],
+      "id": "01M59V508E2JS21KMM4EZGFQ3X",
+      "idempotencyKey": null,
+      "jamId": "01M59V5081QPYHE044R422F8J2",
+      "key": "JB-15",
+      "position": 9216.0,
+      "priority": "medium",
+      "status": "todo",
+      "tags": ["gameplay"],
+      "title": "Tune lantern battery curve",
+      "updatedAt": "2026-10-19T10:26:09.806874Z",
+      "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+    }
+  ],
+  "members": [
+    {
+      "avatar": null,
+      "client": null,
+      "color": "#5B8DEF",
+      "createdAt": "2026-10-19T10:26:09.7930863Z",
+      "handle": "danil",
+      "id": "01M59V5081PHY1SQS6D8CTDMQB",
+      "kind": "human",
+      "lastSeenAt": null,
+      "name": "Danil"
+    },
+    {
+      "avatar": "🎧",
+      "client": null,
+      "color": "#E0679A",
+      "createdAt": "2026-10-19T10:26:09.7938586Z",
+      "handle": "mira",
+      "id": "01M59V50816T1CKWC5FZY96AZ2",
+      "kind": "human",
+      "lastSeenAt": null,
+      "name": "Mira"
+    },
+    {
+      "avatar": "🎨",
+      "client": null,
+      "color": "#3FA37A",
+      "createdAt": "2026-10-19T10:26:09.7943728Z",
+      "handle": "alex",
+      "id": "01M59V5082W1RBNM1PFHR0VRWD",
+      "kind": "human",
+      "lastSeenAt": null,
+      "name": "Alex"
+    },
+    {
+      "avatar": null,
+      "client": "codex",
+      "color": "#9B7BE0",
+      "createdAt": "2026-10-19T10:26:09.7946392Z",
+      "handle": "codex",
+      "id": "01M59V508259R08JQEA2YA3VR5",
+      "kind": "agent",
+      "lastSeenAt": "2026-10-19T10:26:09.7946392Z",
+      "name": "Codex"
+    },
+    {
+      "avatar": null,
+      "client": "claude-code",
+      "color": "#F07E5F",
+      "createdAt": "2026-10-19T10:26:09.7949208Z",
+      "handle": "claude",
+      "id": "01M59V50821V41FAVMJCD0TGP3",
+      "kind": "agent",
+      "lastSeenAt": "2026-10-19T10:26:09.7949208Z",
+      "name": "Claude"
+    }
+  ],
+  "tasks": {
+    "backlog": [
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.7953296Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCozy cabin ending sketch. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V5083FJZ1HPDFM9HZ8K6A",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-1",
+        "position": 1024.0,
+        "priority": "high",
+        "status": "backlog",
+        "tags": ["art"],
+        "title": "Cozy cabin ending sketch",
+        "updatedAt": "2026-10-19T10:26:09.7953296Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.7962849Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nOptional firefly companion. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V5084D6D8GEZ9S79RYM9X",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-2",
+        "position": 2048.0,
+        "priority": "medium",
+        "status": "backlog",
+        "tags": ["gameplay"],
+        "title": "Optional firefly companion",
+        "updatedAt": "2026-10-19T10:26:09.7962849Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.7971527Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nSnow trail variations. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V5085DXEE68EXBH5JVB6J",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-3",
+        "position": 3072.0,
+        "priority": "medium",
+        "status": "backlog",
+        "tags": ["art"],
+        "title": "Snow trail variations",
+        "updatedAt": "2026-10-19T10:26:09.7971527Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.797991Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nAccessibility: color cues. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V50854FBXWE1AY1G89E82",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-4",
+        "position": 4096.0,
+        "priority": "medium",
+        "status": "backlog",
+        "tags": ["ui"],
+        "title": "Accessibility: color cues",
+        "updatedAt": "2026-10-19T10:26:09.797991Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.7988401Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nWeather ambience layers. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V50860B03RZNMX84KQNN9",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-5",
+        "position": 5120.0,
+        "priority": "medium",
+        "status": "backlog",
+        "tags": ["audio"],
+        "title": "Weather ambience layers",
+        "updatedAt": "2026-10-19T10:26:09.7988401Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.7996835Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nController rumble ideas. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V5087W25K291QCW74NWA7",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-6",
+        "position": 6144.0,
+        "priority": "high",
+        "status": "backlog",
+        "tags": ["tech"],
+        "title": "Controller rumble ideas",
+        "updatedAt": "2026-10-19T10:26:09.7996835Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      }
+    ],
+    "done": [
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 1,
+        "createdAt": "2026-10-19T10:26:09.8163076Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nProject scaffolding. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V508RHZJ1VT0CBW1DX3VV",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-26",
+        "position": 1024.0,
+        "priority": "high",
+        "status": "done",
+        "tags": ["tech"],
+        "title": "Project scaffolding",
+        "updatedAt": "2026-10-19T10:26:09.8257311Z",
+        "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8170892Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nMain character silhouette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V508S2PSM3BHHNBZXHFCM",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-27",
+        "position": 2048.0,
+        "priority": "medium",
+        "status": "done",
+        "tags": ["art"],
+        "title": "Main character silhouette",
+        "updatedAt": "2026-10-19T10:26:09.8170892Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8179797Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nInput action map. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V508SE48A9NYT947M8AHQ",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-28",
+        "position": 3072.0,
+        "priority": "medium",
+        "status": "done",
+        "tags": ["gameplay"],
+        "title": "Input action map",
+        "updatedAt": "2026-10-19T10:26:09.8179797Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8187913Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nFirst snowy level blockout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V508TFNH93Q1WBEXG7AY1",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-29",
+        "position": 4096.0,
+        "priority": "medium",
+        "status": "done",
+        "tags": ["art"],
+        "title": "First snowy level blockout",
+        "updatedAt": "2026-10-19T10:26:09.8187913Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8196141Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nUI paper palette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V508VWT3W465WZSG9GH8P",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-30",
+        "position": 5120.0,
+        "priority": "medium",
+        "status": "done",
+        "tags": ["ui"],
+        "title": "UI paper palette",
+        "updatedAt": "2026-10-19T10:26:09.8196141Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 1,
+        "createdAt": "2026-10-19T10:26:09.8204138Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nLantern pickup prototype. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V508WW1J7BTVPMQ2YPRZS",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-31",
+        "position": 6144.0,
+        "priority": "high",
+        "status": "done",
+        "tags": ["gameplay"],
+        "title": "Lantern pickup prototype",
+        "updatedAt": "2026-10-19T10:26:09.8260682Z",
+        "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8212271Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nExport preset: Windows. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V508XT1DA58NE1Q7DYCM9",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-32",
+        "position": 7168.0,
+        "priority": "medium",
+        "status": "done",
+        "tags": ["tech"],
+        "title": "Export preset: Windows",
+        "updatedAt": "2026-10-19T10:26:09.8212271Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      }
+    ],
+    "in_progress": [
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V508259R08JQEA2YA3VR5",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8078031Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nLight puzzle: frozen bridge. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V508F2X3T7QEXXFTZCCND",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-16",
+        "position": 1024.0,
+        "priority": "high",
+        "status": "in_progress",
+        "tags": ["gameplay"],
+        "title": "Light puzzle: frozen bridge",
+        "updatedAt": "2026-10-19T10:26:09.8221844Z",
+        "updatedBy": "01M59V508259R08JQEA2YA3VR5"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8087996Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCabin interior sprites. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V508GS5H112PQXPA5THMK",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-17",
+        "position": 2048.0,
+        "priority": "medium",
+        "status": "in_progress",
+        "tags": ["art"],
+        "title": "Cabin interior sprites",
+        "updatedAt": "2026-10-19T10:26:09.8087996Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8096941Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nWind loop and transitions. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V508H6WHPV8J1YFC2TNBD",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-18",
+        "position": 3072.0,
+        "priority": "medium",
+        "status": "in_progress",
+        "tags": ["audio"],
+        "title": "Wind loop and transitions",
+        "updatedAt": "2026-10-19T10:26:09.8096941Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V50821V41FAVMJCD0TGP3",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8105102Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nKeyboard remapping. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V508J318Z7TYNW3SJBDEJ",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-19",
+        "position": 4096.0,
+        "priority": "medium",
+        "status": "in_progress",
+        "tags": ["tech"],
+        "title": "Keyboard remapping",
+        "updatedAt": "2026-10-19T10:26:09.8230094Z",
+        "updatedBy": "01M59V50821V41FAVMJCD0TGP3"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8112895Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCollectible star feedback. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V508KVDS0MZDQK7DZRB2V",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-20",
+        "position": 5120.0,
+        "priority": "medium",
+        "status": "in_progress",
+        "tags": ["polish"],
+        "title": "Collectible star feedback",
+        "updatedAt": "2026-10-19T10:26:09.8112895Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V508259R08JQEA2YA3VR5",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8121126Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCamera follow smoothing. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V508MZPB893PVZWH63ADJ",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-21",
+        "position": 6144.0,
+        "priority": "high",
+        "status": "in_progress",
+        "tags": ["gameplay"],
+        "title": "Camera follow smoothing",
+        "updatedAt": "2026-10-19T10:26:09.8237526Z",
+        "updatedBy": "01M59V508259R08JQEA2YA3VR5"
+      }
+    ],
+    "review": [
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 1,
+        "createdAt": "2026-10-19T10:26:09.8129268Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nReview snow collision edges. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V508MYRDDBCCEGCZKYR3P",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-22",
+        "position": 1024.0,
+        "priority": "medium",
+        "status": "review",
+        "tags": ["bug"],
+        "title": "Review snow collision edges",
+        "updatedAt": "2026-10-19T10:26:09.8254095Z",
+        "updatedBy": "01M59V50816T1CKWC5FZY96AZ2"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8138193Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCredits screen. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V508NTV78F8JQ0R8BSHW6",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-23",
+        "position": 2048.0,
+        "priority": "medium",
+        "status": "review",
+        "tags": ["ui"],
+        "title": "Credits screen",
+        "updatedAt": "2026-10-19T10:26:09.8138193Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8146737Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nMix pickup chimes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V508PFBB6JQQPQ9X6ABFT",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-24",
+        "position": 3072.0,
+        "priority": "medium",
+        "status": "review",
+        "tags": ["audio"],
+        "title": "Mix pickup chimes",
+        "updatedAt": "2026-10-19T10:26:09.8146737Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8155098Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nCheckpoint lantern animation. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V508QDEM6KM48GPKZ8YE8",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-25",
+        "position": 4096.0,
+        "priority": "medium",
+        "status": "review",
+        "tags": ["art"],
+        "title": "Checkpoint lantern animation",
+        "updatedAt": "2026-10-19T10:26:09.8155098Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      }
+    ],
+    "todo": [
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 1,
+        "createdAt": "2026-10-19T10:26:09.800448Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nPlayer movement: coyote time & jump buffer. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V5088SV8GH0X42WFFY3XH",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-7",
+        "position": 1024.0,
+        "priority": "critical",
+        "status": "todo",
+        "tags": ["gameplay"],
+        "title": "Player movement: coyote time & jump buffer",
+        "updatedAt": "2026-10-19T10:26:09.8284947Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V5082W1RBNM1PFHR0VRWD",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8012372Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nLantern glow shader. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V5089NBCZ17XP4FE2W056",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-8",
+        "position": 2048.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["art"],
+        "title": "Lantern glow shader",
+        "updatedAt": "2026-10-19T10:26:09.8318387Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V50816T1CKWC5FZY96AZ2",
+        "commentCount": 1,
+        "createdAt": "2026-10-19T10:26:09.8020257Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nTitle screen layout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V508AGZ3HZ2JMRAAM1RFJ",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-9",
+        "position": 3072.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["ui"],
+        "title": "Title screen layout",
+        "updatedAt": "2026-10-19T10:26:09.8323609Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V5082W1RBNM1PFHR0VRWD",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8028143Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nSFX: footsteps on snow. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V508AWQ8PJSSNX4KXE041",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-10",
+        "position": 4096.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["audio"],
+        "title": "SFX: footsteps on snow",
+        "updatedAt": "2026-10-19T10:26:09.8328032Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": "01M59V50816T1CKWC5FZY96AZ2",
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8036391Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nSave/load settings. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 1,
+        "id": "01M59V508B2MARCPFVCFHN6SCP",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-11",
+        "position": 5120.0,
+        "priority": "high",
+        "status": "todo",
+        "tags": ["tech"],
+        "title": "Save/load settings",
+        "updatedAt": "2026-10-19T10:26:09.8332335Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8044328Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nPause menu. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 2,
+        "id": "01M59V508CJV0RGH208QPZ8BHV",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-12",
+        "position": 6144.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["ui"],
+        "title": "Pause menu",
+        "updatedAt": "2026-10-19T10:26:09.8044328Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8052634Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nParticles for light pickup. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 3,
+        "id": "01M59V508D5FMZTH5S71S2W2JN",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-13",
+        "position": 7168.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["polish"],
+        "title": "Particles for light pickup",
+        "updatedAt": "2026-10-19T10:26:09.8052634Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.8060794Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nPlaytest round 1 notes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 5,
+        "id": "01M59V508EKBJQPCYAJJFTFMT9",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-14",
+        "position": 8192.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["bug"],
+        "title": "Playtest round 1 notes",
+        "updatedAt": "2026-10-19T10:26:09.8060794Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      },
+      {
+        "archivedAt": null,
+        "assigneeId": null,
+        "commentCount": 0,
+        "createdAt": "2026-10-19T10:26:09.806874Z",
+        "createdBy": "01M59V5081PHY1SQS6D8CTDMQB",
+        "descriptionMd": "## Goal\n\nTune lantern battery curve. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+        "dueAt": null,
+        "estimate": 8,
+        "id": "01M59V508E2JS21KMM4EZGFQ3X",
+        "idempotencyKey": null,
+        "jamId": "01M59V5081QPYHE044R422F8J2",
+        "key": "JB-15",
+        "position": 9216.0,
+        "priority": "medium",
+        "status": "todo",
+        "tags": ["gameplay"],
+        "title": "Tune lantern battery curve",
+        "updatedAt": "2026-10-19T10:26:09.806874Z",
+        "updatedBy": "01M59V5081PHY1SQS6D8CTDMQB"
+      }
+    ]
+  }
+}

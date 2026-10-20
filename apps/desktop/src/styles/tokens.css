@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f7f1e6;
+  --paper-2: #efe6d6;
+  --card: #fffdf8;
+  --card-hover: #ffffff;
+  --ink: #2b2622;
+  --ink-2: #6b6158;
+  --ink-3: #9a8f84;
+  --line: rgba(43, 38, 34, 0.85);
+  --line-soft: rgba(43, 38, 34, 0.14);
+  --sky: #bfddf5;
+  --rose: #f4c6cf;
+  --mint: #cde8d5;
+  --butter: #f8e3a3;
+  --lilac: #dcd3f2;
+  --coral: #f07e5f;
+  --coral-ink: #b8492c;
+  --leaf: #3e9a62;
+  --danger: #d94b3d;
+  --st-backlog: var(--lilac);
+  --st-todo: var(--butter);
+  --st-in_progress: var(--sky);
+  --st-review: var(--rose);
+  --st-done: var(--mint);
+  --m1: #5b8def;
+  --m2: #e0679a;
+  --m3: #3fa37a;
+  --m4: #9b7be0;
+  --m5: #f07e5f;
+  --m6: #d8a630;
+  --r-card: 14px;
+  --r-input: 10px;
+  --r-chip: 999px;
+  --stroke: 1.5px;
+  --shadow-card:
+    0 1px 0 rgba(43, 38, 34, 0.06), 0 8px 20px -10px rgba(43, 38, 34, 0.28);
+  --shadow-lift:
+    0 2px 0 rgba(43, 38, 34, 0.08), 0 18px 36px -12px rgba(43, 38, 34, 0.38);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-fast: 120ms;
+  --t-mid: 200ms;
+  --t-slow: 320ms;
+}
+[data-theme="dark"] {
+  --paper: #1e1b19;
+  --paper-2: #26221f;
+  --card: #2e2925;
+  --card-hover: #36302b;
+  --ink: #f2ebdd;
+  --ink-2: #b5aa9b;
+  --ink-3: #85796c;
+  --line: rgba(242, 235, 221, 0.8);
+  --line-soft: rgba(242, 235, 221, 0.12);
+  --sky: #3b5872;
+  --rose: #6e4450;
+  --mint: #3c5e4a;
+  --butter: #6e5d2e;
+  --lilac: #4e4670;
+  --coral: #f48c6e;
+  --shadow-card:
+    0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 24px -12px rgba(0, 0, 0, 0.7);
+}
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-sky: var(--sky);
+  --color-rose: var(--rose);
+  --color-mint: var(--mint);
+  --color-butter: var(--butter);
+  --color-lilac: var(--lilac);
+  --color-coral: var(--coral);
+  --color-coral-ink: var(--coral-ink);
+  --color-leaf: var(--leaf);
+  --color-danger: var(--danger);
+  --color-st-backlog: var(--st-backlog);
+  --color-st-todo: var(--st-todo);
+  --color-st-in-progress: var(--st-in_progress);
+  --color-st-review: var(--st-review);
+  --color-st-done: var(--st-done);
+  --color-m1: var(--m1);
+  --color-m2: var(--m2);
+  --color-m3: var(--m3);
+  --color-m4: var(--m4);
+  --color-m5: var(--m5);
+  --color-m6: var(--m6);
+  --font-display: "Fraunces Variable", serif;
+  --font-sans: "Manrope Variable", sans-serif;
+  --font-mono: "JetBrains Mono Variable", monospace;
+  --font-hand: "Caveat", cursive;
+  --radius-card: var(--r-card);
+  --radius-input: var(--r-input);
+  --radius-chip: var(--r-chip);
+  --shadow-paper-card: var(--shadow-card);
+  --shadow-paper-lift: var(--shadow-lift);
+  --ease-paper: var(--ease);
+}
