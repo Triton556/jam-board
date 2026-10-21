@@ -5,6 +5,62 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
+	pickFolder: () => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("pick_folder")),
+	skillSavedPath: () => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("skill_saved_path")),
+	skillCheck: (input: SkillInput) => typedError<SkillCheck, ApiError_Serialize>(__TAURI_INVOKE("skill_check", { input })),
+	cancelSkill: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("cancel_skill")),
+	runSkill: (input: SkillInput, step: string) => typedError<SkillResult, ApiError_Serialize>(__TAURI_INVOKE("run_skill", { input, step })),
+	referenceCanvas: () => typedError<ReferenceCanvas, ApiError_Serialize>(__TAURI_INVOKE("reference_canvas")),
+	canvasGeometry: (input: CanvasGeometry) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("canvas_geometry", { input })),
+	canvasArchive: (input: CanvasArchive) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("canvas_archive", { input })),
+	referenceMetadata: (id: string, metadata: string | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("reference_metadata", { id, metadata })),
+	updateRefEdge: (id: string, label: string) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("update_ref_edge", { id, label })),
+	clipboardReference: (bytes: number[], x: number | null, y: number | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("clipboard_reference", { bytes, x, y })),
+	fetchReferencePreview: (id: string) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("fetch_reference_preview", { id })),
+	clearReferencePreview: (id: string) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("clear_reference_preview", { id })),
+	canvasViewport: (value: string | null) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("canvas_viewport", { value })),
+	referenceMedia: (id: string) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("reference_media", { id })),
+	listPlanEpics: () => typedError<Epic[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_epics")),
+	listPlanStories: () => typedError<Story[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_stories")),
+	clearBrain: (key: string) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("clear_brain", { key })),
+	reorderStory: (key: string, beforeKey: string | null) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("reorder_story", { key, beforeKey })),
+	getProject: () => typedError<Project, ApiError_Serialize>(__TAURI_INVOKE("get_project")),
+	updateProject: (input: ProjectEditInput) => typedError<Project, ApiError_Serialize>(__TAURI_INVOKE("update_project", { input })),
+	listEpics: () => typedError<Epic[], ApiError_Serialize>(__TAURI_INVOKE("list_epics")),
+	getEpic: (key: string) => typedError<EpicTree_Serialize, ApiError_Serialize>(__TAURI_INVOKE("get_epic", { key })),
+	getStory: (key: string) => typedError<StoryTree, ApiError_Serialize>(__TAURI_INVOKE("get_story", { key })),
+	createEpic: (input: NewEpic) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("create_epic", { input })),
+	updateEpic: (input: EpicEditInput_Deserialize) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("update_epic", { input })),
+	setEpicStatus: (input: PlanningStatusInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_epic_status", { input })),
+	createStory: (input: NewStory) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("create_story", { input })),
+	updateStory: (input: StoryEditInput_Deserialize) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("update_story", { input })),
+	setStoryStatus: (input: PlanningStatusInput) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("set_story_status", { input })),
+	updateTaskBrief: (input: BriefEditInput_Deserialize) => typedError<TaskDetail_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_task_brief", { input })),
+	checkReady: (key: string) => typedError<Readiness, ApiError_Serialize>(__TAURI_INVOKE("check_ready", { key })),
+	markReady: (input: ReadyInput) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("mark_ready", { input })),
+	answerQuestion: (input: AnswerQuestion) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("answer_question", { input })),
+	askUser: (input: AskUser) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("ask_user", { input })),
+	withdrawQuestion: (id: string) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("withdraw_question", { id })),
+	listQuestions: (input: QuestionListInput) => typedError<Question[], ApiError_Serialize>(__TAURI_INVOKE("list_questions", { input })),
+	reviewTask: (input: ReviewTask) => typedError<Review, ApiError_Serialize>(__TAURI_INVOKE("review_task", { input })),
+	submitReport: (input: SubmitReport) => typedError<Report, ApiError_Serialize>(__TAURI_INVOKE("submit_report", { input })),
+	setBrain: (input: BrainInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
+	listChangesSince: (input: ChangesInput) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_changes_since", { input })),
+	epicJournal: (epicKey: string, after: number) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("epic_journal", { epicKey, after })),
+	addReference: (input: AddReference) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input })),
+	listReferences: (input: ReferenceListInput) => typedError<RefItem[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
+	updateReference: (input: ReferenceEditInput_Deserialize) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input })),
+	linkReference: (input: ReferenceLinkInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
+	unlinkReference: (input: ReferenceLinkInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("unlink_reference", { input })),
+	archiveReference: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_reference", { id })),
+	listRefFrames: () => typedError<RefFrame[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_frames")),
+	createRefFrame: (input: RefFrame) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("create_ref_frame", { input })),
+	updateRefFrame: (input: FrameEditInput_Deserialize) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("update_ref_frame", { input })),
+	archiveRefFrame: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_frame", { id })),
+	listRefEdges: () => typedError<RefEdge[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_edges")),
+	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
+	archiveRefEdge: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_edge", { id })),
+	updateRefGeometry: (input: GeometryInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
 	/**  A local first-content-frame receipt for reproducible release measurements. */
 	appReady: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("app_ready")),
 	appState: () => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("app_state")),
@@ -55,9 +111,17 @@ export const commands = {
 export const events = {
 	boardChanged: makeEvent<BoardChanged_Deserialize>("board-changed"),
 	mcpCallsChanged: makeEvent<McpCallsChanged>("mcp-calls-changed"),
+	skillOutput: makeEvent<SkillOutput>("skill-output"),
 };
 
 /* Types */
+export type Acceptance = {
+	id: string,
+	criterion: string,
+	mandatory: boolean,
+	check: string,
+};
+
 export type ActivityEvent = ActivityEvent_Serialize | ActivityEvent_Deserialize;
 
 export type ActivityEvent_Deserialize = {
@@ -67,6 +131,8 @@ export type ActivityEvent_Deserialize = {
 	taskKey?: string | null,
 	payload: JsonPayload,
 	createdAt: string,
+	epicId?: string | null,
+	sentence?: string,
 };
 
 export type ActivityEvent_Serialize = {
@@ -76,6 +142,8 @@ export type ActivityEvent_Serialize = {
 	taskKey?: string | null,
 	payload: JsonPayload,
 	createdAt: string,
+	epicId: string | null,
+	sentence: string,
 };
 
 export type ActivityQuery = {
@@ -84,9 +152,30 @@ export type ActivityQuery = {
 	actorKind: string | null,
 };
 
+export type AddReference = {
+	kind: string,
+	filePath: string | null,
+	url: string | null,
+	text: string | null,
+	title: string | null,
+	caption: string | null,
+	tags: string[] | null,
+	frameEpicKey: string | null,
+	frameId: string | null,
+	linkTo: string | null,
+	x: number | null,
+	y: number | null,
+};
+
+export type AnswerQuestion = {
+	id: string,
+	answerIndex: number | null,
+	answerText: string | null,
+};
+
 export type ApiError = ApiError_Serialize | ApiError_Deserialize;
 
-export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "internal";
+export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "not_ready" | "wrong_status" | "forbidden" | "internal";
 
 export type ApiError_Deserialize = {
 	code: ApiErrorCode,
@@ -107,6 +196,16 @@ export type AppState = {
 	theme: string,
 };
 
+export type AskUser = {
+	scope: Scope,
+	title: string,
+	bodyMd: string | null,
+	options: QuestionOption[] | null,
+	recommendedIndex: number | null,
+	allowFreeText: boolean | null,
+	roundLabel: string | null,
+};
+
 export type Asset = {
 	id: string,
 	jamId: string,
@@ -116,6 +215,7 @@ export type Asset = {
 	notes: string | null,
 	createdBy: string,
 	createdAt: string,
+	role?: string,
 };
 
 export type AssetEdit = {
@@ -139,6 +239,17 @@ export type AssetWithTasks = {
 	tasks: LinkedTask[],
 } & Asset;
 
+export type Audit = {
+	id: string,
+	jamId: string,
+	position: number | null,
+	createdBy: string,
+	updatedBy: string,
+	createdAt: string,
+	updatedAt: string,
+	archivedAt: string | null,
+};
+
 export type BoardChanged = BoardChanged_Serialize | BoardChanged_Deserialize;
 
 export type BoardChanged_Deserialize = {
@@ -159,6 +270,8 @@ export type BoardJam = {
 	theme: string | null,
 	endsAt: string | null,
 	timeLeft: number | null,
+	template: string,
+	milestoneAt: string | null,
 };
 
 export type BoardSummary = {
@@ -167,6 +280,8 @@ export type BoardSummary = {
 	inProgress: BoardTask[],
 	myTasks: BoardTask[],
 	onlineAgents: MemberStats[],
+	tagSuggestions: string[],
+	openQuestionCount: number,
 };
 
 export type BoardTask = {
@@ -175,6 +290,84 @@ export type BoardTask = {
 	priority: string,
 	status: string,
 	assignee: MemberRef | null,
+	changesRequested: boolean,
+	needsInfo: boolean,
+	epicKey: string,
+};
+
+export type BrainInput = {
+	epicKey: string,
+	memberHandle: string,
+};
+
+export type BriefEditInput = BriefEditInput_Serialize | BriefEditInput_Deserialize;
+
+export type BriefEditInput_Deserialize = {
+	key: string,
+} & BriefPatch_Deserialize;
+
+export type BriefEditInput_Serialize = {
+	key: string,
+} & BriefPatch_Serialize;
+
+export type BriefPatch = BriefPatch_Serialize | BriefPatch_Deserialize;
+
+export type BriefPatch_Deserialize = {
+	goalMd?: string | null,
+	contextMd?: string | null,
+	whereMd?: string | null,
+	changes?: Change[] | null,
+	tests?: BriefTest[] | null,
+	boundariesMd?: string | null,
+	resultMd?: string | null,
+	userQuotesMd?: string | null,
+};
+
+export type BriefPatch_Serialize = {
+	goalMd?: string | null,
+	contextMd?: string | null,
+	whereMd?: string | null,
+	changes?: Change[] | null,
+	tests?: BriefTest[] | null,
+	boundariesMd?: string | null,
+	resultMd?: string | null,
+	userQuotesMd?: string | null,
+};
+
+export type BriefTest = {
+	setup: string,
+	expected: string,
+};
+
+export type CanvasArchive = {
+	kind: string,
+	id: string,
+	archived: boolean,
+};
+
+export type CanvasGeometry = {
+	id: string,
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
+	z: number | null,
+	frameId: string | null,
+};
+
+export type Change = {
+	title: string,
+	now?: string,
+	cause?: string,
+	required: string,
+	where?: string,
+	follow?: string,
+	keep?: string,
+};
+
+export type ChangesInput = {
+	cursor: number,
+	epicKey: string | null,
 };
 
 export type Comment = {
@@ -206,10 +399,129 @@ export type CreateTask = {
 	estimate: number | null,
 	dueAt: string | null,
 	idempotencyKey: string | null,
+	storyKey: string | null,
+} & TaskBrief;
+
+export type EdgeInput = {
+	fromItem: string,
+	toItem: string,
+	label: string,
+};
+
+export type Epic = {
+	key: string,
+	title: string,
+	color: string,
+	status: string,
+	goalMd: string,
+	doneWhenMd: string,
+	notIncludedMd: string,
+	decidedMd: string,
+	openQuestionsMd: string,
+	participation: string,
+	reviewer: string,
+	workerModel: string | null,
+	brainMemberId: string | null,
+} & Audit;
+
+export type EpicEditInput = EpicEditInput_Serialize | EpicEditInput_Deserialize;
+
+export type EpicEditInput_Deserialize = {
+	key: string,
+} & EpicPatch_Deserialize;
+
+export type EpicEditInput_Serialize = {
+	key: string,
+} & EpicPatch_Serialize;
+
+export type EpicPatch = EpicPatch_Serialize | EpicPatch_Deserialize;
+
+export type EpicPatch_Deserialize = {
+	title: string | null,
+	color: string | null,
+	goalMd: string | null,
+	doneWhenMd: string | null,
+	notIncludedMd: string | null,
+	decidedMd: string | null,
+	openQuestionsMd: string | null,
+	participation: string | null,
+	reviewer: string | null,
+	workerModel?: string | null,
+};
+
+export type EpicPatch_Serialize = {
+	title?: string | null,
+	color?: string | null,
+	goalMd?: string | null,
+	doneWhenMd?: string | null,
+	notIncludedMd?: string | null,
+	decidedMd?: string | null,
+	openQuestionsMd?: string | null,
+	participation?: string | null,
+	reviewer?: string | null,
+	workerModel?: string | null,
+};
+
+export type EpicTree = EpicTree_Serialize | EpicTree_Deserialize;
+
+export type EpicTree_Deserialize = {
+	epic: Epic,
+	stories: StoryTree[],
+	journal: ActivityEvent_Deserialize[],
+	openQuestions: Question[],
+};
+
+export type EpicTree_Serialize = {
+	epic: Epic,
+	stories: StoryTree[],
+	journal: ActivityEvent_Serialize[],
+	openQuestions: Question[],
 };
 
 export type ExportPath = {
 	path: string,
+};
+
+export type FrameEditInput = FrameEditInput_Serialize | FrameEditInput_Deserialize;
+
+export type FrameEditInput_Deserialize = {
+	id: string,
+} & FramePatch_Deserialize;
+
+export type FrameEditInput_Serialize = {
+	id: string,
+} & FramePatch_Serialize;
+
+export type FramePatch = FramePatch_Serialize | FramePatch_Deserialize;
+
+export type FramePatch_Deserialize = {
+	title?: string | null,
+	color?: string | null,
+	x?: number | null,
+	y?: number | null,
+	w?: number | null,
+	h?: number | null,
+	collapsed?: boolean | null,
+	epicId?: string | null,
+};
+
+export type FramePatch_Serialize = {
+	title?: string | null,
+	color?: string | null,
+	x?: number | null,
+	y?: number | null,
+	w?: number | null,
+	h?: number | null,
+	collapsed?: boolean | null,
+	epicId?: string | null,
+};
+
+export type GeometryInput = {
+	id: string,
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
 };
 
 export type Jam = {
@@ -222,6 +534,8 @@ export type Jam = {
 	taskSeq: number,
 	keyPrefix: string,
 	createdAt: string,
+	template?: string,
+	milestoneAt?: string | null,
 };
 
 /**
@@ -258,6 +572,9 @@ export type Member = {
 	client: string | null,
 	lastSeenAt: string | null,
 	createdAt: string,
+	statusText?: string,
+	statusScope?: Scope | null,
+	statusAt?: string | null,
 };
 
 export type MemberEdit = {
@@ -279,12 +596,14 @@ export type MemberStats = {
 	counts: { [key in string]: number },
 	online: boolean,
 	workingOn: string[],
+	statusStale: boolean,
 } & Member;
 
 export type MemberWithStats = {
 	counts: { [key in string]: number },
 	online: boolean,
 	workingOn: LinkedTask[],
+	statusStale: boolean,
 } & Member;
 
 export type MoveInput = {
@@ -292,6 +611,7 @@ export type MoveInput = {
 	status: string,
 	beforeKey: string | null,
 	afterKey: string | null,
+	overrideReason: string | null,
 };
 
 export type NewAsset = {
@@ -301,6 +621,19 @@ export type NewAsset = {
 	notes: string | null,
 };
 
+export type NewEpic = {
+	title: string,
+	color: string | null,
+	goalMd: string | null,
+	doneWhenMd: string | null,
+	notIncludedMd: string | null,
+	decidedMd: string | null,
+	openQuestionsMd: string | null,
+	participation: string | null,
+	reviewer: string | null,
+	workerModel: string | null,
+};
+
 export type NewJamInput = {
 	name: string,
 	theme: string | null,
@@ -308,12 +641,99 @@ export type NewJamInput = {
 	endsAt: string,
 	timezone: string,
 	yourName: string,
+	template?: string | null,
+	milestoneAt?: string | null,
 };
 
 export type NewMember = {
 	name: string,
 	color: string,
 	avatar: string | null,
+};
+
+export type NewStory = {
+	epicKey: string,
+	title: string,
+	outcomeMd: string | null,
+	basisMd: string | null,
+	preserveMd: string | null,
+	scaleMd: string | null,
+	rejectionRisksMd: string | null,
+	openDecisionsMd: string | null,
+	acceptance: Acceptance[] | null,
+};
+
+export type PlanningStatusInput = {
+	key: string,
+	status: string,
+	overrideReason: string | null,
+};
+
+export type Project = {
+	jam: Jam,
+	template: string,
+	milestoneAt: string | null,
+	templateLabel: string,
+	tagSuggestions: string[],
+	epics: number,
+	stories: number,
+	tasks: number,
+	openQuestions: number,
+};
+
+export type ProjectEditInput = {
+	template: string,
+	milestoneAt: string | null,
+	name: string | null,
+	startsAt: string | null,
+	endsAt: string | null,
+	timezone: string | null,
+};
+
+export type Question = {
+	id: string,
+	jamId: string,
+	epicId: string | null,
+	scopeType: string,
+	scopeId: string,
+	askedBy: string,
+	roundLabel: string | null,
+	title: string,
+	bodyMd: string,
+	options: QuestionOption[],
+	recommendedIndex: number | null,
+	allowFreeText: boolean,
+	status: string,
+	answerIndex: number | null,
+	answerText: string | null,
+	answeredBy: string | null,
+	answeredAt: string | null,
+	createdAt: string,
+};
+
+export type QuestionListInput = {
+	status: string | null,
+	scope: Scope | null,
+};
+
+export type QuestionOption = {
+	label: string,
+	description: string,
+};
+
+export type Readiness = {
+	ready: boolean,
+	missing: ReadinessIssue[],
+};
+
+export type ReadinessIssue = {
+	code: string,
+	message: string,
+};
+
+export type ReadyInput = {
+	key: string,
+	overrideReason: string | null,
 };
 
 export type RecentCall = {
@@ -324,13 +744,146 @@ export type RecentCall = {
 	ok: boolean,
 };
 
+export type RefEdge = {
+	id: string,
+	jamId: string,
+	fromItem: string,
+	toItem: string,
+	label: string,
+	archivedAt: string | null,
+};
+
+export type RefFrame = {
+	id: string,
+	jamId: string,
+	epicId: string | null,
+	title: string,
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
+	color: string,
+	archivedAt: string | null,
+	collapsed?: boolean,
+};
+
+export type RefItem = {
+	kind: string,
+	assetId: string | null,
+	url: string | null,
+	title: string,
+	captionMd: string,
+	tags: string[],
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
+	z: number | null,
+	frameId: string | null,
+	linkPreview: string | null,
+	metadata?: string | null,
+} & Audit;
+
+export type RefLink = {
+	itemId: string,
+	targetType: string,
+	targetId: string,
+	archivedAt: string | null,
+};
+
+export type ReferenceCanvas = {
+	items: RefItem[],
+	frames: RefFrame[],
+	edges: RefEdge[],
+	links: RefLink[],
+};
+
+export type ReferenceEditInput = ReferenceEditInput_Serialize | ReferenceEditInput_Deserialize;
+
+export type ReferenceEditInput_Deserialize = {
+	itemId: string,
+} & ReferencePatch_Deserialize;
+
+export type ReferenceEditInput_Serialize = {
+	itemId: string,
+} & ReferencePatch_Serialize;
+
+export type ReferenceLinkInput = {
+	itemId: string,
+	targetKey: string,
+};
+
+export type ReferenceListInput = {
+	epicKey: string | null,
+	storyKey: string | null,
+	taskKey: string | null,
+};
+
+export type ReferencePatch = ReferencePatch_Serialize | ReferencePatch_Deserialize;
+
+export type ReferencePatch_Deserialize = {
+	caption?: string | null,
+	tags?: string[] | null,
+	title?: string | null,
+};
+
+export type ReferencePatch_Serialize = {
+	caption?: string | null,
+	tags?: string[] | null,
+	title?: string | null,
+};
+
+export type Report = {
+	id: string,
+	taskId: string,
+	round: number,
+	authorId: string,
+	summaryMd: string,
+	changedFiles: string[],
+	tests: ReportTest[],
+	deviationsMd: string,
+	notVerifiedMd: string,
+	createdAt: string,
+};
+
+export type ReportTest = {
+	name: string,
+	command: string,
+	expected: string,
+	actual: string,
+	result: string,
+};
+
 export type ResetInput = {
 	confirmName: string,
+};
+
+export type Review = {
+	id: string,
+	taskId: string,
+	round: number,
+	reviewerId: string,
+	verdict: string,
+	commentsMd: string,
+	failedTests: string[],
+	createdAt: string,
+};
+
+export type ReviewTask = {
+	key: string,
+	verdict: string,
+	commentsMd: string,
+	failedTests: string[] | null,
 };
 
 export type RuntimeInfo = {
 	dataDir: string,
 	sidecarPath: string,
+};
+
+export type Scope = {
+	type: string,
+	id: string,
 };
 
 export type Settings = {
@@ -353,9 +906,106 @@ export type SettingsPatch = {
 	soundEnabled: boolean | null,
 };
 
+export type SkillCheck = {
+	version: string | null,
+	python: string | null,
+	pythonVersion: string | null,
+	errors: string[],
+};
+
+export type SkillInput = {
+	playbook: string,
+	target: string,
+	client: string,
+	profile: string,
+};
+
+export type SkillOutput = {
+	line: string,
+};
+
+export type SkillResult = {
+	exitCode: number | null,
+	cancelled: boolean,
+	timedOut: boolean,
+};
+
+export type Story = {
+	key: string,
+	epicId: string,
+	title: string,
+	status: string,
+	outcomeMd: string,
+	basisMd: string,
+	preserveMd: string,
+	scaleMd: string,
+	rejectionRisksMd: string,
+	openDecisionsMd: string,
+	acceptance: Acceptance[],
+} & Audit;
+
+export type StoryEditInput = StoryEditInput_Serialize | StoryEditInput_Deserialize;
+
+export type StoryEditInput_Deserialize = {
+	key: string,
+} & StoryPatch_Deserialize;
+
+export type StoryEditInput_Serialize = {
+	key: string,
+} & StoryPatch_Serialize;
+
+export type StoryPatch = StoryPatch_Serialize | StoryPatch_Deserialize;
+
+export type StoryPatch_Deserialize = {
+	title?: string | null,
+	outcomeMd?: string | null,
+	basisMd?: string | null,
+	preserveMd?: string | null,
+	scaleMd?: string | null,
+	rejectionRisksMd?: string | null,
+	openDecisionsMd?: string | null,
+	acceptance?: Acceptance[] | null,
+};
+
+export type StoryPatch_Serialize = {
+	title?: string | null,
+	outcomeMd?: string | null,
+	basisMd?: string | null,
+	preserveMd?: string | null,
+	scaleMd?: string | null,
+	rejectionRisksMd?: string | null,
+	openDecisionsMd?: string | null,
+	acceptance?: Acceptance[] | null,
+};
+
+export type StoryTree = {
+	story: Story,
+	tasks: TaskReady[],
+};
+
+export type SubmitReport = {
+	key: string,
+	summaryMd: string,
+	changedFiles: string[],
+	tests: ReportTest[],
+	deviationsMd: string | null,
+	notVerifiedMd: string | null,
+};
+
 export type TagCount = {
 	tag: string,
 	count: number,
+};
+
+export type TaskBrief = {
+	goalMd?: string,
+	contextMd?: string,
+	whereMd?: string,
+	changes?: Change[],
+	tests?: BriefTest[],
+	boundariesMd?: string,
+	resultMd?: string,
+	userQuotesMd?: string,
 };
 
 export type TaskDetail = TaskDetail_Serialize | TaskDetail_Deserialize;
@@ -365,6 +1015,13 @@ export type TaskDetail_Deserialize = {
 	comments: Comment[],
 	activity: ActivityEvent_Deserialize[],
 	history: ActivityEvent_Deserialize[],
+	brief: TaskBrief,
+	ancestorQuestions?: Question[],
+	story: Story,
+	epic: Epic,
+	reports: Report[],
+	reviews: Review[],
+	references: RefItem[],
 } & TaskSummary;
 
 export type TaskDetail_Serialize = {
@@ -372,6 +1029,13 @@ export type TaskDetail_Serialize = {
 	comments: Comment[],
 	activity: ActivityEvent_Serialize[],
 	history: ActivityEvent_Serialize[],
+	brief: TaskBrief,
+	ancestorQuestions: Question[],
+	story: Story,
+	epic: Epic,
+	reports: Report[],
+	reviews: Review[],
+	references: RefItem[],
 } & TaskSummary;
 
 export type TaskEditInput = TaskEditInput_Serialize | TaskEditInput_Deserialize;
@@ -394,6 +1058,7 @@ export type TaskListPage = {
 export type TaskPatch = TaskPatch_Serialize | TaskPatch_Deserialize;
 
 export type TaskPatch_Deserialize = {
+	brief?: TaskBrief | null,
 	title?: string | null,
 	descriptionMd?: string | null,
 	status?: string | null,
@@ -405,6 +1070,7 @@ export type TaskPatch_Deserialize = {
 };
 
 export type TaskPatch_Serialize = {
+	brief?: TaskBrief | null,
 	title?: string | null,
 	descriptionMd?: string | null,
 	status?: string | null,
@@ -416,12 +1082,22 @@ export type TaskPatch_Serialize = {
 };
 
 export type TaskQuery = {
+	epic: string | null,
+	story: string | null,
+	ready: boolean | null,
+	changesRequested: boolean | null,
+	needsInfo: boolean | null,
 	status: string[] | null,
 	assignee: string | null,
 	tags: string[] | null,
 	text: string | null,
 	includeArchived: boolean | null,
 	sort: TaskSort | null,
+};
+
+export type TaskReady = {
+	task: TaskSummary,
+	readiness: Readiness,
 };
 
 export type TaskSort = {
@@ -449,6 +1125,15 @@ export type TaskSummary = {
 	idempotencyKey: string | null,
 	tags: string[],
 	commentCount: number,
+	storyId?: string,
+	storyKey?: string,
+	ready?: boolean,
+	epicId?: string,
+	epicKey?: string,
+	epicColor?: string,
+	changesRequested?: boolean,
+	needsInfo?: boolean,
+	reviewRound?: number,
 };
 
 /* Tauri Specta runtime */

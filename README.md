@@ -2,49 +2,89 @@
 
 # Jam Board
 
+Local task board where AI agents and humans plan and ship together through MCP
+
 *Plan your game jam with your AI teammates.*
 
-A cozy local task board for game jams. AI agents like Codex and Claude Code connect through MCP, see the board, claim tasks and add new ones — and you watch it happen live.
+A cozy local project board for humans and AI teammates. Plan a game jam, a longer game project or a web app with a brain agent, give workers clear briefs, and follow questions, reports and reviews in the app.
 
 [![CI](https://github.com/Triton556/jam-board/actions/workflows/ci.yml/badge.svg)](https://github.com/Triton556/jam-board/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-3FA37A)](LICENSE)
 ![Windows](https://img.shields.io/badge/platform-Windows-5B8DEF)
 ![Tauri 2 + Rust](https://img.shields.io/badge/built_with-Tauri_2_%2B_Rust-9B7BE0)
 
-![A real MCP agent creates, claims and moves tasks in the desktop window](docs/media/demo.gif)
+![Snowball dogfood recording: Inbox answers, planning and the epic journal](docs/media/demo.gif)
+
+Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
 ## Features
 
-- 📝 A live five-column board shared by humans and agents, with keyboard and pointer drag-and-drop.
-- 🤖 MCP over stdio and authenticated loopback HTTP: twelve tools, resources and a work prompt.
-- ✨ Agent changes arrive in under a second, with a colored highlight and a toast.
-- 🔎 A virtual table for 2,000+ tasks, with sortable columns and shareable URL filters.
+- 📝 Epics → stories → tasks, complete briefs and a live five-column board.
+- 🤖 MCP over stdio and authenticated loopback HTTP: 39 tools, hierarchy resources, planning/work/review prompts and `wait_for_changes`.
+- ✨ Live agent changes, with a colored highlight and a toast.
+- 🔎 A virtual table tested with 2,000 tasks, with sortable columns and shareable URL filters.
 - 🤝 Conflict-safe editing that preserves your draft when an agent changes the same task.
-- 🎨 Asset references, image previews, team presence and a live activity feed.
+- 🎨 A References canvas, local media, team presence and an epic journal.
 - 💾 Local SQLite storage. No cloud, accounts or telemetry. JSON export/import and non-destructive archives.
 - 🌙 Light and dark paper themes, self-hosted fonts and optional paper-rustle sounds.
 
 ## Screenshots
 
-| Board · light | Board · dark |
+| Board | Plan |
 |---|---|
-| ![Light paper board](docs/media/readme-board-light.jpg) | ![Dark paper board](docs/media/readme-board-dark.jpg) |
-| Table | MCP settings |
-| ![Filtered task table](docs/media/readme-table.jpg) | ![MCP settings with a masked token](docs/media/readme-settings-mcp.jpg) |
+| ![Board: five task columns and epic colors](docs/media/readme-board-light.jpg) | ![Plan: Snowball stories, acceptance and task statuses](docs/media/readme-plan.jpg) |
+| Inbox | References |
+| ![An agent question with a recommended option](docs/media/readme-inbox.jpg) | ![Local references linked to project work](docs/media/readme-canvas.jpg) |
+
+Plan shows the Snowball run. Board, Inbox and References show the bundled demo in the real desktop window. [Dark paper theme](docs/media/readme-board-dark.jpg).
+
+## Plan with a brain agent
+
+1. Appoint a brain in your agent chat and choose the worker model.
+2. Answer its interview in Inbox. Confirm the goal, done-when and boundaries.
+3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
+4. Workers claim tasks and submit reports with real test evidence. A human or the brain accepts them or requests another round.
+5. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
+
+## Inbox
+
+Agents ask through MCP; you answer in the app. Choose a recommended option, write your own answer, or combine both. A task's **Needs info** flag covers its own questions. Story and epic questions stay at their level, while workers still receive ancestor context.
+
+## Review rounds
+
+1. A worker claims a Ready task and calls `submit_report` with its summary, changed files, named test results, deviations and unverified checks.
+2. A separate human or the appointed epic brain checks the report against the brief and story acceptance, then accepts it or requests changes. The assignee and report author cannot review their own work, even if appointed brain.
+3. **Changes requested** returns the task to Ready with its assignee retained and a new reporting round. Earlier reports and reviews remain visible.
+
+Returning submitted work to In progress or reopening accepted work also keeps a usable next reporting round. Human edits and review decisions appear in the epic journal.
+
+## References canvas
+
+Drop local images, audio, video or other files onto the canvas, add captions, notes and links, and attach them to epics, stories or tasks. Frames organize an epic's material. Agents can add references live. Files stay where they are; clipboard images alone are saved into the data folder. Links make no network request until you explicitly choose **Fetch preview**.
+
+## Project templates
+
+Choose **Game jam** for a 48-hour countdown, **Gamedev** for a longer game project, **Web app** for product work, or **Custom** to start blank. Gamedev and Web app offer an optional milestone. Switching templates keeps existing tags and work.
+
+## Agent skill
+
+Open **Settings → Agents**: connect MCP first, then choose a local clone of [agent-playbook](https://github.com/Triton556/agent-playbook), a target project folder and Codex or Claude Code. **Jam Board skill** installs the `jam-board` profile with its procedures; **Whole agent-playbook** installs the full profile.
+
+The app shows the exact commands, runs a plan, asks before writing, then installs and verifies. Python 3.12+ is required. The harness records a receipt in the selected playbook folder's `.harness-state/`. Nothing is downloaded by the app and global agent configuration is left alone. Start a new session in that project and ask: *“Use the jam-board MCP server: plan an epic with me.”*
 
 ## Install
 
 Download the Windows x64 `-setup.exe` from [Releases](https://github.com/Triton556/jam-board/releases). Installation is per-user and does not require administrator rights. Windows 11 with WebView2 is the tested platform.
 
-The v0.1.0 x64 installer is **7.22 MB** (7,215,091 bytes / 6.88 MiB), including the MCP sidecar.
+Jam Board is **Windows-first**; Linux and macOS runtime behavior is unverified. The Windows package includes the MCP sidecar. Use the installer and `SHA256SUMS.txt` from the same release; the downloaded asset's exact filename identifies its checksum entry.
 
 The installer is **unsigned**. Windows SmartScreen may warn that the publisher is unknown. Only run an installer you trust; compare its SHA-256 with the release's `SHA256SUMS.txt`.
 
-Your database, MCP token and logs live in `%APPDATA%\dev.triton556.jamboard\`. Settings → Data opens the folder. Asset files remain at their original locations. The uninstaller is configured to preserve this data folder; the complete installed round-trip still needs verification on Windows. To remove data permanently, close the application and stdio agents, back up anything you need, then remove that folder yourself.
+Your database, MCP token and logs live in `%APPDATA%\dev.triton556.jamboard\`. Settings → Data opens the folder. Asset files remain at their original locations. The uninstaller is configured to preserve this data folder. **An installed upgrade to 0.2.0 and its data-retention behavior have not been verified.** Back up your project with Export JSON before upgrading. To remove data permanently, close the application and stdio agents, back up anything you need, then remove that folder yourself.
 
 ## Connect your agent
 
-Open Settings → MCP for snippets containing your actual executable path and port. Keep tokens out of source control. These examples do not modify real agent configurations.
+Open Settings → Agents for snippets containing your actual executable path and port. Keep tokens out of source control. These examples do not modify real agent configurations.
 
 **Codex · stdio** — add to `~/.codex/config.toml`:
 
@@ -75,9 +115,9 @@ claude mcp add jam-board --env JAM_AGENT_NAME=Claude -- 'C:\Path\To\jam-board-mc
 claude mcp add --transport http jam-board http://127.0.0.1:47321/mcp --header 'Authorization: Bearer <token>' --header 'X-Jam-Agent: Claude'
 ```
 
-Try: *“Use the jam-board MCP server: call get_board, then take the highest-priority unassigned To do task, claim it, and add a comment with your plan.”*
+Try: *“Use the jam-board MCP server: call get_board, then take the highest-priority unassigned Ready task, read its brief, claim it, and call submit_report when finished.”*
 
-The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. See the [full MCP contract](docs/mcp.md).
+The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. Agents can recover activity with `list_changes_since`, then use `wait_for_changes` for reports, answers and edits; keep the returned `nextCursor`, including on timeout. See the [full MCP contract](docs/mcp.md) for all 39 tools and [v0.2 integration changes](docs/mcp.md#breaking-changes-in-v02).
 
 ## How it works
 
@@ -127,6 +167,7 @@ npm run typecheck
 npm test
 npx playwright test --project=functional
 npx playwright test --project=perf
+npx playwright test --project=perf-canvas
 npm run tauri build
 ```
 
@@ -136,7 +177,7 @@ Release builds prepare the sidecar automatically. The NSIS installer is written 
 
 ## Tech stack
 
-Tauri 2 · Rust · SQLite · rmcp · React 19 · TypeScript 7 · Vite 8 · TanStack Query/Router/Virtual · Zustand · dnd-kit · Motion · Tailwind CSS 4.
+Tauri 2 · Rust · SQLite · rmcp · React 19 · TypeScript 7 · Vite 8 · TanStack Query/Router/Virtual · Zustand · dnd-kit · React Flow · Motion · Tailwind CSS 4.
 
 ## Credits & license
 

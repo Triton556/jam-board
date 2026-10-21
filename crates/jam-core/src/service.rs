@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) fn jam(c: &Connection) -> Result<Jam> {
     c.query_row(
         "SELECT id, name, theme, starts_at, ends_at, timezone, task_seq, key_prefix,
-created_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY created_at DESC,id DESC LIMIT 1)",
+created_at,template,milestone_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY created_at DESC,id DESC LIMIT 1)",
         [],
         |r| {
             Ok(Jam {
@@ -19,7 +19,7 @@ created_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY creat
                 timezone: r.get(5)?,
                 task_seq: r.get(6)?,
                 key_prefix: r.get(7)?,
-                created_at: r.get(8)?,
+                created_at: r.get(8)?,template:r.get(9)?,milestone_at:r.get(10)?,
             })
         },
     )
@@ -28,7 +28,7 @@ created_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY creat
 }
 pub(crate) fn member(c: &Connection, id: &str) -> Result<Member> {
     c.query_row(
-        "SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at
+        "SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
 FROM members WHERE id=?",
         [id],
         member_row,
@@ -47,6 +47,19 @@ pub(crate) fn member_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Member> {
         client: r.get(6)?,
         last_seen_at: r.get(7)?,
         created_at: r.get(8)?,
+        status_text: r.get(9)?,
+        status_scope: r
+            .get::<_, Option<String>>(10)?
+            .map(|v| serde_json::from_str(&v))
+            .transpose()
+            .map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    10,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
+        status_at: r.get(11)?,
     })
 }
 pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
@@ -70,9 +83,18 @@ pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
         idempotency_key: r.get(16)?,
         tags: Vec::new(),
         comment_count: 0,
+        story_id: r.get(17)?,
+        story_key: String::new(),
+        ready: false,
+        changes_requested: r.get(18)?,
+        review_round: r.get(19)?,
+        epic_id: String::new(),
+        epic_key: String::new(),
+        epic_color: String::new(),
+        needs_info: false,
     })
 }
-pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key";
+pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round";
 pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
     let mut t = c
         .query_row(
@@ -88,6 +110,14 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
         [&t.id],
         |r| r.get(0),
     )?;
+    let story = crate::planning::story(c, &t.story_id)?;
+    let epic = crate::planning::epic(c, &story.epic_id)?;
+    t.epic_id = epic.audit.id;
+    t.epic_key = epic.key;
+    t.epic_color = epic.color;
+    t.story_key = story.key;
+    t.needs_info = crate::workflow::needs_info(c, &t.id)?;
+    t.ready = crate::workflow::readiness_for(c, &t)?.ready;
     Ok(t)
 }
 fn tags(c: &Connection, id: &str) -> Result<Vec<String>> {
@@ -130,9 +160,21 @@ pub(crate) fn event(
     task_id: Option<&str>,
     payload: Value,
 ) -> Result<()> {
+    let epic_id = if let Some(eid) = payload["epicId"].as_str() {
+        Some(eid.to_string())
+    } else if let Some(tid) = task_id {
+        c.query_row(
+            "SELECT s.epic_id FROM tasks t JOIN stories s ON s.id=t.story_id WHERE t.id=?",
+            [tid],
+            |r| r.get::<_, String>(0),
+        )
+        .optional()?
+    } else {
+        None
+    };
     c.execute(
         "INSERT INTO activity(id, jam_id, actor_id, action, task_id, payload,
-created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+created_at,epic_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             id(),
             jam_id,
@@ -140,17 +182,20 @@ created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             action,
             task_id,
             payload.to_string(),
-            now()
+            now(),
+            epic_id
         ],
     )?;
     Ok(())
 }
-fn editable(c: &Connection, key: &str, actor: &str) -> Result<TaskSummary> {
+pub(crate) fn editable(c: &Connection, key: &str, actor: &str) -> Result<TaskSummary> {
     member(c, actor)?;
     let t = task(c, key)?;
     if t.archived_at.is_some() {
         return Err(Error::Archived(key.into()));
     }
+    crate::planning::editable_audit(&crate::planning::story(c, &t.story_id)?.audit)?;
+    crate::planning::editable_audit(&crate::planning::task_epic(c, &t)?.audit)?;
     Ok(t)
 }
 fn status(value: &str) -> Result<()> {
@@ -159,7 +204,7 @@ fn status(value: &str) -> Result<()> {
     } else {
         Err(invalid(
             "status",
-            "expected backlog, todo, in_progress, review or done",
+            "expected backlog, ready, in_progress, review or done",
         ))
     }
 }
@@ -190,7 +235,7 @@ fn estimate(value: Option<i64>) -> Result<()> {
         Err(invalid("estimate", "expected 1, 2, 3, 5 or 8"))
     }
 }
-fn utc_date(value: Option<&str>) -> Result<Option<String>> {
+pub(crate) fn utc_date(value: Option<&str>) -> Result<Option<String>> {
     value
         .map(|v| {
             time::OffsetDateTime::parse(v, &time::format_description::well_known::Rfc3339)
@@ -245,6 +290,39 @@ impl Store {
         timezone: &str,
         your_name: &str,
     ) -> Result<(Jam, Member)> {
+        self.create_project_record(&NewJamInput {
+            name: name.into(),
+            theme: theme.map(str::to_owned),
+            starts_at: starts_at.unwrap_or("").into(),
+            ends_at: ends_at.unwrap_or("").into(),
+            timezone: timezone.into(),
+            your_name: your_name.into(),
+            template: None,
+            milestone_at: None,
+        })
+    }
+    pub(crate) fn create_project_record(&self, input: &NewJamInput) -> Result<(Jam, Member)> {
+        let name = input.name.trim();
+        let your_name = input.your_name.trim();
+        let theme = input.theme.as_deref();
+        let timezone = &input.timezone;
+        let template = input.template.as_deref().unwrap_or("game_jam");
+        crate::planning::validate_template(template)?;
+        let milestone = if matches!(template, "gamedev" | "webapp") {
+            utc_date(input.milestone_at.as_deref())?
+        } else {
+            None
+        };
+        let starts_at = if template == "game_jam" && !input.starts_at.is_empty() {
+            Some(input.starts_at.as_str())
+        } else {
+            None
+        };
+        let ends_at = if template == "game_jam" && !input.ends_at.is_empty() {
+            Some(input.ends_at.as_str())
+        } else {
+            None
+        };
         title(name)?;
         title(your_name)?;
         let starts_at = utc_date(starts_at)?;
@@ -265,7 +343,7 @@ prefix=format!("JB{number}");
 number+=1;
 }
             c.execute("INSERT INTO jams(id, name, theme, starts_at, ends_at, timezone, key_prefix,
-created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",params![jid,name,theme,starts_at,ends_at,timezone,prefix,stamp])?;
+created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params![jid,name,theme,starts_at,ends_at,timezone,prefix,stamp,template,milestone])?;
             event(c,Some(&jid),&mid,"jam.updated",None,json!({
 "name":[null,name],"created":true,"humanJoined":mid}
 ))?;
@@ -426,13 +504,37 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
                 return Ok(key);
             }
             title(&input.title)?;
-            let s = input.status.as_deref().unwrap_or("todo");
+            let s = input.status.as_deref().unwrap_or("backlog");
             let p = input.priority.as_deref().unwrap_or("medium");
             status(s)?;
             priority(p)?;
             estimate(input.estimate)?;
             let due_at = utc_date(input.due_at.as_deref())?;
             let j = jam(c)?;
+            let parent = crate::planning::story(
+                c,
+                input
+                    .story_key
+                    .as_deref()
+                    .ok_or_else(|| invalid("storyKey", "Every task must belong to a story"))?,
+            )?;
+            crate::planning::editable_audit(&parent.audit)?;
+            crate::planning::editable_audit(&crate::planning::epic(c, &parent.epic_id)?.audit)?;
+            if !["backlog", "ready"].contains(&s)
+                && !crate::planning::privileged(
+                    c,
+                    actor,
+                    &crate::planning::epic(c, &parent.epic_id)?,
+                )?
+            {
+                return Err(Error::Forbidden(
+                    "Create a Backlog or Ready task, then use claim_task and submit_report".into(),
+                ));
+            }
+            if parent.audit.jam_id != j.id {
+                return Err(invalid("storyKey", "Choose a story in the active project"));
+            }
+            crate::workflow::validate_brief(&input.brief)?;
             let key = format!("{}-{}", j.key_prefix, j.task_seq + 1);
             let tid = id();
             let stamp = now();
@@ -441,7 +543,7 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             c.execute(
                 "INSERT INTO tasks(id, jam_id, key, title, description_md, status, priority,
 estimate, due_at, position, created_by, updated_by, created_at, updated_at,
-idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 params![
                     tid,
                     j.id,
@@ -457,9 +559,24 @@ idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     actor,
                     stamp,
                     stamp,
-                    input.idempotency_key
+                    input.idempotency_key,
+                    parent.audit.id
                 ],
             )?;
+            crate::planning::patch_record(c, "tasks", &tid, &serde_json::to_value(&input.brief)?)?;
+            if s == "ready" {
+                let r = crate::workflow::readiness(c, &key)?;
+                if !r.ready {
+                    return Err(crate::workflow::not_ready(&r));
+                }
+            }
+            if s == "done" {
+                crate::planning::require_privileged(
+                    c,
+                    actor,
+                    &crate::planning::epic(c, &parent.epic_id)?,
+                )?;
+            }
             set_tags(c, &tid, input.tags.as_deref().unwrap_or(&[]))?;
             event(
                 c,
@@ -504,6 +621,14 @@ idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         self.write(|c| {
  let old=editable(c,key,actor)?;
  if expected.is_some_and(|stamp| stamp != old.updated_at) { return Err(Error::Conflict); }
+ let brief_fields = if let Some(b) = input.brief {
+     crate::workflow::validate_brief(&b)?;
+     let before = serde_json::to_value(crate::workflow::brief(c,key)?)?;
+     let value = serde_json::to_value(&b)?;
+     let fields = value.as_object().unwrap().iter().filter(|(k,v)| before.get(*k) != Some(*v)).map(|(k,_)| k.clone()).collect::<Vec<_>>();
+     crate::planning::patch_record(c,"tasks",&old.id,&value)?;
+     Some(fields)
+ } else { None };
  let mut new=old.clone();
             if let Some(v)=input.title {
  title(&v)?;
@@ -512,7 +637,7 @@ idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             if let Some(v)=input.description_md {
  new.description_md=v;
  }
-            if let Some(v)=input.status { status(&v)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
+            if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
             if let Some(v)=input.assignee_id { if let Some(id)=&v { member(c,id)?; } new.assignee_id=v; }
             if let Some(v)=input.priority {
  priority(&v)?;
@@ -531,7 +656,10 @@ idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
  }
             c.execute("UPDATE tasks SET title=?,description_md=?,status=?,position=?,priority=?,assignee_id=?,estimate=?,due_at=? WHERE id=?",params![new.title,new.description_md,new.status,new.position,new.priority,new.assignee_id,new.estimate,new.due_at,old.id])?;
             touch(c,&old.id,actor)?;
- event(c,Some(&old.jam_id),actor,"task.updated",Some(&old.id),diff(&old,&new)?)?;
+ if let Some(mut fields) = brief_fields {
+     fields.extend(diff(&old,&new)?.as_object().into_iter().flat_map(|m|m.keys().cloned()));
+     crate::planning::v2_event(c,actor,Some(&old.epic_id),"task.brief_updated",Some(&old.id),json!({"key":key,"fields":fields}))?;
+ } else { event(c,Some(&old.jam_id),actor,"task.updated",Some(&old.id),diff(&old,&new)?)?; }
  Ok(())
         }
 )?;
@@ -545,9 +673,21 @@ idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         before: Option<&str>,
         after: Option<&str>,
     ) -> Result<TaskSummary> {
+        self.move_task_with_override(actor, key, target, before, after, None)
+    }
+    pub fn move_task_with_override(
+        &self,
+        actor: &str,
+        key: &str,
+        target: &str,
+        before: Option<&str>,
+        after: Option<&str>,
+        override_reason: Option<&str>,
+    ) -> Result<TaskSummary> {
         status(target)?;
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            let overridden=crate::workflow::transition(c,actor,&old,target,override_reason)?;
             let mut rows = c
                 .prepare(
                     "SELECT key, position FROM tasks WHERE jam_id=? AND status=? AND archived_at IS
@@ -615,10 +755,10 @@ NULL AND key<>? ORDER BY position, key",
                 c,
                 Some(&old.jam_id),
                 actor,
-                "task.moved",
+                if overridden{"task.ready_override"}else{"task.moved"},
                 Some(&old.id),
                 json!({
-                "status":[old.status,target],"position":[old.position,position]}
+                "status":[old.status,target],"position":[old.position,position],"overrideReason":override_reason}
                 ),
             )?;
             task(c, key)
@@ -634,7 +774,15 @@ NULL AND key<>? ORDER BY position, key",
                     holder: member(c, holder)?.name,
                 });
             }
-            let s = if ["backlog", "todo"].contains(&old.status.as_str()) {
+            let human=member(c,actor)?.kind=="human";
+            let brain=crate::planning::task_epic(c,&old)?.brain_member_id.as_deref()==Some(actor);
+            if !human&&old.status!="ready" {
+                if !brain {return Err(if old.status=="backlog" {Error::NotReady(format!("Current status is backlog; {}",crate::workflow::not_ready(&crate::workflow::readiness(c,key)?)))}else{Error::WrongStatus(format!("Expected ready, current status is {}",old.status))});}
+                let r=crate::workflow::readiness(c,key)?;if !r.ready{return Err(crate::workflow::not_ready(&r));}
+            }
+            if human&&old.status!="ready" {let r=crate::workflow::readiness(c,key)?;if !r.ready{return Err(crate::workflow::not_ready(&r));}}
+            if old.status=="ready" {let r=crate::workflow::readiness(c,key)?;let granted:bool=c.query_row("SELECT coalesce(max(CASE WHEN action='task.ready_override' THEN seq END),0)>coalesce(max(CASE WHEN action='task.brief_updated' THEN seq END),0) FROM activity WHERE task_id=?",[&old.id],|r|r.get(0))?;if !r.ready&&!granted{return Err(crate::workflow::not_ready(&r));}}
+            let s = if ["backlog", "ready"].contains(&old.status.as_str()) {
                 "in_progress"
             } else {
                 &old.status
@@ -669,7 +817,7 @@ NULL AND key<>? ORDER BY position, key",
         key: &str,
         target: Option<&str>,
     ) -> Result<TaskSummary> {
-        let target = target.unwrap_or("todo");
+        let target = target.unwrap_or("backlog");
         status(target)?;
         self.write(|c| {
             let old = editable(c, key, actor)?;
@@ -679,6 +827,7 @@ NULL AND key<>? ORDER BY position, key",
                     "only the holder or a human can release this task",
                 ));
             }
+            crate::workflow::transition(c, actor, &old, target, None)?;
             let pos = if target != old.status {
                 end_position(c, &old.jam_id, target)?
             } else {
@@ -835,10 +984,10 @@ NULL AND key<>? ORDER BY position, key",
                 location: location.into(),
                 notes: notes.map(Into::into),
                 created_by: actor.into(),
-                created_at: now(),
+                created_at: now(),role:"asset".into(),
             };
             c.execute(
-                "INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO assets(id,jam_id,kind,name,location,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)",
                 params![
                     a.id,
                     a.jam_id,
@@ -921,6 +1070,7 @@ NULL AND key<>? ORDER BY position, key",
                 .query_map([&j.id], task_row)?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
             for t in &mut rows {
+                *t = task(c, &t.key)?;
                 t.tags = tags(c, &t.id)?;
                 t.comment_count = c.query_row(
                     "SELECT count(*) FROM comments WHERE task_id=?",
@@ -932,7 +1082,36 @@ NULL AND key<>? ORDER BY position, key",
                 .prepare("SELECT id,handle FROM members")?
                 .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
                 .collect::<std::result::Result<BTreeMap<_, _>, _>>()?;
+            let epic_id = filter
+                .epic
+                .as_deref()
+                .map(|key| crate::planning::epic(c, key).map(|e| e.audit.id))
+                .transpose()?;
+            let story_id = filter
+                .story
+                .as_deref()
+                .map(|key| crate::planning::story(c, key).map(|s| s.audit.id))
+                .transpose()?;
+            let readiness = if filter.ready.is_some() {
+                rows.iter()
+                    .map(|t| Ok((t.key.clone(), crate::workflow::readiness(c, &t.key)?.ready)))
+                    .collect::<Result<BTreeMap<_, _>>>()?
+            } else {
+                BTreeMap::new()
+            };
             rows.retain(|t| {
+                if epic_id.as_ref().is_some_and(|id| t.epic_id != *id)
+                    || story_id.as_ref().is_some_and(|id| t.story_id != *id)
+                    || filter
+                        .ready
+                        .is_some_and(|ready| readiness.get(&t.key) != Some(&ready))
+                    || filter
+                        .changes_requested
+                        .is_some_and(|v| t.changes_requested != v)
+                    || filter.needs_info.is_some_and(|v| t.needs_info != v)
+                {
+                    return false;
+                }
                 if !filter.include_archived.unwrap_or(false) && t.archived_at.is_some() {
                     return false;
                 }
@@ -984,7 +1163,7 @@ NULL AND key<>? ORDER BY position, key",
     pub fn list_members(&self) -> Result<Vec<MemberStats>> {
         self.read(|c| {
 let j=jam(c).ok();
- let members=c.prepare("SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at
+ let members=c.prepare("SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
 FROM members ORDER BY created_at, id")?.query_map([],member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
             members.into_iter().map(|m| {
 let counts=c.prepare("SELECT status, count(*) FROM tasks WHERE assignee_id=? AND jam_id=? AND
@@ -993,7 +1172,7 @@ archived_at IS NULL GROUP BY status")?.query_map(params![m.id,j.as_ref().map(|j|
 AND archived_at IS NULL ORDER BY key")?.query_map(params![m.id,j.as_ref().map(|j|&j.id)],|r|r.get(0))?.collect::<std::result::Result<Vec<_>,_>>()?;
                 let online=m.last_seen_at.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).is_some_and(|t|time::OffsetDateTime::now_utc()-t<=time::Duration::seconds(120));
                 Ok(MemberStats{
-member:m,counts,online,working_on:working}
+status_stale:!m.status_text.is_empty()&&m.status_at.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).is_none_or(|s|time::OffsetDateTime::now_utc()-s>time::Duration::minutes(30)),member:m,counts,online,working_on:working}
 ) }
 ).collect() }
 )
@@ -1026,21 +1205,24 @@ member:m,counts,online,working_on:working}
     pub fn board(&self, actor: Option<&str>) -> Result<Value> {
         let j = self.active_jam()?;
         self.read(|c| {
-let ts=c.prepare(&format!("SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? AND archived_at IS NULL ORDER
+let mut ts=c.prepare(&format!("SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? AND archived_at IS NULL ORDER
 BY position, key"))?.query_map([&j.id],task_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
+            for t in &mut ts{*t=task(c,&t.key)?;}
             let summarize=|t:&TaskSummary|json!({
-"key":t.key,"title":t.title,"priority":t.priority,"status":t.status,"assignee":t.assignee_id.as_deref().and_then(|id|member(c,id).ok()).as_ref().map(MemberRef::from)}
+"key":t.key,"title":t.title,"priority":t.priority,"status":t.status,"changesRequested":t.changes_requested,"needsInfo":t.needs_info,"epicKey":t.epic_key,"assignee":t.assignee_id.as_deref().and_then(|id|member(c,id).ok()).as_ref().map(MemberRef::from)}
 );
-            let seconds=j.ends_at.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).map(|t|(t-time::OffsetDateTime::now_utc()).whole_seconds().max(0));
+            let deadline=if j.template=="game_jam"{j.ends_at.clone()}else{None};
+            let seconds=deadline.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).map(|t|(t-time::OffsetDateTime::now_utc()).whole_seconds().max(0));
             Ok(json!({
 "jam":{
-"name":j.name,"theme":j.theme,"endsAt":j.ends_at,"timeLeft":seconds}
+"name":j.name,"theme":j.theme,"endsAt":deadline,"timeLeft":seconds,"template":j.template,"milestoneAt":j.milestone_at}
 ,"columns":STATUSES.iter().map(|s|json!({
 "status":s,"count":ts.iter().filter(|t|&t.status==s).count()}
 )).collect::<Vec<_>>(),"inProgress":ts.iter().filter(|t|t.status=="in_progress").map(summarize).collect::<Vec<_>>(),"myTasks":ts.iter().filter(|t|actor.is_some()&&t.assignee_id.as_deref()==actor).map(summarize).collect::<Vec<_>>() }
 ))
         }
 ).and_then(|mut board| {
+board["tagSuggestions"]=serde_json::to_value(tag_suggestions(&self.active_jam()?.template))?;board["openQuestionCount"]=json!(self.list_questions(Some("open"),None)?.len());
 board["onlineAgents"]=serde_json::to_value(self.list_members()?.into_iter().filter(|m|m.member.kind=="agent"&&m.online).collect::<Vec<_>>())?;
  Ok(board)}
 )
@@ -1133,11 +1315,12 @@ pub(crate) fn asset_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Asset> {
         notes: r.get(5)?,
         created_by: r.get(6)?,
         created_at: r.get(7)?,
+        role: r.get(8)?,
     })
 }
 pub(crate) fn all_assets(c: &Connection, jid: &str) -> Result<Vec<Asset>> {
     Ok(c.prepare(
-        "SELECT id, jam_id, kind, name, location, notes, created_by, created_at FROM
+        "SELECT id, jam_id, kind, name, location, notes, created_by, created_at,role FROM
 assets WHERE jam_id=? ORDER BY created_at, id",
     )?
     .query_map([jid], asset_row)?
@@ -1148,7 +1331,7 @@ pub(crate) fn detail(c: &Connection, key: &str) -> Result<TaskDetail> {
     let assets = c
         .prepare(
             "SELECT a.id, a.jam_id, a.kind, a.name, a.location, a.notes, a.created_by,
-a.created_at FROM assets a JOIN task_assets ta ON ta.asset_id=a.id WHERE
+a.created_at,a.role FROM assets a JOIN task_assets ta ON ta.asset_id=a.id WHERE
 ta.task_id=?",
         )?
         .query_map([&t.id], asset_row)?
@@ -1171,6 +1354,28 @@ task_id=? ORDER BY created_at, id",
     let activity = crate::db::activity(c, 0, Some(&t.id), Some(20))?;
     let history = crate::db::activity(c, 0, Some(&t.id), Some(50))?;
     Ok(TaskDetail {
+        ancestor_questions: crate::planning::records(
+            c,
+            "questions",
+            "status='open' AND ((scope_type='story' AND scope_id=?1) OR (scope_type='epic' AND scope_id=?2)) ORDER BY created_at,id",
+            &[&t.story_id, &t.epic_id],
+        )?,
+        brief: crate::workflow::brief(c, key)?,
+        story: crate::planning::story(c, &t.story_id)?,
+        epic: crate::planning::task_epic(c, &t)?,
+        reports: crate::planning::records(
+            c,
+            "reports",
+            "task_id=? ORDER BY round,created_at",
+            &[&t.id],
+        )?,
+        reviews: crate::planning::records(
+            c,
+            "reviews",
+            "task_id=? ORDER BY round,created_at",
+            &[&t.id],
+        )?,
+        references: crate::references::task_references(c, &t)?,
         task: t,
         assets,
         comments,

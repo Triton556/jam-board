@@ -5,6 +5,7 @@ export type SelectOption = {
   label: string;
   group?: string;
   color?: string;
+  disabled?: boolean;
 };
 export function CustomSelect({
   value,
@@ -53,6 +54,7 @@ export function CustomSelect({
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   const choose = (v: string) => {
+    if (options.find((o) => o.value === v)?.disabled) return;
     onChange(v);
     setOpen(false);
     setQuery("");
@@ -67,19 +69,26 @@ export function CustomSelect({
         if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
           e.preventDefault();
           setOpen(true);
-          setActive((i) =>
-            e.key === "Home"
-              ? 0
-              : e.key === "End"
-                ? filtered.length - 1
-                : Math.max(
-                    0,
-                    Math.min(
-                      filtered.length - 1,
-                      i + (e.key === "ArrowDown" ? 1 : -1),
-                    ),
-                  ),
-          );
+          setActive((i) => {
+            let next =
+              e.key === "Home"
+                ? 0
+                : e.key === "End"
+                  ? filtered.length - 1
+                  : Math.max(
+                      0,
+                      Math.min(
+                        filtered.length - 1,
+                        i + (e.key === "ArrowDown" ? 1 : -1),
+                      ),
+                    );
+            const direction = e.key === "ArrowUp" || e.key === "End" ? -1 : 1;
+            while (filtered[next]?.disabled) {
+              next += direction;
+              if (next < 0 || next >= filtered.length) return i;
+            }
+            return next;
+          });
         }
         if (e.key === "Escape" && open) {
           e.preventDefault();
@@ -149,6 +158,8 @@ export function CustomSelect({
                   role="option"
                   id={`${uid}-${i}`}
                   aria-selected={o.value === value}
+                  disabled={o.disabled}
+                  aria-disabled={o.disabled}
                   className={i === active ? "active-option" : ""}
                   onPointerMove={() => setActive(i)}
                   onClick={() => choose(o.value)}

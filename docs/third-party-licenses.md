@@ -784,3 +784,29 @@ Self-hosted fonts: Fraunces, Manrope, JetBrains Mono and Caveat ? SIL Open Font 
 ## Installer toolchain
 
 The locked Cargo/npm inventory above is unchanged. Windows packaging additionally uses NSIS 3.13 (zlib/libpng; LZMA module CPL-1.0 with a linking exception) and nsis_tauri_utils 0.5.3 (MIT OR Apache-2.0), downloaded and hash-verified by Tauri. See [NSIS licensing](https://nsis.sourceforge.io/License) and the [versioned plugin manifest](https://github.com/tauri-apps/nsis-tauri-utils/blob/nsis_tauri_utils-v0.5.3/Cargo.toml).
+
+## Reference canvas dependency additions
+
+Locked local npm package metadata, added with React Flow 12.12.x.
+
+| Package | Version | License |
+|---|---|---|
+| @types/d3-color | 3.1.3 | MIT |
+| @types/d3-drag | 3.0.7 | MIT |
+| @types/d3-interpolate | 3.0.4 | MIT |
+| @types/d3-selection | 3.0.12 | MIT |
+| @types/d3-transition | 3.0.9 | MIT |
+| @types/d3-zoom | 3.0.9 | MIT |
+| @xyflow/react | 12.12.0 | MIT |
+| zustand | 4.5.7 | MIT |
+| @xyflow/system | 0.0.83 | MIT |
+| classcat | 5.0.5 | MIT |
+| d3-color | 3.1.0 | ISC |
+| d3-dispatch | 3.0.1 | ISC |
+| d3-drag | 3.0.0 | ISC |
+| d3-ease | 3.0.1 | BSD-3-Clause |
+| d3-interpolate | 3.0.1 | ISC |
+| d3-selection | 3.0.0 | ISC |
+| d3-timer | 3.0.1 | ISC |
+| d3-transition | 3.0.1 | ISC |
+| d3-zoom | 3.0.0 | ISC |

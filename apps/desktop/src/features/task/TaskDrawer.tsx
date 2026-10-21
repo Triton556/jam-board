@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBlocker } from "@tanstack/react-router";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   Copy,
   Image as ImageIcon,
@@ -28,18 +28,32 @@ import {
   Tabs,
   TagInput,
 } from "../../components/ui";
+import { WorkingPill } from "../../components/ui/AgentWorking";
+import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { Priority, priorities } from "../../components/ui/Priority";
 import { RoughLine } from "../../components/ui/RoughLine";
+import { useAgentWorking } from "../../lib/agent-working";
 import { api } from "../../lib/api";
+import { invalidatePlanning } from "../../lib/planning-queries";
 import { appQuery, membersQuery, useBoardSettings } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
 import type { TaskDetail, UpdateInput } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
+import { ReferencesSection } from "../references/ReferencesSection";
+import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
+import { ReadinessStrip } from "./Readiness";
+import { Rounds } from "./Rounds";
 import type { TaskFields } from "./task-form";
-import { fieldNames, taskPatch, taskSchema, taskValues } from "./task-form";
+import {
+  equalValue,
+  fieldNames,
+  taskPatch,
+  taskSchema,
+  taskValues,
+} from "./task-form";
 
 export function TaskDrawer({
   taskKey,
@@ -57,9 +71,9 @@ export function TaskDrawer({
   return (
     <Drawer onClose={close} title={taskKey}>
       {task.error ? (
-        <p role="alert">{task.error.message}</p>
+        <QueryError error={task.error} retry={() => void task.refetch()} />
       ) : (
-        <p>Loading task...</p>
+        <PaperSkeleton label="Loading task" />
       )}
     </Drawer>
   );
@@ -72,7 +86,16 @@ export function TaskEditor({
   close(): void;
 }) {
   const { settings } = useBoardSettings();
+  const navigate = useNavigate();
+  const readiness = useQuery({
+    queryKey: ["readiness", task.key],
+    queryFn: () => api.checkReady(task.key),
+  });
   const members = useQuery(membersQuery);
+  const working = useAgentWorking(
+    task,
+    members.data?.find((m) => m.id === task.assigneeId),
+  );
   const app = useQuery(appQuery);
   const tags = useQuery({ queryKey: ["tags"], queryFn: () => api.listTags() });
   const client = useQueryClient();
@@ -130,6 +153,7 @@ export function TaskEditor({
       setBase(task);
   }, [task, changes, app.data?.currentMember?.id]);
   const invalidate = () => {
+    invalidatePlanning(client);
     for (const queryKey of [
       ["task", task.key],
       ["boardTasks"],
@@ -142,13 +166,30 @@ export function TaskEditor({
   };
   const save = useMutation({
     mutationFn: (input: UpdateInput) => api.updateTask(input),
-    onSuccess: (value) => {
+    onMutate: () => structuredClone(getValues()),
+    onSuccess: (value, _input, submitted) => {
+      const current = getValues();
       client.setQueryData(["task", task.key], value);
       resetTask(value);
+      // Preserve typing made while the previous section's blur-save was in flight.
+      for (const field of fieldNames) {
+        if (submitted && !equalValue(current[field], submitted[field]))
+          form.setValue(field, current[field], {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+      }
       invalidate();
     },
     onError: async (error) => {
-      if ("code" in error && error.code === "conflict") {
+      if ("code" in error && error.code === "not_ready") {
+        form.setValue("status", base.status as TaskFields["status"], {
+          shouldDirty: true,
+        });
+        useUiStore.setState({
+          readyRequest: { key: task.key, status: "ready" },
+        });
+      } else if ("code" in error && error.code === "conflict") {
         const fresh = await api.getTask(task.key);
         setLatest(fresh);
         setReview(true);
@@ -156,7 +197,11 @@ export function TaskEditor({
     },
   });
   const submit = (values: TaskFields, version = base.updatedAt) => {
-    const patch = taskPatch(taskValues(base), values);
+    const patch = taskPatch(
+      taskValues(base),
+      values,
+      latest && version === latest.updatedAt ? taskValues(latest) : undefined,
+    );
     if (Object.keys(patch).length)
       save.mutate({ key: task.key, expectedUpdatedAt: version, ...patch });
     else resetTask(latest ?? base);
@@ -307,6 +352,32 @@ export function TaskEditor({
         className="task-form"
       >
         <fieldset disabled={readonly || save.isPending}>
+          <div className="task-breadcrumb">
+            <Button
+              variant="ghost"
+              onClick={() =>
+                void navigate({
+                  to: "/plan/$epicKey",
+                  params: { epicKey: task.epic.key },
+                })
+              }
+            >
+              <i style={{ background: `var(--${task.epic.color})` }} />
+              {task.epic.key} · {task.epic.title}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                void navigate({
+                  to: "/plan/$epicKey",
+                  params: { epicKey: task.epic.key },
+                  search: { story: task.story.key },
+                })
+              }
+            >
+              {task.story.key} · {task.story.title}
+            </Button>
+          </div>
           <textarea
             className="task-title-input"
             aria-label="Task title"
@@ -328,22 +399,52 @@ export function TaskEditor({
           {errors.title && (
             <p className="field-error">{errors.title.message}</p>
           )}
+          {readiness.data && (
+            <ReadinessStrip
+              readiness={readiness.data}
+              status={task.status}
+              onMark={() => {
+                void (async () => {
+                  if (isDirty) {
+                    const parsed = taskSchema.safeParse(getValues());
+                    if (!parsed.success) return;
+                    await save.mutateAsync({
+                      key: task.key,
+                      expectedUpdatedAt: base.updatedAt,
+                      ...taskPatch(taskValues(base), parsed.data),
+                    });
+                  }
+                  const check = await api.checkReady(task.key);
+                  if (check.ready) {
+                    await api.markReady(task.key);
+                    invalidate();
+                  } else
+                    useUiStore.setState({
+                      readyRequest: { key: task.key, status: "ready" },
+                    });
+                })().catch((e) => useUiStore.getState().error(String(e)));
+              }}
+            />
+          )}
           <div className="task-field-grid">
-            <div className="field">
+            <div className="field task-status-field">
               Status
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <Select {...field} aria-label="Status">
-                    {statuses.map((s) => (
-                      <option key={s} value={s}>
-                        {labels[s]}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              />
+              <div className="task-status-control">
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select {...field} aria-label="Status">
+                      {statuses.map((s) => (
+                        <option key={s} value={s}>
+                          {labels[s]}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                />
+                <WorkingPill state={working} />
+              </div>
             </div>
             <div className="field">
               Priority
@@ -353,6 +454,7 @@ export function TaskEditor({
                 render={({ field }) => (
                   <SegmentedControl
                     label="Priority"
+                    size="large"
                     value={field.value}
                     onChange={field.onChange}
                     options={priorities.map((p) => ({
@@ -395,6 +497,7 @@ export function TaskEditor({
                   render={({ field }) => (
                     <SegmentedControl
                       label="Estimate"
+                      size="large"
                       value={String(field.value ?? "")}
                       onChange={(v) => field.onChange(v ? Number(v) : null)}
                       options={["", "1", "2", "3", "5", "8"].map((v) => ({
@@ -440,23 +543,54 @@ export function TaskEditor({
               />
             </div>
           </div>
+          <Controller
+            name="brief"
+            control={control}
+            render={({ field }) => (
+              <BriefEditor
+                value={field.value}
+                onChange={field.onChange}
+                onSave={() => submitRef.current()}
+                disabled={readonly}
+              />
+            )}
+          />
+          {errors.brief && (
+            <p role="alert">
+              Complete required Change and Test fields before saving.
+            </p>
+          )}
           <div className="section-heading">
-            <h2>Description</h2>
+            <h2>Notes</h2>
             <Tabs value={tab} onChange={setTab} items={["Write", "Preview"]} />
           </div>
           {tab === "Write" ? (
             <textarea
-              aria-label="Description"
+              aria-label="Notes"
               className="description-input"
               {...register("descriptionMd")}
             />
           ) : (
-            <Markdown>
-              {watch("descriptionMd") || "*No description yet.*"}
-            </Markdown>
+            <Markdown>{watch("descriptionMd") || "*No notes yet.*"}</Markdown>
           )}
         </fieldset>
       </form>
+      <Rounds task={task} members={members.data ?? []} />
+      {(task.ancestorQuestions?.length ?? 0) > 0 && (
+        <details className="task-section">
+          <summary>Open questions above this task</summary>
+          {(task.ancestorQuestions ?? []).map((q) => (
+            <p key={q.id}>
+              {q.scopeType} · {q.title}
+            </p>
+          ))}
+        </details>
+      )}
+      <ReferencesSection
+        targetKey={task.key}
+        epicKey={task.epic.key}
+        disabled={readonly}
+      />
       <section className={`task-section ${fileOver ? "file-drop-active" : ""}`}>
         {fileOver && <RoughLine frame />}
         <h2>
@@ -666,12 +800,13 @@ export function TaskEditor({
               <strong>Yours</strong>
             </div>
             {fieldNames
+              .filter((field) => field !== "brief")
               .filter(
                 (field) =>
-                  JSON.stringify(taskValues(base)[field]) !==
-                    JSON.stringify(taskValues(latest)[field]) ||
-                  JSON.stringify(taskValues(base)[field]) !==
-                    JSON.stringify(values[field]),
+                  !equalValue(
+                    taskValues(base)[field],
+                    taskValues(latest)[field],
+                  ) || !equalValue(taskValues(base)[field], values[field]),
               )
               .map((field) => (
                 <div className="comparison-row" key={field}>
@@ -685,6 +820,24 @@ export function TaskEditor({
                       {Array.isArray(value)
                         ? value.join(", ")
                         : String(value ?? "–")}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            {Object.keys(values.brief)
+              .filter((key) => {
+                const k = key as keyof typeof values.brief;
+                return (
+                  !equalValue(base.brief[k], latest.brief[k]) ||
+                  !equalValue(base.brief[k], values.brief[k])
+                );
+              })
+              .map((key) => (
+                <div className="comparison-row" key={key}>
+                  <strong>{key}</strong>
+                  {[base.brief, latest.brief, values.brief].map((b, i) => (
+                    <span key={["was", "theirs", "yours"][i]}>
+                      {JSON.stringify(b[key as keyof typeof values.brief])}
                     </span>
                   ))}
                 </div>

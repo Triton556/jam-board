@@ -33,6 +33,8 @@ fn recursive_json_event_exports_without_changing_the_wire_shape() {
                 color: "#5B8DEF".into(),
             },
             task_key: None,
+            epic_id: None,
+            sentence: "Danil updated the jam".into(),
             payload: serde_json::json!({"field":[null,{"nested":[true,1,"text"]}]}),
             created_at: jam_core::now(),
         }],

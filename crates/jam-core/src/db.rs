@@ -53,8 +53,19 @@ impl Store {
             rusqlite_migration::M::up(
                 "ALTER TABLE jams ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));",
             ),
+            rusqlite_migration::M::up_with_hook(
+                include_str!("migration_v3.sql"),
+                crate::migration_v3::migrate,
+            )
+            .foreign_key_check(),
+            rusqlite_migration::M::up(
+                "ALTER TABLE ref_items ADD COLUMN metadata TEXT; ALTER TABLE ref_frames ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0 CHECK(collapsed IN (0,1));",
+            ),
         ]);
-        migrations.to_latest(&mut writer)?;
+        writer.pragma_update(None, "foreign_keys", "OFF")?;
+        let migrated = migrations.to_latest(&mut writer);
+        writer.pragma_update(None, "foreign_keys", "ON")?;
+        migrated?;
         Ok(Self {
             writer: Mutex::new(writer),
             readers: [Mutex::new(connect(path)?), Mutex::new(connect(path)?)],
@@ -114,7 +125,7 @@ impl Store {
 }
 
 pub struct ChangeFeed {
-    connection: Connection,
+    pub(crate) connection: Connection,
     pub last_seq: i64,
     data_version: i64,
 }
@@ -143,6 +154,14 @@ impl ChangeFeed {
         self.data_version = version;
         Ok(changed)
     }
+    /// Shared bounded wait for question and activity long-polls. No transaction survives sleep.
+    pub(crate) fn wait_until_changed(&mut self, deadline: std::time::Instant) -> Result<bool> {
+        std::thread::sleep(
+            std::time::Duration::from_millis(250)
+                .min(deadline.saturating_duration_since(std::time::Instant::now())),
+        );
+        self.data_changed()
+    }
 }
 
 pub(crate) fn activity(
@@ -151,7 +170,7 @@ pub(crate) fn activity(
     task_id: Option<&str>,
     limit: Option<i64>,
 ) -> Result<Vec<ActivityEvent>> {
-    let mut stmt = c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>?1 AND (?2 IS NULL OR a.task_id=?2) ORDER BY a.seq ASC")?;
+    let mut stmt = c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>?1 AND (?2 IS NULL OR a.task_id=?2) ORDER BY a.seq ASC")?;
     let rows = stmt.query_map(rusqlite::params![after, task_id], activity_row)?;
     let mut events = rows.collect::<std::result::Result<Vec<_>, _>>()?;
     if let Some(limit) = limit {
@@ -165,9 +184,16 @@ pub(crate) fn activity(
 
 pub(crate) fn activity_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEvent> {
     let raw: String = r.get(8)?;
+    let payload: serde_json::Value = serde_json::from_str(&raw).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(e))
+    })?;
+    let action: String = r.get(1)?;
+    let actor_name: String = r.get(4)?;
+    let task_key: Option<String> = r.get(7)?;
+    let sentence = crate::activity_sentence(&action, &actor_name, task_key.as_deref(), &payload);
     Ok(ActivityEvent {
         seq: r.get(0)?,
-        action: r.get(1)?,
+        action,
         actor: MemberRef {
             id: r.get(2)?,
             kind: r.get(3)?,
@@ -175,10 +201,10 @@ pub(crate) fn activity_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEv
             handle: r.get(5)?,
             color: r.get(6)?,
         },
-        task_key: r.get(7)?,
-        payload: serde_json::from_str(&raw).map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(e))
-        })?,
+        task_key,
+        payload,
         created_at: r.get(9)?,
+        epic_id: r.get(10)?,
+        sentence,
     })
 }

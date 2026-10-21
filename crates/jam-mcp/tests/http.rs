@@ -74,11 +74,42 @@ async fn http_auth_origin_identity_port_and_tools() {
     .serve(transport)
     .await
     .unwrap();
-    assert_eq!(client.list_all_tools().await.unwrap().len(), 12);
+    let mut actual = client
+        .list_all_tools()
+        .await
+        .unwrap()
+        .iter()
+        .map(|t| t.name.to_string())
+        .collect::<Vec<_>>();
+    actual.sort();
+    assert_eq!(actual.len(), 39);
+    let expected: Vec<String> =
+        serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
+    assert_eq!(actual, expected);
+    let h = s.current_member().unwrap();
+    let e = s
+        .create_epic(
+            &h.id,
+            jam_core::NewEpic {
+                title: "HTTP epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let story = s
+        .create_story(
+            &h.id,
+            jam_core::NewStory {
+                epic_key: e.key,
+                title: "HTTP story".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
     let result = client
         .call_tool(
             CallToolRequestParams::new("create_task").with_arguments(
-                serde_json::json!({"title":"HTTP task"})
+                serde_json::json!({"storyKey":story.key,"title":"HTTP task"})
                     .as_object()
                     .unwrap()
                     .clone(),
@@ -96,6 +127,19 @@ async fn http_auth_origin_identity_port_and_tools() {
     assert!(m.online);
     assert_eq!(m.member.color, "#E0679A");
     assert_eq!(recent.lock().unwrap().len(), 1);
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("wait_for_changes").with_arguments(
+                serde_json::json!({"cursor":0,"actorKind":"human"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_ne!(result.is_error, Some(true));
+    assert_eq!(result.structured_content.unwrap()["timedOut"], false);
     client.cancel().await.unwrap();
     server.stop().await;
     drop(blocker);

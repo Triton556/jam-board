@@ -12,7 +12,7 @@ fn debug_bulk_and_empty_state_command_errors() {
     let (_dir, store) = setup();
     let before = store.latest_seq().unwrap();
     store.seed_bulk(2).unwrap();
-    assert_eq!(store.query_tasks(TaskQuery::default()).unwrap().total, 34);
+    assert_eq!(store.query_tasks(TaskQuery::default()).unwrap().total, 24);
     assert_eq!(store.latest_seq().unwrap(), before + 2);
     assert!(matches!(
         store.seed_bulk(5001),
@@ -23,7 +23,7 @@ fn debug_bulk_and_empty_state_command_errors() {
         Err(Error::NotFound(_))
     ));
     store.archive_current_task("JB-1", None).unwrap();
-    assert_eq!(store.query_tasks(TaskQuery::default()).unwrap().total, 33);
+    assert_eq!(store.query_tasks(TaskQuery::default()).unwrap().total, 23);
     assert_eq!(
         store
             .query_tasks(TaskQuery {
@@ -32,7 +32,7 @@ fn debug_bulk_and_empty_state_command_errors() {
             })
             .unwrap()
             .total,
-        34
+        24
     );
 }
 fn edit(store: &Store, key: &str, fields: serde_json::Value) -> Result<TaskDetail> {
@@ -52,7 +52,7 @@ fn sql_filters_and_ranked_numeric_sorts() {
         }),
         ..Default::default()
     });
-    assert_eq!(tasks.len(), 32);
+    assert_eq!(tasks.len(), 22);
     assert_eq!(tasks[8].key, "JB-9");
     assert_eq!(tasks[9].key, "JB-10");
     for (field, ranks) in [
@@ -109,7 +109,7 @@ fn sql_filters_and_ranked_numeric_sorts() {
     assert!(
         !list(TaskQuery {
             tags: Some(vec![" UI ".into()]),
-            status: Some(vec!["todo".into()]),
+            status: Some(vec!["ready".into()]),
             ..Default::default()
         })
         .is_empty()

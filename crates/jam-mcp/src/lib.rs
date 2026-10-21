@@ -8,3 +8,5 @@ pub use server::{JamServer, RecentCall, RecentCalls};
 
 mod runtime;
 pub use runtime::{ConfigSnippets, McpRuntime, McpStatus, config_snippets};
+
+mod v2;

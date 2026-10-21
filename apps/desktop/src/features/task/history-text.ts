@@ -1,6 +1,10 @@
 import type { ActivityEvent, Status } from "../../lib/types";
 import { labels } from "../../lib/types";
 export function historyText(event: ActivityEvent) {
+  if (event.sentence)
+    return event.sentence.startsWith(event.actor.name)
+      ? event.sentence.slice(event.actor.name.length).trimStart()
+      : event.sentence;
   const payload =
     event.payload &&
     typeof event.payload === "object" &&

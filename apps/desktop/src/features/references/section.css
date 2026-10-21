@@ -1,0 +1,47 @@
+.references-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.linked-references {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.linked-reference {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 7px;
+  background: var(--paper);
+  max-width: 100%;
+  font-size: 13px;
+  text-align: left;
+}
+.linked-reference-thumb {
+  width: 48px;
+  height: 42px;
+  object-fit: contain;
+  background: var(--paper-2);
+  border-radius: 6px;
+}
+.reference-picker-grid {
+  display: grid;
+  gap: 9px;
+  max-height: 350px;
+  overflow: auto;
+}
+.reference-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.reference-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}

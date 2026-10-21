@@ -161,28 +161,71 @@ export function SegmentedControl<T extends string>({
   onChange,
   options,
   disabled,
+  size = "default",
 }: {
   label: string;
   value: T;
   onChange(value: T): void;
   options: { value: T; label: ReactNode; title?: string }[];
   disabled?: boolean;
+  size?: "default" | "large";
 }) {
   return (
-    <fieldset className="segmented" aria-label={label}>
-      {options.map((o) => (
+    <div
+      className={`segmented segmented-${size}`}
+      role="radiogroup"
+      aria-label={label}
+    >
+      {options.map((o, index) => (
+        // biome-ignore lint/a11y/useSemanticElements: A button radio supports rich icon labels and a single roving keyboard focus target.
         <button
           key={o.value}
           type="button"
           disabled={disabled}
           aria-label={o.title ?? String(o.label)}
-          aria-pressed={value === o.value}
+          role="radio"
+          aria-checked={value === o.value}
+          tabIndex={value === o.value ? 0 : -1}
           onClick={() => onChange(o.value)}
+          onKeyDown={(event) => {
+            if (
+              ![
+                "ArrowRight",
+                "ArrowLeft",
+                "ArrowUp",
+                "ArrowDown",
+                "Home",
+                "End",
+              ].includes(event.key)
+            )
+              return;
+            event.preventDefault();
+            const next =
+              event.key === "Home"
+                ? 0
+                : event.key === "End"
+                  ? options.length - 1
+                  : (index +
+                      (event.key === "ArrowRight" || event.key === "ArrowDown"
+                        ? 1
+                        : -1) +
+                      options.length) %
+                    options.length;
+            const option = options[next];
+            if (option) {
+              onChange(option.value);
+              (
+                event.currentTarget.parentElement?.children[
+                  next
+                ] as HTMLButtonElement
+              )?.focus();
+            }
+          }}
         >
           {o.label}
         </button>
       ))}
-    </fieldset>
+    </div>
   );
 }
 export function Tabs({

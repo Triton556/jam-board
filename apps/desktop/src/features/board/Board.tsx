@@ -207,13 +207,27 @@ function Column({
     </section>
   );
 }
-export function Board({ open }: { open(key: string): void }) {
+export function Board({
+  open,
+  epicKeys = [],
+}: {
+  open(key: string): void;
+  epicKeys?: string[];
+}) {
   const { settings } = useBoardSettings();
   const tasks = useQuery(tasksQuery);
   const members = useQuery(membersQuery);
   const move = useMoveTask();
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const board = tasks.data ?? emptyBoard();
+  const source = tasks.data ?? emptyBoard();
+  const board = epicKeys.length
+    ? (Object.fromEntries(
+        statuses.map((s) => [
+          s,
+          source[s].filter((t) => epicKeys.includes(t.epicKey ?? "")),
+        ]),
+      ) as typeof source)
+    : source;
   const boardRef = useRef(board);
   boardRef.current = board;
   const destination = useRef<{ status: Status; index: number } | null>(null);
@@ -300,7 +314,17 @@ export function Board({ open }: { open(key: string): void }) {
       const items = board[target.status].filter((t) => t.key !== key);
       const index =
         target.index < 0 ? items.length : Math.min(target.index, items.length);
-      const next = relocate(board, key, target.status, index);
+      // Translate the visible insertion slot into the full column; hidden epics
+      // may have tasks between the two visible neighbors.
+      const full = source[target.status].filter((t) => t.key !== key);
+      const before = items[index];
+      const after = items[index - 1];
+      const fullIndex = before
+        ? full.findIndex((t) => t.key === before.key)
+        : after
+          ? full.findIndex((t) => t.key === after.key) + 1
+          : full.length;
+      const next = relocate(source, key, target.status, fullIndex);
       move.mutate(moveInput(next, key, target.status));
     }
     setActiveKey(null);
@@ -321,7 +345,7 @@ export function Board({ open }: { open(key: string): void }) {
         : undefined;
     },
     onDragEnd: ({ active, over }) =>
-      `Dropped ${active.id}${over ? ` in ${labels[destination.current?.status ?? locate(String(over.id))?.status ?? "todo"]}` : ""}.`,
+      `Dropped ${active.id}${over ? ` in ${labels[destination.current?.status ?? locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
     onDragCancel: ({ active }) => `Cancelled dragging ${active.id}.`,
   };
   if (tasks.isPending || members.isPending)

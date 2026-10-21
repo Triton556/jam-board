@@ -140,7 +140,7 @@ describe("agent events", () => {
 });
 it("rolls back the optimistic move when move_task fails", async () => {
   const board = await api.listBoardTasks();
-  const source = board.todo[0];
+  const source = board.ready[0];
   if (!source) throw new Error("Missing task");
   const { client, Wrapper } = wrapper();
   client.setQueryData(["boardTasks"], board);
@@ -172,7 +172,7 @@ it("rolls back the optimistic move when move_task fails", async () => {
     expect(
       client
         .getQueryData<BoardTasks>(["boardTasks"])
-        ?.todo.some((t) => t.key === source.key),
+        ?.ready.some((t) => t.key === source.key),
     ).toBe(true),
   );
   expect(useUiStore.getState().toasts[0]?.text).toBe(
@@ -185,8 +185,8 @@ it("creates on Enter, keeps the editor, ignores blank titles and cancels on Esca
   const { Wrapper } = wrapper();
   render(<Board open={() => {}} />, { wrapper: Wrapper });
   await screen.findByText("Player movement: coyote time & jump buffer");
-  await user.click(screen.getByRole("button", { name: "Add task to To do" }));
-  const input = screen.getByRole("textbox", { name: "New task in To do" });
+  await user.click(screen.getByRole("button", { name: "Add task to Backlog" }));
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
   await user.keyboard("{Enter}");
   expect(mockApi.calls.filter((c) => c.command === "create_task")).toHaveLength(
     0,
@@ -255,6 +255,7 @@ describe("onboarding validation", () => {
       history: createMemoryHistory({ initialEntries: ["/"] }),
     });
     render(<RouterProvider router={router} />, { wrapper: Wrapper });
+    fireEvent.click(await screen.findByRole("button", { name: "Game jam" }));
     const submit = await screen.findByRole("button", {
       name: "Create jam",
     });

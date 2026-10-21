@@ -111,7 +111,7 @@ function harness(palette = false) {
 it("validates URL garbage per field and serializes all filters", () => {
   const value = validateTableSearch({
     q: "lantern",
-    status: "todo,wrong,review",
+    status: "ready,wrong,review",
     assignee: "agents",
     tags: " UI ,bug,UI",
     archived: "1",
@@ -121,7 +121,7 @@ it("validates URL garbage per field and serializes all filters", () => {
   });
   expect(value).toEqual({
     q: "lantern",
-    status: "todo,review",
+    status: "ready,review",
     assignee: "agents",
     tags: "ui,bug",
     archived: "1",

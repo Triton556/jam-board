@@ -21,6 +21,8 @@ pub struct TaskAssetRow {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct JamExport {
     pub version: u32,
+    #[serde(default)]
+    pub planning: Option<crate::PlanningExport>,
     pub jam: Jam,
     pub members: Vec<Member>,
     pub tasks: Vec<TaskSummary>,
@@ -50,22 +52,29 @@ impl Store {
         let j=jam(c)?;
         let keys=c.prepare("SELECT key FROM tasks WHERE jam_id=? ORDER BY created_at,key")?.query_map([&j.id],|r|r.get::<_,String>(0))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let tasks=keys.iter().map(|key|task(c,key)).collect::<Result<Vec<_>>>()?;
-        let members=c.prepare("SELECT id,kind,name,handle,color,avatar,client,last_seen_at,created_at FROM members ORDER BY created_at,id")?.query_map([],crate::service::member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
+        let members=c.prepare("SELECT id,kind,name,handle,color,avatar,client,last_seen_at,created_at,status_text,status_scope_json,status_at FROM members ORDER BY created_at,id")?.query_map([],crate::service::member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
         let assets=crate::service::all_assets(c,&j.id)?;
         let tags=tasks.iter().flat_map(|t|t.tags.iter().map(|tag|TaskTagRow{task_id:t.id.clone(),tag:tag.clone()})).collect();
         let links=c.prepare("SELECT l.task_id,l.asset_id FROM task_assets l JOIN tasks t ON t.id=l.task_id WHERE t.jam_id=?")?.query_map([&j.id],|r|Ok(TaskAssetRow{task_id:r.get(0)?,asset_id:r.get(1)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let comments=c.prepare("SELECT c.id,c.task_id,c.author_id,c.body_md,c.created_at FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.jam_id=? ORDER BY c.created_at,c.id")?.query_map([&j.id],|r|Ok(Comment{id:r.get(0)?,task_id:r.get(1)?,author_id:r.get(2)?,body_md:r.get(3)?,created_at:r.get(4)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let seqs=c.prepare("SELECT seq FROM activity WHERE jam_id=? ORDER BY seq")?.query_map([&j.id],|r|r.get::<_,i64>(0))?.collect::<std::result::Result<BTreeSet<_>,_>>()?;
         let activity=crate::db::activity(c,0,None,None)?.into_iter().filter(|e|seqs.contains(&e.seq)).collect();
-        Ok(JamExport{version:1,jam:j,members,tasks,tags,assets,links,comments,activity})
+        Ok(JamExport{version:2,planning:Some(crate::snapshot_v2::export(c,&j.id)?),jam:j,members,tasks,tags,assets,links,comments,activity})
     })
     }
     pub fn import_jam_json(&self, actor: &str, json: &str) -> Result<AppState> {
         if json.len() > 32 * 1024 * 1024 {
             return Err(invalid("file", "Import is limited to 32 MiB"));
         }
-        let snapshot: JamExport = serde_json::from_str(json)
+        let mut snapshot: JamExport = serde_json::from_str(json)
             .map_err(|e| invalid("file", &format!("Invalid Jam Board JSON: {e}")))?;
+        if snapshot.version == 1 {
+            for t in &mut snapshot.tasks {
+                if t.status == "todo" {
+                    t.status = "backlog".into();
+                }
+            }
+        }
         validate_snapshot(&snapshot)?;
         self.write(|c|{
             crate::m5::require_human(c,actor)?;
@@ -73,27 +82,29 @@ impl Store {
             for m in &snapshot.members {
                 let existing=c.query_row("SELECT id,kind FROM members WHERE handle=?",[&m.handle],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional()?;
                 let mid=if let Some((id,kind))=existing{if kind!=m.kind{return Err(invalid("members","An existing handle has a different member kind"));}id}else{
-                    let mid=id();c.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?,?)",params![mid,m.kind,m.name,m.handle,m.color,m.avatar,m.client,m.last_seen_at,m.created_at])?;mid
+                    let mid=id();c.execute("INSERT INTO members(id,kind,name,handle,color,avatar,client,last_seen_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)",params![mid,m.kind,m.name,m.handle,m.color,m.avatar,m.client,m.last_seen_at,m.created_at])?;mid
                 };ids.insert(m.id.clone(),mid);
             }
             let jid=id();ids.insert(snapshot.jam.id.clone(),jid.clone());
             let mut index=1;let prefix=loop{let p=if index==1{"JB".into()}else{format!("JB{index}")};if !c.query_row("SELECT EXISTS(SELECT 1 FROM jams WHERE key_prefix=?)",[&p],|r|r.get::<_,bool>(0))?{break p;}index+=1;};
-            c.execute("INSERT INTO jams(id,name,theme,starts_at,ends_at,timezone,task_seq,key_prefix,created_at) VALUES (?,?,?,?,?,?,?,?,?)",params![jid,snapshot.jam.name,snapshot.jam.theme,snapshot.jam.starts_at,snapshot.jam.ends_at,snapshot.jam.timezone,snapshot.tasks.len() as i64,prefix,now()])?;
+            c.execute("INSERT INTO jams(id,name,theme,starts_at,ends_at,timezone,task_seq,key_prefix,created_at,template,milestone_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",params![jid,snapshot.jam.name,snapshot.jam.theme,snapshot.jam.starts_at,snapshot.jam.ends_at,snapshot.jam.timezone,snapshot.tasks.len() as i64,prefix,now(),snapshot.jam.template,snapshot.jam.milestone_at])?;
             let mut tasks=snapshot.tasks.iter().collect::<Vec<_>>();tasks.sort_by_key(|t|t.key.rsplit('-').next().and_then(|n|n.parse::<u64>().ok()).unwrap_or(0));
             for (i,t) in tasks.iter().enumerate(){ids.insert(t.id.clone(),id());keys.insert(t.key.clone(),format!("{prefix}-{}",i+1));}
             for a in &snapshot.assets{ids.insert(a.id.clone(),id());}
             for comment in &snapshot.comments{ids.insert(comment.id.clone(),id());}
+            let fallback_story=crate::snapshot_v2::prepare(c,snapshot.planning.as_ref(),actor,&jid,&prefix,&mut ids,&mut keys)?;
             let mapped=|old:&str|ids.get(old).cloned().ok_or_else(||invalid("file","Unresolved object reference"));
             for t in tasks {
-                c.execute(&format!("INSERT INTO tasks({TASK_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"),params![mapped(&t.id)?,jid,keys[&t.key],t.title,t.description_md,t.status,t.priority,t.estimate,t.due_at,t.position,t.assignee_id.as_deref().map(mapped).transpose()?,mapped(&t.created_by)?,mapped(&t.updated_by)?,t.created_at,t.updated_at,t.archived_at,Option::<String>::None])?;
+                c.execute(&format!("INSERT INTO tasks({TASK_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"),params![mapped(&t.id)?,jid,keys[&t.key],t.title,t.description_md,t.status,t.priority,t.estimate,t.due_at,t.position,t.assignee_id.as_deref().map(mapped).transpose()?,mapped(&t.created_by)?,mapped(&t.updated_by)?,t.created_at,t.updated_at,t.archived_at,Option::<String>::None,if snapshot.planning.is_some(){mapped(&t.story_id)?}else{fallback_story.clone()},t.changes_requested,t.review_round])?;
             }
             for tag in &snapshot.tags{c.execute("INSERT INTO task_tags VALUES (?,?)",params![mapped(&tag.task_id)?,tag.tag])?;}
-            for a in &snapshot.assets{c.execute("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)",params![mapped(&a.id)?,jid,a.kind,a.name,a.location,a.notes,mapped(&a.created_by)?,a.created_at])?;}
+            for a in &snapshot.assets{c.execute("INSERT INTO assets(id,jam_id,kind,name,location,notes,created_by,created_at,role) VALUES (?,?,?,?,?,?,?,?,?)",params![mapped(&a.id)?,jid,a.kind,a.name,a.location,a.notes,mapped(&a.created_by)?,a.created_at,a.role])?;}
             for l in &snapshot.links{c.execute("INSERT INTO task_assets VALUES (?,?)",params![mapped(&l.task_id)?,mapped(&l.asset_id)?])?;}
             for x in &snapshot.comments{c.execute("INSERT INTO comments VALUES (?,?,?,?,?)",params![mapped(&x.id)?,mapped(&x.task_id)?,mapped(&x.author_id)?,x.body_md,x.created_at])?;}
+            crate::snapshot_v2::finish(c,snapshot.planning.as_ref(),&ids,&keys)?;
             for e in &snapshot.activity {
                 let task_id=e.task_key.as_deref().map(|key|snapshot.tasks.iter().find(|t|t.key==key).ok_or_else(||invalid("activity","Unknown task key")).and_then(|t|mapped(&t.id))).transpose()?;
-                c.execute("INSERT INTO activity(id,jam_id,actor_id,action,task_id,payload,created_at) VALUES (?,?,?,?,?,?,?)",params![id(),jid,mapped(&e.actor.id)?,e.action,task_id,remap_payload(&e.payload,&ids,&keys).to_string(),e.created_at])?;
+                c.execute("INSERT INTO activity(id,jam_id,actor_id,action,task_id,payload,created_at,epic_id) VALUES (?,?,?,?,?,?,?,?)",params![id(),jid,mapped(&e.actor.id)?,e.action,task_id,remap_payload(&e.payload,&ids,&keys).to_string(),e.created_at,e.epic_id.as_deref().map(mapped).transpose()?])?;
             }
             event(c,Some(&jid),actor,"jam.imported",None,serde_json::json!({"name":snapshot.jam.name,"tasks":snapshot.tasks.len()}))?;
             c.execute("INSERT INTO settings VALUES ('current_member_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[actor])?;
@@ -102,7 +113,7 @@ impl Store {
         self.app_state()
     }
 }
-fn remap_payload(
+pub(crate) fn remap_payload(
     v: &serde_json::Value,
     ids: &BTreeMap<String, String>,
     keys: &BTreeMap<String, String>,
@@ -121,13 +132,11 @@ fn remap_payload(
 }
 fn validate_snapshot(s: &JamExport) -> Result<()> {
     use crate::m5::{validate_kind, validate_name};
-    if s.version != 1 {
-        return Err(invalid(
-            "version",
-            "Only Jam Board JSON version 1 is supported",
-        ));
+    if ![1, 2].contains(&s.version) {
+        return Err(invalid("version", "Use Jam Board JSON version 1 or 2"));
     }
     validate_name("jam.name", &s.jam.name, 60)?;
+    crate::snapshot_v2::validate(s)?;
     if s.tasks.len() > 5000 {
         return Err(invalid("tasks", "Import supports at most 5000 tasks"));
     }

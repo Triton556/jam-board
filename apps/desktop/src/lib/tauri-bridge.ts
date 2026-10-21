@@ -20,6 +20,180 @@ async function unwrap<T>(
   return result.data;
 }
 export const tauriApi: JamApi = {
+  getProject: () => unwrap(commands.getProject()),
+  updateProject: (input) =>
+    unwrap(
+      commands.updateProject({
+        name: null,
+        milestoneAt: null,
+        startsAt: null,
+        endsAt: null,
+        timezone: null,
+        ...input,
+      }),
+    ),
+  pickFolder: () => unwrap(commands.pickFolder()),
+  skillSavedPath: () => unwrap(commands.skillSavedPath()),
+  skillCheck: (input) => unwrap(commands.skillCheck(input)),
+  runSkill: (input, step) => unwrap(commands.runSkill(input, step)),
+  cancelSkill: async () => {
+    await unwrap(commands.cancelSkill());
+  },
+  onSkillOutput: (cb) => {
+    let stop: (() => void) | undefined;
+    let disposed = false;
+    void events.skillOutput
+      .listen((e) => cb(e.payload.line))
+      .then((off) => {
+        if (disposed) off();
+        else stop = off;
+      });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  },
+
+  referenceCanvas: () => unwrap(commands.referenceCanvas()),
+  addReference: (input) =>
+    unwrap(
+      commands.addReference({
+        filePath: null,
+        url: null,
+        text: null,
+        title: null,
+        caption: null,
+        tags: null,
+        frameEpicKey: null,
+        frameId: null,
+        linkTo: null,
+        x: null,
+        y: null,
+        ...input,
+      }),
+    ),
+  updateReference: (itemId, patch) =>
+    unwrap(commands.updateReference({ itemId, ...patch })),
+  linkReference: (itemId, targetKey) =>
+    unwrap(commands.linkReference({ itemId, targetKey })),
+  canvasGeometry: (input) => unwrap(commands.canvasGeometry(input)),
+  canvasArchive: async (input) => {
+    await unwrap(commands.canvasArchive(input));
+  },
+  createRefFrame: (input) =>
+    unwrap(
+      commands.createRefFrame({
+        id: "",
+        jamId: "",
+        epicId: null,
+        w: 850,
+        h: 620,
+        color: "m4",
+        archivedAt: null,
+        collapsed: false,
+        ...input,
+      }),
+    ),
+  updateRefFrame: (id, patch) =>
+    unwrap(commands.updateRefFrame({ id, ...patch })),
+  createRefEdge: (fromItem, toItem, label) =>
+    unwrap(commands.createRefEdge({ fromItem, toItem, label })),
+  updateRefEdge: (id, label) => unwrap(commands.updateRefEdge(id, label)),
+  referenceMetadata: (id, metadata) =>
+    unwrap(commands.referenceMetadata(id, metadata)),
+  referenceMedia: (id) => unwrap(commands.referenceMedia(id)),
+  clipboardReference: (bytes, x, y) =>
+    unwrap(commands.clipboardReference(bytes, x, y)),
+  fetchReferencePreview: (id) => unwrap(commands.fetchReferencePreview(id)),
+  clearReferencePreview: (id) => unwrap(commands.clearReferencePreview(id)),
+  canvasViewport: (value) => unwrap(commands.canvasViewport(value ?? null)),
+  listEpics: () => unwrap(commands.listPlanEpics()),
+  listStories: () => unwrap(commands.listPlanStories()),
+  getEpic: (key) => unwrap(commands.getEpic(key)),
+  getStory: (key) => unwrap(commands.getStory(key)),
+  createEpic: (input) =>
+    unwrap(
+      commands.createEpic({
+        color: null,
+        goalMd: null,
+        doneWhenMd: null,
+        notIncludedMd: null,
+        decidedMd: null,
+        openQuestionsMd: null,
+        participation: null,
+        reviewer: null,
+        workerModel: null,
+        ...input,
+      }),
+    ),
+  updateEpic: (key, patch) =>
+    unwrap(
+      commands.updateEpic({
+        title: null,
+        color: null,
+        goalMd: null,
+        doneWhenMd: null,
+        notIncludedMd: null,
+        decidedMd: null,
+        openQuestionsMd: null,
+        participation: null,
+        reviewer: null,
+        ...patch,
+        key,
+      }),
+    ),
+  setEpicStatus: (key, status, overrideReason) =>
+    unwrap(
+      commands.setEpicStatus({
+        key,
+        status,
+        overrideReason: overrideReason ?? null,
+      }),
+    ),
+  setBrain: (epicKey, handle) =>
+    handle === null
+      ? unwrap(commands.clearBrain(epicKey))
+      : unwrap(commands.setBrain({ epicKey, memberHandle: handle })),
+  createStory: (input) =>
+    unwrap(
+      commands.createStory({
+        outcomeMd: null,
+        basisMd: null,
+        preserveMd: null,
+        scaleMd: null,
+        rejectionRisksMd: null,
+        openDecisionsMd: null,
+        acceptance: null,
+        ...input,
+      }),
+    ),
+  updateStory: (key, patch) => unwrap(commands.updateStory({ key, ...patch })),
+  setStoryStatus: (key, status, overrideReason) =>
+    unwrap(
+      commands.setStoryStatus({
+        key,
+        status,
+        overrideReason: overrideReason ?? null,
+      }),
+    ),
+  reorderStory: (key, beforeKey) =>
+    unwrap(commands.reorderStory(key, beforeKey ?? null)),
+  updateTaskBrief: (key, patch) =>
+    unwrap(commands.updateTaskBrief({ key, ...patch })),
+  checkReady: (key) => unwrap(commands.checkReady(key)),
+  markReady: (key, overrideReason) =>
+    unwrap(commands.markReady({ key, overrideReason: overrideReason ?? null })),
+  listQuestions: (status, scope) =>
+    unwrap(
+      commands.listQuestions({ status: status ?? null, scope: scope ?? null }),
+    ),
+  answerQuestion: (input) => unwrap(commands.answerQuestion(input)),
+  withdrawQuestion: (id) => unwrap(commands.withdrawQuestion(id)),
+  askUser: (input) => unwrap(commands.askUser(input)),
+  reviewTask: (input) => unwrap(commands.reviewTask(input)),
+  epicJournal: (key) => unwrap(commands.epicJournal(key, 0)),
+  listChangesSince: (cursor, epicKey) =>
+    unwrap(commands.listChangesSince({ cursor, epicKey: epicKey ?? null })),
   pickFiles: () => unwrap(commands.pickFiles()),
   attachFile: (key, path) => unwrap(commands.attachFile(key, path)),
   appReady: async () => {
@@ -89,7 +263,11 @@ export const tauriApi: JamApi = {
     subscribe(
       getCurrentWebview().onDragDropEvent((e) => {
         onActive?.(e.payload.type === "enter" || e.payload.type === "over");
-        if (e.payload.type === "drop") cb(e.payload.paths);
+        if (e.payload.type === "drop")
+          cb(e.payload.paths, {
+            x: e.payload.position.x / devicePixelRatio,
+            y: e.payload.position.y / devicePixelRatio,
+          });
       }),
     ),
   showInFolder: revealItemInDir,
@@ -98,6 +276,11 @@ export const tauriApi: JamApi = {
   listTasks: (input) =>
     unwrap(
       commands.listTasks({
+        epic: null,
+        story: null,
+        ready: null,
+        changesRequested: null,
+        needsInfo: null,
         status: null,
         assignee: null,
         tags: null,
@@ -142,11 +325,14 @@ export const tauriApi: JamApi = {
         estimate: input.estimate ?? null,
         dueAt: input.dueAt ?? null,
         idempotencyKey: null,
+        storyKey: input.storyKey ?? null,
+        ...input.brief,
       }),
     ),
   moveTask: (input) =>
     unwrap(
       commands.moveTask({
+        overrideReason: null,
         ...input,
         beforeKey: input.beforeKey ?? null,
         afterKey: input.afterKey ?? null,

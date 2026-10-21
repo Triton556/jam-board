@@ -24,12 +24,12 @@ it("loading a new mock demo uses fresh per-jam board preferences", async () => {
   await mockApi.loadDemoJam();
   expect((await mockApi.appState()).jam?.id).not.toBe(before);
   expect(await mockApi.getSettings()).toMatchObject({
-    colorBy: "none",
+    colorBy: "epic",
     estimatesEnabled: false,
     wipLimit: 6,
   });
   const board = await mockApi.listBoardTasks();
-  expect(board.todo.every((t) => t.jamId !== before)).toBe(true);
+  expect(board.ready.every((t) => t.jamId !== before)).toBe(true);
 });
 function wrap(children: React.ReactNode) {
   return render(
@@ -81,14 +81,14 @@ it("cards are flat paper by default and estimates are opt-in", async () => {
 it("custom select exposes a combobox and supports arrows, Enter and Escape", async () => {
   const user = userEvent.setup();
   function Demo() {
-    const [value, set] = useState("todo");
+    const [value, set] = useState("ready");
     return (
       <CustomSelect
         label="Status"
         value={value}
         onChange={set}
         options={[
-          { value: "todo", label: "To do" },
+          { value: "ready", label: "Ready" },
           { value: "review", label: "Review" },
         ]}
       />
@@ -140,9 +140,15 @@ it("table inline creation supports Enter, Escape and pinned filtered-out tasks",
     .setup()
     .click(
       screen
-        .getAllByRole("button", { name: "+ New task" })
+        .getAllByRole("button", { name: /New task/ })
         .at(0) as HTMLButtonElement,
     );
+  await userEvent
+    .setup()
+    .click(screen.getByRole("combobox", { name: "New task story" }));
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("option", { name: /JB-S1/ }));
   const input = screen.getByRole("textbox", { name: "New task title" });
   fireEvent.change(input, { target: { value: "Inline lantern" } });
   fireEvent.keyDown(input, { key: "Enter" });
@@ -164,7 +170,7 @@ it("table inline creation supports Enter, Escape and pinned filtered-out tasks",
     .setup()
     .click(
       screen
-        .getAllByRole("button", { name: "+ New task" })
+        .getAllByRole("button", { name: /New task/ })
         .at(0) as HTMLButtonElement,
     );
   fireEvent.keyDown(screen.getByRole("textbox", { name: "New task title" }), {
@@ -181,7 +187,7 @@ it("asset groups can collapse and persist their state", async () => {
   expect((await mockApi.getSettings()).collapsedAssetKinds).toContain("sprite");
   await userEvent
     .setup()
-    .click(screen.getByRole("button", { name: "List view" }));
+    .click(screen.getByRole("radio", { name: "List view" }));
   await waitFor(() =>
     expect(screen.getByTestId("asset-list")).toBeInTheDocument(),
   );

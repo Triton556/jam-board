@@ -8,6 +8,12 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties } from "react";
 import { Avatar, Stamp } from "../../components/ui";
+import {
+  WorkingLine,
+  WorkingRing,
+  watchWorkingVisibility,
+} from "../../components/ui/AgentWorking";
+import { useAgentWorking } from "../../lib/agent-working";
 import type { ColorBy, Member, TaskSummary } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 
@@ -34,18 +40,22 @@ export function TaskCard({
   const reduced = useReducedMotion();
 
   const member = members.find((m) => m.id === task.assigneeId);
+  const working = useAgentWorking(task, member);
   const Icon = icons[task.priority as keyof typeof icons] ?? Equal;
+  const paint =
+    colorBy === "epic" && task.epicColor
+      ? `var(--${task.epicColor})`
+      : colorBy === "assignee" && member
+        ? member.color
+        : null;
   const style: CSSProperties = {
-    "--assignee-color":
-      colorBy === "assignee" && member ? member.color : "transparent",
-    "--card-fill":
-      colorBy === "assignee" && member
-        ? `color-mix(in srgb, ${member.color} var(--card-mix), var(--card))`
-        : "var(--card)",
-    "--card-border":
-      colorBy === "assignee" && member
-        ? `color-mix(in srgb, ${member.color} 45%, var(--line-soft))`
-        : "var(--line-soft)",
+    "--assignee-color": paint ?? "transparent",
+    "--card-fill": paint
+      ? `color-mix(in srgb, ${paint} var(--card-mix), var(--card))`
+      : "var(--card)",
+    "--card-border": paint
+      ? `color-mix(in srgb, ${paint} 45%, var(--line-soft))`
+      : "var(--line-soft)",
     "--agent-color": member?.kind === "agent" ? member.color : "transparent",
     boxShadow: highlight
       ? `0 0 0 2px ${highlight.color}, 0 0 24px color-mix(in srgb, ${highlight.color} 40%, transparent)`
@@ -55,10 +65,11 @@ export function TaskCard({
   } as CSSProperties;
   return (
     <motion.div
+      ref={watchWorkingVisibility}
       className={`sticker-wrap ${overlay ? "lifted" : ""}`}
       data-testid="task-card"
       data-key={task.key}
-      data-color-by={colorBy === "assignee" && member ? "assignee" : "none"}
+      data-color-by={paint ? colorBy : "none"}
       data-highlighted={highlight ? "true" : "false"}
       style={style}
       layout={!reduced && !overlay}
@@ -80,7 +91,21 @@ export function TaskCard({
             size={17}
           />
         </div>
+        <div className="card-hierarchy">
+          <i style={{ background: `var(--${task.epicColor ?? "m1"})` }} />
+          <span>{task.storyKey}</span>
+        </div>
         <div className="card-title">{task.title}</div>
+        {(task.changesRequested || task.needsInfo) && (
+          <div className="card-flags">
+            {task.changesRequested && (
+              <span className="chip flag-changes">Changes requested</span>
+            )}
+            {task.needsInfo && (
+              <span className="chip flag-info">Needs info</span>
+            )}
+          </div>
+        )}
         {task.tags.length > 0 && (
           <div className="card-tags">
             {task.tags.slice(0, 3).map((tag) => (
@@ -91,6 +116,7 @@ export function TaskCard({
             )}
           </div>
         )}
+        <WorkingLine state={working} />
         <div className="card-footer">
           {estimatesEnabled && task.estimate !== null && (
             <span
@@ -109,7 +135,9 @@ export function TaskCard({
           )}
           {member && (
             <span className="card-assignee">
-              <Avatar member={member} allMembers={members} size={26} />
+              <WorkingRing state={working}>
+                <Avatar member={member} allMembers={members} size={26} />
+              </WorkingRing>
             </span>
           )}
         </div>

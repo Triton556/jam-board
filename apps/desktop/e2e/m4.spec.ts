@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Load demo jam" }).click();
-  await expect(page.getByTestId("task-card")).toHaveCount(32);
+  await expect(page.getByTestId("task-card")).toHaveCount(22);
 }
 async function table(page: import("@playwright/test").Page) {
   await demo(page);
@@ -44,7 +44,7 @@ test("table filters survive URL reload, back and forward", async ({ page }) => {
       .getByRole("group", { name: "Filter statuses" })
       .getByRole("button", { name: "In progress" }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("table-row")).toHaveCount(3);
+  await expect(page.getByTestId("table-row")).toHaveCount(1);
   await page.getByLabel("Search tasks").fill("JB-16");
   await expect(page).toHaveURL(/q=JB-16/);
   await page.goBack();
@@ -59,7 +59,7 @@ test("priority sort cycles ascending, descending and none", async ({
   await page.evaluate(() =>
     window.__jamMock.createTask({
       title: "Low priority task",
-      status: "todo",
+      status: "backlog",
       priority: "low",
     }),
   );
@@ -83,8 +83,8 @@ test("table editing saves changed title, priority and tags onto board", async ({
     .getByRole("textbox", { name: "Task title" })
     .fill("Snowy jump buffer");
   await page
-    .getByRole("group", { name: "Priority", exact: true })
-    .getByRole("button", { name: "Critical", exact: true })
+    .getByRole("radiogroup", { name: "Priority", exact: true })
+    .getByRole("radio", { name: "Critical", exact: true })
     .click();
   const tags = page.getByRole("combobox", { name: "Tags", exact: true });
   await tags.fill("  POLISH ");

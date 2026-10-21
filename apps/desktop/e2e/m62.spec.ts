@@ -5,7 +5,7 @@ async function demo(page: import("@playwright/test").Page) {
   await page
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
-  await expect(page.getByTestId("task-card")).toHaveCount(32);
+  await expect(page.getByTestId("task-card")).toHaveCount(22);
 }
 test("flat cards, assignee colors and opt-in estimates", async ({ page }) => {
   await demo(page);
@@ -22,8 +22,8 @@ test("flat cards, assignee colors and opt-in estimates", async ({ page }) => {
     .locator(".task-card")
     .evaluate((e) => getComputedStyle(e).backgroundColor);
   await page
-    .getByRole("group", { name: "Color by", exact: true })
-    .getByRole("button", { name: "Assignee" })
+    .getByRole("radiogroup", { name: "Color by", exact: true })
+    .getByRole("radio", { name: "Assignee" })
     .click();
   await expect
     .poll(() =>
@@ -81,7 +81,9 @@ test("table inline creation stays visible outside filters", async ({
   await page
     .getByRole("textbox", { name: "New task title" })
     .fill("New filtered lantern");
-  await page.keyboard.press("Enter");
+  await page.getByRole("combobox", { name: "New task story" }).click();
+  await page.getByRole("option", { name: /JB-S1/ }).click();
+  await page.getByRole("textbox", { name: "New task title" }).press("Enter");
   await expect(
     page.getByTestId("table-row").filter({ hasText: "New filtered lantern" }),
   ).toContainText("hidden by filters");
@@ -144,7 +146,7 @@ test("500 assets support grouped grid and bounded virtual list", async ({
   await page.evaluate(() => window.__jamMock.seed_bulk_assets(500));
   await page.getByRole("link", { name: "Assets", exact: true }).click();
   await expect(page.locator(".asset-card")).toHaveCount(508);
-  await page.getByRole("button", { name: "List view" }).click();
+  await page.getByRole("radio", { name: "List view" }).click();
   const scroll = page.getByTestId("asset-list");
   await expect(scroll).toBeVisible();
   for (let i = 0; i < 5; i++) {

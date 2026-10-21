@@ -1,3 +1,5 @@
+import type { PlanningApi } from "./planning-api";
+import type { ReferencesApi } from "./references-api";
 import { tauriApi } from "./tauri-bridge";
 import type {
   ActivityEvent,
@@ -31,7 +33,25 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
-export interface JamApi {
+export interface JamApi extends PlanningApi, ReferencesApi {
+  getProject(): Promise<import("../bindings").Project>;
+  updateProject(
+    input: Partial<import("../bindings").ProjectEditInput> & {
+      template: string;
+    },
+  ): Promise<import("../bindings").Project>;
+  pickFolder(): Promise<string | null>;
+  skillSavedPath(): Promise<string | null>;
+  skillCheck(
+    input: import("../bindings").SkillInput,
+  ): Promise<import("../bindings").SkillCheck>;
+  runSkill(
+    input: import("../bindings").SkillInput,
+    step: "plan" | "install" | "verify",
+  ): Promise<import("../bindings").SkillResult>;
+  cancelSkill(): Promise<void>;
+  onSkillOutput(cb: (line: string) => void): () => void;
+
   pickFiles(): Promise<string[]>;
   attachFile(key: string, path: string): Promise<Asset>;
   appReady(): Promise<void>;
@@ -59,7 +79,7 @@ export interface JamApi {
   mcpConfigSnippets(): Promise<ConfigSnippets>;
   onMcpChanged(cb: () => void): () => void;
   onFileDrop(
-    cb: (paths: string[]) => void,
+    cb: (paths: string[], point?: { x: number; y: number }) => void,
     onActive?: (active: boolean) => void,
   ): () => void;
   showInFolder(path: string): Promise<void>;

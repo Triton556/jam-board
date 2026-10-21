@@ -1,0 +1,104 @@
+﻿.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+.welcome-templates .welcome-content {
+  width: 600px;
+  max-width: 100%;
+}
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  padding: 20px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+.template-card:hover {
+  border-color: var(--line);
+  background: var(--card-hover);
+}
+.template-card strong {
+  font-family: "Fraunces Variable", serif;
+  font-size: 22px;
+  font-weight: 600;
+}
+.template-card > span:not(.template-symbol) {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.template-card small {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.template-symbol {
+  border-radius: 50%;
+  background: var(--butter);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+.template-gamedev {
+  background: var(--mint);
+}
+.template-webapp {
+  background: var(--sky);
+}
+.template-custom {
+  background: var(--lilac);
+}
+.skill-log {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--paper-2);
+  padding: 16px;
+  border-radius: var(--r-input);
+  width: 100%;
+}
+
+.skill-confirm .dialog-heading {
+  align-items: flex-start;
+  gap: 16px;
+}
+.skill-confirm .dialog-heading h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.skill-confirm .dialog-heading .tooltip {
+  flex-shrink: 0;
+}
+.skill-confirm {
+  overflow-x: hidden;
+}
+
+.skill-setup .settings-row-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.skill-setup .settings-row-control > .path-value,
+.skill-setup .settings-row-control > .code-block,
+.skill-setup .settings-row-control > .skill-log,
+.skill-setup .settings-row-control > p {
+  flex-basis: 100%;
+}
+.skill-setup .settings-row-control > .path-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

@@ -2,6 +2,9 @@
 
 :root {
   --paper: #f7f1e6;
+  --primary: #4a4541;
+  --primary-hover: #3d3834;
+  --on-primary: #f7f1e6;
   --paper-2: #efe6d6;
   --card: #fffdf8;
   --card-hover: #ffffff;
@@ -45,6 +48,9 @@
 }
 [data-theme="dark"] {
   --paper: #1e1b19;
+  --primary: #5a534d;
+  --primary-hover: #665e57;
+  --on-primary: #f2ebdd;
   --paper-2: #26221f;
   --card: #2e2925;
   --card-hover: #36302b;
@@ -64,6 +70,9 @@
 }
 @theme inline {
   --color-paper: var(--paper);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
   --color-paper-2: var(--paper-2);
   --color-card: var(--card);
   --color-card-hover: var(--card-hover);

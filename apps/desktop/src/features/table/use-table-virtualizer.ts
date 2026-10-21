@@ -73,6 +73,50 @@ export function useTableVirtualizer(
   // Use the same mount/update lifecycle as TanStack's React adapter.
   useLayoutEffect(() => instance._didMount(), [instance]);
   useLayoutEffect(() => {
+    const element = scroll.current;
+    if (!element) return;
+    let frame: number | undefined;
+    let x = 0;
+    let y = 0;
+    const wheel = (event: WheelEvent) => {
+      if (
+        !event.cancelable ||
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            "input,textarea,select,[contenteditable=true],[role=listbox],[role=menu]",
+          ))
+      )
+        return;
+      // Keep native input deltas, but apply scrolling and the virtual-window
+      // commit in the same frame instead of racing compositor wheel updates.
+      event.preventDefault();
+      const unit =
+        event.deltaMode === 1
+          ? 16
+          : event.deltaMode === 2
+            ? element.clientHeight
+            : 1;
+      x +=
+        (event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX) * unit;
+      y += (event.shiftKey && !event.deltaX ? 0 : event.deltaY) * unit;
+      if (frame === undefined)
+        frame = requestAnimationFrame(() => {
+          frame = undefined;
+          if (x) element.scrollLeft += x;
+          if (y) element.scrollTop += y;
+          x = y = 0;
+        });
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", wheel);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, [scroll]);
+  useLayoutEffect(() => {
     instance._willUpdate();
   });
   return instance;

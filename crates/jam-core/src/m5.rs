@@ -27,6 +27,7 @@ pub struct MemberWithStats {
     pub counts: BTreeMap<String, i64>,
     pub online: bool,
     pub working_on: Vec<LinkedTask>,
+    pub status_stale: bool,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -139,10 +140,10 @@ impl Store {
                 location: location.into(),
                 notes: None,
                 created_by: actor.into(),
-                created_at: now(),
+                created_at: now(),role:"asset".into(),
             };
             c.execute(
-                "INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO assets(id,jam_id,kind,name,location,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)",
                 params![
                     a.id,
                     a.jam_id,
@@ -299,6 +300,7 @@ impl Store {
                         counts,
                         online: m.online,
                         working_on,
+                        status_stale: m.status_stale,
                     })
                 })
                 .collect()
@@ -366,7 +368,7 @@ impl Store {
         }
         self.read(|c|{
             let jid=jam(c)?.id;
-            let mut stmt=c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.jam_id=?1 AND (?2 IS NULL OR a.seq<?2) AND (?3 IS NULL OR m.kind=?3) ORDER BY a.seq DESC LIMIT ?4")?;
+            let mut stmt=c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.jam_id=?1 AND (?2 IS NULL OR a.seq<?2) AND (?3 IS NULL OR m.kind=?3) ORDER BY a.seq DESC LIMIT ?4")?;
             Ok(stmt.query_map(params![jid,input.before_seq,input.actor_kind,limit],crate::db::activity_row)?.collect::<std::result::Result<Vec<_>,_>>()?)
         })
     }
@@ -379,7 +381,7 @@ impl Store {
         Ok(Settings {
             color_by: self
                 .setting(&format!("{prefix}color_by"))?
-                .unwrap_or_else(|| "none".into()),
+                .unwrap_or_else(|| "epic".into()),
             estimates_enabled: self
                 .setting(&format!("{prefix}estimates_enabled"))?
                 .as_deref()
@@ -410,9 +412,9 @@ impl Store {
         if input
             .color_by
             .as_deref()
-            .is_some_and(|v| !matches!(v, "none" | "assignee"))
+            .is_some_and(|v| !matches!(v, "none" | "assignee" | "epic"))
         {
-            return Err(invalid("colorBy", "Choose none or assignee"));
+            return Err(invalid("colorBy", "Choose none, assignee or epic"));
         }
         if input.wip_limit.is_some_and(|v| !(1..=999).contains(&v)) {
             return Err(invalid("wipLimit", "Use 1-999"));

@@ -20,6 +20,7 @@ Jam Board is MIT licensed, copyright 2026 Danil Volodin. Dependencies retain the
 | Biome | MIT / Apache-2.0 |
 | Vitest | MIT |
 | TanStack Query, Router, Virtual; Zustand | MIT |
+| React Flow (`@xyflow/react`, `@xyflow/system`) | MIT |
 | dnd-kit, Motion, react-hook-form, hookform/resolvers, Zod | MIT |
 | react-markdown, remark-gfm, roughjs | MIT |
 | Lucide | ISC |
@@ -30,7 +31,7 @@ Jam Board is MIT licensed, copyright 2026 Danil Volodin. Dependencies retain the
 
 Self-hosted fonts: Fraunces (Undercase Type), Manrope (Mikhail Sharanda and contributors), JetBrains Mono (JetBrains), Caveat (Pablo Impallari and contributors). Font artwork is distributed under SIL Open Font License 1.1; license notices are included in `apps/desktop/src/assets/licenses/`. Fonts are the explicitly specified artwork assets, not a replacement software dependency.
 
-The sticker/J/star icon is original vector artwork for Jam Board, generated to platform sizes by the Tauri CLI. The five chibi illustrations (`danil-laptop`, `duo-board`, `wife-paint`, `duo-hello`, `danil-wave`) are original artwork supplied by the author, with local WebP derivatives. They are stylized likenesses used with permission and are not licensed for reuse outside this project. No photographs or external image services are included.
+The sticker/J/star icon is original vector artwork for Jam Board, generated to platform sizes by the Tauri CLI. M3–M5 include only the five approved chibi PNGs supplied by Danil (`danil-laptop`, `duo-board`, `wife-paint`, `duo-hello`, `danil-wave`) and their local WebP derivatives. The source is the approved `chibi-heroes-20261019/out/` collection. No photographs, reference sheets or external image services are included. These are likenesses of Danil and his wife; permission for these approved chibi does not extend to other images or reference material.
 
 Dependency inventories are in [third-party-licenses](docs/third-party-licenses.md), generated from locked Cargo metadata and the npm license-checker inventory. Local workflow validation uses actionlint (MIT, via its npm WASM package); license-checker is BSD-3-Clause. These one-off tools are not runtime dependencies.
 
