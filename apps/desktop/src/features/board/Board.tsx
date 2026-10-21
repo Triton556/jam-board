@@ -128,7 +128,10 @@ function SortableCard({
       {...attributes}
       {...listeners}
       aria-label={`Open ${task.key}: ${task.title}`}
-      onClick={() => open(task.key)}
+      onClick={(event) => {
+        event.currentTarget.focus();
+        open(task.key);
+      }}
     >
       <TaskCard
         task={task}
@@ -143,11 +146,13 @@ function SortableCard({
 function Column({
   status,
   tasks,
+  totalCount,
   members,
   open,
 }: {
   status: Status;
   tasks: TaskSummary[];
+  totalCount: number;
   members: Member[];
   open(key: string): void;
 }) {
@@ -167,7 +172,7 @@ function Column({
       <header className="column-heading">
         <h2>{labels[status]}</h2>
         <span
-          className={`column-count ${status === "in_progress" && tasks.length > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
+          className={`column-count ${status === "in_progress" && totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
         >
           {tasks.length}
         </span>
@@ -179,6 +184,14 @@ function Column({
         </IconButton>
         <RoughLine color={`var(--st-${status})`} />
       </header>
+      {status === "in_progress" && (
+        <p
+          className={`column-policy ${totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
+        >
+          {totalCount} / {settings?.wipLimit ?? 6} Doing across board
+          {tasks.length !== totalCount && ` · ${tasks.length} shown`}
+        </p>
+      )}
       <div className="column-cards">
         <SortableContext
           items={tasks.map((t) => t.key)}
@@ -288,7 +301,14 @@ export function Board({
   };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: coordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: coordinates,
+      keyboardCodes: {
+        start: ["Space"],
+        cancel: ["Escape"],
+        end: ["Space", "Enter"],
+      },
+    }),
   );
   const active = statuses
     .flatMap((s) => board[s])
@@ -373,7 +393,7 @@ export function Board({
           announcements,
           screenReaderInstructions: {
             draggable:
-              "Press Space to pick up a task. Use arrow keys to move, Space to drop, or Escape to cancel.",
+              "Press Enter to open a task. Press Space to pick it up. Use arrow keys to move, Space to drop, or Escape to cancel.",
           },
         }}
         onDragStart={({ active }) => {
@@ -393,6 +413,7 @@ export function Board({
                 key={status}
                 status={status}
                 tasks={board[status]}
+                totalCount={source[status].length}
                 members={members.data ?? []}
                 open={open}
               />

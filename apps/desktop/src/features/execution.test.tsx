@@ -587,3 +587,34 @@ it("an imported closed story is explicitly paused when restored under a running 
     effectiveState: "paused",
   });
 });
+
+it("even the appointed brain cannot bypass independent review through direct Done mutations", async () => {
+  const task = await mockApi.getTask("JB-7");
+  await mockApi.setBrain(task.epic.key, "codex");
+  await expect(
+    mockApi.simulateAgent({
+      action: "task.created",
+      title: "Not independently reviewed",
+      status: "done",
+    }),
+  ).rejects.toMatchObject({ code: "forbidden" });
+  await expect(
+    mockApi.simulateAgent({
+      action: "task.moved",
+      key: task.key,
+      status: "done",
+    }),
+  ).rejects.toMatchObject({ code: "forbidden" });
+  await expect(
+    mockApi.simulateAgent({
+      action: "task.updated",
+      key: task.key,
+      patch: { status: "done" },
+    }),
+  ).rejects.toMatchObject({ code: "forbidden" });
+  await mockApi.moveTask({ key: task.key, status: "done" });
+  expect(await mockApi.getTask(task.key)).toMatchObject({
+    status: "done",
+    reviews: task.reviews,
+  });
+});

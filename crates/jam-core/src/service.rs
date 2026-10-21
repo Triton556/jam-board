@@ -551,6 +551,11 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             if parent.audit.jam_id != j.id {
                 return Err(invalid("storyKey", "Choose a story in the active project"));
             }
+            if s == "done" && member(c, actor)?.kind != "human" {
+                return Err(Error::Forbidden(
+                    "Agents must create Backlog or Ready work and use review_task with an independent report to mark it Done".into(),
+                ));
+            }
             if s == "in_progress" {
                 crate::execution::require_execution(c, &parent.audit.id)?;
             }
@@ -849,12 +854,20 @@ NULL AND key<>? ORDER BY position, key",
         let target = target.unwrap_or("backlog");
         status(target)?;
         self.write(|c| {
-            let old = editable(c, key, actor)?;
+            let old = task(c, key)?;
             if old.assignee_id.as_deref() != Some(actor) && member(c, actor)?.kind != "human" {
                 return Err(invalid(
                     "actor",
                     "only the holder or a human can release this task",
                 ));
+            }
+            // Giving back an existing claim is cancellation/recovery, not new work.
+            // Permit it even if a task or planning parent was archived after claim.
+            // Keep archive flags intact; readiness validation still applies to Ready.
+            let recovering_claim =
+                old.assignee_id.is_some() && ["backlog", "ready"].contains(&target);
+            if !recovering_claim {
+                editable(c, key, actor)?;
             }
             crate::workflow::transition(c, actor, &old, target, None)?;
             let pos = if target != old.status {

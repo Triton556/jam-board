@@ -444,11 +444,11 @@ export function SettingsPage({
                 />
               </SettingsRow>
               <SettingsRow
-                label="In progress WIP limit"
-                hint="Shows the In progress counter in coral above this number"
+                label="Doing limit"
+                hint="Highlights In progress above this number, even when epic filters hide cards. Review is tracked separately."
               >
                 <input
-                  aria-label="WIP limit"
+                  aria-label="Doing limit"
                   type="number"
                   min={1}
                   max={99}

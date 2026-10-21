@@ -3,6 +3,46 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.3] - 2026-10-21
+
+### Fixed
+
+- Native cold startup no longer waits for animation frames or a route-specific
+  element before showing its hidden window. Fonts have a bounded wait; the
+  first-frame receipt is written only if visible frames were actually observed.
+- Agents cannot bypass independent report review by directly creating, moving,
+  updating or releasing a task to Done—even when the agent is its epic's brain.
+  Human manual Done stays available and is not mislabeled as reviewed acceptance.
+- Existing holders and humans can release claims after task/story/epic archive,
+  without reopening scopes, creating grants, altering evidence or faking reports.
+- Enter opens a board card; Space still starts keyboard drag. Activation establishes
+  an explicit focus-return target without starting or moving work.
+- Epic filters no longer disappear below 1360px. Compact navigation retains epic
+  titles and planning states instead of relying on unlabeled color dots.
+- Filtering the board no longer hides a Doing-limit warning across its cards.
+
+### Changed
+
+- Main navigation has visible concise labels in its compact rail. The expanded
+  sidebar remains available and the board retains horizontal scrolling.
+- Execution controls use a compact permission/count/action layout with optional
+  explanatory disclosure. “New work allowed” is distinct from actual agent activity;
+  plan status has its own visible label.
+- Fresh agent presence outside the task is quiet and labeled unconfirmed/elsewhere;
+  only task-scoped activity animates the working ring, pencil and handwritten line.
+  Reduced-motion behavior and the paper visual language are preserved.
+
+### Verification and compatibility
+
+- Independent review closed both alpha1 regressions at alpha2 and verified eight
+  alpha2 feedback/focus/error scenarios. New safety fixes have adversarial, real
+  stdio and full workspace coverage; independent retest of this exact version is
+  still pending at commit time.
+- No schema migration beyond v6. MCP remains 44 tools; direct agent Done is now
+  intentionally rejected with guidance to use independent review.
+- Native alpha1 screenshots reproduced the hidden filter and Enter behavior;
+  exact alpha3 native rebuild/visual acceptance is the next step, not yet a claim.
+
 ## [0.3.0-alpha.2] - 2026-10-21
 
 ### Added

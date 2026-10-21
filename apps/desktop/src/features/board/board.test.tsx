@@ -281,3 +281,62 @@ describe("onboarding validation", () => {
     );
   });
 });
+
+it("Enter opens a card without starting a drag or mutating its status", async () => {
+  const open = vi.fn(),
+    { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={open} />, { wrapper: Wrapper });
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  card.focus();
+  await user.keyboard("{Enter}");
+  expect(open).toHaveBeenCalledExactlyOnceWith("JB-7");
+  expect(card).not.toHaveAttribute("aria-pressed", "true");
+  expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+    false,
+  );
+});
+it("activation without implicit focus retains an explicit drawer return target", async () => {
+  let openingFocus: Element | null = null;
+  const { Wrapper } = wrapper();
+  render(
+    <Board
+      open={() => {
+        openingFocus = document.activeElement;
+      }}
+    />,
+    { wrapper: Wrapper },
+  );
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  // Exercise activation without synthetic pointer focus (also relevant to accessibility APIs).
+  fireEvent.click(card);
+  expect(openingFocus).toBe(card);
+});
+it("an epic filter does not hide a project-wide Doing-limit warning", async () => {
+  const { client, Wrapper } = wrapper(),
+    source = await api.listBoardTasks();
+  const base = source.in_progress[0];
+  if (!base) throw new Error("Missing fixture");
+  const board = {
+    ...source,
+    in_progress: Array.from({ length: 7 }, (_, i) => ({
+      ...base,
+      id: `capacity-${i}`,
+      key: `CP-${i + 1}`,
+      epicKey: i < 2 ? "CP-E1" : "CP-E2",
+    })),
+  };
+  client.setQueryData(["boardTasks"], board);
+  client.setQueryData(["settings"], {
+    ...(await api.getSettings()),
+    wipLimit: 6,
+  });
+  render(<Board open={() => {}} epicKeys={["CP-E1"]} />, { wrapper: Wrapper });
+  const column = await screen.findByRole("region", {
+    name: "In progress column",
+  });
+  expect(within(column).getAllByTestId("task-card")).toHaveLength(2);
+  expect(
+    within(column).getByText("7 / 6 Doing across board · 2 shown"),
+  ).toHaveClass("over-wip");
+});

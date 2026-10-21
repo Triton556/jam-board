@@ -30,6 +30,22 @@ export function agentWorking(
   )
     return null;
   const age = Math.max(0, now - at);
+  const scoped =
+    member.statusScope?.type === "task" &&
+    [task.id, task.key].includes(member.statusScope.id);
+  if (!scoped) {
+    if (age > 600000) return null;
+    const elsewhere = member.statusScope?.type === "task";
+    const text = `${member.name} · ${elsewhere ? "active elsewhere" : "task activity unconfirmed"}`;
+    return {
+      mode: "quiet",
+      color: "var(--ink-3)",
+      text,
+      tooltip: `${member.name} is online. ${elsewhere ? "The latest status belongs to another task." : "No task-specific activity was reported."} Latest agent status: ${status}`,
+      name: member.name,
+      status,
+    };
+  }
   if (age > 1800000) {
     const text = `${member.name} · last update ${Math.floor(age / 60000)} min ago`;
     return {
@@ -41,13 +57,7 @@ export function agentWorking(
       status,
     };
   }
-  const scoped =
-    member.statusScope?.type === "task" &&
-    [task.id, task.key].includes(member.statusScope.id);
-  if (!scoped && age > 600000) return null;
-  const text = scoped
-    ? `${member.name} · ${status}`
-    : `${member.name} is working…`;
+  const text = `${member.name} · ${status}`;
   return {
     mode: "active",
     color: member.color,

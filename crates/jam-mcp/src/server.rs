@@ -356,7 +356,7 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<CreateTask>(
             "create_task",
-            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. Supply idempotencyKey to safely retry without creating duplicates.",
+            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. Supply idempotencyKey to safely retry without creating duplicates. Agents cannot create Done tasks; completion requires independent review_task evidence.",
             false,
         ),
         tool::<UpdateTask>(
@@ -366,7 +366,7 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<Move>(
             "move_task",
-            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses, but entry into In progress always requires a human-started story/epic. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
+            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses, but entry into In progress always requires a human-started story/epic. Agents cannot move directly to Done; use review_task with an independent report. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
             false,
         ),
         tool::<Key>(
@@ -376,7 +376,7 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<Release>(
             "release_task",
-            "Release a task you hold and move it to backlog or the supplied status. Only the current holder or a human can release it.",
+            "Release a task you hold and move it to backlog or the supplied status. Only the current holder or a human can release it. Returning an existing claim to Backlog or Ready is allowed after task/parent archival without restoring or starting work; Ready still validates readiness. Agents cannot release directly to Done; use independent review_task.",
             false,
         ),
         tool::<AddComment>(

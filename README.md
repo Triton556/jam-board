@@ -17,9 +17,9 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.2**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.3**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.2.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.3.md).
 
 ## Features
 
@@ -76,7 +76,7 @@ Agents ask through MCP; you answer in the app. Choose a recommended option, writ
 ## Review rounds
 
 1. A worker claims a Ready task and calls `submit_report` with its summary, changed files, named test results, deviations and unverified checks.
-2. A separate human or the appointed epic brain checks the report against the brief and story acceptance, then accepts it or requests changes. The assignee and report author cannot review their own work, even if appointed brain.
+2. A separate human or the appointed epic brain checks the report against the brief and story acceptance, then accepts it or requests changes. Agents can mark Done only through this independent review—not direct task creation, status changes or release. A human can still mark work Done manually; that is not a recorded review. The assignee and report author cannot review their own work, even if appointed brain.
 3. **Changes requested** returns the task to Ready with its assignee retained and a new reporting round. Earlier reports and reviews remain visible.
 
 Returning submitted work to In progress or reopening accepted work also keeps a usable next reporting round. Human edits and review decisions appear in the epic journal.

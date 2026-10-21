@@ -107,11 +107,11 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
                 }
               >
                 {state.effectiveState === "running"
-                  ? "Work started"
+                  ? "New work allowed"
                   : "New work paused"}
               </Stamp>
               <span className="small muted">
-                Ready is a brief state, not permission to execute.
+                {state.readyCount} Ready · {state.inProgressCount} In progress
               </span>
             </div>
             {state.source === "epic" && (
@@ -182,10 +182,16 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
                 </span>
               )}
             </div>
-            <p className="small muted">
-              Pause blocks new claims, not running work or its reports.
-              Switching projects does not pause anything.
-            </p>
+            <details className="execution-help">
+              <summary>How starting works</summary>
+              <p className="small muted">
+                Ready is a brief state, not permission to execute. Start allows
+                connected workers to take Ready work; it never launches a
+                session. Pause blocks new claims, not running work or its
+                reports. Switching projects does not pause anything. In progress
+                counts include archived tasks.
+              </p>
+            </details>
           </>
         )
       )}

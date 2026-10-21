@@ -154,6 +154,7 @@ export function PlanPage({
           </Button>
         </div>
         <div className="epic-filter">
+          <span className="small muted">Show epics</span>
           <Select
             aria-label="Epic filter"
             value={filter}

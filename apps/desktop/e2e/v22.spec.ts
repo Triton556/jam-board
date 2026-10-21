@@ -54,9 +54,9 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     "Done when",
     "The bridge playtest passes with keyboard controls.",
   );
-  await select(page, "Epic status", "Active");
+  await select(page, "Epic plan status", "Active");
   await expect(
-    page.getByRole("combobox", { name: "Epic status" }),
+    page.getByRole("combobox", { name: "Epic plan status" }),
   ).toContainText("Active");
   await page.getByRole("radio", { name: "Stories", exact: true }).click();
   await page.getByRole("button", { name: "New story", exact: true }).click();
@@ -77,9 +77,9 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
   await page
     .getByRole("button", { name: "Save acceptance", exact: true })
     .click();
-  await select(page, "Story status", "Active");
+  await select(page, "Story plan status", "Active");
   await expect(
-    page.getByRole("combobox", { name: "Story status" }),
+    page.getByRole("combobox", { name: "Story plan status" }),
   ).toContainText("Active");
   await page.getByRole("button", { name: "Close task", exact: true }).click();
   await page

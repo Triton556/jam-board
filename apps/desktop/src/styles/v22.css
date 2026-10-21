@@ -771,32 +771,56 @@
 }
 @media (width < 1360px) {
   .plan-page {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: 16px;
     padding: 20px;
   }
-  .epic-card-content,
-  .epic-rail-heading h1,
-  .epic-rail-heading span,
-  .epic-filter {
-    display: none;
-  }
   .epic-rail-heading {
-    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .epic-card {
-    padding: 16px;
-    height: 56px;
+    padding: 12px 12px 12px 16px;
   }
-  .epic-color-dot {
-    display: block;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    margin: auto;
+  .epic-card h2 {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+  .epic-card .workload,
+  .epic-card-meta {
+    display: none;
+  }
+  .epic-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .epic-process {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .drawer {
     width: 520px;
+  }
+}
+@media (width < 1000px) {
+  .plan-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 16px;
+  }
+  .epic-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .epic-list {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    max-height: 180px;
+  }
+  .epic-card {
+    flex: 0 0 210px;
+    margin-bottom: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

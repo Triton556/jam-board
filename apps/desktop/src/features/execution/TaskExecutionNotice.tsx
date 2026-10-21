@@ -14,7 +14,7 @@ export function taskExecutionExplanation(status: string, running: boolean) {
   if (status === "backlog")
     return "This is a draft. Refine its brief and mark Ready before asking a worker to take it.";
   return running
-    ? "Ready for a connected worker to claim inside this started story."
+    ? "Ready for a connected worker to claim inside this authorized story."
     : "Ready describes the brief. Start this story or its epic before taking new work.";
 }
 
@@ -34,7 +34,7 @@ export function TaskExecutionNotice({ task }: { task: TaskDetail }) {
             : state.error
               ? "Work permission unavailable"
               : running
-                ? "Story work started"
+                ? "Story allows new work"
                 : "New work paused"}
         </strong>
         <p className="small muted">
