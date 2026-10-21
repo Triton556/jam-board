@@ -1,0 +1,115 @@
+{
+  "source": "Actual Worker execution, independently rerun by Brain read-only. Private raw evidence retains screenshots, input/state observations and file URLs.",
+  "command": "node evidence/final-check.cjs",
+  "startedAt": "2026-10-20T13:27:04.119Z",
+  "finishedAt": "2026-10-20T13:28:15.219Z",
+  "browser": "real headless Chromium, channel chrome",
+  "result": "PASS",
+  "records": 13,
+  "before": {
+    "index.html": "5cbe3aa750a7abf0d0b4139fe6c996f2cff50f0be17a3055616d3e227f0f257e",
+    "main.js": "952c5bfb4021006088fbc8afff77e57b7dab223face257799785ffbb278ce0f1"
+  },
+  "after": {
+    "index.html": "5cbe3aa750a7abf0d0b4139fe6c996f2cff50f0be17a3055616d3e227f0f257e",
+    "main.js": "952c5bfb4021006088fbc8afff77e57b7dab223face257799785ffbb278ce0f1"
+  },
+  "toyUnchanged": true,
+  "runs": [
+    {
+      "command": "node evidence/sketch-check.cjs final-sketch",
+      "exitCode": 0,
+      "results": [
+        {
+          "name": "T1 Sketch startup",
+          "viewport": "1280x720",
+          "result": "PASS"
+        },
+        {
+          "name": "T2 Roll/grow/trail",
+          "viewport": "1280x720",
+          "result": "PASS"
+        },
+        {
+          "name": "T3 Basic restart",
+          "viewport": "1280x720",
+          "result": "PASS"
+        },
+        {
+          "name": "T4 Grow then resize size synchronization",
+          "result": "PASS"
+        },
+        {
+          "name": "T1 Sketch startup",
+          "viewport": "800x600",
+          "result": "PASS"
+        },
+        {
+          "name": "T2 Roll/grow/trail",
+          "viewport": "800x600",
+          "result": "PASS"
+        },
+        {
+          "name": "T3 Basic restart",
+          "viewport": "800x600",
+          "result": "PASS"
+        }
+      ]
+    },
+    {
+      "command": "node evidence/freeplay-check.cjs final-freeplay",
+      "exitCode": 0,
+      "results": [
+        {
+          "name": "T2 Input edges",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "result": "PASS"
+        },
+        {
+          "name": "T3 Growth/bounds",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "result": "PASS"
+        },
+        {
+          "name": "T4 Restart",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "result": "PASS"
+        },
+        {
+          "name": "T2 Input edges",
+          "viewport": {
+            "width": 800,
+            "height": 600
+          },
+          "result": "PASS"
+        },
+        {
+          "name": "T3 Growth/bounds",
+          "viewport": {
+            "width": 800,
+            "height": 600
+          },
+          "result": "PASS"
+        },
+        {
+          "name": "T4 Restart",
+          "viewport": {
+            "width": 800,
+            "height": 600
+          },
+          "result": "PASS"
+        }
+      ]
+    }
+  ],
+  "notVerified": "Supplementary hidden-only visibilitychange transition: headless lifecycle/minimize probes emitted no event. Actual tab blur recovery passed; this separate path remains NOT_RUN and was disclosed before final human confirmation."
+}

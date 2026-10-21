@@ -1,0 +1,125 @@
+{
+  "scope": "All tracked/staged files; briefs and reports exempt only from personal-path/private-link scans. Token scan includes them.",
+  "files": 656,
+  "trackedBytes": 49761116,
+  "mediaBytes": 45412375,
+  "tokenFiles": 131,
+  "tokenMatches": [],
+  "unreadable": [],
+  "personalPaths": [],
+  "privateLinks": [],
+  "largestFiles": [
+    {
+      "path": "docs/media/v2.5/dogfood.webm",
+      "bytes": 2126779
+    },
+    {
+      "path": "docs/media/demo.gif",
+      "bytes": 1235481
+    },
+    {
+      "path": "docs/media/m4.1/agent-highlight-dark.png",
+      "bytes": 1084514
+    },
+    {
+      "path": "docs/media/m4.1/content-board-dark.png",
+      "bytes": 1063331
+    },
+    {
+      "path": "docs/media/v2.1/board-dark.png",
+      "bytes": 865872
+    },
+    {
+      "path": "docs/media/m6.2/board-dark-assignee.png",
+      "bytes": 838215
+    },
+    {
+      "path": "docs/media/m3/browser-dark.png",
+      "bytes": 794142
+    },
+    {
+      "path": "docs/media/m4.1/content-panel.png",
+      "bytes": 784882
+    },
+    {
+      "path": "docs/media/m3/desktop-content-dark.png",
+      "bytes": 766868
+    },
+    {
+      "path": "docs/media/m4.1/agent-highlight-light.png",
+      "bytes": 742502
+    },
+    {
+      "path": "docs/media/m4.1/content-board-light.png",
+      "bytes": 723708
+    },
+    {
+      "path": "docs/media/m6.2/board-dark-none.png",
+      "bytes": 699152
+    }
+  ],
+  "largestHistoryBlobs": [
+    {
+      "object": "d3b795d7bd982c7335d52151b1a9846d31f26f75",
+      "bytes": 11764310,
+      "path": "docs/media/m4/table-performance-trace.json"
+    },
+    {
+      "object": "40c4a7dc58a5f91e9ba216737808d631d0e4cd94",
+      "bytes": 1500704,
+      "path": "docs/media/v2.5/dogfood.webm"
+    },
+    {
+      "object": "bff67af65f352ecc45a745f4473f1088e76cece3",
+      "bytes": 1084514,
+      "path": "docs/media/m4.1/agent-highlight-dark.png"
+    },
+    {
+      "object": "b5d0a95956d54271c339a4852858ee8c85959bea",
+      "bytes": 1063331,
+      "path": "docs/media/m4.1/content-board-dark.png"
+    },
+    {
+      "object": "fae4467e20db44d3b9971d7f5075adf151270543",
+      "bytes": 891274,
+      "path": "docs/media/demo.gif"
+    },
+    {
+      "object": "e333810e00b8b49808f40dcca262e29ee3178d17",
+      "bytes": 878777,
+      "path": "docs/media/demo.gif"
+    },
+    {
+      "object": "8ed420ffe5f27171ff60df630cf9142bdbb546de",
+      "bytes": 865872,
+      "path": "docs/media/v2.1/board-dark.png"
+    },
+    {
+      "object": "b3846b5ad85bf38fba11d43f8262ff608b1b1b6a",
+      "bytes": 838215,
+      "path": "docs/media/m6.2/board-dark-assignee.png"
+    },
+    {
+      "object": "6fc3066ea75275547efe571bcedc69fc3afcfcf9",
+      "bytes": 794142,
+      "path": "docs/media/m3/browser-dark.png"
+    },
+    {
+      "object": "6a768bce5f980c370b5498db8e2058b66c9d0f07",
+      "bytes": 784882,
+      "path": "docs/media/m4.1/content-panel.png"
+    },
+    {
+      "object": "a89ab895a0cf62c0d11ce8a9e304d20ba0942908",
+      "bytes": 766868,
+      "path": "docs/media/m3/desktop-content-dark.png"
+    },
+    {
+      "object": "95a031e88dd83658f9c07f2c865164a127088f02",
+      "bytes": 742502,
+      "path": "docs/media/m4.1/agent-highlight-light.png"
+    }
+  ],
+  "gitSize": "count: 1791\nsize: 54.43 MiB\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0 bytes",
+  "clean": true
+}

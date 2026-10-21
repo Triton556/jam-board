@@ -1,0 +1,65 @@
+{
+  "initial": {
+    "x": 339.84000000000003,
+    "y": 195.84,
+    "radius": 18,
+    "roll": 0,
+    "distance": 0,
+    "trailSegments": 0,
+    "width": 1062,
+    "height": 544,
+    "cap": 59.84,
+    "sizeText": "Size: 36 cm"
+  },
+  "idle": {
+    "x": 339.84000000000003,
+    "y": 195.84,
+    "radius": 18,
+    "roll": 0,
+    "distance": 0,
+    "trailSegments": 0,
+    "width": 1062,
+    "height": 544,
+    "cap": 59.84,
+    "sizeText": "Size: 36 cm"
+  },
+  "grown": {
+    "x": 59.84,
+    "y": 484.15999999999997,
+    "radius": 59.84,
+    "roll": 41.60934362804452,
+    "distance": 1486.0449999999985,
+    "trailSegments": 744,
+    "width": 1062,
+    "height": 544,
+    "cap": 59.84,
+    "sizeText": "Size: 120 cm"
+  },
+  "resized": {
+    "x": 46.64,
+    "y": 377.35999999999996,
+    "radius": 46.64,
+    "roll": 41.60934362804452,
+    "distance": 1486.0449999999985,
+    "trailSegments": 744,
+    "width": 742,
+    "height": 424,
+    "cap": 46.64,
+    "sizeText": "Size: 93 cm"
+  },
+  "restarted": {
+    "x": 237.44,
+    "y": 152.64,
+    "radius": 18,
+    "roll": 0,
+    "distance": 0,
+    "trailSegments": 0,
+    "width": 742,
+    "height": 424,
+    "cap": 46.64,
+    "sizeText": "Size: 36 cm"
+  },
+  "sizeCorrectAfterResize": true,
+  "errors": [],
+  "source": "Real headless Chrome, file URL, physical keyboard events; read-only diagnostics"
+}

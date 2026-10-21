@@ -1,0 +1,23 @@
+{
+  "source": "real release WebView2, CDP content capture without cursor overlay, resize and caption only",
+  "width": 960,
+  "frames": 90,
+  "durationSeconds": 15.3,
+  "bytes": 891274,
+  "transcript": [
+    {
+      "tool": "create_task",
+      "key": "JB-33",
+      "visibleAfterMs": 223
+    },
+    {
+      "tool": "claim_task",
+      "key": "JB-17"
+    },
+    {
+      "tool": "move_task",
+      "key": "JB-17",
+      "status": "review"
+    }
+  ]
+}

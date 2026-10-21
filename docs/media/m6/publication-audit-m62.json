@@ -1,0 +1,156 @@
+{
+  "recordedAt": "2026-10-20T02:40:42.799Z",
+  "tokenFiles": 37,
+  "distinctTokens": 37,
+  "checkedRevisions": 24,
+  "matches": 0,
+  "stagedIndexChecked": true,
+  "trackedBytes": 29344288,
+  "largestCurrentFiles": [
+    {
+      "path": "docs/media/m4.1/agent-highlight-dark.png",
+      "bytes": 1084514
+    },
+    {
+      "path": "docs/media/m4.1/content-board-dark.png",
+      "bytes": 1063331
+    },
+    {
+      "path": "docs/media/demo.gif",
+      "bytes": 891274
+    },
+    {
+      "path": "docs/media/m6.2/board-dark-assignee.png",
+      "bytes": 838215
+    },
+    {
+      "path": "docs/media/m3/browser-dark.png",
+      "bytes": 794142
+    },
+    {
+      "path": "docs/media/m4.1/content-panel.png",
+      "bytes": 784882
+    },
+    {
+      "path": "docs/media/m3/desktop-content-dark.png",
+      "bytes": 766868
+    },
+    {
+      "path": "docs/media/m4.1/agent-highlight-light.png",
+      "bytes": 742502
+    },
+    {
+      "path": "docs/media/m4.1/content-board-light.png",
+      "bytes": 723708
+    },
+    {
+      "path": "docs/media/m6.2/board-dark-none.png",
+      "bytes": 699152
+    },
+    {
+      "path": "docs/media/m6.2/task-panel.png",
+      "bytes": 664196
+    },
+    {
+      "path": "docs/media/m3/desktop-task-drawer.png",
+      "bytes": 649348
+    },
+    {
+      "path": "docs/media/m3/desktop-highlight-toast.png",
+      "bytes": 613014
+    },
+    {
+      "path": "docs/media/m4.1/window-board-dark.png",
+      "bytes": 596746
+    },
+    {
+      "path": "docs/media/m4/cards-sticker-dark.png",
+      "bytes": 596746
+    },
+    {
+      "path": "docs/media/m6.2/board-light-assignee.png",
+      "bytes": 587574
+    },
+    {
+      "path": "docs/media/m4.1/window-task-panel.png",
+      "bytes": 580541
+    },
+    {
+      "path": "docs/media/m3/browser-light.png",
+      "bytes": 579695
+    },
+    {
+      "path": "docs/media/m4.1/window-board-light.png",
+      "bytes": 575408
+    },
+    {
+      "path": "docs/media/m4/cards-sticker-light.png",
+      "bytes": 575408
+    }
+  ],
+  "largestHistoricalBlobs": [
+    {
+      "oid": "d3b795d7bd982c7335d52151b1a9846d31f26f75",
+      "path": "docs/media/m4/table-performance-trace.json",
+      "bytes": 11764310
+    },
+    {
+      "oid": "bff67af65f352ecc45a745f4473f1088e76cece3",
+      "path": "docs/media/m4.1/agent-highlight-dark.png",
+      "bytes": 1084514
+    },
+    {
+      "oid": "b5d0a95956d54271c339a4852858ee8c85959bea",
+      "path": "docs/media/m4.1/content-board-dark.png",
+      "bytes": 1063331
+    },
+    {
+      "oid": "e333810e00b8b49808f40dcca262e29ee3178d17",
+      "path": "docs/media/demo.gif",
+      "bytes": 878777
+    },
+    {
+      "oid": "b3846b5ad85bf38fba11d43f8262ff608b1b1b6a",
+      "path": "docs/media/m6.2/board-dark-assignee.png",
+      "bytes": 838215
+    },
+    {
+      "oid": "6fc3066ea75275547efe571bcedc69fc3afcfcf9",
+      "path": "docs/media/m3/browser-dark.png",
+      "bytes": 794142
+    },
+    {
+      "oid": "6a768bce5f980c370b5498db8e2058b66c9d0f07",
+      "path": "docs/media/m4.1/content-panel.png",
+      "bytes": 784882
+    },
+    {
+      "oid": "a89ab895a0cf62c0d11ce8a9e304d20ba0942908",
+      "path": "docs/media/m3/desktop-content-dark.png",
+      "bytes": 766868
+    },
+    {
+      "oid": "95a031e88dd83658f9c07f2c865164a127088f02",
+      "path": "docs/media/m4.1/agent-highlight-light.png",
+      "bytes": 742502
+    },
+    {
+      "oid": "f2ca43daf0b6f23f5157f21d978c60beb2d5e6de",
+      "path": "docs/media/m4.1/content-board-light.png",
+      "bytes": 723708
+    },
+    {
+      "oid": "f399c5c42f3d582c4fe50771a5d2e0e8d7d5e068",
+      "path": "docs/media/m6.2/board-dark-none.png",
+      "bytes": 699152
+    },
+    {
+      "oid": "1a9292a0284d8562f4c6eb772bbb1b48ce4b2774",
+      "path": "docs/media/m6.2/task-panel.png",
+      "bytes": 664196
+    }
+  ],
+  "gitObjectStatistics": "count: 903\nsize: 29.03 MiB\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0 bytes",
+  "publicDocumentReferences": "No private brief/report links or personal absolute paths in README, architecture, MCP or credits",
+  "historyRewritten": false
+}

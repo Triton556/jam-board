@@ -1,0 +1,21 @@
+[package]
+name = "jam-mcp-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "jam-board-mcp"
+path = "src/main.rs"
+
+[dependencies]
+jam-core.workspace = true
+jam-mcp.workspace = true
+tokio.workspace = true
+rmcp.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile = "3"
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }

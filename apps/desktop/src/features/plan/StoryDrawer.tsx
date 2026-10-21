@@ -1,0 +1,195 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useId, useState } from "react";
+import { Button, Drawer, Stamp } from "../../components/ui";
+import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import { api } from "../../lib/api";
+import {
+  epicsQuery,
+  invalidatePlanning,
+  questionsQuery,
+} from "../../lib/planning-queries";
+import { ReferencesSection } from "../references/ReferencesSection";
+import { AcceptanceEditor } from "../task/BriefEditor";
+import {
+  NewTaskDialog,
+  PlanningStatus,
+  SavedMarkdown,
+} from "./PlanningControls";
+import { usePlanningDraft } from "./planning-draft";
+import { TaskRows } from "./TaskRows";
+export const intentFields = [
+  ["outcomeMd", "Outcome"],
+  ["basisMd", "Whose material is the basis"],
+  ["preserveMd", "What already works (keep)"],
+  ["scaleMd", "Scale of change"],
+  ["rejectionRisksMd", "How it could fail"],
+  ["openDecisionsMd", "Open decisions"],
+] as const;
+export function StoryDrawer({
+  storyKey,
+  close,
+  openTask,
+}: {
+  storyKey: string;
+  close(): void;
+  openTask(key: string): void;
+}) {
+  const query = useQuery({
+      queryKey: ["story", storyKey],
+      queryFn: () => api.getStory(storyKey),
+    }),
+    epics = useQuery(epicsQuery),
+    questions = useQuery(questionsQuery);
+  const client = useQueryClient(),
+    navigate = useNavigate();
+  const [newTask, setNewTask] = useState(false);
+  const story = query.data?.story,
+    epic = epics.data?.find((e) => e.id === story?.epicId);
+  const save = useMutation({
+    mutationFn: ({
+      key,
+      patch,
+    }: {
+      key: string;
+      patch: Parameters<typeof api.updateStory>[1];
+    }) => api.updateStory(key, patch),
+    onSuccess: () => invalidatePlanning(client),
+  });
+  return (
+    <Drawer title={storyKey} onClose={close}>
+      {query.isPending ? (
+        <PaperSkeleton label="Loading story" />
+      ) : query.error ? (
+        <QueryError error={query.error} retry={() => void query.refetch()} />
+      ) : (
+        story && (
+          <div className="story-editor">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (epic)
+                  void navigate({
+                    to: "/plan/$epicKey",
+                    params: { epicKey: epic.key },
+                  });
+              }}
+            >
+              {epic?.key} · {epic?.title}
+            </Button>
+            <label className="field">
+              Story title
+              <input
+                className="planning-title"
+                aria-label="Story title"
+                defaultValue={story.title}
+                key={story.updatedAt}
+                maxLength={140}
+                disabled={story.status === "archived"}
+                onBlur={(e) => {
+                  if (e.target.value !== story.title)
+                    save.mutate({
+                      key: storyKey,
+                      patch: { title: e.target.value },
+                    });
+                }}
+              />
+            </label>
+            <PlanningStatus
+              level="Story"
+              entityKey={storyKey}
+              value={story.status}
+            />
+            {questions.data?.some(
+              (q) =>
+                q.status === "open" &&
+                q.scopeType === "story" &&
+                q.scopeId === story.id,
+            ) && <Stamp className="needs-info">Needs info</Stamp>}
+            {intentFields.map(([field, label]) => (
+              <SavedMarkdown
+                key={`${story.id}:${field}`}
+                label={label}
+                value={story[field]}
+                save={(value) => api.updateStory(storyKey, { [field]: value })}
+                disabled={story.status === "archived"}
+              />
+            ))}
+            <AcceptanceDraft
+              key={story.id}
+              value={story.acceptance}
+              disabled={story.status === "archived"}
+              save={(acceptance) =>
+                save.mutateAsync({ key: storyKey, patch: { acceptance } })
+              }
+            />
+            {save.error && <p role="alert">{save.error.message}</p>}
+            <div className="section-heading">
+              <h2>Tasks</h2>
+              <Button
+                disabled={story.status === "archived"}
+                onClick={() => setNewTask(true)}
+              >
+                + Task
+              </Button>
+            </div>
+            <ReferencesSection
+              targetKey={story.key}
+              epicKey={epic?.key ?? ""}
+              disabled={!!story.archivedAt}
+            />
+            <TaskRows rows={query.data?.tasks ?? []} openTask={openTask} />
+            {newTask && (
+              <NewTaskDialog
+                storyKey={story.key}
+                close={() => setNewTask(false)}
+                created={openTask}
+              />
+            )}
+          </div>
+        )
+      )}
+    </Drawer>
+  );
+}
+function AcceptanceDraft({
+  value,
+  save,
+  disabled,
+}: {
+  value: Parameters<typeof AcceptanceEditor>[0]["value"];
+  save(
+    value: Parameters<typeof AcceptanceEditor>[0]["value"],
+  ): Promise<unknown>;
+  disabled?: boolean;
+}) {
+  const draft = usePlanningDraft(value);
+  const saveScope = useId();
+  const mutation = useMutation({
+    scope: { id: saveScope },
+    mutationFn: (submitted: typeof draft.snapshot & { save: typeof save }) =>
+      submitted.save(submitted.draft),
+    onSuccess: (_, submitted) => draft.saved(submitted),
+  });
+  return (
+    <section>
+      <h2>Acceptance criteria</h2>
+      <AcceptanceEditor
+        value={draft.value}
+        onChange={(value) => draft.change(value, mutation.isPending)}
+        disabled={disabled}
+      />
+      <Button
+        variant="primary"
+        disabled={
+          disabled ||
+          !draft.dirty ||
+          draft.value.some((a) => !a.criterion.trim() || !a.check.trim())
+        }
+        onClick={() => mutation.mutate({ ...draft.snapshot, save })}
+      >
+        Save acceptance
+      </Button>
+    </section>
+  );
+}

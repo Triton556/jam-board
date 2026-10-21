@@ -1,0 +1,82 @@
+{
+  "baseline": {
+    "rust": 56,
+    "vitest": 74,
+    "functional": 39,
+    "tablePerf": 3
+  },
+  "final": {
+    "rust": 60,
+    "vitest": 87,
+    "functional": 42,
+    "tablePerf": 3,
+    "canvasPerf": 4
+  },
+  "rust": [
+    {
+      "command": "cargo fmt --all --check",
+      "code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --offline -- -D warnings",
+      "code": 0
+    },
+    {
+      "command": "cargo test --workspace --offline",
+      "code": 0
+    }
+  ],
+  "frontend": [
+    {
+      "command": "npm run check",
+      "code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "code": 0
+    },
+    {
+      "command": "npm test",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=functional",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf-canvas --repeat-each=2",
+      "code": 0
+    }
+  ],
+  "fonts": [
+    {
+      "command": "npm run check",
+      "code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "code": 0
+    },
+    {
+      "command": "npm test",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test e2e/v23.spec.ts --project=functional",
+      "code": 0
+    }
+  ],
+  "native": {
+    "items": 10,
+    "frames": 1,
+    "edges": 1,
+    "latencyMs": 177,
+    "errors": 0,
+    "remoteRequests": 0
+  },
+  "stoppedProcesses": true
+}

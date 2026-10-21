@@ -1,0 +1,87 @@
+{
+  "native": true,
+  "mock": false,
+  "folderSelection": "injected picker results; real native validation and runner",
+  "revision": "df75cb8",
+  "installAuthorized": true,
+  "playbookSourceUnchanged": true,
+  "porcelain": {
+    "before": "",
+    "after": ""
+  },
+  "checkout": {
+    "before": {
+      "head": "df75cb8f91a861f451f24861f0669120e06371ba",
+      "branch": "main",
+      "configSha256": "a8a16b76462f0d08c9f85da7b51613cc32dcb458b433a11af0467a6df3d7851c"
+    },
+    "after": {
+      "head": "df75cb8f91a861f451f24861f0669120e06371ba",
+      "branch": "main",
+      "configSha256": "a8a16b76462f0d08c9f85da7b51613cc32dcb458b433a11af0467a6df3d7851c"
+    }
+  },
+  "receipts": {
+    "preExistingUnchanged": 121,
+    "created": [
+      ".harness-state/receipts/9d9a35b25a0e8b180d140dfd06b12ba8b304e52cc56d6de8b99154b930b46421.json",
+      ".harness-state/receipts/98998767ad86d9653d72859d456c27f2f1971f0ecb2c6b3cbacc2c5a0b810075.json"
+    ],
+    "retained": []
+  },
+  "results": [
+    {
+      "client": "codex",
+      "uiLabel": "Codex",
+      "profile": "jam-board",
+      "plan": 0,
+      "install": 0,
+      "verify": 0,
+      "skillName": "jam-board",
+      "skillNameLine": "name: jam-board",
+      "receipt": ".harness-state/receipts/9d9a35b25a0e8b180d140dfd06b12ba8b304e52cc56d6de8b99154b930b46421.json",
+      "target": ".dev-data\\skill-install-test\\codex-1792489620487",
+      "cleanup": {
+        "dryRun": "removal-planned",
+        "status": "removed",
+        "method": "harness.py remove",
+        "receiptRemoved": true
+      }
+    },
+    {
+      "client": "claude",
+      "uiLabel": "Claude Code",
+      "profile": "jam-board",
+      "plan": 0,
+      "install": 0,
+      "verify": 0,
+      "skillName": "jam-board",
+      "skillNameLine": "name: jam-board",
+      "receipt": ".harness-state/receipts/98998767ad86d9653d72859d456c27f2f1971f0ecb2c6b3cbacc2c5a0b810075.json",
+      "target": ".dev-data\\skill-install-test\\claude-1792489637507",
+      "cleanup": {
+        "dryRun": "removal-planned",
+        "status": "removed",
+        "method": "harness.py remove",
+        "receiptRemoved": true
+      }
+    }
+  ],
+  "captures": [
+    "templates-light.jpg",
+    "templates-dark.jpg",
+    "project-light.jpg",
+    "project-dark.jpg",
+    "codex-setup-light.jpg",
+    "codex-setup-dark.jpg",
+    "codex-installed-light.jpg",
+    "codex-installed-dark.jpg",
+    "claude-setup-light.jpg",
+    "claude-setup-dark.jpg",
+    "claude-installed-light.jpg",
+    "claude-installed-dark.jpg"
+  ],
+  "pageErrors": [],
+  "remoteRequests": [],
+  "temporaryTargetsRemoved": true
+}

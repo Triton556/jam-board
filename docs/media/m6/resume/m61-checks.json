@@ -1,0 +1,74 @@
+{
+  "recordedAt": "2026-10-20T02:40:22.151Z",
+  "authorVerification": true,
+  "definition": "Twelve grouped M6.1 acceptance checks. FAIL includes blocked or unperformed mandatory checks; it is not a count of unit tests.",
+  "installer": {
+    "path": "target/release/bundle/nsis/Jam Board_0.1.0_x64-setup.exe",
+    "bytes": 7215091,
+    "sha256": "6e8c67c6fa21e79ec9a3d5f3b76ecc88574e9c1ad4a179a8f5d616c721b8a70f"
+  },
+  "checks": [
+    {
+      "id": "official_tools_and_nsis",
+      "status": "PASS",
+      "evidence": "Normal Tauri build; official downloads and bundler hash checks recorded"
+    },
+    {
+      "id": "installer_size_and_sha256",
+      "status": "PASS",
+      "evidence": "7215091 bytes, below 15 MB, SHA-256 rechecked"
+    },
+    {
+      "id": "node_checker_no_policy_bypass",
+      "status": "PASS",
+      "evidence": "Node replacement syntax checked; actual scenario run without changing execution policy"
+    },
+    {
+      "id": "silent_per_user_install",
+      "status": "FAIL",
+      "evidence": "Installer exited 0 but installed application and sidecar were absent"
+    },
+    {
+      "id": "installed_onboarding_and_demo",
+      "status": "FAIL",
+      "evidence": "Not run: no installed executable"
+    },
+    {
+      "id": "installed_mcp_default_db_live_capture",
+      "status": "FAIL",
+      "evidence": "Not run: no installed sidecar; installed-agent-card.png is not fabricated"
+    },
+    {
+      "id": "uninstall_program_shortcuts_and_retention",
+      "status": "FAIL",
+      "evidence": "Not run: per-user installation did not complete"
+    },
+    {
+      "id": "fresh_appdata_cleanup",
+      "status": "FAIL",
+      "evidence": "Not exercised: scenario created no default data directory; no existing data removed"
+    },
+    {
+      "id": "clean_native_gif_and_readme_images",
+      "status": "PASS",
+      "evidence": "15.3 seconds, 891274 bytes, 960 px; decoded frames and README images inspected"
+    },
+    {
+      "id": "final_regression",
+      "status": "PASS",
+      "evidence": "Rust 37, Vitest 53, functional 28, perf 3; fmt/Clippy/Biome/typecheck clean"
+    },
+    {
+      "id": "readme_facts_and_publication_privacy",
+      "status": "PASS",
+      "evidence": "Actual size/data path documented; unverified retention is explicit; no private path/brief/report links in public entry documents"
+    },
+    {
+      "id": "reports_and_local_commits",
+      "status": "PASS",
+      "evidence": "Russian report and English local commits; no push; V2.1 file excluded and unchanged"
+    }
+  ],
+  "passed": 7,
+  "total": 12
+}

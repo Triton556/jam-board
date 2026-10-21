@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-20",
+  "scope": "V2.5.1 working-presence follow-up only; V2.5 dogfood block remains unchanged",
+  "commands": [
+    {
+      "command": "cargo fmt --all --check",
+      "code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --offline -- -D warnings",
+      "code": 0
+    },
+    {
+      "command": "cargo test --workspace --offline",
+      "code": 0
+    },
+    {
+      "command": "npm run check",
+      "code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "code": 0
+    },
+    {
+      "command": "npm test",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=functional",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf-canvas",
+      "code": 0
+    }
+  ],
+  "counts": {
+    "rust": 67,
+    "vitest": 114,
+    "functional": 49,
+    "tablePerf": 6,
+    "canvasPerf": 2
+  },
+  "acceptance": {
+    "unit": "PASS",
+    "functional": "PASS",
+    "performance": "PASS",
+    "native": "PASS"
+  },
+  "native": {
+    "arrivalMs": 368,
+    "video": {
+      "width": 960,
+      "nominalSeconds": 6,
+      "bytes": 329056,
+      "playback": {
+        "seconds": 6.738867,
+        "width": 960,
+        "height": 607,
+        "decodedFrames": 7
+      }
+    }
+  },
+  "limitations": [
+    "Windows native dev build, isolated demo data",
+    "No installer rebuild, CI run or macOS/Linux runtime verification",
+    "Scripted MCP fixture, no additional AI session",
+    "No acceptance of the blocked V2.5 Snowball cycle"
+  ]
+}

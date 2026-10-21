@@ -1,0 +1,281 @@
+{
+  "source": "real release WebView2 via CDP",
+  "freshKeys": "JB-*",
+  "cursorOverlay": false,
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "crisp": [
+    {
+      "kind": "board-columns",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "board-column ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "board-column ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "board-column ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "board-column ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "board-column ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    },
+    {
+      "kind": "sticker-wrap ",
+      "transform": "none",
+      "filter": "none",
+      "backdropFilter": "none",
+      "willChange": "auto"
+    }
+  ],
+  "systemScaleChanged": false,
+  "scaleFactor": 1,
+  "releaseSha256": "fc2288e6f0f37730237b5b53a4cec77819b8052bd66c90abcb05c94dcf5553f7",
+  "scaleVerification": "Current native display scale and enlarged before/after crop; no OS display settings changed; a separate Windows 125% run was not performed"
+}

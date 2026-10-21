@@ -1,0 +1,92 @@
+{
+  "sessions": [
+    {
+      "role": "brain",
+      "threadId": "01a158c2-496f-7832-b37e-aa92036a4a5f",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "danger-full-access",
+      "exitCode": 0,
+      "state": "completed/stopped; accepted dogfood Done",
+      "continuationTurns": [
+        {
+          "startedAt": "2026-10-20T13:09:30.832Z",
+          "finishedAt": "2026-10-20T13:11:44.145Z",
+          "exitCode": 0
+        },
+        {
+          "startedAt": "2026-10-20T13:21:44.087Z",
+          "finishedAt": "2026-10-20T13:23:46.849Z",
+          "exitCode": 0
+        },
+        {
+          "startedAt": "2026-10-20T13:30:14.980Z",
+          "finishedAt": "2026-10-20T13:33:36.520Z",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "role": "worker",
+      "threadId": "01a158c5-ff67-7e52-be2c-dd3969ccbccd",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "danger-full-access",
+      "exitCode": 0,
+      "state": "completed/stopped; accepted dogfood Done",
+      "continuationTurns": [
+        {
+          "startedAt": "2026-10-20T13:07:46.208Z",
+          "finishedAt": "2026-10-20T13:11:45.101Z",
+          "exitCode": 0
+        },
+        {
+          "startedAt": "2026-10-20T13:12:42.160Z",
+          "finishedAt": "2026-10-20T13:22:03.678Z",
+          "exitCode": 0
+        },
+        {
+          "startedAt": "2026-10-20T13:25:23.961Z",
+          "finishedAt": "2026-10-20T13:29:40.578Z",
+          "exitCode": 0
+        }
+      ]
+    }
+  ],
+  "processes": {
+    "ownedProcesses": [],
+    "ports": [],
+    "ownedProcessCount": 0
+  },
+  "checkedAt": "2026-10-20T14:20:03.766Z",
+  "historicalBlockedAttempts": [
+    {
+      "role": "brain",
+      "threadId": "01a158c2-496f-7832-b37e-aa92036a4a5f",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "workspace-write",
+      "exitCode": 0,
+      "state": "stopped; blocked on worker Chromium spawn EPERM"
+    },
+    {
+      "role": "worker",
+      "threadId": "01a158c5-ff67-7e52-be2c-dd3969ccbccd",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "workspace-write",
+      "exitCode": 0,
+      "state": "stopped; blocked on worker Chromium spawn EPERM"
+    }
+  ],
+  "playbookPorcelainBefore": "",
+  "playbookPorcelainAfter": "",
+  "installedSkillName": "jam-board",
+  "harnessVerification": {
+    "status": "pass",
+    "checked_files": 291,
+    "failures": [],
+    "limits": "Integrity only; this does not prove human perception, runtime capabilities or model parity."
+  },
+  "userInstallationAndDefaultDataUntouched": true
+}

@@ -1,0 +1,131 @@
+{
+  "initialGzipBytes": 233065,
+  "chunks": [
+    {
+      "file": "assets/index-kfW3It4Q.js",
+      "bytes": 493374,
+      "gzipBytes": 155561,
+      "initial": true
+    },
+    {
+      "file": "assets/ActivityPage-BEkGDw9c.js",
+      "bytes": 7844,
+      "gzipBytes": 3146,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetLinkDialog-DelqaKR5.js",
+      "bytes": 2992,
+      "gzipBytes": 1434,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetsPage-CVeFnZiY.js",
+      "bytes": 6985,
+      "gzipBytes": 2869,
+      "initial": false
+    },
+    {
+      "file": "assets/CommandPalette-wmA544XY.js",
+      "bytes": 4186,
+      "gzipBytes": 1989,
+      "initial": false
+    },
+    {
+      "file": "assets/MarkdownContent-DNA5mLCy.js",
+      "bytes": 155320,
+      "gzipBytes": 46052,
+      "initial": false
+    },
+    {
+      "file": "assets/Priority-C8TMnqPx.js",
+      "bytes": 444,
+      "gzipBytes": 316,
+      "initial": false
+    },
+    {
+      "file": "assets/SettingsPage-DQg7-jbc.js",
+      "bytes": 12302,
+      "gzipBytes": 4259,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskDrawer-CWxxbJtH.js",
+      "bytes": 15490,
+      "gzipBytes": 5410,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskTable-BenzaFCs.js",
+      "bytes": 40043,
+      "gzipBytes": 12505,
+      "initial": false
+    },
+    {
+      "file": "assets/TeamPage-DAZjuSnv.js",
+      "bytes": 3859,
+      "gzipBytes": 1643,
+      "initial": false
+    },
+    {
+      "file": "assets/copy-Dv3ua7a6.js",
+      "bytes": 268,
+      "gzipBytes": 229,
+      "initial": false
+    },
+    {
+      "file": "assets/dist-js-Civ4r3i1.js",
+      "bytes": 2039,
+      "gzipBytes": 991,
+      "initial": true
+    },
+    {
+      "file": "assets/m5-CqWne6M2.js",
+      "bytes": 2404,
+      "gzipBytes": 998,
+      "initial": false
+    },
+    {
+      "file": "assets/motion-B9D42OPY.js",
+      "bytes": 140505,
+      "gzipBytes": 46024,
+      "initial": true
+    },
+    {
+      "file": "assets/rough-Dy-Kn_BL.js",
+      "bytes": 27109,
+      "gzipBytes": 8785,
+      "initial": true
+    },
+    {
+      "file": "assets/table-time-OMgw3xBt.js",
+      "bytes": 833,
+      "gzipBytes": 517,
+      "initial": false
+    },
+    {
+      "file": "assets/time-C9DNGUbc.js",
+      "bytes": 218,
+      "gzipBytes": 167,
+      "initial": false
+    },
+    {
+      "file": "assets/ui-store-B10Vj-h5.js",
+      "bytes": 64692,
+      "gzipBytes": 19692,
+      "initial": true
+    },
+    {
+      "file": "assets/useMutation-Cv7r4mhP.js",
+      "bytes": 5796,
+      "gzipBytes": 1857,
+      "initial": true
+    },
+    {
+      "file": "assets/useRouter-iu8eJc6G.js",
+      "bytes": 181,
+      "gzipBytes": 155,
+      "initial": true
+    }
+  ]
+}

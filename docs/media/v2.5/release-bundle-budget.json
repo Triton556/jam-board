@@ -1,0 +1,221 @@
+{
+  "initialGzipBytes": 242252,
+  "chunks": [
+    {
+      "file": "assets/index-Dja0emtA.js",
+      "bytes": 305139,
+      "gzipBytes": 98426,
+      "initial": true
+    },
+    {
+      "file": "assets/ActivityPage-9RCpXcue.js",
+      "bytes": 8112,
+      "gzipBytes": 3001,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetLinkDialog-Cn__FRiC.js",
+      "bytes": 1884,
+      "gzipBytes": 996,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetsPage-leXk1GCm.js",
+      "bytes": 11582,
+      "gzipBytes": 4267,
+      "initial": false
+    },
+    {
+      "file": "assets/AsyncState-5QPhqU6Q.js",
+      "bytes": 531,
+      "gzipBytes": 334,
+      "initial": false
+    },
+    {
+      "file": "assets/BriefEditor-BSK2gJ60.js",
+      "bytes": 10858,
+      "gzipBytes": 3765,
+      "initial": false
+    },
+    {
+      "file": "assets/CommandPalette-CfhIjRO8.js",
+      "bytes": 4491,
+      "gzipBytes": 2063,
+      "initial": false
+    },
+    {
+      "file": "assets/InboxPage-DtuUZ47b.js",
+      "bytes": 4727,
+      "gzipBytes": 1956,
+      "initial": false
+    },
+    {
+      "file": "assets/Journal-CcOc97TQ.js",
+      "bytes": 6385,
+      "gzipBytes": 2836,
+      "initial": false
+    },
+    {
+      "file": "assets/Markdown-X60bAGoU.js",
+      "bytes": 608,
+      "gzipBytes": 353,
+      "initial": false
+    },
+    {
+      "file": "assets/MarkdownContent-KiutrvEE.js",
+      "bytes": 155332,
+      "gzipBytes": 46056,
+      "initial": false
+    },
+    {
+      "file": "assets/MarkdownField-7kDZO-ge.js",
+      "bytes": 1695,
+      "gzipBytes": 896,
+      "initial": false
+    },
+    {
+      "file": "assets/PlanPage-Dq2NS4Cc.js",
+      "bytes": 13390,
+      "gzipBytes": 4688,
+      "initial": false
+    },
+    {
+      "file": "assets/PlanningControls-DzBQxLcN.js",
+      "bytes": 3391,
+      "gzipBytes": 1560,
+      "initial": false
+    },
+    {
+      "file": "assets/Priority-BRTAzF5i.js",
+      "bytes": 486,
+      "gzipBytes": 335,
+      "initial": false
+    },
+    {
+      "file": "assets/ReferencesPage-Cx20JGfT.js",
+      "bytes": 217437,
+      "gzipBytes": 69242,
+      "initial": false
+    },
+    {
+      "file": "assets/SettingsPage-BfW6c-B0.js",
+      "bytes": 22614,
+      "gzipBytes": 7289,
+      "initial": false
+    },
+    {
+      "file": "assets/StoryDrawer-Bu4fM-Qr.js",
+      "bytes": 3824,
+      "gzipBytes": 1729,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskDrawer-DtGKfFit.js",
+      "bytes": 23268,
+      "gzipBytes": 7635,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskTable-DHE71Jl4.js",
+      "bytes": 14596,
+      "gzipBytes": 5199,
+      "initial": false
+    },
+    {
+      "file": "assets/TeamPage-BDJEs8ur.js",
+      "bytes": 3839,
+      "gzipBytes": 1628,
+      "initial": false
+    },
+    {
+      "file": "assets/audio-lines-BPKVEQG8.js",
+      "bytes": 336,
+      "gzipBytes": 223,
+      "initial": false
+    },
+    {
+      "file": "assets/copy-BCUvLGN8.js",
+      "bytes": 267,
+      "gzipBytes": 229,
+      "initial": false
+    },
+    {
+      "file": "assets/dialogs-fWNCheyf.js",
+      "bytes": 3848,
+      "gzipBytes": 1443,
+      "initial": false
+    },
+    {
+      "file": "assets/dist-js-Civ4r3i1.js",
+      "bytes": 2039,
+      "gzipBytes": 991,
+      "initial": true
+    },
+    {
+      "file": "assets/ellipsis-CaPtsw4S.js",
+      "bytes": 285,
+      "gzipBytes": 203,
+      "initial": false
+    },
+    {
+      "file": "assets/file-text-CXLHvx6W.js",
+      "bytes": 416,
+      "gzipBytes": 271,
+      "initial": false
+    },
+    {
+      "file": "assets/m5-CUOnNHRU.js",
+      "bytes": 2440,
+      "gzipBytes": 1027,
+      "initial": false
+    },
+    {
+      "file": "assets/motion-CYvnvwsi.js",
+      "bytes": 132318,
+      "gzipBytes": 43207,
+      "initial": true
+    },
+    {
+      "file": "assets/plus-DN93n75A.js",
+      "bytes": 184,
+      "gzipBytes": 168,
+      "initial": true
+    },
+    {
+      "file": "assets/queries-toyObY9B.js",
+      "bytes": 77417,
+      "gzipBytes": 22931,
+      "initial": true
+    },
+    {
+      "file": "assets/react-runtime-BJ7VjyXE.js",
+      "bytes": 218757,
+      "gzipBytes": 67526,
+      "initial": true
+    },
+    {
+      "file": "assets/rough-Dy-Kn_BL.js",
+      "bytes": 27109,
+      "gzipBytes": 8785,
+      "initial": true
+    },
+    {
+      "file": "assets/type-CQujWdPq.js",
+      "bytes": 899,
+      "gzipBytes": 475,
+      "initial": false
+    },
+    {
+      "file": "assets/use-table-virtualizer-BQ_6TXqa.js",
+      "bytes": 32833,
+      "gzipBytes": 9796,
+      "initial": false
+    },
+    {
+      "file": "assets/useNavigate-D3tYN1il.js",
+      "bytes": 291,
+      "gzipBytes": 218,
+      "initial": true
+    }
+  ]
+}

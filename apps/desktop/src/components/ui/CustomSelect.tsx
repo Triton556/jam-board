@@ -1,0 +1,180 @@
+import { ChevronDown } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+export type SelectOption = {
+  value: string;
+  label: string;
+  group?: string;
+  color?: string;
+  disabled?: boolean;
+};
+export function CustomSelect({
+  value,
+  onChange,
+  options,
+  label,
+  disabled,
+  id,
+  searchable = false,
+}: {
+  value: string;
+  onChange(value: string): void;
+  options: SelectOption[];
+  label: string;
+  disabled?: boolean;
+  id?: string;
+  searchable?: boolean;
+}) {
+  const uid = useId(),
+    listId = `${uid}-list`;
+  const [open, setOpen] = useState(false),
+    [query, setQuery] = useState(""),
+    [active, setActive] = useState(0);
+  const root = useRef<HTMLDivElement>(null),
+    button = useRef<HTMLButtonElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (open)
+      document
+        .getElementById(`${uid}-${active}`)
+        ?.scrollIntoView({ block: "nearest" });
+  }, [open, active, uid]);
+  useEffect(() => {
+    if (open && searchable) search.current?.focus();
+  }, [open, searchable]);
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(query.toLowerCase()),
+  );
+  const selected = options.find((o) => o.value === value);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  const choose = (v: string) => {
+    if (options.find((o) => o.value === v)?.disabled) return;
+    onChange(v);
+    setOpen(false);
+    setQuery("");
+    button.current?.focus();
+  };
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Delegates option keyboard events while focus remains in the combobox or its search input.
+    <div
+      className="custom-select"
+      ref={root}
+      onKeyDown={(e) => {
+        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+          e.preventDefault();
+          setOpen(true);
+          setActive((i) => {
+            let next =
+              e.key === "Home"
+                ? 0
+                : e.key === "End"
+                  ? filtered.length - 1
+                  : Math.max(
+                      0,
+                      Math.min(
+                        filtered.length - 1,
+                        i + (e.key === "ArrowDown" ? 1 : -1),
+                      ),
+                    );
+            const direction = e.key === "ArrowUp" || e.key === "End" ? -1 : 1;
+            while (filtered[next]?.disabled) {
+              next += direction;
+              if (next < 0 || next >= filtered.length) return i;
+            }
+            return next;
+          });
+        }
+        if (e.key === "Escape" && open) {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(false);
+          button.current?.focus();
+        }
+        if (e.key === "Enter" && open) {
+          e.preventDefault();
+          const o = filtered[active];
+          if (o) choose(o.value);
+        }
+        if (e.key === "Tab") setOpen(false);
+      }}
+    >
+      <button
+        ref={button}
+        type="button"
+        id={id}
+        role="combobox"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-haspopup="listbox"
+        aria-activedescendant={open ? `${uid}-${active}` : undefined}
+        disabled={disabled}
+        className="input-like"
+        onClick={() => {
+          setOpen(!open);
+          setActive(
+            Math.max(
+              0,
+              options.findIndex((o) => o.value === value),
+            ),
+          );
+        }}
+      >
+        <span>
+          {selected?.color && (
+            <i className="select-dot" style={{ background: selected.color }} />
+          )}
+          {selected?.label ?? "Select…"}
+        </span>
+        <ChevronDown size={16} />
+      </button>
+      {open && (
+        <div className="combo-popup">
+          {searchable && (
+            <input
+              ref={search}
+              aria-label={`Search ${label.toLowerCase()}`}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActive(0);
+              }}
+            />
+          )}
+          <div id={listId} role="listbox" aria-label={`${label} options`}>
+            {filtered.map((o, i) => (
+              <div key={o.value}>
+                {o.group && filtered[i - 1]?.group !== o.group && (
+                  <small className="eyebrow">{o.group}</small>
+                )}
+                <button
+                  type="button"
+                  role="option"
+                  id={`${uid}-${i}`}
+                  aria-selected={o.value === value}
+                  disabled={o.disabled}
+                  aria-disabled={o.disabled}
+                  className={i === active ? "active-option" : ""}
+                  onPointerMove={() => setActive(i)}
+                  onClick={() => choose(o.value)}
+                >
+                  {o.color && (
+                    <i className="select-dot" style={{ background: o.color }} />
+                  )}
+                  {o.label}
+                </button>
+              </div>
+            ))}
+            {!filtered.length && <p className="muted">No matches</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

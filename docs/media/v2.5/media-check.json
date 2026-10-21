@@ -1,0 +1,14 @@
+{
+  "gif": {
+    "width": 960,
+    "seconds": 23,
+    "pages": 17
+  },
+  "video": {
+    "width": 960,
+    "height": 651,
+    "advancedSeconds": 1.086807,
+    "duration": 45.882,
+    "decoded": 12
+  }
+}

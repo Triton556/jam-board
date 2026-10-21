@@ -1,0 +1,137 @@
+{
+  "initialGzipBytes": 233675,
+  "chunks": [
+    {
+      "file": "assets/index-DKIJkju7.js",
+      "bytes": 292631,
+      "gzipBytes": 93640,
+      "initial": true
+    },
+    {
+      "file": "assets/ActivityPage-lii6Cx0W.js",
+      "bytes": 7851,
+      "gzipBytes": 3151,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetLinkDialog-DeQT-_-N.js",
+      "bytes": 2993,
+      "gzipBytes": 1442,
+      "initial": false
+    },
+    {
+      "file": "assets/AssetsPage-BT5g1GLh.js",
+      "bytes": 11790,
+      "gzipBytes": 4302,
+      "initial": false
+    },
+    {
+      "file": "assets/CommandPalette-CjHt1yVt.js",
+      "bytes": 4154,
+      "gzipBytes": 1978,
+      "initial": false
+    },
+    {
+      "file": "assets/MarkdownContent-KiutrvEE.js",
+      "bytes": 155332,
+      "gzipBytes": 46056,
+      "initial": false
+    },
+    {
+      "file": "assets/Priority-Chq8CFzm.js",
+      "bytes": 487,
+      "gzipBytes": 336,
+      "initial": false
+    },
+    {
+      "file": "assets/SettingsPage-CJnrlVky.js",
+      "bytes": 13379,
+      "gzipBytes": 4546,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskDrawer-ChU9FjJ_.js",
+      "bytes": 15946,
+      "gzipBytes": 5569,
+      "initial": false
+    },
+    {
+      "file": "assets/TaskTable-CyB5Genu.js",
+      "bytes": 10538,
+      "gzipBytes": 3942,
+      "initial": false
+    },
+    {
+      "file": "assets/TeamPage-q5-Z2xte.js",
+      "bytes": 3827,
+      "gzipBytes": 1633,
+      "initial": false
+    },
+    {
+      "file": "assets/copy-DoJvg_Cf.js",
+      "bytes": 268,
+      "gzipBytes": 232,
+      "initial": false
+    },
+    {
+      "file": "assets/dist-js-Civ4r3i1.js",
+      "bytes": 2039,
+      "gzipBytes": 991,
+      "initial": true
+    },
+    {
+      "file": "assets/m5-DE6qNswQ.js",
+      "bytes": 2411,
+      "gzipBytes": 1004,
+      "initial": false
+    },
+    {
+      "file": "assets/motion-CYvnvwsi.js",
+      "bytes": 132318,
+      "gzipBytes": 43207,
+      "initial": true
+    },
+    {
+      "file": "assets/react-runtime-BJ7VjyXE.js",
+      "bytes": 218757,
+      "gzipBytes": 67526,
+      "initial": true
+    },
+    {
+      "file": "assets/rough-Dy-Kn_BL.js",
+      "bytes": 27109,
+      "gzipBytes": 8785,
+      "initial": true
+    },
+    {
+      "file": "assets/table-time-CgqFCFa8.js",
+      "bytes": 840,
+      "gzipBytes": 520,
+      "initial": false
+    },
+    {
+      "file": "assets/time-C9DNGUbc.js",
+      "bytes": 218,
+      "gzipBytes": 167,
+      "initial": false
+    },
+    {
+      "file": "assets/ui-store-BGPGUsqc.js",
+      "bytes": 63178,
+      "gzipBytes": 19364,
+      "initial": true
+    },
+    {
+      "file": "assets/use-table-virtualizer-CP_cm0Dp.js",
+      "bytes": 32172,
+      "gzipBytes": 9535,
+      "initial": false
+    },
+    {
+      "file": "assets/useRouter-DbJnEVX7.js",
+      "bytes": 188,
+      "gzipBytes": 162,
+      "initial": true
+    }
+  ]
+}

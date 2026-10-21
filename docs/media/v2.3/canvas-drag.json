@@ -1,0 +1,18 @@
+{
+  "scenario": "drag",
+  "displayIntervalMs": 13.299999999999955,
+  "meanMs": 13.333185840707966,
+  "p95Ms": 13.5,
+  "longFrames": 0,
+  "longFrameShare": 0,
+  "frames": 226,
+  "longTasks": 0,
+  "longTaskTotalMs": 0,
+  "maxNodes": 22,
+  "count": 500,
+  "framesCount": 40,
+  "edges": 300,
+  "production": true,
+  "warmupMs": 1000,
+  "measurementMs": 3000
+}

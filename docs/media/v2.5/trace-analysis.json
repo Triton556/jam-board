@@ -1,0 +1,55 @@
+{
+  "scope": "Separate three-second diagnostic pan traces; overlapping durations, not exclusive CPU time. Only readable-mode link sizing changed between these runs.",
+  "traces": [
+    {
+      "phase": "before",
+      "groups": {
+        "FunctionCall": {
+          "count": 1120,
+          "sumMs": 1021.3399999999983,
+          "maxMs": 29.312
+        },
+        "UpdateLayoutTree": {
+          "count": 216,
+          "sumMs": 43.38300000000003,
+          "maxMs": 4.357
+        },
+        "Layout": {
+          "count": 216,
+          "sumMs": 105.30299999999998,
+          "maxMs": 2.655
+        },
+        "Paint": {
+          "count": 3199,
+          "sumMs": 247.58100000000343,
+          "maxMs": 4.264
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "groups": {
+        "FunctionCall": {
+          "count": 1166,
+          "sumMs": 974.0719999999988,
+          "maxMs": 15.593
+        },
+        "UpdateLayoutTree": {
+          "count": 218,
+          "sumMs": 54.17100000000003,
+          "maxMs": 6.499
+        },
+        "Layout": {
+          "count": 218,
+          "sumMs": 123.47400000000006,
+          "maxMs": 2.9
+        },
+        "Paint": {
+          "count": 3123,
+          "sumMs": 309.2519999999992,
+          "maxMs": 5.629
+        }
+      }
+    }
+  ]
+}

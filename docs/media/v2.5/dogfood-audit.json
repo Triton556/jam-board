@@ -1,0 +1,1345 @@
+{
+  "simulatedHuman": true,
+  "notDanilsAcceptance": true,
+  "checks": {
+    "exactTree": true,
+    "allDone": true,
+    "allAccepted": true,
+    "actualBrowserPass": true,
+    "noOverrides": true,
+    "noSelfReviews": true,
+    "noAgentAnswers": true,
+    "correctedRound": true,
+    "readyAtRelease": true,
+    "finalBriefContentComplete": true,
+    "closingHuman": true,
+    "closingOrder": true,
+    "closingAfterAcceptance": true,
+    "closingAfterStories": true,
+    "orderedPrelude": true
+  },
+  "firstContextSeq": 3,
+  "firstInterviewQuestionSeq": 4,
+  "lastDoneSeq": 114,
+  "epics": [
+    {
+      "key": "JB-E1",
+      "status": "done"
+    }
+  ],
+  "stories": [
+    {
+      "key": "JB-S1",
+      "status": "done"
+    },
+    {
+      "key": "JB-S2",
+      "status": "done"
+    }
+  ],
+  "questions": [
+    {
+      "id": "01M5CC67M6CBFZF1922T6CFTA3",
+      "title": "Q1 — How should rolling feel?",
+      "status": "answered",
+      "answerIndex": null,
+      "answerText": "Пусть снежок оставляет след",
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CC67MSQSRZK4C49J1H1PND",
+      "title": "Q2 — Which controls and device?",
+      "status": "answered",
+      "answerIndex": 0,
+      "answerText": null,
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CC67NCY0DYZ7GB9Q5N5CRE",
+      "title": "Q3 — What is the play goal?",
+      "status": "answered",
+      "answerIndex": 0,
+      "answerText": null,
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CC7TA4YJ0681VENRX2BPW7",
+      "title": "Playback — confirm the tiny Snowball slice",
+      "status": "answered",
+      "answerIndex": 0,
+      "answerText": null,
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CCBXQAHBJQX060MWRZ4KYK",
+      "title": "What role should the attached danil-laptop reference have?",
+      "status": "answered",
+      "answerIndex": 0,
+      "answerText": null,
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CCKCFZBPCJ7YTV52WHMYBH",
+      "title": "First sketch checkpoint — inspect before acceptance",
+      "status": "answered",
+      "answerIndex": 0,
+      "answerText": "Simulated human operator: I inspected the corrected sketch in Chromium. Rolling, growth, trail, restart and the Size counter after resize work. I approve this first sketch. The browser-capable environment is now authorized; Brain must still review the actual Worker PASS evidence before dependent work.",
+      "answeredByKind": "human"
+    },
+    {
+      "id": "01M5CR7K3S9QV011FNPJ6CVEJ9",
+      "title": "Final checkpoint — may Brain close Snowball JB-E1?",
+      "status": "answered",
+      "answerIndex": null,
+      "answerText": "Да, закрывай",
+      "answeredByKind": "human"
+    }
+  ],
+  "events": [
+    {
+      "seq": 1,
+      "action": "jam.updated",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": null,
+      "sentence": "Test operator jam updated "
+    },
+    {
+      "seq": 2,
+      "action": "member.joined",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain member joined "
+    },
+    {
+      "seq": 3,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain: interviewing: round 1"
+    },
+    {
+      "seq": 4,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain asked a question (Snowball — design round 1)"
+    },
+    {
+      "seq": 5,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain asked a question (Snowball — design round 1)"
+    },
+    {
+      "seq": 6,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain asked a question (Snowball — design round 1)"
+    },
+    {
+      "seq": 7,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": null,
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 8,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": null,
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 9,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": null,
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 10,
+      "action": "epic.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created epic JB-E1 · Snowball — roll, grow, leave a trail"
+    },
+    {
+      "seq": 11,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · brainMemberId"
+    },
+    {
+      "seq": 12,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain asked a question (Snowball — playback)"
+    },
+    {
+      "seq": 13,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: playback confirmation in Inbox"
+    },
+    {
+      "seq": 14,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 15,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, doneWhenMd, openQuestionsMd"
+    },
+    {
+      "seq": 16,
+      "action": "epic.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-E1 to active"
+    },
+    {
+      "seq": 17,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: writing complete briefs: 2 stories, 3 sequential tasks"
+    },
+    {
+      "seq": 18,
+      "action": "story.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created story JB-S1 · Feel the snowball roll and grow"
+    },
+    {
+      "seq": 19,
+      "action": "story.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created story JB-S2 · Keep free play clear and restartable"
+    },
+    {
+      "seq": 20,
+      "action": "story.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-S1 to active"
+    },
+    {
+      "seq": 21,
+      "action": "story.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-S2 to active"
+    },
+    {
+      "seq": 22,
+      "action": "reference.added",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": null,
+      "sentence": "Test operator added reference danil-laptop"
+    },
+    {
+      "seq": 23,
+      "action": "reference.linked",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator linked a reference to JB-S1"
+    },
+    {
+      "seq": 24,
+      "action": "task.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created JB-1 · Build the coherent rolling-and-growing sketch"
+    },
+    {
+      "seq": 25,
+      "action": "task.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created JB-2 · Make free play reliable at both desktop sizes"
+    },
+    {
+      "seq": 26,
+      "action": "task.created",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain created JB-3 · Record final Chromium regression evidence"
+    },
+    {
+      "seq": 27,
+      "action": "task.moved",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain moved JB-1 to Ready"
+    },
+    {
+      "seq": 28,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: Worker report on JB-1; JB-2/JB-3 held for prerequisites"
+    },
+    {
+      "seq": 29,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd"
+    },
+    {
+      "seq": 30,
+      "action": "comment.added",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain commented on JB-1"
+    },
+    {
+      "seq": 31,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain asked a question (Snowball — attachment clarification)"
+    },
+    {
+      "seq": 32,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: clarify human attachment in Inbox; first task not yet claimed"
+    },
+    {
+      "seq": 33,
+      "action": "member.joined",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Worker member joined "
+    },
+    {
+      "seq": 34,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 35,
+      "action": "comment.added",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain commented on JB-1"
+    },
+    {
+      "seq": 36,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd"
+    },
+    {
+      "seq": 37,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: Worker claim/report on Ready JB-1; attachment clarified"
+    },
+    {
+      "seq": 38,
+      "action": "task.claimed",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker claimed JB-1"
+    },
+    {
+      "seq": 39,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: implementing JB-1: snowy canvas, movement, growth and trail"
+    },
+    {
+      "seq": 40,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: JB-1 in progress; next step actual-file review and human sketch checkpoint"
+    },
+    {
+      "seq": 41,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: testing JB-1: real headless Chrome at 1280x720 and 800x600"
+    },
+    {
+      "seq": 42,
+      "action": "comment.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker commented on JB-1"
+    },
+    {
+      "seq": 43,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: submitting JB-1: Chrome spawn EPERM; behavior checks unverified"
+    },
+    {
+      "seq": 44,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 actual Chromium behavior script"
+    },
+    {
+      "seq": 45,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 launch failure evidence"
+    },
+    {
+      "seq": 46,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 implementation baseline"
+    },
+    {
+      "seq": 47,
+      "action": "report.submitted",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker submitted a report for JB-1"
+    },
+    {
+      "seq": 48,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: waiting for Brain: JB-1 report submitted; Chrome launch blocked"
+    },
+    {
+      "seq": 49,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain asked a question (Snowball — first sketch)"
+    },
+    {
+      "seq": 50,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: blocked: Chrome spawn EPERM; waiting human first-sketch/environment answer"
+    },
+    {
+      "seq": 51,
+      "action": "review.recorded",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator returned JB-1 for changes"
+    },
+    {
+      "seq": 52,
+      "action": "task.claimed",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker claimed JB-1"
+    },
+    {
+      "seq": 53,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: fixing JB-1 round 1: refresh Size after resize; Chrome remains blocked"
+    },
+    {
+      "seq": 54,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd"
+    },
+    {
+      "seq": 55,
+      "action": "comment.added",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain commented on JB-1"
+    },
+    {
+      "seq": 56,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 round 1: unexecuted browser checks"
+    },
+    {
+      "seq": 57,
+      "action": "report.submitted",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker submitted a report for JB-1"
+    },
+    {
+      "seq": 58,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: waiting for Brain: resize correction reported; Chromium still unverified"
+    },
+    {
+      "seq": 59,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: idle: JB-1 round 1 in Review; no Ready work; awaiting authorized Chrome environment"
+    },
+    {
+      "seq": 60,
+      "action": "review.recorded",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain returned JB-1: tests T1 Sketch startup and T2 Roll/grow/trail and T3 Basic restart and T4 Grow then resize size synchronization failed"
+    },
+    {
+      "seq": 61,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, openQuestionsMd"
+    },
+    {
+      "seq": 62,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: blocked: JB-1 verification returned; needs authorized Chrome environment and human checkpoint"
+    },
+    {
+      "seq": 63,
+      "action": "task.claimed",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker claimed JB-1"
+    },
+    {
+      "seq": 64,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: testing JB-1 round 2: authorized real headless Chrome run"
+    },
+    {
+      "seq": 65,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 round 2: actual Chrome PASS results"
+    },
+    {
+      "seq": 66,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 first sketch: L-shaped trail at 1280x720"
+    },
+    {
+      "seq": 67,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 first sketch: initial view at 800x600"
+    },
+    {
+      "seq": 68,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-1 corrected Size after resize"
+    },
+    {
+      "seq": 69,
+      "action": "report.submitted",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker submitted a report for JB-1"
+    },
+    {
+      "seq": 70,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: waiting: JB-1 round 2 all checks PASS; human sketch checkpoint and Brain review pending"
+    },
+    {
+      "seq": 71,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 72,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: reviewing JB-1 round 2: actual Chrome evidence and answered first-sketch checkpoint"
+    },
+    {
+      "seq": 73,
+      "action": "review.recorded",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain accepted JB-1"
+    },
+    {
+      "seq": 74,
+      "action": "story.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-S1 to done"
+    },
+    {
+      "seq": 75,
+      "action": "comment.added",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain commented on JB-2"
+    },
+    {
+      "seq": 76,
+      "action": "task.moved",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain moved JB-2 to Ready"
+    },
+    {
+      "seq": 77,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, openQuestionsMd"
+    },
+    {
+      "seq": 78,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: JB-2 Ready; orchestrator to resume existing Worker if idle; JB-3 held"
+    },
+    {
+      "seq": 79,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-1",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: idle: JB-1 round 2 PASS awaits Brain review; human approved sketch; JB-2/JB-3 not Ready"
+    },
+    {
+      "seq": 80,
+      "action": "task.claimed",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker claimed JB-2"
+    },
+    {
+      "seq": 81,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: testing JB-2 baseline: accepted sketch plus input/reset/resize edges"
+    },
+    {
+      "seq": 82,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: testing JB-2 fixes: overflow removed; hidden-state key reset; full real Chrome scenarios"
+    },
+    {
+      "seq": 83,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-2 original edge checks: preserved failures"
+    },
+    {
+      "seq": 84,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-2 real Chrome: input, walls, reset PASS"
+    },
+    {
+      "seq": 85,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-2 controls and reset at 800x600"
+    },
+    {
+      "seq": 86,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-2 cap and boundaries at 1280x720"
+    },
+    {
+      "seq": 87,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: recording JB-2 evidence: input/walls/reset PASS; preserving distinct sketch regression output"
+    },
+    {
+      "seq": 88,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-2 preserved sketch regression: 7 PASS records"
+    },
+    {
+      "seq": 89,
+      "action": "report.submitted",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker submitted a report for JB-2"
+    },
+    {
+      "seq": 90,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: waiting: JB-2 round 0 submitted; T1-T4 PASS; hidden-only lifecycle coverage limit recorded"
+    },
+    {
+      "seq": 91,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: idle: JB-2 round 0 in Review, real Chrome PASS; no Ready task; JB-3 dependent"
+    },
+    {
+      "seq": 92,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: reviewing JB-2 round 0: real input, boundaries, restart and lifecycle coverage limits"
+    },
+    {
+      "seq": 93,
+      "action": "review.recorded",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-2",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain accepted JB-2"
+    },
+    {
+      "seq": 94,
+      "action": "comment.added",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain commented on JB-3"
+    },
+    {
+      "seq": 95,
+      "action": "task.moved",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain moved JB-3 to Ready"
+    },
+    {
+      "seq": 96,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, openQuestionsMd"
+    },
+    {
+      "seq": 97,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: JB-3 Ready; orchestrator must resume same idle Worker for final evidence"
+    },
+    {
+      "seq": 98,
+      "action": "task.claimed",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker claimed JB-3"
+    },
+    {
+      "seq": 99,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: testing JB-3: final real Chrome regression and preserved evidence index"
+    },
+    {
+      "seq": 100,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-3 final evidence index and visible comparison"
+    },
+    {
+      "seq": 101,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-3 actual final Chromium results: 13 PASS; hidden NOT_RUN"
+    },
+    {
+      "seq": 102,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-3 reproducible final Chromium runner"
+    },
+    {
+      "seq": 103,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-3 final moved view at 1280x720"
+    },
+    {
+      "seq": 104,
+      "action": "reference.added",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker added reference JB-3 final clean reset at 800x600"
+    },
+    {
+      "seq": 105,
+      "action": "report.submitted",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker submitted a report for JB-3"
+    },
+    {
+      "seq": 106,
+      "action": "agent.status",
+      "actor": "Worker",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Worker: finished Worker: JB-3 round 0 submitted; 13/13 Chrome PASS; hidden-only NOT_RUN; awaiting Brain"
+    },
+    {
+      "seq": 107,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: reviewing JB-3 round 0: final evidence, source hashes and story acceptance"
+    },
+    {
+      "seq": 108,
+      "action": "review.recorded",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "taskKey": "JB-3",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain accepted JB-3"
+    },
+    {
+      "seq": 109,
+      "action": "story.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-S2 to done"
+    },
+    {
+      "seq": 110,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, openQuestionsMd"
+    },
+    {
+      "seq": 111,
+      "action": "question.asked",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain asked a question (Snowball — final closure)"
+    },
+    {
+      "seq": 112,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain: waiting: final human Inbox answer; all3 tasks and both stories Done"
+    },
+    {
+      "seq": 113,
+      "action": "question.answered",
+      "actor": "Test operator",
+      "actorKind": "human",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Test operator answered a question"
+    },
+    {
+      "seq": 114,
+      "action": "epic.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain set JB-E1 to done"
+    },
+    {
+      "seq": 115,
+      "action": "agent.status",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": null,
+      "sentence": "Brain: "
+    },
+    {
+      "seq": 116,
+      "action": "epic.updated",
+      "actor": "Brain",
+      "actorKind": "agent",
+      "epicId": "01M5CC7T7VC9C2NJ4XK06V6KWZ",
+      "sentence": "Brain updated JB-E1 · decidedMd, openQuestionsMd"
+    }
+  ],
+  "reports": [
+    {
+      "key": "JB-1",
+      "status": "done",
+      "rounds": [
+        {
+          "round": 0,
+          "author": "Worker",
+          "tests": [
+            {
+              "name": "T1 Sketch startup",
+              "result": "FAIL"
+            },
+            {
+              "name": "T2 Roll/grow/trail",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "T3 Basic restart",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "S1 JavaScript syntax",
+              "result": "PASS"
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "author": "Worker",
+          "tests": [
+            {
+              "name": "T1 Sketch startup",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "T2 Roll/grow/trail",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "T3 Basic restart",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "T4 Grow then resize size synchronization",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "S1 JavaScript syntax",
+              "result": "PASS"
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "author": "Worker",
+          "tests": [
+            {
+              "name": "T1 Sketch startup",
+              "result": "PASS"
+            },
+            {
+              "name": "T2 Roll/grow/trail",
+              "result": "PASS"
+            },
+            {
+              "name": "T3 Basic restart",
+              "result": "PASS"
+            },
+            {
+              "name": "T4 Grow then resize size synchronization",
+              "result": "PASS"
+            },
+            {
+              "name": "S1 JavaScript syntax",
+              "result": "PASS"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "round": 0,
+          "verdict": "changes_requested",
+          "reviewer": "Test operator"
+        },
+        {
+          "round": 1,
+          "verdict": "changes_requested",
+          "reviewer": "Brain"
+        },
+        {
+          "round": 2,
+          "verdict": "accept",
+          "reviewer": "Brain"
+        }
+      ]
+    },
+    {
+      "key": "JB-2",
+      "status": "done",
+      "rounds": [
+        {
+          "round": 0,
+          "author": "Worker",
+          "tests": [
+            {
+              "name": "T1 Baseline and preservation",
+              "result": "PASS"
+            },
+            {
+              "name": "T2 Input edges",
+              "result": "PASS"
+            },
+            {
+              "name": "T3 Growth/bounds",
+              "result": "PASS"
+            },
+            {
+              "name": "T4 Restart",
+              "result": "PASS"
+            },
+            {
+              "name": "S1 JavaScript syntax",
+              "result": "PASS"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "round": 0,
+          "verdict": "accept",
+          "reviewer": "Brain"
+        }
+      ]
+    },
+    {
+      "key": "JB-3",
+      "status": "done",
+      "rounds": [
+        {
+          "round": 0,
+          "author": "Worker",
+          "tests": [
+            {
+              "name": "T1 Final regression",
+              "result": "PASS"
+            },
+            {
+              "name": "T2 Visible preservation",
+              "result": "PASS"
+            },
+            {
+              "name": "H1 Hidden-only handler execution",
+              "result": "NOT_RUN"
+            },
+            {
+              "name": "S1 Evidence script syntax",
+              "result": "PASS"
+            }
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "round": 0,
+          "verdict": "accept",
+          "reviewer": "Brain"
+        }
+      ]
+    }
+  ],
+  "readiness": [
+    {
+      "key": "JB-1",
+      "ready": false,
+      "missing": [
+        {
+          "code": "story_active",
+          "message": "The story is still draft"
+        }
+      ]
+    },
+    {
+      "key": "JB-2",
+      "ready": false,
+      "missing": [
+        {
+          "code": "story_active",
+          "message": "The story is still draft"
+        }
+      ]
+    },
+    {
+      "key": "JB-3",
+      "ready": false,
+      "missing": [
+        {
+          "code": "story_active",
+          "message": "The story is still draft"
+        }
+      ]
+    }
+  ],
+  "releaseChecks": [
+    {
+      "key": "JB-1",
+      "missing": [],
+      "ready": true,
+      "log": "brain-1792490489888-events.jsonl"
+    },
+    {
+      "key": "JB-2",
+      "missing": [],
+      "ready": true,
+      "log": "brain-1792490489888-events.jsonl"
+    },
+    {
+      "key": "JB-3",
+      "missing": [],
+      "ready": true,
+      "log": "brain-1792490489888-events.jsonl"
+    },
+    {
+      "key": "JB-2",
+      "missing": [],
+      "ready": true,
+      "log": "brain-1792501770820-events.jsonl"
+    },
+    {
+      "key": "JB-3",
+      "missing": [],
+      "ready": true,
+      "log": "brain-1792502504074-events.jsonl"
+    }
+  ],
+  "readinessNote": "Release-time MCP check_ready results are authoritative. After story closure, story_active intentionally prevents preparing more work; no brief content is missing.",
+  "closing": {
+    "questionId": "01M5CR7K3S9QV011FNPJ6CVEJ9",
+    "answeredAt": "2026-10-20T13:33:07.1984257Z",
+    "epicDoneAt": "2026-10-20T13:33:31.1673055Z"
+  },
+  "journalUiPrelude": true
+}

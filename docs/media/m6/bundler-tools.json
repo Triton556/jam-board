@@ -1,0 +1,1828 @@
+{
+  "command": "npm run tauri build",
+  "startedAt": "2026-10-19T15:22:19.199Z",
+  "finishedAt": "2026-10-19T15:27:01.280Z",
+  "exitCode": 0,
+  "cache": "target/.tauri",
+  "downloadUrls": [
+    "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.13/nsis-3.13.zip",
+    "https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll"
+  ],
+  "newCachedFiles": [
+    {
+      "path": "NSIS/Bin/GenPat.exe",
+      "bytes": 25088
+    },
+    {
+      "path": "NSIS/Bin/MakeLangId.exe",
+      "bytes": 24576
+    },
+    {
+      "path": "NSIS/Bin/makensis.exe",
+      "bytes": 468992
+    },
+    {
+      "path": "NSIS/Bin/RegTool-x86.bin",
+      "bytes": 5120
+    },
+    {
+      "path": "NSIS/Bin/zip2exe.exe",
+      "bytes": 23040
+    },
+    {
+      "path": "NSIS/Bin/zlib1.dll",
+      "bytes": 81964
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/big.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/classic-cross.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/classic.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/colorful.bmp",
+      "bytes": 2512
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/grey-cross.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/grey.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/modern.bmp",
+      "bytes": 1652
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/red-round.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/red.bmp",
+      "bytes": 886
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/simple-round.bmp",
+      "bytes": 1616
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/simple-round2.bmp",
+      "bytes": 1844
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Checks/simple.bmp",
+      "bytes": 1616
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis-r.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-branding-r.bmp",
+      "bytes": 25820
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-branding.bmp",
+      "bytes": 25820
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-grey-right.bmp",
+      "bytes": 8932
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-grey.bmp",
+      "bytes": 8956
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-metro-right.bmp",
+      "bytes": 25820
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-metro.bmp",
+      "bytes": 25820
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-vintage-right.bmp",
+      "bytes": 8996
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/nsis3-vintage.bmp",
+      "bytes": 9008
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-nsis.bmp",
+      "bytes": 9740
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-r-nsis.bmp",
+      "bytes": 9740
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-r.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-uninstall-nsis.bmp",
+      "bytes": 9740
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-uninstall-r-nsis.bmp",
+      "bytes": 9740
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-uninstall-r.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange-uninstall.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/orange.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Header/win.bmp",
+      "bytes": 9744
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/arrow-install.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/arrow-uninstall.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/arrow2-install.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/arrow2-uninstall.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/box-install.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/box-uninstall.ico",
+      "bytes": 4710
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/classic-install.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/classic-uninstall.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/llama-blue.ico",
+      "bytes": 2238
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/llama-grey.ico",
+      "bytes": 2238
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-install-blue-full.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-install-blue.ico",
+      "bytes": 13902
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-install-colorful.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-install-full.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-install.ico",
+      "bytes": 13902
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-uninstall-blue-full.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-uninstall-blue.ico",
+      "bytes": 13902
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-uninstall-colorful.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-uninstall-full.ico",
+      "bytes": 23558
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/modern-uninstall.ico",
+      "bytes": 13902
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis-menu.ico",
+      "bytes": 39119
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis1-install.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis1-uninstall.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis3-install-alt.ico",
+      "bytes": 13111
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis3-install.ico",
+      "bytes": 11697
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/nsis3-uninstall.ico",
+      "bytes": 12533
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/orange-install-nsis.ico",
+      "bytes": 25214
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/orange-install.ico",
+      "bytes": 25214
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/orange-uninstall-nsis.ico",
+      "bytes": 25214
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/orange-uninstall.ico",
+      "bytes": 25214
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/pixel-install.ico",
+      "bytes": 5390
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/pixel-uninstall.ico",
+      "bytes": 5390
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/win-install.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Icons/win-uninstall.ico",
+      "bytes": 1078
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/arrow.bmp",
+      "bytes": 52576
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/llama.bmp",
+      "bytes": 26494
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nsis.bmp",
+      "bytes": 26494
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nsis3-branding.bmp",
+      "bytes": 154544
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nsis3-grey.bmp",
+      "bytes": 51832
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nsis3-metro.bmp",
+      "bytes": 154544
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nsis3-vintage.bmp",
+      "bytes": 51920
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/nullsoft.bmp",
+      "bytes": 26494
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/orange-nsis.bmp",
+      "bytes": 52572
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/orange-uninstall-nsis.bmp",
+      "bytes": 52572
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/orange-uninstall.bmp",
+      "bytes": 52576
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/orange.bmp",
+      "bytes": 52576
+    },
+    {
+      "path": "NSIS/Contrib/Graphics/Wizard/win.bmp",
+      "bytes": 26494
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Afrikaans.nlf",
+      "bytes": 4876
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Afrikaans.nsh",
+      "bytes": 7131
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Albanian.nlf",
+      "bytes": 5537
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Albanian.nsh",
+      "bytes": 8065
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Arabic.nlf",
+      "bytes": 6290
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Arabic.nsh",
+      "bytes": 8698
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Armenian.nlf",
+      "bytes": 7230
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Armenian.nsh",
+      "bytes": 9929
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Asturian.nlf",
+      "bytes": 5607
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Asturian.nsh",
+      "bytes": 8026
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Basque.nlf",
+      "bytes": 5249
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Basque.nsh",
+      "bytes": 7845
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Belarusian.nlf",
+      "bytes": 8498
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Belarusian.nsh",
+      "bytes": 10690
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Bosnian.nlf",
+      "bytes": 5332
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Bosnian.nsh",
+      "bytes": 7719
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Breton.nlf",
+      "bytes": 5554
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Breton.nsh",
+      "bytes": 7565
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Bulgarian.nlf",
+      "bytes": 8143
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Bulgarian.nsh",
+      "bytes": 10245
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Catalan.nlf",
+      "bytes": 5830
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Catalan.nsh",
+      "bytes": 8028
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Corsican.nlf",
+      "bytes": 6407
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Corsican.nsh",
+      "bytes": 8569
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Croatian.nlf",
+      "bytes": 5231
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Croatian.nsh",
+      "bytes": 7610
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Czech.nlf",
+      "bytes": 5869
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Czech.nsh",
+      "bytes": 8296
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Danish.nlf",
+      "bytes": 5387
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Danish.nsh",
+      "bytes": 7990
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Dutch.nlf",
+      "bytes": 5278
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Dutch.nsh",
+      "bytes": 7925
+    },
+    {
+      "path": "NSIS/Contrib/Language files/English.nlf",
+      "bytes": 4945
+    },
+    {
+      "path": "NSIS/Contrib/Language files/English.nsh",
+      "bytes": 7886
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Esperanto.nlf",
+      "bytes": 5341
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Esperanto.nsh",
+      "bytes": 7994
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Estonian.nlf",
+      "bytes": 4897
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Estonian.nsh",
+      "bytes": 6816
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Farsi.nlf",
+      "bytes": 6951
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Farsi.nsh",
+      "bytes": 9506
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Finnish.nlf",
+      "bytes": 5019
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Finnish.nsh",
+      "bytes": 7247
+    },
+    {
+      "path": "NSIS/Contrib/Language files/French.nlf",
+      "bytes": 5820
+    },
+    {
+      "path": "NSIS/Contrib/Language files/French.nsh",
+      "bytes": 8640
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Galician.nlf",
+      "bytes": 5428
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Galician.nsh",
+      "bytes": 7419
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Georgian.nlf",
+      "bytes": 10068
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Georgian.nsh",
+      "bytes": 11734
+    },
+    {
+      "path": "NSIS/Contrib/Language files/German.nlf",
+      "bytes": 5777
+    },
+    {
+      "path": "NSIS/Contrib/Language files/German.nsh",
+      "bytes": 8823
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Greek.nlf",
+      "bytes": 8477
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Greek.nsh",
+      "bytes": 10898
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hebrew.nlf",
+      "bytes": 5949
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hebrew.nsh",
+      "bytes": 8803
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hindi.nlf",
+      "bytes": 10610
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hindi.nsh",
+      "bytes": 13430
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hungarian.nlf",
+      "bytes": 5806
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Hungarian.nsh",
+      "bytes": 7656
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Icelandic.nlf",
+      "bytes": 5694
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Icelandic.nsh",
+      "bytes": 7663
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Indonesian.nlf",
+      "bytes": 5758
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Indonesian.nsh",
+      "bytes": 8220
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Irish.nlf",
+      "bytes": 5873
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Irish.nsh",
+      "bytes": 7775
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Italian.nlf",
+      "bytes": 5593
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Italian.nsh",
+      "bytes": 8674
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Japanese.nlf",
+      "bytes": 6614
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Japanese.nsh",
+      "bytes": 9784
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Korean.nlf",
+      "bytes": 5499
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Korean.nsh",
+      "bytes": 8582
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Kurdish.nlf",
+      "bytes": 5853
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Kurdish.nsh",
+      "bytes": 7974
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Latvian.nlf",
+      "bytes": 5605
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Latvian.nsh",
+      "bytes": 7670
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Lithuanian.nlf",
+      "bytes": 5330
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Lithuanian.nsh",
+      "bytes": 7240
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Luxembourgish.nlf",
+      "bytes": 5714
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Luxembourgish.nsh",
+      "bytes": 7834
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Macedonian.nlf",
+      "bytes": 8255
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Macedonian.nsh",
+      "bytes": 10317
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Malay.nlf",
+      "bytes": 4793
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Malay.nsh",
+      "bytes": 6923
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Mongolian.nlf",
+      "bytes": 7228
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Mongolian.nsh",
+      "bytes": 9982
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Norwegian.nlf",
+      "bytes": 5074
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Norwegian.nsh",
+      "bytes": 7998
+    },
+    {
+      "path": "NSIS/Contrib/Language files/NorwegianNynorsk.nlf",
+      "bytes": 5025
+    },
+    {
+      "path": "NSIS/Contrib/Language files/NorwegianNynorsk.nsh",
+      "bytes": 7784
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Pashto.nlf",
+      "bytes": 6448
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Pashto.nsh",
+      "bytes": 8653
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Polish.nlf",
+      "bytes": 5607
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Polish.nsh",
+      "bytes": 8471
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Portuguese.nlf",
+      "bytes": 5426
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Portuguese.nsh",
+      "bytes": 8134
+    },
+    {
+      "path": "NSIS/Contrib/Language files/PortugueseBR.nlf",
+      "bytes": 5553
+    },
+    {
+      "path": "NSIS/Contrib/Language files/PortugueseBR.nsh",
+      "bytes": 8229
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Romanian.nlf",
+      "bytes": 6242
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Romanian.nsh",
+      "bytes": 8209
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Russian.nlf",
+      "bytes": 7684
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Russian.nsh",
+      "bytes": 10516
+    },
+    {
+      "path": "NSIS/Contrib/Language files/ScotsGaelic.nlf",
+      "bytes": 6038
+    },
+    {
+      "path": "NSIS/Contrib/Language files/ScotsGaelic.nsh",
+      "bytes": 8527
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Serbian.nlf",
+      "bytes": 8193
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Serbian.nsh",
+      "bytes": 10384
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SerbianLatin.nlf",
+      "bytes": 5555
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SerbianLatin.nsh",
+      "bytes": 7695
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SimpChinese.nlf",
+      "bytes": 5050
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SimpChinese.nsh",
+      "bytes": 7683
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Slovak.nlf",
+      "bytes": 6488
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Slovak.nsh",
+      "bytes": 8906
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Slovenian.nlf",
+      "bytes": 5171
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Slovenian.nsh",
+      "bytes": 8091
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Spanish.nlf",
+      "bytes": 5554
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Spanish.nsh",
+      "bytes": 8213
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SpanishInternational.nlf",
+      "bytes": 5554
+    },
+    {
+      "path": "NSIS/Contrib/Language files/SpanishInternational.nsh",
+      "bytes": 8326
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Swedish.nlf",
+      "bytes": 5345
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Swedish.nsh",
+      "bytes": 8094
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Tatar.nlf",
+      "bytes": 7682
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Tatar.nsh",
+      "bytes": 10312
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Thai.nlf",
+      "bytes": 9985
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Thai.nsh",
+      "bytes": 12742
+    },
+    {
+      "path": "NSIS/Contrib/Language files/TradChinese.nlf",
+      "bytes": 5076
+    },
+    {
+      "path": "NSIS/Contrib/Language files/TradChinese.nsh",
+      "bytes": 7650
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Turkish.nlf",
+      "bytes": 5743
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Turkish.nsh",
+      "bytes": 8073
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Ukrainian.nlf",
+      "bytes": 8073
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Ukrainian.nsh",
+      "bytes": 10191
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Uzbek.nlf",
+      "bytes": 5495
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Uzbek.nsh",
+      "bytes": 7604
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Vietnamese.nlf",
+      "bytes": 6611
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Vietnamese.nsh",
+      "bytes": 9243
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Welsh.nlf",
+      "bytes": 4737
+    },
+    {
+      "path": "NSIS/Contrib/Language files/Welsh.nsh",
+      "bytes": 7012
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI/ioSpecial.ini",
+      "bytes": 211
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI/System.nsh",
+      "bytes": 69210
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Deprecated.nsh",
+      "bytes": 1891
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Interface.nsh",
+      "bytes": 10295
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Localization.nsh",
+      "bytes": 4821
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/MUI2.nsh",
+      "bytes": 2354
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/Components.nsh",
+      "bytes": 6998
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/Directory.nsh",
+      "bytes": 3598
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/Finish.nsh",
+      "bytes": 18056
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/InstallFiles.nsh",
+      "bytes": 4973
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/License.nsh",
+      "bytes": 4477
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/StartMenu.nsh",
+      "bytes": 8196
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/UninstallConfirm.nsh",
+      "bytes": 2372
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages/Welcome.nsh",
+      "bytes": 5367
+    },
+    {
+      "path": "NSIS/Contrib/Modern UI 2/Pages.nsh",
+      "bytes": 9392
+    },
+    {
+      "path": "NSIS/Contrib/UIs/default.exe",
+      "bytes": 6144
+    },
+    {
+      "path": "NSIS/Contrib/UIs/modern.exe",
+      "bytes": 6656
+    },
+    {
+      "path": "NSIS/Contrib/UIs/modern_headerbmp.exe",
+      "bytes": 4608
+    },
+    {
+      "path": "NSIS/Contrib/UIs/modern_headerbmpr.exe",
+      "bytes": 4608
+    },
+    {
+      "path": "NSIS/Contrib/UIs/modern_nodesc.exe",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Contrib/UIs/modern_smalldesc.exe",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Contrib/UIs/sdbarker_tiny.exe",
+      "bytes": 6656
+    },
+    {
+      "path": "NSIS/Contrib/zip2exe/Base.nsh",
+      "bytes": 1747
+    },
+    {
+      "path": "NSIS/Contrib/zip2exe/Classic.nsh",
+      "bytes": 118
+    },
+    {
+      "path": "NSIS/Contrib/zip2exe/Modern.nsh",
+      "bytes": 213
+    },
+    {
+      "path": "NSIS/COPYING",
+      "bytes": 15632
+    },
+    {
+      "path": "NSIS/Docs/AdvSplash/advsplash.txt",
+      "bytes": 2019
+    },
+    {
+      "path": "NSIS/Docs/Banner/Readme.txt",
+      "bytes": 1215
+    },
+    {
+      "path": "NSIS/Docs/BgImage/BgImage.txt",
+      "bytes": 3134
+    },
+    {
+      "path": "NSIS/Docs/Dialer/Dialer.txt",
+      "bytes": 2993
+    },
+    {
+      "path": "NSIS/Docs/InstallOptions/Changelog.txt",
+      "bytes": 6314
+    },
+    {
+      "path": "NSIS/Docs/InstallOptions/Readme.html",
+      "bytes": 52108
+    },
+    {
+      "path": "NSIS/Docs/makensisw/License.txt",
+      "bytes": 910
+    },
+    {
+      "path": "NSIS/Docs/makensisw/Readme.txt",
+      "bytes": 7396
+    },
+    {
+      "path": "NSIS/Docs/Math/Math.txt",
+      "bytes": 10258
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/Changelog.txt",
+      "bytes": 11738
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/images/closed.gif",
+      "bytes": 203
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/images/header.gif",
+      "bytes": 6023
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/images/open.gif",
+      "bytes": 138
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/images/screen1.png",
+      "bytes": 15647
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/images/screen2.png",
+      "bytes": 18437
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/License.txt",
+      "bytes": 840
+    },
+    {
+      "path": "NSIS/Docs/Modern UI/Readme.html",
+      "bytes": 81810
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/images/closed.gif",
+      "bytes": 203
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/images/header.gif",
+      "bytes": 6023
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/images/open.gif",
+      "bytes": 138
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/images/screen1.png",
+      "bytes": 15647
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/images/screen2.png",
+      "bytes": 18437
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/License.txt",
+      "bytes": 840
+    },
+    {
+      "path": "NSIS/Docs/Modern UI 2/Readme.html",
+      "bytes": 78651
+    },
+    {
+      "path": "NSIS/Docs/MultiUser/Readme.html",
+      "bytes": 16615
+    },
+    {
+      "path": "NSIS/Docs/nsDialogs/Readme.html",
+      "bytes": 39834
+    },
+    {
+      "path": "NSIS/Docs/nsExec/nsExec.txt",
+      "bytes": 1632
+    },
+    {
+      "path": "NSIS/Docs/NSISdl/License.txt",
+      "bytes": 943
+    },
+    {
+      "path": "NSIS/Docs/NSISdl/ReadMe.txt",
+      "bytes": 2969
+    },
+    {
+      "path": "NSIS/Docs/Splash/splash.txt",
+      "bytes": 1235
+    },
+    {
+      "path": "NSIS/Docs/StartMenu/Readme.txt",
+      "bytes": 2264
+    },
+    {
+      "path": "NSIS/Docs/StrFunc/StrFunc.txt",
+      "bytes": 24311
+    },
+    {
+      "path": "NSIS/Docs/System/System.html",
+      "bytes": 31131
+    },
+    {
+      "path": "NSIS/Docs/System/WhatsNew.txt",
+      "bytes": 2205
+    },
+    {
+      "path": "NSIS/Docs/VPatch/Readme.html",
+      "bytes": 14024
+    },
+    {
+      "path": "NSIS/Examples/AdvSplash/Example.nsi",
+      "bytes": 1171
+    },
+    {
+      "path": "NSIS/Examples/AppGen.nsi",
+      "bytes": 2047
+    },
+    {
+      "path": "NSIS/Examples/Banner/Example.nsi",
+      "bytes": 698
+    },
+    {
+      "path": "NSIS/Examples/BgImage/Example.nsi",
+      "bytes": 2846
+    },
+    {
+      "path": "NSIS/Examples/bigtest.nsi",
+      "bytes": 8786
+    },
+    {
+      "path": "NSIS/Examples/example1.nsi",
+      "bytes": 1018
+    },
+    {
+      "path": "NSIS/Examples/example2.nsi",
+      "bytes": 2776
+    },
+    {
+      "path": "NSIS/Examples/FileFunc.ini",
+      "bytes": 1534
+    },
+    {
+      "path": "NSIS/Examples/FileFunc.nsi",
+      "bytes": 19385
+    },
+    {
+      "path": "NSIS/Examples/FileFuncTest.nsi",
+      "bytes": 14283
+    },
+    {
+      "path": "NSIS/Examples/gfx.nsi",
+      "bytes": 3301
+    },
+    {
+      "path": "NSIS/Examples/install-per-user.nsi",
+      "bytes": 8953
+    },
+    {
+      "path": "NSIS/Examples/install-shared.nsi",
+      "bytes": 2924
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/test.ini",
+      "bytes": 1013
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/test.nsi",
+      "bytes": 2181
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testimgs.ini",
+      "bytes": 1936
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testimgs.nsi",
+      "bytes": 1972
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testlink.ini",
+      "bytes": 614
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testlink.nsi",
+      "bytes": 1282
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testnotify.ini",
+      "bytes": 1395
+    },
+    {
+      "path": "NSIS/Examples/InstallOptions/testnotify.nsi",
+      "bytes": 4378
+    },
+    {
+      "path": "NSIS/Examples/languages.nsi",
+      "bytes": 7366
+    },
+    {
+      "path": "NSIS/Examples/Library.nsi",
+      "bytes": 8366
+    },
+    {
+      "path": "NSIS/Examples/LogicLib.nsi",
+      "bytes": 13401
+    },
+    {
+      "path": "NSIS/Examples/makensis.nsi",
+      "bytes": 36992
+    },
+    {
+      "path": "NSIS/Examples/Math/math.nsi",
+      "bytes": 1213
+    },
+    {
+      "path": "NSIS/Examples/Math/mathtest.ini",
+      "bytes": 1122
+    },
+    {
+      "path": "NSIS/Examples/Math/mathtest.nsi",
+      "bytes": 5701
+    },
+    {
+      "path": "NSIS/Examples/Math/mathtest.txt",
+      "bytes": 482
+    },
+    {
+      "path": "NSIS/Examples/Memento.nsi",
+      "bytes": 1532
+    },
+    {
+      "path": "NSIS/Examples/Modern UI/Basic.nsi",
+      "bytes": 1969
+    },
+    {
+      "path": "NSIS/Examples/Modern UI/HeaderBitmap.nsi",
+      "bytes": 2108
+    },
+    {
+      "path": "NSIS/Examples/Modern UI/MultiLanguage.nsi",
+      "bytes": 5995
+    },
+    {
+      "path": "NSIS/Examples/Modern UI/StartMenu.nsi",
+      "bytes": 2822
+    },
+    {
+      "path": "NSIS/Examples/Modern UI/WelcomeFinish.nsi",
+      "bytes": 2114
+    },
+    {
+      "path": "NSIS/Examples/MultiUser.nsi",
+      "bytes": 1886
+    },
+    {
+      "path": "NSIS/Examples/nsDialogs/example.nsi",
+      "bytes": 7580
+    },
+    {
+      "path": "NSIS/Examples/nsDialogs/InstallOptions.nsi",
+      "bytes": 1135
+    },
+    {
+      "path": "NSIS/Examples/nsDialogs/timer.nsi",
+      "bytes": 2035
+    },
+    {
+      "path": "NSIS/Examples/nsDialogs/welcome.nsi",
+      "bytes": 5609
+    },
+    {
+      "path": "NSIS/Examples/nsExec/test.nsi",
+      "bytes": 812
+    },
+    {
+      "path": "NSIS/Examples/NSISMenu.nsi",
+      "bytes": 13029
+    },
+    {
+      "path": "NSIS/Examples/one-section.nsi",
+      "bytes": 1592
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll-vs2008.sln",
+      "bytes": 882
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll-vs2008.vcproj",
+      "bytes": 6303
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll.c",
+      "bytes": 1285
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll.dpr",
+      "bytes": 2777
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll.dsp",
+      "bytes": 4346
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll.dsw",
+      "bytes": 533
+    },
+    {
+      "path": "NSIS/Examples/Plugin/exdll_with_unit.dpr",
+      "bytes": 2280
+    },
+    {
+      "path": "NSIS/Examples/Plugin/extdll.inc",
+      "bytes": 2951
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis/api.h",
+      "bytes": 3330
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis/nsis_tchar.h",
+      "bytes": 5054
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis/pluginapi-x86-ansi.lib",
+      "bytes": 7004
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis/pluginapi-x86-unicode.lib",
+      "bytes": 7012
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis/pluginapi.h",
+      "bytes": 3148
+    },
+    {
+      "path": "NSIS/Examples/Plugin/nsis.pas",
+      "bytes": 6471
+    },
+    {
+      "path": "NSIS/Examples/primes.nsi",
+      "bytes": 1656
+    },
+    {
+      "path": "NSIS/Examples/rtest.nsi",
+      "bytes": 1325
+    },
+    {
+      "path": "NSIS/Examples/silent.nsi",
+      "bytes": 2217
+    },
+    {
+      "path": "NSIS/Examples/Splash/Example.nsi",
+      "bytes": 553
+    },
+    {
+      "path": "NSIS/Examples/StartMenu/Example.nsi",
+      "bytes": 1231
+    },
+    {
+      "path": "NSIS/Examples/StrFunc.nsi",
+      "bytes": 21602
+    },
+    {
+      "path": "NSIS/Examples/System/Resource.dll",
+      "bytes": 31744
+    },
+    {
+      "path": "NSIS/Examples/System/SysFunc.nsh",
+      "bytes": 10453
+    },
+    {
+      "path": "NSIS/Examples/System/System.nsh",
+      "bytes": 14575
+    },
+    {
+      "path": "NSIS/Examples/System/System.nsi",
+      "bytes": 5432
+    },
+    {
+      "path": "NSIS/Examples/TextFunc.ini",
+      "bytes": 2007
+    },
+    {
+      "path": "NSIS/Examples/TextFunc.nsi",
+      "bytes": 24227
+    },
+    {
+      "path": "NSIS/Examples/TextFuncTest.nsi",
+      "bytes": 9078
+    },
+    {
+      "path": "NSIS/Examples/unicode.nsi",
+      "bytes": 1033
+    },
+    {
+      "path": "NSIS/Examples/UserInfo/UserInfo.nsi",
+      "bytes": 1417
+    },
+    {
+      "path": "NSIS/Examples/VersionInfo.nsi",
+      "bytes": 1029
+    },
+    {
+      "path": "NSIS/Examples/VPatch/example.nsi",
+      "bytes": 1670
+    },
+    {
+      "path": "NSIS/Examples/VPatch/newfile.txt",
+      "bytes": 125
+    },
+    {
+      "path": "NSIS/Examples/VPatch/oldfile.txt",
+      "bytes": 125
+    },
+    {
+      "path": "NSIS/Examples/VPatch/patch.pat",
+      "bytes": 99
+    },
+    {
+      "path": "NSIS/Examples/waplugin.nsi",
+      "bytes": 4708
+    },
+    {
+      "path": "NSIS/Examples/WordFunc.ini",
+      "bytes": 1796
+    },
+    {
+      "path": "NSIS/Examples/WordFunc.nsi",
+      "bytes": 16437
+    },
+    {
+      "path": "NSIS/Examples/WordFuncTest.nsi",
+      "bytes": 16440
+    },
+    {
+      "path": "NSIS/Include/Colors.nsh",
+      "bytes": 1858
+    },
+    {
+      "path": "NSIS/Include/FileFunc.nsh",
+      "bytes": 40522
+    },
+    {
+      "path": "NSIS/Include/InstallOptions.nsh",
+      "bytes": 4820
+    },
+    {
+      "path": "NSIS/Include/Integration.nsh",
+      "bytes": 1240
+    },
+    {
+      "path": "NSIS/Include/LangFile.nsh",
+      "bytes": 5494
+    },
+    {
+      "path": "NSIS/Include/Library.nsh",
+      "bytes": 21785
+    },
+    {
+      "path": "NSIS/Include/LogicLib.nsh",
+      "bytes": 36040
+    },
+    {
+      "path": "NSIS/Include/Memento.nsh",
+      "bytes": 12107
+    },
+    {
+      "path": "NSIS/Include/MUI.nsh",
+      "bytes": 50
+    },
+    {
+      "path": "NSIS/Include/MUI2.nsh",
+      "bytes": 50
+    },
+    {
+      "path": "NSIS/Include/MultiUser.nsh",
+      "bytes": 14996
+    },
+    {
+      "path": "NSIS/Include/nsDialogs.nsh",
+      "bytes": 45506
+    },
+    {
+      "path": "NSIS/Include/Sections.nsh",
+      "bytes": 6672
+    },
+    {
+      "path": "NSIS/Include/StrFunc.nsh",
+      "bytes": 45978
+    },
+    {
+      "path": "NSIS/Include/TextFunc.nsh",
+      "bytes": 24348
+    },
+    {
+      "path": "NSIS/Include/UpgradeDLL.nsh",
+      "bytes": 5132
+    },
+    {
+      "path": "NSIS/Include/Util.nsh",
+      "bytes": 5241
+    },
+    {
+      "path": "NSIS/Include/VB6RunTime.nsh",
+      "bytes": 3464
+    },
+    {
+      "path": "NSIS/Include/VPatchLib.nsh",
+      "bytes": 724
+    },
+    {
+      "path": "NSIS/Include/Win/COM.nsh",
+      "bytes": 17248
+    },
+    {
+      "path": "NSIS/Include/Win/Propkey.nsh",
+      "bytes": 8509
+    },
+    {
+      "path": "NSIS/Include/Win/RestartManager.nsh",
+      "bytes": 3578
+    },
+    {
+      "path": "NSIS/Include/Win/WinDef.nsh",
+      "bytes": 1796
+    },
+    {
+      "path": "NSIS/Include/Win/WinError.nsh",
+      "bytes": 8238
+    },
+    {
+      "path": "NSIS/Include/Win/WinNT.nsh",
+      "bytes": 10383
+    },
+    {
+      "path": "NSIS/Include/Win/WinUser.nsh",
+      "bytes": 6328
+    },
+    {
+      "path": "NSIS/Include/WinCore.nsh",
+      "bytes": 11919
+    },
+    {
+      "path": "NSIS/Include/WinMessages.nsh",
+      "bytes": 36757
+    },
+    {
+      "path": "NSIS/Include/WinVer.nsh",
+      "bytes": 24908
+    },
+    {
+      "path": "NSIS/Include/WordFunc.nsh",
+      "bytes": 43576
+    },
+    {
+      "path": "NSIS/Include/x64.nsh",
+      "bytes": 3962
+    },
+    {
+      "path": "NSIS/makensis.exe",
+      "bytes": 2560
+    },
+    {
+      "path": "NSIS/makensisw.exe",
+      "bytes": 1139712
+    },
+    {
+      "path": "NSIS/NSIS.chm",
+      "bytes": 415674
+    },
+    {
+      "path": "NSIS/NSIS.exe",
+      "bytes": 91352
+    },
+    {
+      "path": "NSIS/nsisconf.nsh",
+      "bytes": 1726
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/AdvSplash.dll",
+      "bytes": 5632
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/Banner.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/BgImage.dll",
+      "bytes": 7680
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/Dialer.dll",
+      "bytes": 3584
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/InstallOptions.dll",
+      "bytes": 14848
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/LangDLL.dll",
+      "bytes": 5632
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/Math.dll",
+      "bytes": 67584
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/nsDialogs.dll",
+      "bytes": 9728
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/nsExec.dll",
+      "bytes": 6656
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/NSISdl.dll",
+      "bytes": 15360
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/Splash.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/StartMenu.dll",
+      "bytes": 7680
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/System.dll",
+      "bytes": 12288
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/TypeLib.dll",
+      "bytes": 3584
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/UserInfo.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-ansi/VPatch.dll",
+      "bytes": 8192
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/additional/nsis_tauri_utils.dll",
+      "bytes": 34304
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/AdvSplash.dll",
+      "bytes": 6144
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/Banner.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/BgImage.dll",
+      "bytes": 7680
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/Dialer.dll",
+      "bytes": 3584
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/InstallOptions.dll",
+      "bytes": 15872
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/LangDLL.dll",
+      "bytes": 5632
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/Math.dll",
+      "bytes": 69120
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/nsDialogs.dll",
+      "bytes": 9728
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/nsExec.dll",
+      "bytes": 7168
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/NSISdl.dll",
+      "bytes": 15360
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/Splash.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/StartMenu.dll",
+      "bytes": 7680
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/System.dll",
+      "bytes": 12288
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/TypeLib.dll",
+      "bytes": 3584
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/UserInfo.dll",
+      "bytes": 4096
+    },
+    {
+      "path": "NSIS/Plugins/x86-unicode/VPatch.dll",
+      "bytes": 8704
+    },
+    {
+      "path": "NSIS/Stubs/bzip2-x86-ansi",
+      "bytes": 37888
+    },
+    {
+      "path": "NSIS/Stubs/bzip2-x86-unicode",
+      "bytes": 38912
+    },
+    {
+      "path": "NSIS/Stubs/bzip2_solid-x86-ansi",
+      "bytes": 38400
+    },
+    {
+      "path": "NSIS/Stubs/bzip2_solid-x86-unicode",
+      "bytes": 39424
+    },
+    {
+      "path": "NSIS/Stubs/lzma-x86-ansi",
+      "bytes": 37376
+    },
+    {
+      "path": "NSIS/Stubs/lzma-x86-unicode",
+      "bytes": 38400
+    },
+    {
+      "path": "NSIS/Stubs/lzma_solid-x86-ansi",
+      "bytes": 38400
+    },
+    {
+      "path": "NSIS/Stubs/lzma_solid-x86-unicode",
+      "bytes": 38912
+    },
+    {
+      "path": "NSIS/Stubs/uninst",
+      "bytes": 766
+    },
+    {
+      "path": "NSIS/Stubs/zlib-x86-ansi",
+      "bytes": 38912
+    },
+    {
+      "path": "NSIS/Stubs/zlib-x86-unicode",
+      "bytes": 39936
+    },
+    {
+      "path": "NSIS/Stubs/zlib_solid-x86-ansi",
+      "bytes": 38912
+    },
+    {
+      "path": "NSIS/Stubs/zlib_solid-x86-unicode",
+      "bytes": 40960
+    }
+  ],
+  "newCachedBytes": 7175793,
+  "hashVerification": "performed by the installed Tauri bundler; no manual downloads",
+  "attempts": [
+    {
+      "command": "npm run tauri build",
+      "startedAt": "2026-10-19T15:09:51.719Z",
+      "finishedAt": "2026-10-19T15:14:06.628Z",
+      "exitCode": 1,
+      "downloadUrls": [
+        "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.13/nsis-3.13.zip",
+        "https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll"
+      ],
+      "newCachedBytes": 7175793,
+      "hashVerification": "performed by the installed Tauri bundler; no manual downloads"
+    },
+    {
+      "command": "npm run tauri build",
+      "startedAt": "2026-10-19T15:15:39.781Z",
+      "finishedAt": "2026-10-19T15:20:02.241Z",
+      "exitCode": 0,
+      "downloadUrls": [],
+      "newCachedBytes": 0,
+      "hashVerification": "performed by the installed Tauri bundler; no manual downloads"
+    },
+    {
+      "command": "npm run tauri build",
+      "startedAt": "2026-10-19T15:22:19.199Z",
+      "finishedAt": "2026-10-19T15:27:01.280Z",
+      "exitCode": 0,
+      "downloadUrls": [],
+      "newCachedBytes": 0,
+      "hashVerification": "performed by the installed Tauri bundler; no manual downloads"
+    }
+  ],
+  "downloadArtifacts": [
+    {
+      "url": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.13/nsis-3.13.zip",
+      "bytes": 2363925,
+      "metadataMethod": "HEAD; binary body not requested"
+    },
+    {
+      "url": "https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll",
+      "bytes": 34304,
+      "metadataMethod": "HEAD; binary body not requested"
+    }
+  ],
+  "downloadPayloadBytes": 2398229
+}

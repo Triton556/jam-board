@@ -1,0 +1,125 @@
+{
+  "method": "WCAG sRGB relative luminance; exact 14% / 22% member blend over card, ink and ink-2",
+  "results": [
+    {
+      "theme": "light",
+      "epic": "#5b8def",
+      "mix": 0.14,
+      "inkContrast": 12.77,
+      "originalSecondaryContrast": 5.16,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.16,
+      "AA": true
+    },
+    {
+      "theme": "light",
+      "epic": "#e0679a",
+      "mix": 0.14,
+      "inkContrast": 12.71,
+      "originalSecondaryContrast": 5.13,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.13,
+      "AA": true
+    },
+    {
+      "theme": "light",
+      "epic": "#3fa37a",
+      "mix": 0.14,
+      "inkContrast": 12.8,
+      "originalSecondaryContrast": 5.17,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.17,
+      "AA": true
+    },
+    {
+      "theme": "light",
+      "epic": "#9b7be0",
+      "mix": 0.14,
+      "inkContrast": 12.77,
+      "originalSecondaryContrast": 5.15,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.15,
+      "AA": true
+    },
+    {
+      "theme": "light",
+      "epic": "#f07e5f",
+      "mix": 0.14,
+      "inkContrast": 12.96,
+      "originalSecondaryContrast": 5.23,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.23,
+      "AA": true
+    },
+    {
+      "theme": "light",
+      "epic": "#d8a630",
+      "mix": 0.14,
+      "inkContrast": 13.29,
+      "originalSecondaryContrast": 5.36,
+      "secondaryToken": "ink-2",
+      "secondaryContrast": 5.36,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#5b8def",
+      "mix": 0.22,
+      "inkContrast": 8.86,
+      "originalSecondaryContrast": 4.6,
+      "secondaryToken": "ink",
+      "secondaryContrast": 8.86,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#e0679a",
+      "mix": 0.22,
+      "inkContrast": 8.86,
+      "originalSecondaryContrast": 4.6,
+      "secondaryToken": "ink",
+      "secondaryContrast": 8.86,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#3fa37a",
+      "mix": 0.22,
+      "inkContrast": 8.79,
+      "originalSecondaryContrast": 4.56,
+      "secondaryToken": "ink",
+      "secondaryContrast": 8.79,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#9b7be0",
+      "mix": 0.22,
+      "inkContrast": 8.86,
+      "originalSecondaryContrast": 4.6,
+      "secondaryToken": "ink",
+      "secondaryContrast": 8.86,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#f07e5f",
+      "mix": 0.22,
+      "inkContrast": 8.4,
+      "originalSecondaryContrast": 4.36,
+      "secondaryToken": "ink",
+      "secondaryContrast": 8.4,
+      "AA": true
+    },
+    {
+      "theme": "dark",
+      "epic": "#d8a630",
+      "mix": 0.22,
+      "inkContrast": 7.9,
+      "originalSecondaryContrast": 4.1,
+      "secondaryToken": "ink",
+      "secondaryContrast": 7.9,
+      "AA": true
+    }
+  ]
+}

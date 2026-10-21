@@ -1,0 +1,28 @@
+{
+  "native": true,
+  "mock": false,
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "dataDirectory": ".dev-data\\capture-011-1792473423161",
+  "screenshots": [
+    "board-light.jpg",
+    "table-light.jpg",
+    "table-archived-light.jpg",
+    "settings-board-light.jpg",
+    "settings-appearance-light.jpg",
+    "settings-about-light.jpg",
+    "activity-light.jpg",
+    "task-controls-light.jpg",
+    "board-dark.jpg",
+    "table-dark.jpg",
+    "table-archived-dark.jpg",
+    "settings-board-dark.jpg",
+    "settings-appearance-dark.jpg",
+    "settings-about-dark.jpg",
+    "activity-dark.jpg",
+    "task-controls-dark.jpg"
+  ],
+  "pageErrors": []
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "theme": "light",
+    "background": "#4a4541",
+    "foreground": "#f7f1e6",
+    "ratio": 8.419,
+    "pass": true
+  },
+  {
+    "theme": "light",
+    "background": "#3d3834",
+    "foreground": "#f7f1e6",
+    "ratio": 10.299,
+    "pass": true
+  },
+  {
+    "theme": "dark",
+    "background": "#5a534d",
+    "foreground": "#f2ebdd",
+    "ratio": 6.37,
+    "pass": true
+  },
+  {
+    "theme": "dark",
+    "background": "#665e57",
+    "foreground": "#f2ebdd",
+    "ratio": 5.359,
+    "pass": true
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "theme": "light",
+  "fonts": "loaded",
+  "viewport": [
+    1360,
+    860
+  ],
+  "cards": 34,
+  "cardBackground": "rgb(255, 253, 248)",
+  "contrast": {
+    "primary": 5.6,
+    "inkOnPaper": 13.31,
+    "secondaryOnCard": 5.94
+  }
+}

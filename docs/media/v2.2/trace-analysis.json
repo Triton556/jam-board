@@ -1,0 +1,125 @@
+{
+  "scope": "Separate production trace passes: 1s warmup + 3s scroll. Acceptance uses untraced rAF metrics. Synchronous layout in the test driver / TanStack callback is retained as accepted behavior.",
+  "traces": [
+    {
+      "scenario": "A",
+      "groups": {
+        "FunctionCall": {
+          "count": 2997,
+          "sumMs": 212.82199999999824,
+          "maxMs": 3.258
+        },
+        "UpdateLayoutTree": {
+          "count": 323,
+          "sumMs": 142.9679999999999,
+          "maxMs": 2.214
+        },
+        "Layout": {
+          "count": 143,
+          "sumMs": 135.26600000000002,
+          "maxMs": 3.953
+        },
+        "Paint": {
+          "count": 235,
+          "sumMs": 315.933,
+          "maxMs": 3.299
+        },
+        "PrePaint": {
+          "count": 1144,
+          "sumMs": 137.24599999999975,
+          "maxMs": 3.05
+        },
+        "Layerize": {
+          "count": 285,
+          "sumMs": 108.65999999999997,
+          "maxMs": 2.879
+        },
+        "HitTest": {
+          "count": 726,
+          "sumMs": 117.68199999999996,
+          "maxMs": 0.462
+        }
+      }
+    },
+    {
+      "scenario": "B",
+      "groups": {
+        "FunctionCall": {
+          "count": 3922,
+          "sumMs": 455.9279999999949,
+          "maxMs": 2.887
+        },
+        "UpdateLayoutTree": {
+          "count": 574,
+          "sumMs": 260.7490000000002,
+          "maxMs": 1.876
+        },
+        "Layout": {
+          "count": 278,
+          "sumMs": 221.13999999999993,
+          "maxMs": 2.274
+        },
+        "Paint": {
+          "count": 429,
+          "sumMs": 558.3329999999997,
+          "maxMs": 2.44
+        },
+        "PrePaint": {
+          "count": 875,
+          "sumMs": 236.8959999999993,
+          "maxMs": 2.013
+        },
+        "Layerize": {
+          "count": 301,
+          "sumMs": 193.79400000000038,
+          "maxMs": 2.235
+        },
+        "HitTest": {
+          "count": 308,
+          "sumMs": 59.70599999999998,
+          "maxMs": 0.371
+        }
+      }
+    },
+    {
+      "scenario": "C",
+      "groups": {
+        "FunctionCall": {
+          "count": 1934,
+          "sumMs": 163.67199999999983,
+          "maxMs": 2.689
+        },
+        "UpdateLayoutTree": {
+          "count": 176,
+          "sumMs": 87.19699999999996,
+          "maxMs": 1.728
+        },
+        "Layout": {
+          "count": 99,
+          "sumMs": 87.12800000000003,
+          "maxMs": 2.31
+        },
+        "Paint": {
+          "count": 174,
+          "sumMs": 198.53300000000004,
+          "maxMs": 1.993
+        },
+        "PrePaint": {
+          "count": 481,
+          "sumMs": 95.65700000000005,
+          "maxMs": 1.778
+        },
+        "Layerize": {
+          "count": 303,
+          "sumMs": 72.66799999999999,
+          "maxMs": 1.891
+        },
+        "HitTest": {
+          "count": 92,
+          "sumMs": 22.341000000000008,
+          "maxMs": 0.349
+        }
+      }
+    }
+  ]
+}

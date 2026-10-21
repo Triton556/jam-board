@@ -1,0 +1,185 @@
+{
+  "method": "WCAG 2 relative luminance; sRGB CSS color-mix; full precision before display rounding",
+  "results": [
+    {
+      "theme": "light",
+      "status": "backlog",
+      "hover": false,
+      "mixPercent": 22,
+      "background": "#f7f4f7",
+      "ink": 13.695961605067165,
+      "ink2": 5.528349151165336
+    },
+    {
+      "theme": "light",
+      "status": "backlog",
+      "hover": true,
+      "mixPercent": 14,
+      "background": "#faf9fd",
+      "ink": 14.268546928379621,
+      "ink2": 5.759472140363335
+    },
+    {
+      "theme": "light",
+      "status": "todo",
+      "hover": false,
+      "mixPercent": 22,
+      "background": "#fdf7e5",
+      "ink": 14.017328908934765,
+      "ink2": 5.658068459146707
+    },
+    {
+      "theme": "light",
+      "status": "todo",
+      "hover": true,
+      "mixPercent": 14,
+      "background": "#fefbf2",
+      "ink": 14.473624659837245,
+      "ink2": 5.842251381085448
+    },
+    {
+      "theme": "light",
+      "status": "in_progress",
+      "hover": false,
+      "mixPercent": 22,
+      "background": "#f1f6f7",
+      "ink": 13.728587679676144,
+      "ink2": 5.541518604838722
+    },
+    {
+      "theme": "light",
+      "status": "in_progress",
+      "hover": true,
+      "mixPercent": 14,
+      "background": "#f6fafe",
+      "ink": 14.29026988540792,
+      "ink2": 5.768240571124981
+    },
+    {
+      "theme": "light",
+      "status": "review",
+      "hover": false,
+      "mixPercent": 22,
+      "background": "#fdf1ef",
+      "ink": 13.52557603841492,
+      "ink2": 5.459573337539788
+    },
+    {
+      "theme": "light",
+      "status": "review",
+      "hover": true,
+      "mixPercent": 14,
+      "background": "#fdf7f8",
+      "ink": 14.154405528208489,
+      "ink2": 5.71339917878936
+    },
+    {
+      "theme": "light",
+      "status": "done",
+      "hover": false,
+      "mixPercent": 22,
+      "background": "#f4f8f0",
+      "ink": 13.956747337126117,
+      "ink2": 5.633614821589729
+    },
+    {
+      "theme": "light",
+      "status": "done",
+      "hover": true,
+      "mixPercent": 14,
+      "background": "#f8fcf9",
+      "ink": 14.437878691532884,
+      "ink2": 5.827822588187848
+    },
+    {
+      "theme": "dark",
+      "status": "backlog",
+      "hover": false,
+      "mixPercent": 30,
+      "background": "#38323c",
+      "ink": 10.530042895532187,
+      "ink2": 5.465188648226075
+    },
+    {
+      "theme": "dark",
+      "status": "backlog",
+      "hover": true,
+      "mixPercent": 24,
+      "background": "#3c353c",
+      "ink": 10.005444888745517,
+      "ink2": 5.192917480860841
+    },
+    {
+      "theme": "dark",
+      "status": "todo",
+      "hover": false,
+      "mixPercent": 30,
+      "background": "#413928",
+      "ink": 9.653990764696713,
+      "ink2": 5.01050957348767
+    },
+    {
+      "theme": "dark",
+      "status": "todo",
+      "hover": true,
+      "mixPercent": 24,
+      "background": "#433b2c",
+      "ink": 9.32116567466345,
+      "ink2": 4.837770305287122
+    },
+    {
+      "theme": "dark",
+      "status": "in_progress",
+      "hover": false,
+      "mixPercent": 30,
+      "background": "#32373c",
+      "ink": 10.1219885778047,
+      "ink2": 5.253404722250797
+    },
+    {
+      "theme": "dark",
+      "status": "in_progress",
+      "hover": true,
+      "mixPercent": 24,
+      "background": "#373a3c",
+      "ink": 9.694375149609801,
+      "ink2": 5.031469438911033
+    },
+    {
+      "theme": "dark",
+      "status": "review",
+      "hover": false,
+      "mixPercent": 30,
+      "background": "#413132",
+      "ink": 10.334327603761412,
+      "ink2": 5.363610620341334
+    },
+    {
+      "theme": "dark",
+      "status": "review",
+      "hover": true,
+      "mixPercent": 24,
+      "background": "#433534",
+      "ink": 9.85270177309635,
+      "ink2": 5.113642405723712
+    },
+    {
+      "theme": "dark",
+      "status": "done",
+      "hover": false,
+      "mixPercent": 30,
+      "background": "#323930",
+      "ink": 10.042692485307516,
+      "ink2": 5.212249324417786
+    },
+    {
+      "theme": "dark",
+      "status": "done",
+      "hover": true,
+      "mixPercent": 24,
+      "background": "#373b32",
+      "ink": 9.630699404469409,
+      "ink2": 4.998421144335114
+    }
+  ]
+}

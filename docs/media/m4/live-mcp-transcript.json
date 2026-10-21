@@ -1,0 +1,22 @@
+{
+  "transport": "stdio",
+  "client": "codex-m4-live-demo",
+  "request": {
+    "tool": "update_task",
+    "arguments": {
+      "key": "JB-7",
+      "title": "Player movement: a more forgiving jump buffer",
+      "priority": "critical",
+      "description": "## Agent checkpoint\nReviewed jump buffering and coyote time. Keep the transition gentle."
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "JB-7 · Player movement: a more forgiving jump buffer"
+    }
+  ],
+  "updatedAt": "2026-10-19T08:57:11.4572391Z",
+  "observedBanner": "Codex updated this task while you were editing · Review changes",
+  "preservedHumanTitle": "Player movement: tune the jump buffer"
+}

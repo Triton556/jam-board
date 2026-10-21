@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "command": "npm run tauri build",
+  "code": 0,
+  "artifact": ".dev-data/release-0.2.0/Jam Board_0.2.0_x64-setup.exe",
+  "bytes": 8646297,
+  "miB": 8.24575138092041,
+  "sha256": "a026cbd6f1abfb198b9ed32c19aabe702d71990f65efbfa82af05188a685d84a",
+  "sourceCommit": "14081a5973d5230abdde6408e7cb984b2b0e0ed5",
+  "copyHashMatches": true,
+  "installed": false,
+  "userInstallationUntouched": true,
+  "appBytes": 23481344,
+  "sidecarBytes": 7462400,
+  "temporaryDirectory": ".dev-data/nsis-temp",
+  "downloads": [],
+  "initialGzipBytes": 242252,
+  "previous": {
+    "bytes": 8642426,
+    "sha256": "76d49780b0c59dedc3bc963691ebe087cb59a4e8a7cf95e23fd873b5f7bdfe5e"
+  },
+  "bundlerTools": {
+    "cache": "target/.tauri",
+    "newCacheFiles": [],
+    "newCachedBytes": 0,
+    "downloadMessages": []
+  }
+}

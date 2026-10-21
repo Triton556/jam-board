@@ -1,0 +1,38 @@
+{
+  "source": "actual final release WebView2 via CDP; native capture helper unavailable during this last check",
+  "checks": [
+    {
+      "route": "assets",
+      "theme": "light",
+      "viewport": {
+        "width": 1360,
+        "height": 860
+      },
+      "images": [
+        {
+          "loaded": true,
+          "width": 238,
+          "height": 112
+        }
+      ]
+    },
+    {
+      "route": "team",
+      "theme": "dark",
+      "viewport": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "route": "table",
+      "theme": "light",
+      "viewport": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ],
+  "applicationSha256": "cc2baad4ed739be1b3f0245522241a10e28d9cea735275c0631b3ae057fc680e",
+  "sidecarSha256": "99bdf55d5655576d47c50c70ceceeb05df535fe353515258ac81b7bc01d01300"
+}

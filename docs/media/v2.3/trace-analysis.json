@@ -1,0 +1,168 @@
+{
+  "method": "CDP devtools.timeline totals from separate diagnostic gestures; nested durations overlap and are not exclusive CPU percentages",
+  "canvas": {
+    "beforeRaster": {
+      "trace": ".dev-data/perf-traces/canvas-before-raster.json",
+      "note": "Intermediate DOM overview, not the initial full-card 133.91 ms/frame run",
+      "events": {
+        "Paint": {
+          "count": 15952,
+          "totalMs": 1337.96,
+          "maxMs": 16.56
+        },
+        "PrePaint": {
+          "count": 151,
+          "totalMs": 45.78,
+          "maxMs": 4.99
+        },
+        "UpdateLayoutTree": {
+          "count": 150,
+          "totalMs": 63.46,
+          "maxMs": 11.5
+        },
+        "Layout": {
+          "count": 150,
+          "totalMs": 162.12,
+          "maxMs": 15.81
+        },
+        "HitTest": {
+          "count": 6,
+          "totalMs": 10.83,
+          "maxMs": 2.42
+        },
+        "FunctionCall": {
+          "count": 921,
+          "totalMs": 564.92,
+          "maxMs": 30.21
+        },
+        "EventDispatch": {
+          "count": 80,
+          "totalMs": 1.77,
+          "maxMs": 0.06
+        }
+      }
+    },
+    "afterRaster": {
+      "trace": ".dev-data/perf-traces/canvas-pan.json",
+      "events": {
+        "Paint": {
+          "count": 3105,
+          "totalMs": 249.24,
+          "maxMs": 4.52
+        },
+        "PrePaint": {
+          "count": 240,
+          "totalMs": 51.08,
+          "maxMs": 1.77
+        },
+        "UpdateLayoutTree": {
+          "count": 225,
+          "totalMs": 45.42,
+          "maxMs": 4.15
+        },
+        "Layout": {
+          "count": 225,
+          "totalMs": 98.98,
+          "maxMs": 3.02
+        },
+        "HitTest": {
+          "count": 6,
+          "totalMs": 5.85,
+          "maxMs": 1.44
+        },
+        "FunctionCall": {
+          "count": 1204,
+          "totalMs": 847.49,
+          "maxMs": 15.58
+        },
+        "EventDispatch": {
+          "count": 0,
+          "totalMs": 0,
+          "maxMs": 0
+        }
+      }
+    }
+  },
+  "table": {
+    "beforeDecorativeHitTestIsolation": {
+      "trace": ".dev-data/perf-traces/table-v23-before-A.json",
+      "events": {
+        "Paint": {
+          "count": 233,
+          "totalMs": 419.16,
+          "maxMs": 3.55
+        },
+        "PrePaint": {
+          "count": 1045,
+          "totalMs": 176.7,
+          "maxMs": 3.2
+        },
+        "UpdateLayoutTree": {
+          "count": 287,
+          "totalMs": 187.52,
+          "maxMs": 3.01
+        },
+        "Layout": {
+          "count": 142,
+          "totalMs": 180.11,
+          "maxMs": 4.95
+        },
+        "HitTest": {
+          "count": 658,
+          "totalMs": 123.74,
+          "maxMs": 0.72
+        },
+        "FunctionCall": {
+          "count": 2547,
+          "totalMs": 254.13,
+          "maxMs": 4.32
+        },
+        "EventDispatch": {
+          "count": 1796,
+          "totalMs": 244.64,
+          "maxMs": 4.43
+        }
+      }
+    },
+    "afterWheelInputBatching": {
+      "trace": ".dev-data/perf-traces/after-A.json",
+      "events": {
+        "Paint": {
+          "count": 229,
+          "totalMs": 318.77,
+          "maxMs": 2.96
+        },
+        "PrePaint": {
+          "count": 923,
+          "totalMs": 135.99,
+          "maxMs": 3.16
+        },
+        "UpdateLayoutTree": {
+          "count": 354,
+          "totalMs": 155.04,
+          "maxMs": 3.98
+        },
+        "Layout": {
+          "count": 140,
+          "totalMs": 132.78,
+          "maxMs": 3.51
+        },
+        "HitTest": {
+          "count": 493,
+          "totalMs": 95.51,
+          "maxMs": 0.51
+        },
+        "FunctionCall": {
+          "count": 3860,
+          "totalMs": 293.02,
+          "maxMs": 3.45
+        },
+        "EventDispatch": {
+          "count": 2231,
+          "totalMs": 239.96,
+          "maxMs": 3.5
+        }
+      }
+    }
+  }
+}

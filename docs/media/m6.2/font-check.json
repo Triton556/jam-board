@@ -1,0 +1,16 @@
+{
+  "chosen": "Manrope Variable",
+  "reason": "Centered 20px inline-grid and line-height:1, consistent UI numerals; both local font candidates rendered and compared",
+  "fonts": [
+    {
+      "family": "Manrope Variable",
+      "ascent": 9,
+      "descent": 1
+    },
+    {
+      "family": "JetBrains Mono Variable",
+      "ascent": 9,
+      "descent": 1
+    }
+  ]
+}

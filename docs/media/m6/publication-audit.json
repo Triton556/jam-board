@@ -1,0 +1,121 @@
+{
+  "tokenFiles": 21,
+  "distinctTokens": 21,
+  "checkedRevisions": 19,
+  "matches": 0,
+  "trackedBytes": 22204945,
+  "largestCurrentFiles": [
+    {
+      "path": "docs/media/m4.1/agent-highlight-dark.png",
+      "bytes": 1084514
+    },
+    {
+      "path": "docs/media/m4.1/content-board-dark.png",
+      "bytes": 1063331
+    },
+    {
+      "path": "docs/media/demo.gif",
+      "bytes": 878777
+    },
+    {
+      "path": "docs/media/m3/browser-dark.png",
+      "bytes": 794142
+    },
+    {
+      "path": "docs/media/m4.1/content-panel.png",
+      "bytes": 784882
+    },
+    {
+      "path": "docs/media/m3/desktop-content-dark.png",
+      "bytes": 766868
+    },
+    {
+      "path": "docs/media/m4.1/agent-highlight-light.png",
+      "bytes": 742502
+    },
+    {
+      "path": "docs/media/m4.1/content-board-light.png",
+      "bytes": 723708
+    },
+    {
+      "path": "docs/media/m3/desktop-task-drawer.png",
+      "bytes": 649348
+    },
+    {
+      "path": "docs/media/m3/desktop-highlight-toast.png",
+      "bytes": 613014
+    },
+    {
+      "path": "docs/media/m4.1/window-board-dark.png",
+      "bytes": 596746
+    },
+    {
+      "path": "docs/media/m4/cards-sticker-dark.png",
+      "bytes": 596746
+    }
+  ],
+  "largestHistoricalBlobs": [
+    {
+      "type": "blob",
+      "oid": "d3b795d7bd982c7335d52151b1a9846d31f26f75",
+      "bytes": 11764310,
+      "path": "docs/media/m4/table-performance-trace.json"
+    },
+    {
+      "type": "blob",
+      "oid": "bff67af65f352ecc45a745f4473f1088e76cece3",
+      "bytes": 1084514,
+      "path": "docs/media/m4.1/agent-highlight-dark.png"
+    },
+    {
+      "type": "blob",
+      "oid": "b5d0a95956d54271c339a4852858ee8c85959bea",
+      "bytes": 1063331,
+      "path": "docs/media/m4.1/content-board-dark.png"
+    },
+    {
+      "type": "blob",
+      "oid": "6fc3066ea75275547efe571bcedc69fc3afcfcf9",
+      "bytes": 794142,
+      "path": "docs/media/m3/browser-dark.png"
+    },
+    {
+      "type": "blob",
+      "oid": "6a768bce5f980c370b5498db8e2058b66c9d0f07",
+      "bytes": 784882,
+      "path": "docs/media/m4.1/content-panel.png"
+    },
+    {
+      "type": "blob",
+      "oid": "a89ab895a0cf62c0d11ce8a9e304d20ba0942908",
+      "bytes": 766868,
+      "path": "docs/media/m3/desktop-content-dark.png"
+    },
+    {
+      "type": "blob",
+      "oid": "95a031e88dd83658f9c07f2c865164a127088f02",
+      "bytes": 742502,
+      "path": "docs/media/m4.1/agent-highlight-light.png"
+    },
+    {
+      "type": "blob",
+      "oid": "f2ca43daf0b6f23f5157f21d978c60beb2d5e6de",
+      "bytes": 723708,
+      "path": "docs/media/m4.1/content-board-light.png"
+    },
+    {
+      "type": "blob",
+      "oid": "7e4a502b7d959ffd2daec33a553a68c55508798a",
+      "bytes": 649348,
+      "path": "docs/media/m3/desktop-task-drawer.png"
+    },
+    {
+      "type": "blob",
+      "oid": "1a1c65cf97785c072123edd90a39258c1553e03e",
+      "bytes": 613014,
+      "path": "docs/media/m3/desktop-highlight-toast.png"
+    }
+  ],
+  "nonhistoricalAbsolutePathMatches": [],
+  "gitObjectStorage": "count: 718\nsize: 21.46 MiB\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\nprune-packable: 0\ngarbage: 0\nsize-garbage: 0 bytes"
+}
