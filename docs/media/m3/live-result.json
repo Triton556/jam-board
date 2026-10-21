@@ -1,0 +1,42 @@
+{
+  "transport": "real stdio process → SQLite → ChangeFeed → Tauri event → React",
+  "created": "JB7-33",
+  "claimed": "JB7-7",
+  "moved": "JB7-1",
+  "arrivalObservedByMs": 241,
+  "frames": [
+    {
+      "frame": 1,
+      "sampledAtMs": 0,
+      "compositorFrameAtMs": -3
+    },
+    {
+      "frame": 2,
+      "sampledAtMs": 206,
+      "compositorFrameAtMs": 112
+    },
+    {
+      "frame": 3,
+      "sampledAtMs": 411,
+      "compositorFrameAtMs": 379
+    },
+    {
+      "frame": 4,
+      "sampledAtMs": 599,
+      "compositorFrameAtMs": 574
+    },
+    {
+      "frame": 5,
+      "sampledAtMs": 801,
+      "compositorFrameAtMs": 793
+    },
+    {
+      "frame": 6,
+      "sampledAtMs": 1002,
+      "compositorFrameAtMs": 977
+    }
+  ],
+  "humanActorVerified": true,
+  "themePersistsAfterReload": true,
+  "pageErrors": []
+}

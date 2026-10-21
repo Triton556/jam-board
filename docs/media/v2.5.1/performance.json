@@ -1,0 +1,287 @@
+{
+  "methodology": {
+    "build": "production VITE_MOCK_BRIDGE=1",
+    "viewport": {
+      "width": 1360,
+      "height": 860
+    },
+    "totalRows": 2000,
+    "workingAgents": 50,
+    "warmupMs": 1000,
+    "measuredMs": 3000,
+    "displayCalibration": "median of 30 idle rAF intervals",
+    "A": "wheel 120 px every 16 ms",
+    "B": "15000 px/s scrollTop via rAF",
+    "C": "PageDown every 100 ms",
+    "thresholds": {
+      "A_C": {
+        "longFrameFraction": 0.05,
+        "p95DisplayIntervals": 2,
+        "longTaskLimitMs": 50
+      },
+      "B": {
+        "longFrameFraction": 0.15,
+        "longTaskLimitMs": 100
+      },
+      "maxRows": 60
+    }
+  },
+  "fixtureInterpretation": "Fifty working virtual rows mounted, including overscan; all mounted task rows are working. Physical board card density is unchanged.",
+  "before": {
+    "A": {
+      "scenario": "A",
+      "phase": "after",
+      "recordedAt": "2026-10-20T11:50:36.418Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3019.7,
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 31.43894736842105,
+      "p95Ms": 53.30000000000018,
+      "longFrameFraction": 0.7894736842105263,
+      "longTasks": {
+        "count": 1,
+        "sumMs": 54,
+        "maxMs": 54
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 95,
+      "scrollTop": 29880,
+      "traced": false
+    },
+    "B": {
+      "scenario": "B",
+      "phase": "after",
+      "recordedAt": "2026-10-20T11:50:50.045Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3030.00000000447,
+      "displayIntervalMs": 13.299999999999955,
+      "meanFrameMs": 45.85454545454545,
+      "p95Ms": 53.5,
+      "longFrameFraction": 1,
+      "longTasks": {
+        "count": 7,
+        "sumMs": 382,
+        "maxMs": 63
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 66,
+      "scrollTop": 60450,
+      "traced": false
+    },
+    "C": {
+      "scenario": "C",
+      "phase": "after",
+      "recordedAt": "2026-10-20T11:51:03.922Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3016.19999999851,
+      "displayIntervalMs": 13.299999999999955,
+      "meanFrameMs": 19.19235668789809,
+      "p95Ms": 26.900000000000546,
+      "longFrameFraction": 0.39490445859872614,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 157,
+      "scrollTop": 19976,
+      "traced": false
+    }
+  },
+  "after": {
+    "A": {
+      "scenario": "A",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:28:58.332Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3002.5999999940395,
+      "displayIntervalMs": 13.300000000000182,
+      "meanFrameMs": 13.33288888888889,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 225,
+      "scrollTop": 29880,
+      "traced": false
+    },
+    "B": {
+      "scenario": "B",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:29:10.060Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3006.3,
+      "displayIntervalMs": 13.399999999999864,
+      "meanFrameMs": 13.452914798206278,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0.008968609865470852,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 223,
+      "scrollTop": 60095,
+      "traced": false
+    },
+    "C": {
+      "scenario": "C",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:29:21.775Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3002.2000000029802,
+      "displayIntervalMs": 13.299999999999955,
+      "meanFrameMs": 13.333333333333334,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 50,
+      "allWorking": true,
+      "frameCount": 225,
+      "scrollTop": 19850,
+      "traced": false
+    }
+  },
+  "ordinary": {
+    "A": {
+      "scenario": "A",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:28:23.694Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3007.89999999851,
+      "displayIntervalMs": 13.299999999999955,
+      "meanFrameMs": 13.33288888888889,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 0,
+      "allWorking": true,
+      "frameCount": 225,
+      "scrollTop": 30000,
+      "traced": false
+    },
+    "B": {
+      "scenario": "B",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:28:35.281Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3004.19999999851,
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 13.33288888888889,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 0,
+      "allWorking": true,
+      "frameCount": 225,
+      "scrollTop": 60063,
+      "traced": false
+    },
+    "C": {
+      "scenario": "C",
+      "phase": "after",
+      "recordedAt": "2026-10-20T12:28:46.824Z",
+      "production": true,
+      "warmupMs": 1000,
+      "measurementMs": 3002.8,
+      "displayIntervalMs": 13.399999999999864,
+      "meanFrameMs": 13.333333333333334,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50,
+      "maxWorking": 0,
+      "allWorking": true,
+      "frameCount": 225,
+      "scrollTop": 19969,
+      "traced": false
+    }
+  },
+  "traceAnalysis": {
+    "scope": "Equivalent second B pass with devtools.timeline tracing; diagnostic counts only, not acceptance timing",
+    "before": {
+      "Paint": {
+        "count": 2985,
+        "durationMs": 1012.297
+      },
+      "UpdateLayoutTree": {
+        "count": 422,
+        "durationMs": 555.751
+      },
+      "Layout": {
+        "count": 182,
+        "durationMs": 262.802
+      },
+      "CompositeLayers": {
+        "count": 0,
+        "durationMs": 0
+      }
+    },
+    "after": {
+      "Paint": {
+        "count": 426,
+        "durationMs": 1421.448
+      },
+      "UpdateLayoutTree": {
+        "count": 1151,
+        "durationMs": 500.243
+      },
+      "Layout": {
+        "count": 579,
+        "durationMs": 266.266
+      },
+      "CompositeLayers": {
+        "count": 0,
+        "durationMs": 0
+      }
+    },
+    "cautions": [
+      "Acceptance metrics use the first untraced pass.",
+      "CDP Animation/LayerTree observer experiments added overhead; those timings were excluded.",
+      "The existing scroll driver and virtualizer can cause synchronous layout; this stage does not claim zero layout."
+    ]
+  }
+}

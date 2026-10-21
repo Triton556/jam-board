@@ -1,0 +1,50 @@
+[
+  {
+    "name": "window-board-light",
+    "difference": 0.8642590059279526
+  },
+  {
+    "name": "window-table-light",
+    "difference": 0.8002553579571363
+  },
+  {
+    "name": "window-assets-light",
+    "difference": 0.8676288189694482
+  },
+  {
+    "name": "window-team-light",
+    "difference": 0.9121477428180574
+  },
+  {
+    "name": "window-activity-light",
+    "difference": 0.776032831737346
+  },
+  {
+    "name": "window-settings-light",
+    "difference": 0.8391062471500228
+  },
+  {
+    "name": "window-board-dark",
+    "difference": 0.8776151390788873
+  },
+  {
+    "name": "window-table-dark",
+    "difference": 0.7683629730962153
+  },
+  {
+    "name": "window-assets-dark",
+    "difference": 0.9372001823985409
+  },
+  {
+    "name": "window-team-dark",
+    "difference": 1.086233470132239
+  },
+  {
+    "name": "window-activity-dark",
+    "difference": 0.7893251253989968
+  },
+  {
+    "name": "window-settings-dark",
+    "difference": 0.9863064295485636
+  }
+]

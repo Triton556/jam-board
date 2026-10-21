@@ -1,0 +1,13 @@
+{
+  "transport": "real stdio sidecar",
+  "tool": "add_comment",
+  "key": "JB-16",
+  "content": [
+    {
+      "type": "text",
+      "text": "Completed add_comment ."
+    }
+  ],
+  "highlighted": "true",
+  "toast": "Cd\nCodex commented on JB-16\nView"
+}

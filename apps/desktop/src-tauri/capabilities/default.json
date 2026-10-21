@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Local Jam Board desktop window",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-show", "dialog:allow-open", "opener:default", "window-state:default"]
+}

@@ -1,0 +1,61 @@
+{
+  "transport": "real stdio sidecar",
+  "key": "JB-33",
+  "online": true,
+  "comments": 1,
+  "recentCalls": [
+    {
+      "at": "2026-10-19T11:01:47.9040696Z",
+      "error": null,
+      "agent": "Codex",
+      "tool": "get_board",
+      "ok": true
+    },
+    {
+      "at": "2026-10-19T11:01:47.9005993Z",
+      "error": null,
+      "agent": "Codex",
+      "tool": "add_comment",
+      "ok": true
+    },
+    {
+      "at": "2026-10-19T11:01:47.8952761Z",
+      "error": null,
+      "agent": "Codex",
+      "tool": "create_task",
+      "ok": true
+    }
+  ],
+  "activity": [
+    {
+      "seq": 62,
+      "action": "comment.added",
+      "actor": "Codex"
+    },
+    {
+      "seq": 61,
+      "action": "task.created",
+      "actor": "Codex"
+    }
+  ],
+  "nativeData": {
+    "exported": {
+      "version": 1,
+      "tasks": 33,
+      "assets": 9,
+      "settingsIncluded": false
+    },
+    "imported": {
+      "keyPrefix": "JB2",
+      "tasks": 33
+    },
+    "archivedToOnboarding": true
+  },
+  "readingPosition": {
+    "before": 350,
+    "after": 350,
+    "pendingButton": "1 new events ↑"
+  },
+  "captureDataDir": "capture-20261019-m5-final",
+  "dataRoundtripDir": "capture-20261019-m5"
+}

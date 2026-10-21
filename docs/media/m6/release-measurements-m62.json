@@ -1,0 +1,259 @@
+{
+  "releaseSha256": "fc2288e6f0f37730237b5b53a4cec77819b8052bd66c90abcb05c94dcf5553f7",
+  "build": "release",
+  "installed": false,
+  "measurementDriver": "Node; read-only inline Windows CIM queries; no execution-policy changes",
+  "debugger": false,
+  "osFileCacheFlushed": false,
+  "idleSeconds": 30,
+  "seedTasks": 32,
+  "medianStartupMs": 892,
+  "medianPrivateWorkingSetBytes": 121659392,
+  "runs": [
+    {
+      "run": 1,
+      "startupMs": 934,
+      "privateWorkingSetBytes": 125722624,
+      "processes": [
+        {
+          "pid": 35544,
+          "name": "jam-board",
+          "role": "application",
+          "privateWorkingSetBytes": 5246976
+        },
+        {
+          "pid": 35852,
+          "name": "msedgewebview2#14",
+          "role": "browser",
+          "privateWorkingSetBytes": 33210368
+        },
+        {
+          "pid": 25152,
+          "name": "msedgewebview2#15",
+          "role": "crashpad-handler",
+          "privateWorkingSetBytes": 2060288
+        },
+        {
+          "pid": 41896,
+          "name": "msedgewebview2#16",
+          "role": "gpu-process",
+          "privateWorkingSetBytes": 33574912
+        },
+        {
+          "pid": 35272,
+          "name": "msedgewebview2#17",
+          "role": "utility",
+          "privateWorkingSetBytes": 7045120
+        },
+        {
+          "pid": 3996,
+          "name": "msedgewebview2#18",
+          "role": "utility",
+          "privateWorkingSetBytes": 2924544
+        },
+        {
+          "pid": 37196,
+          "name": "msedgewebview2#19",
+          "role": "renderer",
+          "privateWorkingSetBytes": 41660416
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "startupMs": 892,
+      "privateWorkingSetBytes": 120659968,
+      "processes": [
+        {
+          "pid": 40852,
+          "name": "jam-board",
+          "role": "application",
+          "privateWorkingSetBytes": 5427200
+        },
+        {
+          "pid": 40732,
+          "name": "msedgewebview2#14",
+          "role": "browser",
+          "privateWorkingSetBytes": 29605888
+        },
+        {
+          "pid": 2692,
+          "name": "msedgewebview2#15",
+          "role": "crashpad-handler",
+          "privateWorkingSetBytes": 2052096
+        },
+        {
+          "pid": 40272,
+          "name": "msedgewebview2#16",
+          "role": "gpu-process",
+          "privateWorkingSetBytes": 31801344
+        },
+        {
+          "pid": 40404,
+          "name": "msedgewebview2#17",
+          "role": "utility",
+          "privateWorkingSetBytes": 6975488
+        },
+        {
+          "pid": 32188,
+          "name": "msedgewebview2#18",
+          "role": "utility",
+          "privateWorkingSetBytes": 2912256
+        },
+        {
+          "pid": 30788,
+          "name": "msedgewebview2#19",
+          "role": "renderer",
+          "privateWorkingSetBytes": 41885696
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "startupMs": 995,
+      "privateWorkingSetBytes": 122810368,
+      "processes": [
+        {
+          "pid": 41760,
+          "name": "jam-board",
+          "role": "application",
+          "privateWorkingSetBytes": 5443584
+        },
+        {
+          "pid": 39564,
+          "name": "msedgewebview2#14",
+          "role": "browser",
+          "privateWorkingSetBytes": 29265920
+        },
+        {
+          "pid": 17632,
+          "name": "msedgewebview2#15",
+          "role": "crashpad-handler",
+          "privateWorkingSetBytes": 2072576
+        },
+        {
+          "pid": 32912,
+          "name": "msedgewebview2#16",
+          "role": "gpu-process",
+          "privateWorkingSetBytes": 34271232
+        },
+        {
+          "pid": 36052,
+          "name": "msedgewebview2#17",
+          "role": "utility",
+          "privateWorkingSetBytes": 6586368
+        },
+        {
+          "pid": 30928,
+          "name": "msedgewebview2#18",
+          "role": "utility",
+          "privateWorkingSetBytes": 2912256
+        },
+        {
+          "pid": 33676,
+          "name": "msedgewebview2#19",
+          "role": "renderer",
+          "privateWorkingSetBytes": 42258432
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "startupMs": 859,
+      "privateWorkingSetBytes": 121659392,
+      "processes": [
+        {
+          "pid": 36960,
+          "name": "jam-board",
+          "role": "application",
+          "privateWorkingSetBytes": 5431296
+        },
+        {
+          "pid": 30836,
+          "name": "msedgewebview2#14",
+          "role": "browser",
+          "privateWorkingSetBytes": 28815360
+        },
+        {
+          "pid": 30796,
+          "name": "msedgewebview2#15",
+          "role": "crashpad-handler",
+          "privateWorkingSetBytes": 2056192
+        },
+        {
+          "pid": 22680,
+          "name": "msedgewebview2#16",
+          "role": "gpu-process",
+          "privateWorkingSetBytes": 33615872
+        },
+        {
+          "pid": 8652,
+          "name": "msedgewebview2#17",
+          "role": "utility",
+          "privateWorkingSetBytes": 6656000
+        },
+        {
+          "pid": 38168,
+          "name": "msedgewebview2#18",
+          "role": "utility",
+          "privateWorkingSetBytes": 2916352
+        },
+        {
+          "pid": 30908,
+          "name": "msedgewebview2#19",
+          "role": "renderer",
+          "privateWorkingSetBytes": 42168320
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "startupMs": 864,
+      "privateWorkingSetBytes": 120348672,
+      "processes": [
+        {
+          "pid": 15684,
+          "name": "jam-board",
+          "role": "application",
+          "privateWorkingSetBytes": 5341184
+        },
+        {
+          "pid": 20736,
+          "name": "msedgewebview2#14",
+          "role": "browser",
+          "privateWorkingSetBytes": 29003776
+        },
+        {
+          "pid": 35560,
+          "name": "msedgewebview2#15",
+          "role": "crashpad-handler",
+          "privateWorkingSetBytes": 2048000
+        },
+        {
+          "pid": 34236,
+          "name": "msedgewebview2#16",
+          "role": "gpu-process",
+          "privateWorkingSetBytes": 32628736
+        },
+        {
+          "pid": 38508,
+          "name": "msedgewebview2#17",
+          "role": "utility",
+          "privateWorkingSetBytes": 6610944
+        },
+        {
+          "pid": 41444,
+          "name": "msedgewebview2#18",
+          "role": "utility",
+          "privateWorkingSetBytes": 2924544
+        },
+        {
+          "pid": 20056,
+          "name": "msedgewebview2#19",
+          "role": "renderer",
+          "privateWorkingSetBytes": 41791488
+        }
+      ]
+    }
+  ]
+}

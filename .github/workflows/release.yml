@@ -1,0 +1,41 @@
+name: Draft Windows release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci
+        working-directory: apps/desktop
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          args: --bundles nsis
+          tagName: ${{ github.ref_name }}
+          releaseName: Jam Board ${{ github.ref_name }}
+          releaseBody: Unsigned Windows installer. See README for SmartScreen and local data instructions.
+          releaseDraft: true
+          prerelease: false
+      - name: Add checksums to the draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $files = Get-ChildItem target/release/bundle/nsis/*-setup.exe
+          if (-not $files) { throw 'NSIS installer missing' }
+          $lines = $files | ForEach-Object { "$( (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLower() )  $($_.Name)" }
+          [IO.File]::WriteAllLines("$PWD/SHA256SUMS.txt", $lines, [Text.UTF8Encoding]::new($false))
+          gh release upload ${{ github.ref_name }} SHA256SUMS.txt --clobber

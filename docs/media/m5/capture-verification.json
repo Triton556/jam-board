@@ -1,0 +1,72 @@
+[
+  {
+    "file": "window-onboarding-light.jpg",
+    "route": "http://127.0.0.1:1420/welcome",
+    "meanPixelDifference": 0.8832466940264478
+  },
+  {
+    "file": "window-onboarding-dark.jpg",
+    "route": "http://127.0.0.1:1420/welcome",
+    "meanPixelDifference": 1.1363474692202462
+  },
+  {
+    "file": "window-assets-light.jpg",
+    "route": "http://127.0.0.1:1420/assets",
+    "meanPixelDifference": 0.8512859097127223
+  },
+  {
+    "file": "window-team-light.jpg",
+    "route": "http://127.0.0.1:1420/team",
+    "meanPixelDifference": 0.8840720474236207
+  },
+  {
+    "file": "window-activity-light.jpg",
+    "route": "http://127.0.0.1:1420/activity",
+    "meanPixelDifference": 0.7536297309621524
+  },
+  {
+    "file": "window-settings-mcp-top-light.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 0.8273050615595076
+  },
+  {
+    "file": "window-settings-mcp-light.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 0.869046967624259
+  },
+  {
+    "file": "window-assets-dark.jpg",
+    "route": "http://127.0.0.1:1420/assets",
+    "meanPixelDifference": 0.9882854537163702
+  },
+  {
+    "file": "window-team-dark.jpg",
+    "route": "http://127.0.0.1:1420/team",
+    "meanPixelDifference": 1.0528089375284997
+  },
+  {
+    "file": "window-activity-dark.jpg",
+    "route": "http://127.0.0.1:1420/activity",
+    "meanPixelDifference": 0.8080346557227542
+  },
+  {
+    "file": "window-settings-mcp-top-dark.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 0.9967578659370725
+  },
+  {
+    "file": "window-settings-mcp-dark.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 1.041937984496124
+  },
+  {
+    "file": "window-about-dark.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 1.1206976744186046
+  },
+  {
+    "file": "window-appearance-dark.jpg",
+    "route": "http://127.0.0.1:1420/settings",
+    "meanPixelDifference": 0.9948882808937528
+  }
+]

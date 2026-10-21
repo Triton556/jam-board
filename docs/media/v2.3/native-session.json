@@ -1,0 +1,77 @@
+{
+  "native": true,
+  "mock": false,
+  "dataDirectory": ".dev-data\\capture-v23-1792486200682",
+  "dropMethod": "native Tauri drag-drop event injected with seven real paths; production handler and filesystem checks",
+  "droppedFiles": [
+    "apps\\desktop\\src\\assets\\chibi\\danil-laptop.png",
+    "apps\\desktop\\src\\assets\\chibi\\duo-board.png",
+    "apps\\desktop\\src\\assets\\chibi\\wife-paint.png",
+    "apps\\desktop\\src\\assets\\chibi\\duo-hello.png",
+    "apps\\desktop\\src\\assets\\chibi\\danil-wave.png",
+    "apps\\desktop\\src\\assets\\chibi\\duo-board-256.webp",
+    ".dev-data\\capture-v23-1792486200682\\lantern-chime.wav"
+  ],
+  "items": 10,
+  "frames": 1,
+  "edges": 1,
+  "audio": {
+    "duration": 1,
+    "peaks": 64,
+    "playPause": true
+  },
+  "agentLatencyMs": 177,
+  "referenceAssets": 8,
+  "remoteRequests": [],
+  "localRequests": {
+    "ipc": 313,
+    "assets": 21,
+    "vite": 17
+  },
+  "pageErrors": [],
+  "captures": [
+    "canvas-agent-light.jpg",
+    "canvas-agent-dark.jpg",
+    "canvas-light.jpg",
+    "canvas-dark.jpg",
+    "audio-waveform.jpg",
+    "image-lightbox.jpg",
+    "task-linked-reference.jpg"
+  ],
+  "transcript": [
+    {
+      "agent": "Codex",
+      "tool": "add_reference",
+      "arguments": {
+        "kind": "asset",
+        "filePath": "apps\\desktop\\src\\assets\\chibi\\wife-paint.png",
+        "title": "Codex · warm lantern silhouette",
+        "caption": "Keep the silhouette readable against the snowy path.",
+        "frameEpicKey": "JB-E1",
+        "linkTo": "JB-12",
+        "x": 294,
+        "y": 514
+      },
+      "summary": [
+        {
+          "type": "text",
+          "text": "Completed add_reference ."
+        }
+      ]
+    },
+    {
+      "agent": "Codex",
+      "tool": "update_reference",
+      "arguments": {
+        "itemId": "01M5C81XPZVZS9RMZP1CVBV5HN",
+        "caption": "One warm silhouette, a quiet edge, no additional particles."
+      },
+      "summary": [
+        {
+          "type": "text",
+          "text": "Completed update_reference ."
+        }
+      ]
+    }
+  ]
+}

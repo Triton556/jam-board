@@ -1,0 +1,76 @@
+{
+  "native": true,
+  "mock": false,
+  "fixture": "Scripted MCP client, not an AI session; isolated demo only",
+  "dataDirectory": ".dev-data\\capture-v251-1792499005320",
+  "taskKey": "JB-2",
+  "arrivalMs": 368,
+  "sourceFrames": 242,
+  "sourceSeconds": 6.4259068965911865,
+  "sourceData": ".dev-data\\capture-v251-1792499005320",
+  "cursorOverlay": false,
+  "pageErrors": [],
+  "transcript": [
+    {
+      "name": "list_tasks",
+      "arguments": {
+        "status": [
+          "ready"
+        ],
+        "assignee": "unassigned"
+      }
+    },
+    {
+      "name": "list_tasks",
+      "arguments": {
+        "status": [
+          "in_progress"
+        ]
+      }
+    },
+    {
+      "name": "claim_task",
+      "arguments": {
+        "key": "JB-2"
+      }
+    },
+    {
+      "name": "move_task",
+      "arguments": {
+        "key": "JB-2",
+        "status": "in_progress",
+        "beforeKey": "JB-12"
+      }
+    },
+    {
+      "name": "set_status",
+      "arguments": {
+        "text": "implementing snow trails",
+        "scope": {
+          "type": "task",
+          "id": "JB-2"
+        }
+      }
+    }
+  ],
+  "captures": [
+    "board-light.jpg",
+    "board-light.jpg",
+    "task-panel-light.jpg",
+    "table-light.jpg",
+    "board-dark.jpg",
+    "task-panel-dark.jpg",
+    "table-dark.jpg"
+  ],
+  "video": {
+    "width": 960,
+    "nominalSeconds": 6,
+    "bytes": 329056,
+    "playback": {
+      "seconds": 6.738867,
+      "width": 960,
+      "height": 607,
+      "decodedFrames": 7
+    }
+  }
+}

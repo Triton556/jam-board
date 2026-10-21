@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-10-19T07:13:28Z",
+  "scope": ["M1", "M2"],
+  "environment": { "os": "Windows 11", "rust": "1.99.1", "node": "22.13.0", "npm": "10.9.2" },
+  "checks": [
+    { "command": "cargo fmt --all --check", "result": "passed" },
+    { "command": "cargo clippy --workspace --all-targets -- -D warnings", "result": "passed", "warnings": 0 },
+    { "command": "cargo test --workspace", "result": "passed", "passed": 16, "failed": 0, "groups": { "jam-core": 10, "jam-mcp": 2, "jam-mcp-cli": 3, "desktop-event-contract": 1 } },
+    { "command": "npm run check", "cwd": "apps/desktop", "result": "passed" },
+    { "command": "npm run typecheck", "cwd": "apps/desktop", "result": "passed" },
+    { "command": "npm test", "cwd": "apps/desktop", "result": "no test files", "passed": 0, "failed": 0, "note": "Vitest --passWithNoTests; frontend feature tests belong to later milestones." },
+    { "command": "npm run build", "cwd": "apps/desktop", "result": "passed" },
+    { "command": "node scripts/m2-smoke.mjs --cdp", "result": "passed", "task": "JB-34", "actualDesktopEventLatencyMs": 81 }
+  ],
+  "concurrency": { "applicationThreads": 4, "stdioProcesses": 1, "mutationsPerWriter": 200, "expectedActivityDelta": 1000, "actualActivityDelta": 1000, "databaseLockedErrors": 0 },
+  "desktop": { "contentViewport": [1360, 860], "theme": "light", "paper": "rgb(247, 241, 230)", "fonts": "loaded", "httpPort": 47321 },
+  "notVerified": ["Linux native runtime", "NSIS installer", "release cold start", "release idle RAM", "M3-M6 UI and e2e", "real Codex or Claude Code client connection", "independent review"]
+}

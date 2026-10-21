@@ -1,0 +1,30 @@
+{
+  "rust": {
+    "passed": 35,
+    "failed": 0,
+    "fmt": true,
+    "clippy": true
+  },
+  "frontend": {
+    "biome": true,
+    "typecheck": true,
+    "vitest": {
+      "passed": 46,
+      "failed": 0
+    },
+    "playwrightFunctional": {
+      "passed": 23,
+      "failed": 0
+    },
+    "playwrightPerfDuringM5": {
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "secrets": {
+    "tokenFilesChecked": 9,
+    "worktreeMatches": 0,
+    "indexMatches": 0
+  },
+  "nativeFrames": 14
+}

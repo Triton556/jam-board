@@ -1,0 +1,11 @@
+﻿{
+    "scope":  "Native/MCP, owned capture/test commands and local ports",
+    "checkedAt":  "2026-10-20T22:32:24.5345678+10:00",
+    "clean":  true,
+    "listeners":  [
+
+                  ],
+    "ownedProcesses":  [
+
+                       ]
+}

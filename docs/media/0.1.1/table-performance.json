@@ -1,0 +1,116 @@
+{
+  "methodology": {
+    "build": "production VITE_MOCK_BRIDGE=1",
+    "viewport": {
+      "width": 1360,
+      "height": 860
+    },
+    "totalRows": 2000,
+    "warmupMs": 1000,
+    "measuredMs": 3000,
+    "displayCalibration": "median of 30 idle rAF intervals",
+    "A": "wheel 120 px every 16 ms",
+    "B": "15000 px/s scrollTop via rAF",
+    "C": "PageDown every 100 ms",
+    "thresholds": {
+      "A_C": {
+        "longFrameFraction": 0.05,
+        "p95DisplayIntervals": 2,
+        "longTaskLimitMs": 50
+      },
+      "B": {
+        "longFrameFraction": 0.15,
+        "longTaskLimitMs": 100
+      },
+      "maxRows": 60
+    }
+  },
+  "before": {
+    "A": {
+      "scenario": "A",
+      "recordedAt": "2026-10-20T05:08:35.979Z",
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 13.57556561085973,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0.01809954751131222,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    },
+    "B": {
+      "scenario": "B",
+      "recordedAt": "2026-10-20T05:08:46.847Z",
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 13.333333333333334,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    },
+    "C": {
+      "scenario": "C",
+      "recordedAt": "2026-10-20T05:08:57.631Z",
+      "displayIntervalMs": 13.300000000000011,
+      "meanFrameMs": 13.332888888888887,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    }
+  },
+  "after": {
+    "A": {
+      "scenario": "A",
+      "recordedAt": "2026-10-20T05:19:46.407Z",
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 13.333333333333334,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    },
+    "B": {
+      "scenario": "B",
+      "recordedAt": "2026-10-20T05:19:57.102Z",
+      "displayIntervalMs": 13.300000000000011,
+      "meanFrameMs": 13.333333333333332,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    },
+    "C": {
+      "scenario": "C",
+      "recordedAt": "2026-10-20T05:20:07.872Z",
+      "displayIntervalMs": 13.300000000000068,
+      "meanFrameMs": 13.333333333333334,
+      "p95Ms": 13.5,
+      "longFrameFraction": 0,
+      "longTasks": {
+        "count": 0,
+        "sumMs": 0,
+        "maxMs": 0
+      },
+      "maxRows": 50
+    }
+  }
+}

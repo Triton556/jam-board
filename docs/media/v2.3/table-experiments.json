@@ -1,0 +1,692 @@
+[
+  {
+    "name": "initial",
+    "log": ".dev-data/v2.3-final/7.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T07:57:10.785Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3007.4999999970196,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 14.218009478672986,
+        "p95Ms": 26.699999999999818,
+        "longFrameFraction": 0.06635071090047394,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 211,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T07:57:23.782Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3008.000000000745,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60120,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T07:57:35.339Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3003.3999999999996,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.332888888888887,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 20013,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "decorative-hit-tests",
+    "log": ".dev-data/v2.3-followup/4.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:11:40.695Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3000.2000000014905,
+        "displayIntervalMs": 13.399999999999864,
+        "meanFrameMs": 13.82488479262673,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0.03686635944700461,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 217,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:11:52.134Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3006.7000000014905,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.332444444444445,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60101,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:12:03.637Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3004.8999999999996,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.331555555555553,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 20009,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "decorative-hit-tests-repeat",
+    "log": ".dev-data/v2.3-closure/4.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:21:49.394Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3002.499999999255,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 14.083568075117372,
+        "p95Ms": 26.5,
+        "longFrameFraction": 0.056338028169014086,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 213,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:22:02.874Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3004.5,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60068,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:22:14.444Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.5999999992546,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.332888888888887,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19960,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "raf-coalescing-rejected",
+    "log": ".dev-data/v2.3-wheel-raf/perf.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:24:10.436Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3006.599999997765,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 14.77832512315271,
+        "p95Ms": 26.600000000000364,
+        "longFrameFraction": 0.10837438423645321,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 203,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:24:23.551Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.000000000745,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60015,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:24:35.509Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.7999999985095,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.333333333333332,
+        "p95Ms": 13.400000000000546,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19959,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "bounded-prerender-only",
+    "log": ".dev-data/v2.3-wheel-prerender/perf.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:25:25.394Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.699999997765,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 14.01869158878505,
+        "p95Ms": 26.5,
+        "longFrameFraction": 0.0514018691588785,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 214,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:25:38.367Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.300000000745,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.332444444444445,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60155,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:25:49.856Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.9000000007454,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.332888888888892,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19961,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "recycled-rows",
+    "log": ".dev-data/v2.3-wheel-pool/perf.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:27:01.898Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.800000000745,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.698630136986301,
+        "p95Ms": 13.599999999999909,
+        "longFrameFraction": 0.0273972602739726,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 219,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:27:13.327Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3006.10000000298,
+        "displayIntervalMs": 13.350000000000023,
+        "meanFrameMs": 13.332444444444443,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60092,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:27:24.748Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3002.7,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.332888888888887,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19961,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "recycled-rows-repeat",
+    "log": ".dev-data/v2.3-accepted/4.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:31:30.041Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.5999999992546,
+        "displayIntervalMs": 13.300000000000125,
+        "meanFrameMs": 14.634146341463412,
+        "p95Ms": 26.699999999999818,
+        "longFrameFraction": 0.0975609756097561,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 205,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:31:42.551Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3003.4999999985102,
+        "displayIntervalMs": 13.300000000000011,
+        "meanFrameMs": 13.333333333333336,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60053,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:31:54.345Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.0999999985097,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19949,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "same-frame-wheel",
+    "log": ".dev-data/v2.3-wheel-input/perf.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:34:34.850Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3010.6000000000004,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.392857142857144,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0.004464285714285714,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 224,
+        "scrollTop": 29880,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:34:46.493Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3005.2,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.332888888888887,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60078,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:34:57.677Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3002.39999999851,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 20013,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "same-frame-wheel-repeat",
+    "log": ".dev-data/v2.3-release-check/4.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:39:19.154Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3008.300000000745,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.333777777777778,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 29880,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:39:30.704Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3005.5999999992546,
+        "displayIntervalMs": 13.300000000000068,
+        "meanFrameMs": 13.333333333333332,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60084,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:39:41.887Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.9000000007454,
+        "displayIntervalMs": 13.300000000000011,
+        "meanFrameMs": 13.333333333333336,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19958,
+        "traced": false
+      }
+    ]
+  },
+  {
+    "name": "same-frame-wheel-final",
+    "log": ".dev-data/v2.3-verified/4.log",
+    "metrics": [
+      {
+        "scenario": "A",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:47:01.978Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3007.7,
+        "displayIntervalMs": 13.300000000000182,
+        "meanFrameMs": 13.333777777777778,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 30000,
+        "traced": false
+      },
+      {
+        "scenario": "B",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:47:13.498Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3005.6000000007452,
+        "displayIntervalMs": 13.399999999999864,
+        "meanFrameMs": 13.33288888888889,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 60084,
+        "traced": false
+      },
+      {
+        "scenario": "C",
+        "phase": "after",
+        "recordedAt": "2026-10-20T08:47:24.975Z",
+        "production": true,
+        "warmupMs": 1000,
+        "measurementMs": 3001.999999999255,
+        "displayIntervalMs": 13.299999999999955,
+        "meanFrameMs": 13.333333333333334,
+        "p95Ms": 13.5,
+        "longFrameFraction": 0,
+        "longTasks": {
+          "count": 0,
+          "sumMs": 0,
+          "maxMs": 0
+        },
+        "maxRows": 50,
+        "frameCount": 225,
+        "scrollTop": 19958,
+        "traced": false
+      }
+    ]
+  }
+]

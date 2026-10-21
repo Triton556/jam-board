@@ -1,0 +1,466 @@
+use crate::server::{parse, tool, value};
+use jam_core::*;
+use rmcp::model::Tool;
+use serde_json::Value;
+
+pub(crate) fn execute(
+    store: &Store,
+    actor: &Member,
+    name: &str,
+    args: Value,
+) -> Option<jam_core::Result<Value>> {
+    Some((|| {
+        Ok(match name {
+            "get_project" => {
+                parse::<crate::server::Empty>(args)?;
+                value(store.get_project()?)?
+            }
+            "list_epics" => {
+                parse::<crate::server::Empty>(args)?;
+                value(store.list_epics()?)?
+            }
+            "get_epic" => value(store.get_epic(&parse::<crate::server::Key>(args)?.key)?)?,
+            "create_epic" => value(store.create_epic(&actor.id, parse(args)?)?)?,
+            "update_epic" => {
+                let a: EpicEditInput = parse(args)?;
+                value(store.update_epic(&actor.id, &a.key, a.patch)?)?
+            }
+            "set_epic_status" => {
+                let a: PlanningStatusInput = parse(args)?;
+                value(store.set_epic_status(
+                    &actor.id,
+                    &a.key,
+                    &a.status,
+                    a.override_reason.as_deref(),
+                )?)?
+            }
+            "become_brain" => {
+                value(store.become_brain(&actor.id, &parse::<EpicKeyInput>(args)?.epic_key)?)?
+            }
+            "set_brain" => {
+                let a: BrainInput = parse(args)?;
+                value(store.set_brain(&actor.id, &a.epic_key, &a.member_handle)?)?
+            }
+            "create_story" => value(store.create_story(&actor.id, parse(args)?)?)?,
+            "update_story" => {
+                let a: StoryEditInput = parse(args)?;
+                value(store.update_story(&actor.id, &a.key, a.patch)?)?
+            }
+            "set_story_status" => {
+                let a: PlanningStatusInput = parse(args)?;
+                value(store.set_story_status(
+                    &actor.id,
+                    &a.key,
+                    &a.status,
+                    a.override_reason.as_deref(),
+                )?)?
+            }
+            "update_task_brief" => {
+                let a: BriefEditInput = parse(args)?;
+                value(store.update_task_brief(&actor.id, &a.key, a.patch)?)?
+            }
+            "check_ready" => value(store.check_ready(&parse::<crate::server::Key>(args)?.key)?)?,
+            "mark_ready" => {
+                let a: ReadyInput = parse(args)?;
+                value(store.mark_ready(&actor.id, &a.key, a.override_reason.as_deref())?)?
+            }
+            "submit_report" => value(store.submit_report(&actor.id, parse(args)?)?)?,
+            "review_task" => value(store.review_task(&actor.id, parse(args)?)?)?,
+            "ask_user" => value(store.ask_user(&actor.id, parse(args)?)?)?,
+            "wait_for_answer" => {
+                let a: WaitInput = parse(args)?;
+                value(store.wait_for_answer(&a.question_ids, a.timeout_seconds)?)?
+            }
+            "list_questions" => {
+                let a: QuestionListInput = parse(args)?;
+                value(store.list_questions(a.status.as_deref(), a.scope.as_ref())?)?
+            }
+            "withdraw_question" => {
+                value(store.withdraw_question(&actor.id, &parse::<IdInput>(args)?.id)?)?
+            }
+            "set_status" => {
+                let a: StatusTextInput = parse(args)?;
+                value(store.set_status(&actor.id, &a.text, a.scope)?)?
+            }
+            "list_changes_since" => {
+                let a: ChangesInput = parse(args)?;
+                value(store.list_changes_since(a.cursor, a.epic_key.as_deref())?)?
+            }
+            "wait_for_changes" => value(store.wait_for_changes(&actor.id, parse(args)?)?)?,
+            "add_reference" => value(store.add_reference(&actor.id, parse(args)?)?)?,
+            "list_references" => {
+                let a: ReferenceListInput = parse(args)?;
+                value(store.list_references(
+                    a.epic_key.as_deref(),
+                    a.story_key.as_deref(),
+                    a.task_key.as_deref(),
+                )?)?
+            }
+            "link_reference" => {
+                let a: ReferenceLinkInput = parse(args)?;
+                value(store.link_reference(&actor.id, &a.item_id, &a.target_key)?)?
+            }
+            "update_reference" => {
+                let a: ReferenceEditInput = parse(args)?;
+                value(store.update_reference(&actor.id, &a.item_id, a.patch)?)?
+            }
+            _ => return Err(Error::NotFound("unhandled".into())),
+        })
+    })())
+    .filter(|result| !matches!(result,Err(Error::NotFound(s))if s=="unhandled"))
+}
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct IdInput {
+    id: String,
+}
+
+pub(crate) fn tools() -> Vec<Tool> {
+    vec![
+        tool::<crate::server::Empty>(
+            "get_project",
+            "Read the active project's template, dates, suggested tags and hierarchy counts. Non-jam projects use milestoneAt rather than a countdown.",
+            true,
+        ),
+        tool::<crate::server::Empty>(
+            "list_epics",
+            "List non-archived epics in project order, including their brain and worker model.",
+            true,
+        ),
+        tool::<crate::server::Key>(
+            "get_epic",
+            "Read an epic tree, task readiness, the last 30 journal rows and open questions. Example: key=JB-E1.",
+            true,
+        ),
+        tool::<NewEpic>(
+            "create_epic",
+            "Create a draft epic from the interview summary. Define goalMd and doneWhenMd before activating it.",
+            false,
+        ),
+        tool::<EpicEditInput>(
+            "update_epic",
+            "Edit the supplied interview fields without replacing omitted fields. Human edits remain visible in the change feed.",
+            false,
+        ),
+        tool::<PlanningStatusInput>(
+            "set_epic_status",
+            "Change an epic's lifecycle status as its brain. Done requires completed stories or an explicit overrideReason.",
+            false,
+        ),
+        tool::<EpicKeyInput>(
+            "become_brain",
+            "Become the planner and reviewer of an epic that has no brain. If another brain is appointed, forbidden names that agent.",
+            false,
+        ),
+        tool::<BrainInput>(
+            "set_brain",
+            "Appoint an existing agent by handle as the epic's brain. Only the current brain or a human may replace it.",
+            false,
+        ),
+        tool::<NewStory>(
+            "create_story",
+            "Create a draft story under epicKey using an intent card and acceptance criteria. Each criterion has id, criterion, mandatory and check.",
+            false,
+        ),
+        tool::<StoryEditInput>(
+            "update_story",
+            "Edit a story's intent card and acceptance array. A supplied acceptance array replaces the entire list.",
+            false,
+        ),
+        tool::<PlanningStatusInput>(
+            "set_story_status",
+            "Activate a story after defining its outcome and mandatory acceptance. Done requires completed tasks or an authorized overrideReason.",
+            false,
+        ),
+        tool::<BriefEditInput>(
+            "update_task_brief",
+            "Update supplied brief fields; changes and tests replace their whole arrays. Keep description in update_task for free-form notes.",
+            false,
+        ),
+        tool::<crate::server::Key>(
+            "check_ready",
+            "Read the exact missing readiness codes and messages for a task. This does not change the task.",
+            true,
+        ),
+        tool::<ReadyInput>(
+            "mark_ready",
+            "Move a complete brief to Ready. A human or this epic's brain may pass a non-empty overrideReason, recorded in the journal.",
+            false,
+        ),
+        tool::<SubmitReport>(
+            "submit_report",
+            "Submit the assignee's report and move In progress to Review. Tests record name, command, expected, actual and PASS, FAIL or NOT_RUN.",
+            false,
+        ),
+        tool::<ReviewTask>(
+            "review_task",
+            "As the epic's brain, compare the report to the brief tests and story acceptance. Accept completes the task; changes_requested returns it to Ready for the same worker.",
+            false,
+        ),
+        tool::<AskUser>(
+            "ask_user",
+            "Ask a scoped interview or implementation question with up to six options. Scope is {type:'project'|'epic'|'story'|'task', id:<ID or key>}; only humans answer.",
+            false,
+        ),
+        tool::<WaitInput>(
+            "wait_for_answer",
+            "Wait on the activity feed until any listed question is answered or the timeout expires. timeoutSeconds is at most 60 and the SQLite writer remains available.",
+            true,
+        ),
+        tool::<QuestionListInput>(
+            "list_questions",
+            "Read questions and human answers, optionally filtered by status and scope.",
+            true,
+        ),
+        tool::<IdInput>(
+            "withdraw_question",
+            "Withdraw an open question you asked. A human can withdraw any question.",
+            false,
+        ),
+        tool::<StatusTextInput>(
+            "set_status",
+            "Publish a short status line with an optional epic, story or task scope. Lines older than 30 minutes are marked stale.",
+            false,
+        ),
+        tool::<ChangesInput>(
+            "list_changes_since",
+            "Read ordered activity after cursor, optionally scoped to epicKey. Save the last seq to react to human edits, answers and reports.",
+            true,
+        ),
+        tool::<ChangesWaitInput>(
+            "wait_for_changes",
+            "Wait for up to 100 ordered matching activity events after cursor. Defaults: excludeSelf=true, includeProject=false, timeoutSeconds=30 (1–60). nextCursor advances past all inspected events, including non-matches. With epicKey, includeProject adds only project-wide human events. Holds no SQLite writer.",
+            true,
+        ),
+        tool::<AddReference>(
+            "add_reference",
+            "Add an existing readable file, a URL or a note without copying files or fetching links. Optionally place it in an epic frame and link it to an epic, story or task key.",
+            false,
+        ),
+        tool::<ReferenceListInput>(
+            "list_references",
+            "List active references, optionally filtered by epicKey, storyKey or taskKey. Archived items are hidden.",
+            true,
+        ),
+        tool::<ReferenceLinkInput>(
+            "link_reference",
+            "Link a reference item to a task, story or epic by targetKey. References and targets must belong to the same project.",
+            false,
+        ),
+        tool::<ReferenceEditInput>(
+            "update_reference",
+            "Edit a reference title, caption or tags; supplied tags replace the list. Links are stored without network previews.",
+            false,
+        ),
+    ]
+}
+
+pub(crate) fn epic_markdown(tree: &EpicTree) -> String {
+    let e = &tree.epic;
+    let mut md = format!(
+        "# {} · {}\n\nStatus: {}\nWorker model: {}\nParticipation: {}\nReviewer: {}\n\n",
+        e.key,
+        e.title,
+        e.status,
+        e.worker_model.as_deref().unwrap_or("Not chosen"),
+        e.participation,
+        e.reviewer
+    );
+    for (heading, text) in [
+        ("Goal and audience", &e.goal_md),
+        ("Done when", &e.done_when_md),
+        ("Not included", &e.not_included_md),
+        ("Decided", &e.decided_md),
+        ("Open questions", &e.open_questions_md),
+    ] {
+        md.push_str(&format!("## {heading}\n\n{text}\n\n"));
+    }
+    md.push_str("## Work tree\n\n");
+    for story in &tree.stories {
+        md.push_str(&format!(
+            "### {} · {} · {}\n\n",
+            story.story.key, story.story.title, story.story.status
+        ));
+        for task in &story.tasks {
+            md.push_str(&format!(
+                "- {} · {} · {} · brief {}{}{}\n",
+                task.task.key,
+                task.task.title,
+                task.task.status,
+                if task.readiness.ready {
+                    "complete"
+                } else {
+                    "incomplete"
+                },
+                if task.task.changes_requested {
+                    " · Changes requested"
+                } else {
+                    ""
+                },
+                if task.task.needs_info {
+                    " · Needs info"
+                } else {
+                    ""
+                }
+            ));
+        }
+    }
+    md.push_str("\n## Inbox\n\n");
+    for q in &tree.open_questions {
+        md.push_str(&format!("- {} · {}\n", q.id, q.title));
+    }
+    md.push_str("\n## Journal\n\n");
+    md.push_str("Recover with list_changes_since at turn start. Then wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits; handle events, save nextCursor even on timeout, and repeat. Omit actions to observe every change.\n\n");
+    for event in &tree.journal {
+        md.push_str(&format!("- {} · {}\n", event.created_at, event.sentence));
+    }
+    md
+}
+
+pub(crate) fn story_markdown(tree: &StoryTree) -> String {
+    let s = &tree.story;
+    let mut md = format!("# {} · {}\n\nStatus: {}\n\n", s.key, s.title, s.status);
+    for (heading, text) in [
+        ("Outcome", &s.outcome_md),
+        ("Whose material is the basis", &s.basis_md),
+        ("What already works", &s.preserve_md),
+        ("Scale of change", &s.scale_md),
+        ("How it could fail", &s.rejection_risks_md),
+        ("Open decisions", &s.open_decisions_md),
+    ] {
+        md.push_str(&format!("## {heading}\n\n{text}\n\n"));
+    }
+    md.push_str("## Acceptance\n\n");
+    for a in &s.acceptance {
+        md.push_str(&format!(
+            "- {} · {} · {}\n  Check: {}\n",
+            a.id,
+            if a.mandatory { "Mandatory" } else { "Optional" },
+            a.criterion,
+            a.check
+        ));
+    }
+    md.push_str("\n## Tasks\n\n");
+    for task in &tree.tasks {
+        md.push_str(&format!(
+            "- {} · {} · {}\n",
+            task.task.key, task.task.title, task.task.status
+        ));
+    }
+    md
+}
+
+pub(crate) fn task_markdown(t: &TaskDetail) -> String {
+    let mut md = format!(
+        "# {} · {}\n\nStory: {} · {}\nEpic: {} · {}\nStatus: {}\n\n",
+        t.task.key,
+        t.task.title,
+        t.story.key,
+        t.story.title,
+        t.epic.key,
+        t.epic.title,
+        t.task.status
+    );
+    for (name, text) in [
+        ("Goal", &t.brief.goal_md),
+        ("Context", &t.brief.context_md),
+        ("Where", &t.brief.where_md),
+    ] {
+        md.push_str(&format!("## {name}\n\n{text}\n\n"));
+    }
+    md.push_str("## Changes\n\n");
+    for change in &t.brief.changes {
+        md.push_str(&format!("### {}\n\nNow: {}\n\nCause: {}\n\nRequired: {}\n\nWhere: {}\n\nFollow: {}\n\nKeep: {}\n\n",change.title,change.now,change.cause,change.required,change.r#where,change.follow,change.keep));
+    }
+    md.push_str("## Tests\n\n");
+    for (i, test) in t.brief.tests.iter().enumerate() {
+        md.push_str(&format!(
+            "{}. Setup: {}\n   Expected: {}\n\n",
+            i + 1,
+            test.setup,
+            test.expected
+        ));
+    }
+    md.push_str(&format!("## Boundaries\n\n{}\n\n## Result\n\n{}\n\n## User quotes\n\n{}\n\n## Notes\n\n{}\n\n## Comments\n\n",t.brief.boundaries_md,t.brief.result_md,t.brief.user_quotes_md,t.task.description_md));
+    for c in &t.comments {
+        md.push_str(&format!("- {} · {}\n", c.created_at, c.body_md));
+    }
+    if !t.ancestor_questions.is_empty() {
+        md.push_str("\n## Open questions above this task\n\n");
+        for q in &t.ancestor_questions {
+            md.push_str(&format!("- {}: {}\n", q.scope_type, q.title));
+        }
+    }
+    md
+}
+pub(crate) fn prompt(name: &str) -> Option<String> {
+    Some(match name{
+    "plan_epic"=>"Follow requirements-interview.md and task-brief-and-acceptance.md from agent-playbook 1.1.0. Read get_project/get_board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Create a draft epic, become_brain if appointed, record the agreed participation/reviewer/workerModel, create stories with intent cards and mandatory acceptance, and tasks with complete briefs following brief-writing.md. Activate complete epics/stories, check_ready and mark_ready for actionable tasks, then set_status scoped to the epic. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
+    "work_on_next_task"=>"Follow brief-writing.md from agent-playbook 1.1.0. Call get_board, then list_tasks with status=[ready]. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call claim_task. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. Submit_report with summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
+    "review_task"=>"Follow task-brief-and-acceptance.md from agent-playbook 1.1.0. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Call review_task with accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and use wait_for_changes (timeoutSeconds=60) for human corrections; save nextCursor and repeat. Use list_changes_since for recovery at turn start.".into(),
+    _=>return None,
+})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_resource_playbook_headings_snapshot() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../apps/desktop/src/lib/demo-fixture.json"
+        ))
+        .unwrap();
+        let mut task: TaskDetail = serde_json::from_value(
+            fixture["details"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["key"] == "JB-9")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        assert!(!task.ancestor_questions.is_empty());
+        let ancestor = &task.ancestor_questions[0];
+        let contextual_markdown = task_markdown(&task);
+        assert!(contextual_markdown.contains("## Open questions above this task"));
+        assert!(contextual_markdown.contains(&ancestor.title));
+        task.task.key = "JB-9".into();
+        task.task.title = "Lantern cue".into();
+        task.task.status = "review".into();
+        task.task.description_md = "Keep notes here.".into();
+        task.story.key = "JB-S1".into();
+        task.story.title = "Safe bridge".into();
+        task.epic.key = "JB-E1".into();
+        task.epic.title = "Lantern levels".into();
+        task.comments.clear();
+        task.ancestor_questions.clear();
+        task.brief = TaskBrief {
+            goal_md: "Light the next safe tile.".into(),
+            context_md: "The bridge exists.".into(),
+            where_md: "game/lantern.gd".into(),
+            changes: vec![Change {
+                title: "Cue".into(),
+                now: "No cue".into(),
+                cause: "Tiles look alike".into(),
+                required: "Highlight one tile".into(),
+                r#where: "Bridge scene".into(),
+                follow: "Paper palette".into(),
+                keep: "Keyboard controls".into(),
+            }],
+            tests: vec![BriefTest {
+                setup: "Hold the lantern".into(),
+                expected: "One tile lights up".into(),
+            }],
+            boundaries_md: "No new engine.".into(),
+            result_md: "Report tests and changed files.".into(),
+            user_quotes_md: "".into(),
+        };
+        assert_eq!(
+            task_markdown(&task),
+            include_str!("../tests/fixtures/task-brief.md")
+        );
+    }
+}

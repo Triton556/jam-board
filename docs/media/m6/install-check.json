@@ -1,0 +1,87 @@
+{
+  "startedAt": "2026-10-20T02:35:23.109Z",
+  "perUser": true,
+  "executionPolicyChanged": false,
+  "steps": {
+    "install": {
+      "ok": false,
+      "attempted": true,
+      "silent": true,
+      "exitCode": 0,
+      "application": false,
+      "sidecar": false
+    },
+    "live": {
+      "status": "not_run",
+      "reason": "Per-user installation produced no binaries"
+    },
+    "close": {
+      "status": "not_run",
+      "reason": "Per-user installation produced no binaries"
+    },
+    "uninstall": {
+      "status": "not_run",
+      "reason": "Per-user installation produced no binaries"
+    },
+    "cleanup": {
+      "status": "not_run",
+      "reason": "Per-user installation produced no binaries"
+    }
+  },
+  "dataDirectoryExistedBefore": false,
+  "installer": {
+    "path": "target/release/bundle/nsis/Jam Board_0.1.0_x64-setup.exe",
+    "bytes": 7215091,
+    "sha256": "6e8c67c6fa21e79ec9a3d5f3b76ecc88574e9c1ad4a179a8f5d616c721b8a70f"
+  },
+  "ok": false,
+  "error": "Error: Installed application or bundled sidecar is missing",
+  "finishedAt": "2026-10-20T02:35:24.212Z",
+  "previousAttempt": {
+    "startedAt": "2026-10-19T15:48:50.425Z",
+    "finishedAt": "2026-10-19T15:48:50.810Z",
+    "steps": {
+      "install": {
+        "attempted": true,
+        "ok": false,
+        "silent": true,
+        "exitCode": 0,
+        "application": false,
+        "sidecar": false
+      },
+      "live": {
+        "status": "not_run",
+        "reason": "Per-user installation produced no binaries"
+      },
+      "close": {
+        "status": "not_run",
+        "reason": "Per-user installation produced no binaries"
+      },
+      "uninstall": {
+        "status": "not_run",
+        "reason": "Per-user installation produced no binaries"
+      },
+      "cleanup": {
+        "status": "not_run",
+        "reason": "Per-user installation produced no binaries"
+      }
+    },
+    "error": "Error: Installed application or bundled sidecar is missing"
+  },
+  "diagnostics": {
+    "workspaceExtraction": "The unchanged installer extracts successfully inside .dev-data; this is diagnostic, not per-user acceptance.",
+    "programsProbe": {
+      "api": "CreateDirectoryW",
+      "result": 0,
+      "getLastError": 5,
+      "meaning": "Access denied",
+      "target": "%LOCALAPPDATA%/Programs/JamBoard-M6Check"
+    },
+    "stockInstallTarget": "%LOCALAPPDATA%/Jam Board",
+    "stockInstallObservation": "Installer exited 0 but application and sidecar were absent; no specific Win32 error was obtained for this target.",
+    "policyChanged": false,
+    "elevated": false,
+    "securityCause": "unconfirmed",
+    "dataCleanup": "No default data directory was created by the automated scenario; nothing was removed there."
+  }
+}

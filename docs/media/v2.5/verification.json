@@ -1,0 +1,66 @@
+{
+  "checks": [
+    {
+      "command": "cargo fmt --all --check",
+      "code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --offline -- -D warnings",
+      "code": 0
+    },
+    {
+      "command": "cargo test --workspace --offline",
+      "code": 0,
+      "attempts": [
+        {
+          "code": 101,
+          "log": "2-initial-deadline-failure.log",
+          "reason": "Existing five-second deadline test missed its wall-clock assertion window."
+        },
+        {
+          "code": 0,
+          "log": "2.log",
+          "isolated": true
+        }
+      ]
+    },
+    {
+      "command": "npm run check",
+      "code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "code": 0
+    },
+    {
+      "command": "npm test",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=functional",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf-canvas",
+      "code": 0
+    }
+  ],
+  "rust": 67,
+  "vitest": 116,
+  "functional": 50,
+  "table": 6,
+  "canvas": 2,
+  "allCommandsPassed": true,
+  "acceptance": {
+    "dogfood": "PASS",
+    "polish": "PASS",
+    "regression": "PASS",
+    "publication": "PASS",
+    "releaseBuild": "PASS"
+  },
+  "note": "Initial blocked evidence is retained in local history and private logs; current dogfood closes at seq114 after UI answer113."
+}

@@ -1,0 +1,13 @@
+{
+  "tool": "actionlint npm 2.0.6 (WASM)",
+  "results": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "issues": []
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "issues": []
+    }
+  ]
+}

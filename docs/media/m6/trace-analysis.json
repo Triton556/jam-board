@@ -1,0 +1,125 @@
+{
+  "scope": "Separate traced runs, supporting diagnostics only; untraced acceptance metrics are in table-performance.json",
+  "traces": [
+    {
+      "name": "block10-A.json",
+      "groups": {
+        "FunctionCall": {
+          "count": 2543,
+          "sumMs": 233.23099999999928,
+          "maxMs": 3.816
+        },
+        "UpdateLayoutTree": {
+          "count": 210,
+          "sumMs": 132.45100000000005,
+          "maxMs": 2.692
+        },
+        "Layout": {
+          "count": 71,
+          "sumMs": 101.61499999999998,
+          "maxMs": 3.005
+        },
+        "Paint": {
+          "count": 442,
+          "sumMs": 312.1149999999998,
+          "maxMs": 1.833
+        },
+        "Layerize": {
+          "count": 286,
+          "sumMs": 142.09199999999984,
+          "maxMs": 1.694
+        }
+      }
+    },
+    {
+      "name": "after-A.json",
+      "groups": {
+        "FunctionCall": {
+          "count": 2980,
+          "sumMs": 238.77799999999854,
+          "maxMs": 4.147
+        },
+        "UpdateLayoutTree": {
+          "count": 320,
+          "sumMs": 134.1569999999999,
+          "maxMs": 1.96
+        },
+        "Layout": {
+          "count": 142,
+          "sumMs": 109.56099999999994,
+          "maxMs": 2.046
+        },
+        "Paint": {
+          "count": 232,
+          "sumMs": 259.5319999999999,
+          "maxMs": 2.055
+        },
+        "Layerize": {
+          "count": 289,
+          "sumMs": 95.04199999999992,
+          "maxMs": 1.897
+        }
+      }
+    },
+    {
+      "name": "after-B.json",
+      "groups": {
+        "FunctionCall": {
+          "count": 3922,
+          "sumMs": 512.7439999999954,
+          "maxMs": 3.382
+        },
+        "UpdateLayoutTree": {
+          "count": 573,
+          "sumMs": 250.71600000000012,
+          "maxMs": 1.814
+        },
+        "Layout": {
+          "count": 277,
+          "sumMs": 216.66699999999986,
+          "maxMs": 2.425
+        },
+        "Paint": {
+          "count": 423,
+          "sumMs": 505.3489999999996,
+          "maxMs": 2.368
+        },
+        "Layerize": {
+          "count": 301,
+          "sumMs": 171.008,
+          "maxMs": 2.088
+        }
+      }
+    },
+    {
+      "name": "after-C.json",
+      "groups": {
+        "FunctionCall": {
+          "count": 2018,
+          "sumMs": 189.8869999999998,
+          "maxMs": 3.087
+        },
+        "UpdateLayoutTree": {
+          "count": 192,
+          "sumMs": 90.12699999999994,
+          "maxMs": 1.414
+        },
+        "Layout": {
+          "count": 105,
+          "sumMs": 80.014,
+          "maxMs": 1.916
+        },
+        "Paint": {
+          "count": 179,
+          "sumMs": 186.33199999999994,
+          "maxMs": 2.289
+        },
+        "Layerize": {
+          "count": 301,
+          "sumMs": 68.75500000000001,
+          "maxMs": 1.711
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+{
+  "scope": "Separate 4-second trace passes: 1s warmup plus 3s scroll, production mock; timings are supporting diagnostics, not the untraced acceptance metrics.",
+  "forcedLayoutDefinition": "Layout contained in a same-thread FunctionCall / FireAnimationFrame / TimerFire / EventDispatch span",
+  "traces": [
+    {
+      "phase": "before",
+      "scenario": "A",
+      "groups": {
+        "FunctionCall": {
+          "count": 4152,
+          "sumMs": 495.3079999999955,
+          "maxMs": 4.872
+        },
+        "UpdateLayoutTree": {
+          "count": 642,
+          "sumMs": 665.0309999999997,
+          "maxMs": 8.427
+        },
+        "Layout": {
+          "count": 316,
+          "sumMs": 203.19099999999983,
+          "maxMs": 1.934
+        },
+        "Paint": {
+          "count": 2545,
+          "sumMs": 401.33999999999895,
+          "maxMs": 1.953
+        },
+        "PrePaint": {
+          "count": 1093,
+          "sumMs": 206.0619999999986,
+          "maxMs": 1.75
+        },
+        "Layerize": {
+          "count": 196,
+          "sumMs": 212.382,
+          "maxMs": 1.98
+        },
+        "HitTest": {
+          "count": 591,
+          "sumMs": 31.19099999999997,
+          "maxMs": 0.188
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 0,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 0,
+        "testDriver": 0,
+        "browserFrameWithoutFunctionCall": 0
+      },
+      "largestStyleRecalculationElements": 288,
+      "largestLayoutObjectCount": 1575,
+      "file": "trace-before-A.json.gz"
+    },
+    {
+      "phase": "before",
+      "scenario": "B",
+      "groups": {
+        "FunctionCall": {
+          "count": 5884,
+          "sumMs": 817.2149999999999,
+          "maxMs": 10.596
+        },
+        "UpdateLayoutTree": {
+          "count": 1068,
+          "sumMs": 1325.0290000000036,
+          "maxMs": 13.538
+        },
+        "Layout": {
+          "count": 534,
+          "sumMs": 370.0969999999998,
+          "maxMs": 2.52
+        },
+        "Paint": {
+          "count": 4687,
+          "sumMs": 754.2439999999957,
+          "maxMs": 2.57
+        },
+        "PrePaint": {
+          "count": 1067,
+          "sumMs": 343.7839999999986,
+          "maxMs": 1.757
+        },
+        "Layerize": {
+          "count": 267,
+          "sumMs": 295.41100000000006,
+          "maxMs": 1.84
+        },
+        "HitTest": {
+          "count": 275,
+          "sumMs": 16.113,
+          "maxMs": 0.128
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 0,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 0,
+        "testDriver": 0,
+        "browserFrameWithoutFunctionCall": 0
+      },
+      "largestStyleRecalculationElements": 359,
+      "largestLayoutObjectCount": 1575,
+      "file": "trace-before-B.json.gz"
+    },
+    {
+      "phase": "before",
+      "scenario": "C",
+      "groups": {
+        "FunctionCall": {
+          "count": 6117,
+          "sumMs": 724.4370000000062,
+          "maxMs": 6.674
+        },
+        "UpdateLayoutTree": {
+          "count": 1069,
+          "sumMs": 627.4009999999994,
+          "maxMs": 3.802
+        },
+        "Layout": {
+          "count": 532,
+          "sumMs": 252.26599999999985,
+          "maxMs": 1.224
+        },
+        "Paint": {
+          "count": 4117,
+          "sumMs": 572.9319999999959,
+          "maxMs": 1.342
+        },
+        "PrePaint": {
+          "count": 1099,
+          "sumMs": 327.98199999999883,
+          "maxMs": 1.527
+        },
+        "Layerize": {
+          "count": 301,
+          "sumMs": 320.891,
+          "maxMs": 2.178
+        },
+        "HitTest": {
+          "count": 275,
+          "sumMs": 20.875999999999998,
+          "maxMs": 0.279
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 32,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 32,
+        "testDriver": 0,
+        "browserFrameWithoutFunctionCall": 0
+      },
+      "largestStyleRecalculationElements": 109,
+      "largestLayoutObjectCount": 1582,
+      "file": "trace-before-C.json.gz"
+    },
+    {
+      "phase": "after",
+      "scenario": "A",
+      "groups": {
+        "FunctionCall": {
+          "count": 2752,
+          "sumMs": 275.0129999999983,
+          "maxMs": 3.631
+        },
+        "UpdateLayoutTree": {
+          "count": 275,
+          "sumMs": 174.98,
+          "maxMs": 2.011
+        },
+        "Layout": {
+          "count": 127,
+          "sumMs": 117.14400000000002,
+          "maxMs": 2.43
+        },
+        "Paint": {
+          "count": 482,
+          "sumMs": 388.95700000000056,
+          "maxMs": 2.152
+        },
+        "PrePaint": {
+          "count": 1025,
+          "sumMs": 74.18600000000012,
+          "maxMs": 0.861
+        },
+        "Layerize": {
+          "count": 284,
+          "sumMs": 153.11800000000014,
+          "maxMs": 1.711
+        },
+        "HitTest": {
+          "count": 746,
+          "sumMs": 90.36100000000013,
+          "maxMs": 0.421
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 0,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 0,
+        "testDriver": 0,
+        "browserFrameWithoutFunctionCall": 0
+      },
+      "largestStyleRecalculationElements": 270,
+      "largestLayoutObjectCount": 1613,
+      "file": "trace-after-A.json.gz"
+    },
+    {
+      "phase": "after",
+      "scenario": "B",
+      "groups": {
+        "FunctionCall": {
+          "count": 4188,
+          "sumMs": 1031.8969999999981,
+          "maxMs": 3.616
+        },
+        "UpdateLayoutTree": {
+          "count": 568,
+          "sumMs": 350.81600000000054,
+          "maxMs": 2.023
+        },
+        "Layout": {
+          "count": 273,
+          "sumMs": 236.5289999999999,
+          "maxMs": 1.669
+        },
+        "Paint": {
+          "count": 917,
+          "sumMs": 799.9380000000001,
+          "maxMs": 1.961
+        },
+        "PrePaint": {
+          "count": 602,
+          "sumMs": 130.65400000000017,
+          "maxMs": 0.823
+        },
+        "Layerize": {
+          "count": 302,
+          "sumMs": 301.45200000000017,
+          "maxMs": 1.68
+        },
+        "HitTest": {
+          "count": 308,
+          "sumMs": 43.35599999999998,
+          "maxMs": 0.338
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 269,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 0,
+        "testDriver": 269,
+        "browserFrameWithoutFunctionCall": 0
+      },
+      "largestStyleRecalculationElements": 156,
+      "largestLayoutObjectCount": 1613,
+      "file": "trace-after-B.json.gz"
+    },
+    {
+      "phase": "after",
+      "scenario": "C",
+      "groups": {
+        "FunctionCall": {
+          "count": 2365,
+          "sumMs": 225.29199999999875,
+          "maxMs": 2.732
+        },
+        "UpdateLayoutTree": {
+          "count": 219,
+          "sumMs": 131.306,
+          "maxMs": 1.802
+        },
+        "Layout": {
+          "count": 101,
+          "sumMs": 85.98600000000002,
+          "maxMs": 1.796
+        },
+        "Paint": {
+          "count": 632,
+          "sumMs": 336.84400000000005,
+          "maxMs": 1.984
+        },
+        "PrePaint": {
+          "count": 425,
+          "sumMs": 60.08399999999996,
+          "maxMs": 0.718
+        },
+        "Layerize": {
+          "count": 303,
+          "sumMs": 170.61900000000009,
+          "maxMs": 1.789
+        },
+        "HitTest": {
+          "count": 130,
+          "sumMs": 22.709999999999997,
+          "maxMs": 0.329
+        }
+      },
+      "forcedLayoutInJavaScriptCount": 2,
+      "synchronousLayoutAttribution": {
+        "applicationCallback": 1,
+        "testDriver": 0,
+        "browserFrameWithoutFunctionCall": 1
+      },
+      "largestStyleRecalculationElements": 156,
+      "largestLayoutObjectCount": 1613,
+      "file": "trace-after-C.json.gz"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "source": "Real native WebView2 CDP screencasts: original run and approved continuation of the same two real Codex threads. Simulated UI human; not Danil acceptance.",
+  "cursorOverlay": false,
+  "selectedSourceSeconds": 86,
+  "playbackSpeed": 2,
+  "finalHoldSeconds": 3,
+  "videoSeconds": 45.882,
+  "videoBytes": 2126779,
+  "width": 960,
+  "playback": {
+    "seconds": 45.882,
+    "width": 960,
+    "height": 651,
+    "decodedFrames": 9
+  },
+  "gifSeconds": 23,
+  "gifBytes": 1235481,
+  "gifHoldSeconds": 4,
+  "videoCuts": [
+    [
+      "original",
+      1792490555,
+      14,
+      "Brain interviews; a simulated human answers in the real Inbox."
+    ],
+    [
+      "original",
+      1792490695,
+      18,
+      "One epic, two stories and complete task briefs arrive from Brain."
+    ],
+    [
+      "original",
+      1792490972,
+      10,
+      "A real resize defect is returned through the task panel."
+    ],
+    [
+      "resume",
+      1792501744,
+      10,
+      "Authorized Chromium checks pass; the operator approves the sketch."
+    ],
+    [
+      "resume",
+      1792502214,
+      8,
+      "The same Worker verifies input, walls, resize and restart."
+    ],
+    [
+      "resume",
+      1792502974,
+      10,
+      "Final real Chromium report: 13 checks PASS; limits stay explicit."
+    ],
+    [
+      "resume",
+      1792503182,
+      8,
+      "The final closing answer is entered in the real Inbox."
+    ],
+    [
+      "resume",
+      1792503228,
+      8,
+      "Done: three accepted tasks, two stories and the epic."
+    ],
+    [
+      "resume",
+      1792503231.7,
+      6,
+      "The journal preserves the cycle. Simulated operator, not user acceptance.",
+      true
+    ]
+  ],
+  "gifCuts": [
+    [
+      "original",
+      1792490558,
+      6,
+      "Brain asks; the test operator answers in Inbox."
+    ],
+    [
+      "original",
+      1792490696,
+      9,
+      "Stories and complete task briefs appear from the plan."
+    ],
+    [
+      "resume",
+      1792503184,
+      4,
+      "The operator answers the final closing question."
+    ],
+    [
+      "resume",
+      1792503231.7,
+      4,
+      "All three tasks, both stories and the epic are Done.",
+      true
+    ]
+  ],
+  "completion": "Epic JB-E1 Done at seq114 after the real Inbox closing answer at seq113; old FAIL/NOT_RUN history retained.",
+  "gifReplacementReason": "Adds the actual final human answer and Done journal to the real interview and plan arrival; the previous GIF ended before acceptance."
+}

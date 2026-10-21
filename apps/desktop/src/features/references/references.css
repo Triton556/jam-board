@@ -1,0 +1,571 @@
+.references-page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  isolation: isolate;
+  background: var(--paper);
+  overflow: hidden;
+}
+.references-page .react-flow {
+  height: 100%;
+  min-height: 500px;
+}
+.references-page .react-flow__viewport {
+  will-change: transform;
+}
+.references-page .react-flow__node-reference {
+  will-change: transform;
+}
+.references-page .react-flow__edges,
+.references-page .react-flow__node-frame,
+.references-page .react-flow__edgelabel-renderer {
+  will-change: transform;
+}
+.reference-toolbar,
+.reference-filters {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px;
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+.reference-toolbar {
+  top: 16px;
+  left: 16px;
+}
+.reference-toolbar .button {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+.reference-toolbar .mono {
+  font-size: 11px;
+  min-width: 36px;
+  text-align: center;
+}
+.reference-filters {
+  right: 16px;
+  top: 70px;
+  gap: 6px;
+  max-width: 70%;
+  flex-wrap: wrap;
+}
+.reference-filters button {
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--paper);
+}
+.reference-filters button[aria-pressed="true"] {
+  background: color-mix(
+    in srgb,
+    var(--chip-color, var(--ink)) 15%,
+    var(--card)
+  );
+  border-color: var(--chip-color, var(--ink));
+}
+.reference-add {
+  position: relative;
+}
+.reference-add-menu {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  min-width: 135px;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line-soft);
+  background: var(--card);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lift);
+}
+.reference-card {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 2px var(--reference-highlight),
+    0 0 24px color-mix(in srgb, var(--reference-highlight) 40%, transparent);
+  transition:
+    box-shadow 0.6s,
+    opacity 0.2s;
+  overflow: visible;
+  color: var(--ink);
+}
+.reference-card.selected {
+  border-color: var(--ink);
+}
+.reference-overview-scene {
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  will-change: transform;
+}
+.reference-overview-hit {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.references-page .react-flow__node-reference:has(.reference-overview-hit) {
+  will-change: auto;
+}
+
+.reference-card.kind-note {
+  background: color-mix(in srgb, var(--reference-color) 35%, var(--card));
+}
+.reference-card-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 12px 12px 0 0;
+  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+  font-size: 12px;
+}
+.reference-card-header strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-menu {
+  position: relative;
+}
+.reference-menu summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+}
+.reference-menu[open] > .reference-action-list {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  z-index: 20;
+  display: grid;
+  min-width: 155px;
+  padding: 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-lift);
+}
+.reference-menu button {
+  text-align: left;
+  padding: 6px 9px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.reference-menu button:hover {
+  background: var(--paper-2);
+}
+.reference-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 6px;
+}
+.reference-content img,
+.reference-content video {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  min-height: 0;
+}
+.reference-image {
+  flex: 1;
+  min-height: 35px;
+  border: 0;
+  background: var(--paper-2);
+  border-radius: 5px;
+  padding: 0;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.reference-caption {
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.reference-card.kind-link {
+  height: auto;
+  min-height: inherit;
+}
+.kind-link .reference-content {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+.kind-link .reference-caption {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.reference-caption p {
+  margin: 3px 0;
+}
+.kind-note .reference-caption {
+  font-family: Caveat, cursive;
+  font-size: 18px;
+  line-height: 1.25;
+}
+.kind-note .reference-caption h1,
+.kind-note .reference-caption h2 {
+  font-family: "Fraunces Variable", serif;
+  font-size: 23px;
+}
+.reference-chips,
+.reference-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 8px 7px;
+}
+.reference-chips:empty,
+.reference-tags:empty {
+  display: none;
+}
+.reference-chips button {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 10px;
+  padding: 3px 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--paper);
+  border-radius: 6px;
+}
+.reference-chips small {
+  font-family: "Manrope Variable", sans-serif;
+  color: var(--ink-2);
+  font-size: 9px;
+}
+.reference-tags {
+  color: var(--ink-2);
+  font-size: 10px;
+}
+.reference-link {
+  display: grid;
+  gap: 9px;
+}
+.reference-link-title {
+  font-family: "Fraunces Variable", serif;
+  font-size: 21px;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  word-break: break-word;
+}
+.reference-link small {
+  overflow-wrap: anywhere;
+}
+.reference-file {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+}
+.reference-file > svg {
+  grid-row: 1 / 3;
+}
+.reference-file > span,
+.reference-file > small {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-file > .button {
+  grid-column: 1 / -1;
+  height: 28px;
+  min-height: 28px;
+  font-size: 12px;
+}
+.kind-file .reference-caption,
+.kind-font .reference-caption {
+  -webkit-line-clamp: 1;
+}
+.reference-audio {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 5px;
+}
+.reference-audio audio {
+  display: none;
+}
+.reference-audio svg {
+  width: 100%;
+  max-height: 54px;
+  fill: var(--ink-2);
+}
+.reference-audio input {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 18px;
+  accent-color: var(--ink);
+}
+.reference-audio span {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: var(--ink-2);
+}
+.reference-audio button {
+  border: 0;
+  background: var(--paper-2);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.reference-frame {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  pointer-events: none;
+}
+.reference-frame-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--reference-color);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.reference-frame-tab {
+  position: absolute;
+  left: 0;
+  top: -17px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  background: var(--paper);
+  border: 1.5px solid var(--reference-color);
+  border-radius: 7px;
+  padding: 5px 10px;
+  pointer-events: auto;
+  font-family: "Fraunces Variable", serif;
+  font-size: 16px;
+  cursor: grab;
+  white-space: nowrap;
+}
+.reference-frame-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reference-frame-tab button {
+  padding: 0 3px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+}
+.reference-frame-overview .reference-frame-outline {
+  visibility: hidden;
+}
+.reference-frame-overview .reference-frame-tab {
+  opacity: 0;
+}
+.reference-frame.collapsed .reference-frame-tab {
+  top: 0;
+}
+.reference-frame .react-flow__resize-control {
+  pointer-events: auto;
+}
+.references-page .react-flow__node-frame {
+  background: none;
+  border: 0;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+.references-page .react-flow__node-frame.selected {
+  outline: none;
+}
+.references-page .react-flow__node-reference:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.references-page .react-flow__node-frame:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+.references-page .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--card);
+  background: var(--ink);
+  opacity: 0;
+}
+.references-page .react-flow__node:hover .react-flow__handle,
+.references-page .react-flow__node.selected .react-flow__handle,
+.references-page .react-flow__node:has(.connecting) .react-flow__handle,
+.references-page .react-flow__node:focus-within .react-flow__handle {
+  opacity: 1;
+}
+.references-page .react-flow__resize-control {
+  border-color: var(--ink);
+  background: var(--card);
+}
+.reference-edge {
+  pointer-events: none;
+}
+.reference-edge-label {
+  position: absolute;
+  pointer-events: all;
+  border: 0;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-2);
+  padding: 2px 5px;
+  font-family: Caveat, cursive;
+  font-size: 16px;
+  max-width: 240px;
+}
+.references-page .react-flow__edgelabel-renderer {
+  z-index: 2000;
+}
+.reference-note-text {
+  display: block;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  cursor: text;
+}
+.reference-edge-label:hover {
+  color: var(--ink);
+}
+.reference-empty {
+  position: absolute;
+  inset: 120px 25% 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.reference-empty .empty-state {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--paper) 85%, transparent);
+  border-radius: 20px;
+  padding: 25px;
+}
+.reference-notice,
+.reference-connect-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  z-index: 8;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.reference-connect-hint {
+  bottom: 80px;
+}
+.reference-lightbox {
+  max-width: 90vw !important;
+  width: 900px !important;
+}
+.reference-lightbox img {
+  max-height: 75vh;
+  max-width: 100%;
+  object-fit: contain;
+  margin: auto;
+}
+.reference-picker-grid {
+  display: grid;
+  gap: 9px;
+  max-height: 350px;
+  overflow: auto;
+}
+.reference-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.reference-picker-row img,
+.linked-reference-thumb {
+  width: 48px;
+  height: 42px;
+  object-fit: contain;
+  background: var(--paper-2);
+  border-radius: 6px;
+}
+.linked-references {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.linked-reference {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 7px;
+  background: var(--paper);
+  max-width: 100%;
+}
+.references-page .react-flow__minimap {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.references-page .react-flow__attribution {
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 9px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reference-card {
+    transition: none;
+  }
+}
+@media (max-width: 1200px) {
+  .reference-toolbar {
+    gap: 0;
+    padding: 5px;
+  }
+  .reference-toolbar .button {
+    padding: 0 6px;
+  }
+  .reference-filters {
+    top: 68px;
+  }
+}

@@ -1,0 +1,178 @@
+<img src="apps/desktop/src-tauri/icons/icon.png" width="96" alt="Jam Board paper sticker icon">
+
+# Jam Board
+
+*Plan your game jam with your AI teammates.*
+
+A cozy local project board for humans and AI teammates. Plan a game jam, a longer game project or a web app with a brain agent, give workers clear briefs, and follow questions, reports and reviews in the app.
+
+[![CI](https://github.com/Triton556/jam-board/actions/workflows/ci.yml/badge.svg)](https://github.com/Triton556/jam-board/actions/workflows/ci.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-3FA37A)](LICENSE)
+![Windows](https://img.shields.io/badge/platform-Windows-5B8DEF)
+![Tauri 2 + Rust](https://img.shields.io/badge/built_with-Tauri_2_%2B_Rust-9B7BE0)
+
+![Real Snowball planning: answer an agent in Inbox and watch the plan appear](docs/media/demo.gif)
+
+The clip comes from a completed two-agent Snowball run: interview, plan, real Chromium evidence, correction and Brain reviews, then epic Done after an Inbox answer. The human operator is simulated; this is a development check, not Danil's personal acceptance.
+
+## Features
+
+- 📝 Epics → stories → tasks, complete briefs and a live five-column board.
+- 🤖 MCP over stdio and authenticated loopback HTTP: 39 tools, hierarchy resources, planning/work/review prompts.
+- ✨ Agent changes arrive in under a second, with a colored highlight and a toast.
+- 🔎 A virtual table for 2,000+ tasks, with sortable columns and shareable URL filters.
+- 🤝 Conflict-safe editing that preserves your draft when an agent changes the same task.
+- 🎨 A References canvas, local media, team presence and an epic journal.
+- 💾 Local SQLite storage. No cloud, accounts or telemetry. JSON export/import and non-destructive archives.
+- 🌙 Light and dark paper themes, self-hosted fonts and optional paper-rustle sounds.
+
+## Screenshots
+
+| Board | Plan |
+|---|---|
+| ![A live board with epic colors](docs/media/readme-board-light.jpg) | ![Stories and their actionable tasks](docs/media/readme-plan.jpg) |
+| Inbox | References |
+| ![An agent question with a recommended option](docs/media/readme-inbox.jpg) | ![Local references linked to project work](docs/media/readme-canvas.jpg) |
+
+Plan shows the Snowball run. Board, Inbox and References show the bundled demo in the real desktop window. [Dark paper theme](docs/media/readme-board-dark.jpg).
+
+## Plan with a brain agent
+
+1. Appoint a brain in your agent chat and choose the worker model.
+2. Answer its interview in Inbox. Confirm the goal, done-when and boundaries.
+3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
+4. Workers claim tasks and submit reports with real test evidence. A human or the brain accepts them or requests another round.
+5. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
+
+![The Snowball epic and story plan in the real desktop window](docs/media/readme-plan.jpg)
+
+## Answer questions in Inbox
+
+Agents ask through MCP; you answer in the app. Choose a recommended option, write your own answer, or combine both. A task's **Needs info** flag covers its own questions. Story and epic questions stay at their level, while workers still receive ancestor context.
+
+## References canvas
+
+Drop local images, audio, video or other files onto the canvas, add captions, notes and links, and attach them to epics, stories or tasks. Frames organize an epic's material. Agents can add references live. Files stay where they are; clipboard images alone are saved into the data folder. Links make no network request until you explicitly choose **Fetch preview**.
+
+## Project templates
+
+Choose **Game jam** for a 48-hour countdown, **Gamedev** for a longer game project, **Web app** for product work, or **Custom** to start blank. Gamedev and Web app offer an optional milestone. Switching templates keeps existing tags and work.
+
+## Give your agents the skill
+
+Open **Settings → Agents**: connect MCP first, then choose a local clone of [agent-playbook](https://github.com/Triton556/agent-playbook), a target project folder and Codex or Claude Code. **Jam Board skill** installs the `jam-board` profile with its procedures; **Whole agent-playbook** installs the full profile.
+
+The app shows the exact commands, runs a plan, asks before writing, then installs and verifies. Python 3.12+ is required. The harness records a receipt in the selected playbook folder's `.harness-state/`. Nothing is downloaded by the app and global agent configuration is left alone. Start a new session in that project and ask: *“Use the jam-board MCP server: plan an epic with me.”*
+
+## Install
+
+Download the Windows x64 `-setup.exe` from [Releases](https://github.com/Triton556/jam-board/releases). Installation is per-user and does not require administrator rights. Windows 11 with WebView2 is the tested platform.
+
+The 0.2.0 x64 installer is **8.25 MiB (8,646,297 bytes)**, including the MCP sidecar. Its SHA-256 accompanies the release artifact.
+
+The installer is **unsigned**. Windows SmartScreen may warn that the publisher is unknown. Only run an installer you trust; compare its SHA-256 with the release's `SHA256SUMS.txt`.
+
+Your database, MCP token and logs live in `%APPDATA%\dev.triton556.jamboard\`. Settings → Data opens the folder. Asset files remain at their original locations. The uninstaller is configured to preserve this data folder. The 0.2.0 installer was not installed over an existing user's build during release preparation. To remove data permanently, close the application and stdio agents, back up anything you need, then remove that folder yourself.
+
+## Connect your agent
+
+Open Settings → Agents for snippets containing your actual executable path and port. Keep tokens out of source control. These examples do not modify real agent configurations.
+
+**Codex · stdio** — add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.jam-board]
+command = 'C:\Path\To\jam-board-mcp.exe'
+env = { JAM_AGENT_NAME = "Codex" }
+```
+
+**Codex · HTTP** — keep Jam Board open and set `JAM_BOARD_TOKEN` in the environment inherited by Codex, using Copy in Settings:
+
+```toml
+[mcp_servers.jam-board-http]
+url = "http://127.0.0.1:47321/mcp"
+bearer_token_env_var = "JAM_BOARD_TOKEN"
+http_headers = { "X-Jam-Agent" = "Codex" }
+```
+
+**Claude Code · stdio** — run in PowerShell:
+
+```powershell
+claude mcp add jam-board --env JAM_AGENT_NAME=Claude -- 'C:\Path\To\jam-board-mcp.exe'
+```
+
+**Claude Code · HTTP**:
+
+```powershell
+claude mcp add --transport http jam-board http://127.0.0.1:47321/mcp --header 'Authorization: Bearer <token>' --header 'X-Jam-Agent: Claude'
+```
+
+Try: *“Use the jam-board MCP server: call get_board, then take the highest-priority unassigned Ready task, read its brief, claim it, and submit a report when finished.”*
+
+The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. See the [full MCP contract](docs/mcp.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+  Window[Window · React] <--> Bridge[tauri-specta]
+  Bridge <--> Core[jam-core]
+  Core <--> DB[(SQLite · WAL)]
+  Agents[AI agents] <-->|stdio| CLI[jam-board-mcp]
+  CLI <--> Core
+  Agents <-->|Bearer · loopback| HTTP[HTTP MCP inside app]
+  HTTP <--> Core
+  DB --> Feed[activity.seq + PRAGMA data_version]
+  Feed -->|board-changed| Window
+```
+
+All business rules live in `jam-core`. Tauri commands and MCP tools call the same services, so numbering, claims, ordering and archives behave consistently for people and agents.
+
+SQLite WAL coordinates the separate processes. Each mutation writes one activity event in the same short transaction. The desktop polls `PRAGMA data_version` every 250 ms and forwards new `activity.seq` entries as `board-changed` events.
+
+The frontend refreshes affected query caches, animates agent changes and preserves unsaved human input during conflicts. HTTP stays on loopback with Bearer and Origin checks. See [architecture](docs/architecture.md) and the [recorded decisions](docs/decisions.md).
+
+## Development
+
+Requirements: Rust stable (edition 2024), Node.js 22, and on Windows MSVC Build Tools 2022 plus WebView2. Linux build dependencies are in the CI workflow; Linux runtime and macOS have not been validated for this MVP. Use the committed lockfiles.
+
+```powershell
+cd apps/desktop
+npm ci
+$env:JAM_BOARD_DATA_DIR = (Resolve-Path ../..).Path + '/.dev-data'
+npm run tauri dev
+```
+
+From the repository root:
+
+```powershell
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+From `apps/desktop`:
+
+```powershell
+npm run check
+npm run typecheck
+npm test
+npx playwright test --project=functional
+npx playwright test --project=perf
+npx playwright test --project=perf-canvas
+npm run tauri build
+```
+
+Playwright starts mock-backed Vite servers. Local tests use installed Chrome; CI uses Playwright Chromium. The `perf` project measures production wheel/flick/PageDown scenarios and is manual-only in CI. Set `VITE_MOCK_BRIDGE=1` before `npm run dev` to develop the UI without Tauri. The mock shares generated types and a fixture exported by `cargo run -p jam-core --example export-demo-fixture`.
+
+Release builds prepare the sidecar automatically. The NSIS installer is written beneath `target/release/bundle/nsis/`. `node scripts/m6-install-check.mjs` runs the explicit per-user installation check, refuses pre-existing default data, and removes only the fresh data it created after verifying uninstall retention. Development data and raw traces belong in `.dev-data`.
+
+## Tech stack
+
+Tauri 2 · Rust · SQLite · rmcp · React 19 · TypeScript 7 · Vite 8 · TanStack Query/Router/Virtual · Zustand · dnd-kit · React Flow · Motion · Tailwind CSS 4.
+
+## Credits & license
+
+MIT © 2026 Danil Volodin. Built by Danil Volodin with AI coding agents (Codex, Claude Code).
+
+See [CREDITS.md](CREDITS.md) and [third-party licenses](docs/third-party-licenses.md).

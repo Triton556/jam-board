@@ -1,0 +1,65 @@
+{
+  "baseline": {
+    "biome": "PASS",
+    "typecheck": "PASS",
+    "vitest": "58/58",
+    "functional": "31/31",
+    "perf": "3/3"
+  },
+  "final": {
+    "commands": [
+      {
+        "command": "npm run check",
+        "code": 0
+      },
+      {
+        "command": "npm run typecheck",
+        "code": 0
+      },
+      {
+        "command": "npm test",
+        "code": 0
+      },
+      {
+        "command": "npx playwright test --project=functional",
+        "code": 0
+      },
+      {
+        "command": "npx playwright test --project=perf",
+        "code": 0
+      }
+    ],
+    "vitest": "61/61",
+    "functional": "35/35",
+    "perf": "3/3"
+  },
+  "rustAndDataDiff": "No changes relative to 8f54228",
+  "native": {
+    "native": true,
+    "mock": false,
+    "viewport": {
+      "width": 1360,
+      "height": 860
+    },
+    "dataDirectory": ".dev-data\\capture-011-1792473423161",
+    "screenshots": [
+      "board-light.jpg",
+      "table-light.jpg",
+      "table-archived-light.jpg",
+      "settings-board-light.jpg",
+      "settings-appearance-light.jpg",
+      "settings-about-light.jpg",
+      "activity-light.jpg",
+      "task-controls-light.jpg",
+      "board-dark.jpg",
+      "table-dark.jpg",
+      "table-archived-dark.jpg",
+      "settings-board-dark.jpg",
+      "settings-appearance-dark.jpg",
+      "settings-about-dark.jpg",
+      "activity-dark.jpg",
+      "task-controls-dark.jpg"
+    ],
+    "pageErrors": []
+  }
+}

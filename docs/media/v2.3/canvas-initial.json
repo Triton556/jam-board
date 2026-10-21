@@ -1,0 +1,18 @@
+{
+  "scenario": "pan-zoom",
+  "displayIntervalMs": 13.300000000000182,
+  "meanMs": 133.90869565217395,
+  "p95Ms": 160,
+  "longFrames": 23,
+  "longFrameShare": 1,
+  "frames": 23,
+  "longTasks": 16,
+  "longTaskTotalMs": 1180,
+  "maxNodes": 473,
+  "count": 500,
+  "framesCount": 40,
+  "edges": 300,
+  "production": true,
+  "warmupMs": 1000,
+  "measurementMs": 3000
+}

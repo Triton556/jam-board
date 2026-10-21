@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "rust": 37,
+    "vitest": 53,
+    "functional": 28
+  },
+  "final": {
+    "rust": 52,
+    "vitest": 58,
+    "functional": 31,
+    "perf": 3
+  },
+  "commands": [
+    {
+      "command": "cargo fmt --all --check",
+      "code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "code": 0
+    },
+    {
+      "command": "cargo test --workspace",
+      "code": 0
+    },
+    {
+      "command": "npm run check",
+      "code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "code": 0
+    },
+    {
+      "command": "npm test",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=functional",
+      "code": 0
+    },
+    {
+      "command": "npx playwright test --project=perf",
+      "code": 0
+    }
+  ],
+  "additionalRustChecks": [
+    "cargo fmt --all --check",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo test --workspace"
+  ],
+  "scope": "V2.1 only; Windows native and mock browser checks; later Rust scope/claim checks are recorded in .dev-data/v21-rust-last.log"
+}
