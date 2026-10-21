@@ -3,6 +3,56 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.2] - 2026-10-21
+
+### Added
+
+- Durable human-authorized Start/Pause for an exact story or epic, separate from
+  brief readiness. Confirmations name the project and saved scope; they never
+  launch operating-system processes or agent sessions.
+- Typed Inbox start requests from the appointed epic brain, with explicit human
+  approval or decline. Generic question answers cannot grant execution.
+- MCP `get_execution`, `list_execution`, `request_execution` and
+  `list_execution_requests` (44 tools total). Start/Pause/approval remain native
+  human commands, not agent-callable capabilities.
+- Task-specific permission guidance, persistent decision receipts and stable
+  keyboard focus after scope changes, Inbox decisions and review submission.
+- Migration, restart, cross-process claim/pause race, stale approval, inherited
+  scope, archive recovery, HTTP and stdio regression coverage.
+
+### Changed
+
+- Every entry into new work checks scope permission, including direct status
+  changes, task creation In progress, reassignment and follow-up review rounds.
+  Existing holders may still report while paused, including archived evidence.
+- Explicit story pauses survive epic resume. Pausing an epic blocks all new work
+  beneath it. Closed or restored planning scopes never silently resume execution.
+- Project and scope safety counts include individually archived In progress tasks;
+  restore only changes visibility, not status, assignee, round or permission.
+- Chat commands can request scope work through the brain, but still require a
+  typed Inbox confirmation; no untrusted approval flag is accepted.
+
+### Fixed
+
+- Assigning a shared local member now adds project membership atomically, keeping
+  project export/import round trips valid.
+- Project picker counts and names refresh after board changes and on revisit.
+- Failed review submissions show their error inside the active dialog and retain
+  comments for retry; pending submissions cannot be duplicated or dismissed.
+- Guidance no longer tells a running Ready task—or already reviewed result—to
+  start its scope again.
+
+### Compatibility and migration
+
+- Additive database migration v6 creates execution state and request tables.
+  Existing projects start paused for new work; existing assignments, rounds and
+  reports remain intact. JSON import preserves work history, not grants/approvals.
+- This intentionally tightens the MCP workflow: `execution_required` means ask
+  the human to start the story/epic or approve its typed Inbox request. Ready
+  overrides and brain roles cannot bypass that gate.
+- Exact revisions and immutable project/scope IDs reject stale confirmations;
+  UI project switching never redirects an existing MCP session or approval.
+
 ## [0.3.0-alpha.1] - 2026-10-21
 
 ### Added

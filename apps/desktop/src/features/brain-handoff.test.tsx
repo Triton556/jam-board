@@ -95,6 +95,6 @@ it("the workflow guide explains stories as the feature-sized intermediate level"
   expect(screen.getByText(/is a feature or outcome/)).toBeVisible();
   expect(screen.getAllByRole("listitem")).toHaveLength(5);
   expect(
-    screen.getByText(/Authorize a story or epic, not each worker/),
+    screen.getByText(/Authorize the scope, not each worker/),
   ).toBeVisible();
 });

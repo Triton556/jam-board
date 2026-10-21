@@ -1,3 +1,4 @@
+import type { ExecutionApi } from "./execution-api";
 import type { PlanningApi } from "./planning-api";
 import type { ProjectsApi } from "./project-api";
 import type { ReferencesApi } from "./references-api";
@@ -34,7 +35,11 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
-export interface JamApi extends PlanningApi, ReferencesApi, ProjectsApi {
+export interface JamApi
+  extends PlanningApi,
+    ReferencesApi,
+    ProjectsApi,
+    ExecutionApi {
   getProject(): Promise<import("../bindings").Project>;
   updateProject(
     input: Partial<import("../bindings").ProjectEditInput> & {

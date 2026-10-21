@@ -53,7 +53,7 @@ the brain to read sources, ask focused questions and reconcile human corrections
 The dialog explains that copying the message does not launch an agent. Connection
 checking is read-only: it must not take a Ready task as a connectivity test.
 
-The separate execution policy must distinguish brief readiness from permission
+The execution policy distinguishes brief readiness from permission
 to start. A scope start authorizes the brain to organize workers within that
 scope, not to expand the project. Pause stops new work; already-running work may
 submit evidence. This is a domain rule, not merely reassuring UI copy.
@@ -81,6 +81,24 @@ progress. It does not prescribe this application's hierarchy, visual style,
 column names or numeric limits. We therefore use it to clarify policies rather
 than to import enterprise process. A limit on the In progress column should be
 named specifically and not disappear when an epic filter hides some work.
+
+## 5. Decisions need a visible outcome and usable recovery
+
+**Scenario:** approve a start request or answer a planning question, then its card
+leaves the Open list. Keep a short live receipt and move keyboard focus to the
+stable section heading rather than leaving it on the removed button. The receipt
+states what was saved, not that an agent has actually launched. The same principle
+applies to direct Start/Pause and report reviews. A failed review keeps its draft
+and an error inside the active dialog; pending actions cannot be duplicated.
+
+This applies [visibility of system status and error recovery](https://www.nngroup.com/articles/ten-usability-heuristics/)
+and HAX's [clear action consequences](https://www.microsoft.com/en-us/haxtoolkit/guideline/convey-the-consequences-of-user-actions/)
+to a concrete asynchronous workflow. These are design inferences, not claims that
+an article independently tested this application.
+
+Checks: success receipt survives card removal; focus stays in the relevant
+section; modal errors remain inside its accessible boundary; input survives a
+failed save; no duplicate pending submission; generic answers never authorize work.
 
 ## Verification boundaries
 

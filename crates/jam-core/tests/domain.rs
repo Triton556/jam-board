@@ -1,3 +1,4 @@
+mod support;
 use jam_core::*;
 
 fn setup() -> (tempfile::TempDir, Store, Member, Member, Member) {
@@ -37,6 +38,7 @@ fn setup() -> (tempfile::TempDir, Store, Member, Member, Member) {
         )
         .unwrap();
     s.set_story_status(&h.id, &st.key, "active", None).unwrap();
+    support::start_story(&s, &h.id, &st.key);
     let a = s.identify_agent("Codex", "codex").unwrap();
     let b = s.identify_agent("Claude", "claude-code").unwrap();
     (dir, s, h, a, b)

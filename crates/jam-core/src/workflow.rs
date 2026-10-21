@@ -115,6 +115,9 @@ pub(crate) fn transition(
             ));
         }
     }
+    if target == "in_progress" && t.status != "in_progress" {
+        crate::execution::require_execution(c, &t.story_id)?;
+    }
     let mut overridden = false;
     if target == "done" {
         require_privileged(c, actor, &e)?;
@@ -228,7 +231,7 @@ impl Store {
     }
     pub fn submit_report(&self, actor: &str, input: SubmitReport) -> Result<Report> {
         self.write(|c|{
-        let t=crate::service::editable(c,&input.key,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
+        let t=task(c,&input.key)?;member(c,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
         if t.status!="in_progress"{return Err(Error::WrongStatus(format!("Expected in_progress, current status is {}",t.status)));}
         crate::m5::validate_name("summaryMd",&input.summary_md,20000)?;let mut names=std::collections::BTreeSet::new();for test in &input.tests{if test.name.trim().is_empty()||!names.insert(&test.name)||!["PASS","FAIL","NOT_RUN"].contains(&test.result.as_str()){return Err(invalid("tests","Each test needs a unique name and PASS, FAIL or NOT_RUN result"));}}
         let duplicate:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM reports WHERE task_id=? AND round=?)",params![t.id,t.review_round],|r|r.get(0))?;
@@ -239,7 +242,7 @@ impl Store {
     }
     pub fn review_task(&self, actor: &str, input: ReviewTask) -> Result<Review> {
         self.write(|c|{
-        let t=crate::service::editable(c,&input.key,actor)?;let e=task_epic(c,&t)?;require_privileged(c,actor,&e)?;
+        let t=task(c,&input.key)?;let e=task_epic(c,&t)?;require_privileged(c,actor,&e)?;
         if t.assignee_id.as_deref()==Some(actor){return Err(Error::Forbidden("A worker can never review its own task".into()));}
         let reports:Vec<Report>=records(c,"reports","task_id=? AND round=?",&[&t.id,&t.review_round])?;let report=reports.first().ok_or_else(||invalid("report",&format!("No report for round {}",t.review_round)))?;
         if report.author_id==actor{return Err(Error::Forbidden("A worker can never review its own report".into()));}

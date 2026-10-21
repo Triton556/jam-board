@@ -301,6 +301,8 @@ pub(crate) fn tool<T: JsonSchema>(
         "create_task" | "update_task" | "get_task" | "claim_task" => {
             Some(schema::<jam_core::TaskDetail>())
         }
+        "get_execution" => Some(schema::<jam_core::ExecutionState>()),
+        "request_execution" => Some(schema::<jam_core::ExecutionRequest>()),
         "get_session_context" => Some(schema::<SessionContext>()),
         "list_tasks" => Some(schema::<jam_core::TaskPage>()),
         "move_task" | "release_task" | "archive_task" => Some(schema::<jam_core::TaskSummary>()),
@@ -364,12 +366,12 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<Move>(
             "move_task",
-            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
+            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses, but entry into In progress always requires a human-started story/epic. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
             false,
         ),
         tool::<Key>(
             "claim_task",
-            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name.",
+            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name. New work requires a human-started story/epic; Ready alone is not execution permission.",
             false,
         ),
         tool::<Release>(
@@ -415,7 +417,7 @@ impl ServerHandler for JamServer {
         self.negotiate_initialize(&request)
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your game jam with your AI teammates. Use task keys such as JB-12. Claim a Ready task with claim_task before working, then submit_report with results and test evidence. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your game jam with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, claim a Ready task before working, then submit_report with results and test evidence. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -482,6 +484,7 @@ impl ServerHandler for JamServer {
                     jam_core::Error::NotFound(_) => "not_found",
                     jam_core::Error::ClaimConflict { .. } => "claim_conflict",
                     jam_core::Error::NotReady(_) => "not_ready",
+                    jam_core::Error::ExecutionRequired(_) => "execution_required",
                     jam_core::Error::WrongStatus(_) => "wrong_status",
                     jam_core::Error::Forbidden(_) => "forbidden",
                     jam_core::Error::Archived(_) => "archived",
@@ -598,7 +601,7 @@ impl ServerHandler for JamServer {
                 ("plan_epic", "Interview, plan and prepare an epic."),
                 (
                     "work_on_next_task",
-                    "Work on a Ready task and submit a report.",
+                    "Work on a Ready task within a human-started scope and submit a report.",
                 ),
                 (
                     "review_task",

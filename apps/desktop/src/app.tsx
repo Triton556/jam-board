@@ -51,6 +51,7 @@ import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
+import { executionRequestsQuery } from "./lib/execution-queries";
 
 const PlanPage = lazy(() =>
   import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage })),
@@ -191,6 +192,7 @@ function Root() {
       }
       for (const queryKey of [
         ["project"],
+        ["projects"],
         ["boardTasks"],
         ["board"],
         ["activity"],
@@ -199,6 +201,8 @@ function Root() {
         ["assets"],
         ["references"],
         ["members"],
+        ["execution"],
+        ["executionRequests"],
         ["epics"],
         ["epic"],
         ["stories"],
@@ -354,8 +358,11 @@ function Shell() {
     onError: (error) => useUiStore.getState().error(error.message),
   });
   const questions = useQuery(questionsQuery);
+  const startRequests = useQuery(executionRequestsQuery);
   const questionCount =
-    questions.data?.filter((q) => q.status === "open").length ?? 0;
+    (questions.data?.filter((q) => q.status === "open").length ?? 0) +
+    (startRequests.data?.filter((request) => request.status === "pending")
+      .length ?? 0);
   const newTask = useCallback(() => {
     if (location === "/table") {
       window.dispatchEvent(new Event("table-new-task"));

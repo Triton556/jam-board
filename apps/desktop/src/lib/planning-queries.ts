@@ -14,6 +14,9 @@ export const storiesQuery = {
 };
 export function invalidatePlanning(client: QueryClient) {
   for (const queryKey of [
+    ["projects"],
+    ["execution"],
+    ["executionRequests"],
     ["epics"],
     ["epic"],
     ["stories"],

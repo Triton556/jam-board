@@ -1,3 +1,4 @@
+mod support;
 use jam_core::*;
 use std::sync::Arc;
 
@@ -43,6 +44,7 @@ fn setup() -> (tempfile::TempDir, Arc<Store>, Member, Member, Member, Story) {
         .unwrap();
     s.set_story_status(&h.id, &story.key, "active", None)
         .unwrap();
+    support::start_story(&s, &h.id, &story.key);
     let story = s.get_story(&story.key).unwrap().story;
     (dir, s, h, brain, worker, story)
 }
@@ -133,7 +135,7 @@ fn v01_fixture_migrates_without_losing_tasks_and_only_once() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        5
+        6
     );
     assert!(
         db.prepare("PRAGMA foreign_key_check")
@@ -733,6 +735,7 @@ fn active_intents_nullable_model_restoration_and_invalid_import_are_checked() {
         .unwrap();
     s.set_epic_status(&h.id, &e.key, "archived", None).unwrap();
     s.set_epic_status(&h.id, &e.key, "active", None).unwrap();
+    support::start_story(&s, &h.id, &story.key);
     let t = create(&s, &h, &story, "backlog");
     let incomplete = s
         .create_task(

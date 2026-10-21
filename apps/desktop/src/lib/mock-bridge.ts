@@ -4,6 +4,11 @@ import type { JamApi } from "./api";
 import fixture from "./demo-fixture.json";
 import { makeSnippets } from "./mcp-config";
 import {
+  emptyExecution,
+  MockExecution,
+  type MockExecutionData,
+} from "./mock-execution";
+import {
   MockPlanning,
   mockReadiness,
   type PlanData,
@@ -51,7 +56,8 @@ export type AgentSimulation = {
     | "agent.status"
     | "report.submitted"
     | "question.asked"
-    | "reference.added";
+    | "reference.added"
+    | "execution.requested";
   reference?: ReferenceInput;
   scope?: Scope;
   text?: string;
@@ -70,6 +76,7 @@ type MockProjectSnapshot = {
   state: AppState;
   tasks: TaskDetail[];
   planData: PlanData;
+  executionData: MockExecutionData;
   members: Member[];
   assets: Asset[];
   activity: ActivityEvent[];
@@ -84,6 +91,7 @@ export class MockBridge implements JamApi {
       state: this.state,
       tasks: this.tasks,
       planData: this.planData,
+      executionData: this.executionData,
       members: this.members,
       assets: this.assets,
       activity: this.activity,
@@ -100,6 +108,7 @@ export class MockBridge implements JamApi {
     const theme = this.state.theme;
     const { archived: _archived, ...data } = clone(project);
     Object.assign(this, data);
+    this.executionData = data.executionData ?? emptyExecution();
     this.state.theme = theme;
     this.state.hasJam = true;
     if (this.state.jam) delete this.projects[this.state.jam.id];
@@ -130,7 +139,7 @@ export class MockBridge implements JamApi {
                 selected: p.state.jam?.id === this.state.jam?.id,
                 taskCount: p.tasks.filter((t) => !t.archivedAt).length,
                 inProgressCount: p.tasks.filter(
-                  (t) => !t.archivedAt && t.status === "in_progress",
+                  (t) => t.status === "in_progress",
                 ).length,
               },
             ]
@@ -303,6 +312,46 @@ export class MockBridge implements JamApi {
   };
   private tasks: TaskDetail[] = [];
   private planData: PlanData = { epics: [], stories: [], questions: [] };
+  private executionData = emptyExecution();
+  private execution = new MockExecution({
+    data: () => this.executionData,
+    plan: () => this.planData,
+    tasks: () => this.tasks,
+    project: () => this.state.jam,
+    human: () => this.human(),
+    call: (name, input) => this.call(name, input),
+    changed: (action, actor, scope) =>
+      this.event(
+        action,
+        actor,
+        undefined,
+        { scope },
+        scope.type === "epic"
+          ? scope.id
+          : this.planData.stories.find((story) => story.id === scope.id)
+              ?.epicId,
+      ),
+  });
+  getExecution: JamApi["getExecution"] = (scope) => this.execution.get(scope);
+  listExecution: JamApi["listExecution"] = () => this.execution.list();
+  setExecution: JamApi["setExecution"] = (input) => this.execution.set(input);
+  listExecutionRequests: JamApi["listExecutionRequests"] = (status) =>
+    this.execution.requests(status);
+  resolveExecutionRequest: JamApi["resolveExecutionRequest"] = (input) =>
+    this.execution.resolve(input);
+  /** Explicit human fixture actions for tests unrelated to the execution gate. */
+  async startAllDemoScopes() {
+    for (const epic of this.planData.epics.filter(
+      (epic) => !epic.archivedAt && epic.status !== "done",
+    )) {
+      const state = await this.getExecution({ type: "epic", id: epic.id });
+      await this.setExecution({
+        scope: state.scope,
+        action: "start",
+        expectedRevision: state.revision,
+      });
+    }
+  }
   private planning = new MockPlanning({
     data: () => this.planData,
     tasks: () => this.tasks,
@@ -447,6 +496,7 @@ export class MockBridge implements JamApi {
             canvasData: this.canvasData,
             canvasViewportValue: this.canvasViewportValue,
             planData: this.planData,
+            executionData: this.executionData,
             state: this.state,
             tasks,
             contexts,
@@ -495,6 +545,22 @@ export class MockBridge implements JamApi {
     epicId?: string,
     sentence = "",
   ) {
+    if (action === "epic.status" || action === "story.status") {
+      const type = action === "epic.status" ? "epic" : "story";
+      const fields =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? payload
+          : {};
+      const entity = (
+        type === "epic" ? this.planData.epics : this.planData.stories
+      ).find((item) => item.key === fields.key);
+      this.execution.revokeClosed(
+        actor,
+        false,
+        fields.wasClosed && entity ? { type, id: entity.id } : undefined,
+      );
+    }
+    if (action === "jam.archived") this.execution.revokeClosed(actor, true);
     const event: ActivityEvent = {
       seq: (this.activity.at(-1)?.seq ?? 0) + 1,
       action,
@@ -660,6 +726,7 @@ export class MockBridge implements JamApi {
     this.members = [human];
     this.tasks = [];
     this.planData = { epics: [], stories: [], questions: [] };
+    this.executionData = emptyExecution();
     this.activity = [];
     this.state = {
       ...this.state,
@@ -759,6 +826,7 @@ export class MockBridge implements JamApi {
     for (const q of this.planData.questions) q.jamId = jamId;
     this.planning.sync();
     this.activity = data.activity;
+    this.executionData = emptyExecution();
     this.checkpoint();
     return clone(this.state);
   }
@@ -998,12 +1066,13 @@ export class MockBridge implements JamApi {
       needsInfo: false,
       reviewRound: 0,
     };
+    task.ready = mockReadiness(task).ready;
+    if (task.status === "ready") this.guardReady(task, actor);
+    if (task.status === "in_progress") this.execution.requireTaskStart(task);
     if (!this.planData.epics.some((e) => e.id === epic.id))
       this.planData.epics.push(epic);
     if (!this.planData.stories.some((s) => s.id === story.id))
       this.planData.stories.push(story);
-    task.ready = mockReadiness(task).ready;
-    if (task.status === "ready") this.guardReady(task, actor);
     jam.taskSeq += 1;
     this.tasks.push(task);
     this.event("task.created", actor, task, {
@@ -1051,6 +1120,8 @@ export class MockBridge implements JamApi {
       );
     if (input.status === "ready" && task.status !== "ready")
       this.guardReady(task, actor, input.overrideReason);
+    if (input.status === "in_progress" && task.status !== "in_progress")
+      this.execution.requireTaskStart(task);
     const after = this.tasks.find((t) => t.key === input.afterKey);
     task.position =
       before && after
@@ -1425,11 +1496,7 @@ export class MockBridge implements JamApi {
     await this.call("reset_jam", input);
     if (input.confirmName !== this.state.jam?.name)
       throw new JamError("validation", "Type the exact jam name");
-    if (
-      this.tasks.some(
-        (task) => !task.archivedAt && task.status === "in_progress",
-      )
-    )
+    if (this.tasks.some((task) => task.status === "in_progress"))
       throw new JamError(
         "validation",
         "Tasks are still in progress. Pause new work and let running tasks finish or release them before archiving.",
@@ -1440,6 +1507,7 @@ export class MockBridge implements JamApi {
     this.state.jam = null;
     this.tasks = [];
     this.planData = { epics: [], stories: [], questions: [] };
+    this.executionData = emptyExecution();
     this.assets = [];
     this.activity = [];
     this.canvasData = emptyCanvas();
@@ -1559,6 +1627,7 @@ export class MockBridge implements JamApi {
     });
     this.activity = snapshot.activity.map(remapEvent);
     this.planData = remap(snapshot.planData);
+    this.executionData = emptyExecution();
     this.canvasData = remap(snapshot.canvasData ?? emptyCanvas());
     this.tasks = snapshot.tasks.map((t) => ({
       ...t,
@@ -1687,6 +1756,7 @@ export class MockBridge implements JamApi {
       "report.submitted": "submit_report",
       "question.asked": "ask_user",
       "reference.added": "add_reference",
+      "execution.requested": "request_execution",
     };
     const call = {
       at: new Date().toISOString(),
@@ -1747,6 +1817,15 @@ export class MockBridge implements JamApi {
       this.event("member.joined", actor);
     }
     actor.lastSeenAt = input.lastSeenAt ?? new Date().toISOString();
+    if (input.action === "execution.requested") {
+      if (!input.scope || !["epic", "story"].includes(input.scope.type))
+        throw new JamError("validation", "Choose an epic or story to start");
+      return this.execution.request(
+        { type: input.scope.type as "epic" | "story", id: input.scope.id },
+        input.text ?? "The plan is ready for this scope.",
+        actor,
+      );
+    }
     if (input.action === "reference.added")
       return this.canvas.add(
         input.reference ?? {
@@ -1843,6 +1922,8 @@ export class MockBridge implements JamApi {
           `Expected ready, current status is ${task.status}`,
         );
       this.guardReady(task, actor);
+      if (task.status !== "in_progress" || task.assigneeId !== actor.id)
+        this.execution.requireTaskStart(task);
       task.assigneeId = actor.id;
       task.status = "in_progress";
     } else {
@@ -1947,6 +2028,12 @@ export class MockBridge implements JamApi {
             .filter((t) => t.status === next.status && !t.archivedAt)
             .map((t) => t.position ?? 0),
         ) + 1024;
+    if (
+      next.status === "in_progress" &&
+      (task.status !== "in_progress" ||
+        (!!next.assigneeId && next.assigneeId !== task.assigneeId))
+    )
+      this.execution.requireTaskStart(next);
     const payload = Object.fromEntries(
       Object.keys(input)
         .filter((k) => !["key", "expectedUpdatedAt"].includes(k))
@@ -2216,18 +2303,20 @@ export class MockBridge implements JamApi {
         .filter((s) => s.status === "active")
         .slice(0, 20);
       for (let i = 0; i < n; i++) {
-        this.create(
+        const created = this.create(
           {
             title: `Bulk task ${i + 1}: polish the lantern village`,
             storyKey: bulkStories[i % bulkStories.length]?.key,
             tags: ["gameplay", i % 2 ? "polish" : "ui"],
             estimate: [1, 2, 3, 5, 8][i % 5],
-            status: statuses[i % 5] ?? "ready",
+            status: "backlog",
             priority: ["low", "medium", "high", "critical"][i % 4],
           },
           this.human(),
           true,
         );
+        // Synthetic historical benchmark data, not a grant of future work.
+        this.find(created.key).status = statuses[i % 5] ?? "ready";
         const task = this.tasks.at(-1);
         if (task)
           task.assigneeId =

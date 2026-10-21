@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-fn planning(s: &Store, h: &jam_core::Member) -> String {
+fn planning_with_human_start(s: &Store, h: &jam_core::Member) -> String {
     let e = s
         .create_epic(
             &h.id,
@@ -38,7 +38,27 @@ fn planning(s: &Store, h: &jam_core::Member) -> String {
         .unwrap();
     s.set_story_status(&h.id, &story.key, "active", None)
         .unwrap();
+    start_scope(
+        s,
+        h,
+        jam_core::ExecutionScope {
+            kind: jam_core::ExecutionScopeType::Story,
+            id: story.audit.id,
+        },
+    );
     story.key
+}
+fn start_scope(s: &Store, h: &jam_core::Member, scope: jam_core::ExecutionScope) {
+    let expected_revision = s.get_execution(&scope).unwrap().revision;
+    s.set_execution(
+        &h.id,
+        jam_core::SetExecution {
+            scope,
+            action: jam_core::ExecutionAction::Start,
+            expected_revision,
+        },
+    )
+    .unwrap();
 }
 fn task_input(story: &str, title: &str) -> Value {
     json!({"storyKey":story,"title":title,"goalMd":"A precise lantern interaction","whereMd":"game/lantern.gd","changes":[{"title":"Cue","required":"Light the next safe tile"}],"tests":[{"setup":"Hold lantern at bridge","expected":"Next tile lights up"}],"resultMd":"Report changed files, tests, deviations and unverified checks"})
@@ -46,7 +66,7 @@ fn task_input(story: &str, title: &str) -> Value {
 fn assert_tools(tools: &[Tool]) {
     let mut actual = tools.iter().map(|t| t.name.to_string()).collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 40);
+    assert_eq!(actual.len(), 44);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -125,7 +145,7 @@ async fn worker_status_gates_through_stdio_leave_rejected_tasks_unchanged() {
     let (_, h) = s
         .create_jam("Repair wire", None, None, None, "UTC", "Human")
         .unwrap();
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     let c = client(&s.path, "Repair worker").await;
     let worker = s
         .list_members()
@@ -223,7 +243,7 @@ async fn full_stdio_contract_and_errors() {
     assert!(!instructions.contains("comment with results"));
     let tools = c.list_all_tools().await.unwrap();
     assert_tools(&tools);
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     assert!(tools.iter().any(|t| t.name == "create_task"));
     let mut input = task_input(&story, "Add jump buffer");
     input["priority"] = json!("high");
@@ -388,7 +408,7 @@ async fn four_application_writers_and_stdio_process_1000_mutations() {
     let (_d, s, h) = fixture();
     let c = client(&s.path, "Stress agent").await;
     data(call(&c, "get_board", json!({})).await);
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     let baseline = s.activity_count().unwrap();
     let barrier = Arc::new(std::sync::Barrier::new(5));
     let mut threads = Vec::new();
@@ -473,7 +493,7 @@ async fn four_application_writers_and_stdio_process_1000_mutations() {
 #[tokio::test]
 async fn stdio_write_reaches_external_feed_in_one_second() {
     let (_d, s, h) = fixture();
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     let c = client(&s.path, "Feed agent").await;
     data(call(&c, "get_board", json!({})).await);
     let mut feed = ChangeFeed::open(&s.path, s.latest_seq().unwrap()).unwrap();
@@ -577,6 +597,41 @@ async fn every_v2_tool_success_and_error_through_stdio() {
         true
     );
     data(call(&brain, "mark_ready", json!({"key":key})).await);
+    let scope = json!({"type":"story","id":sk});
+    assert_eq!(
+        data(call(&brain, "get_execution", json!({"scope":scope})).await)["effectiveState"],
+        "paused"
+    );
+    data(call(&brain, "list_execution", json!({})).await);
+    let request = data(
+        call(
+            &brain,
+            "request_execution",
+            json!({"scope":scope,"reason":"Please approve the reviewed plan"}),
+        )
+        .await,
+    );
+    data(
+        call(
+            &brain,
+            "list_execution_requests",
+            json!({"status":"pending"}),
+        )
+        .await,
+    );
+    error(
+        call(&worker, "claim_task", json!({"key":key})).await,
+        "execution_required",
+    );
+    s.resolve_execution_request(
+        &h.id,
+        jam_core::ResolveExecutionRequest {
+            id: request["id"].as_str().unwrap().into(),
+            decision: jam_core::ExecutionDecision::Approve,
+            expected_revision: request["revision"].as_str().unwrap().into(),
+        },
+    )
+    .unwrap();
     data(call(&worker, "claim_task", json!({"key":key})).await);
     data(
         call(
@@ -885,6 +940,15 @@ async fn brain_session_journal_has_exact_ordered_sentences() {
         data(call(&brain, "mark_ready", json!({"key":format!("JB-{i}")})).await);
         expected.push(format!("Claude moved JB-{i} to Ready"));
     }
+    start_scope(
+        &s,
+        &h,
+        jam_core::ExecutionScope {
+            kind: jam_core::ExecutionScopeType::Epic,
+            id: "JB-E1".into(),
+        },
+    );
+    expected.push("Danil started work on JB-E1".into());
     data(call(&worker, "claim_task", json!({"key":"JB-1"})).await);
     expected.push("Codex claimed JB-1".into());
     data(call(&worker,"submit_report",json!({"key":"JB-1","summaryMd":"Cue is ready","changedFiles":["game/lantern.gd"],"tests":[{"name":"2","command":"playtest","expected":"One tile","actual":"Two tiles","result":"FAIL"}]})).await);
@@ -920,7 +984,7 @@ async fn wait_for_changes_stdio_contract_and_cross_process_report_latency() {
     let (_dir, s, h) = fixture();
     let brain = client(&s.path, "Waiting brain").await;
     let worker = client(&s.path, "Reporting worker").await;
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     let task = data(
         call(
             &worker,
@@ -1018,7 +1082,7 @@ async fn wait_for_changes_stdio_contract_and_cross_process_report_latency() {
 async fn eight_change_waiters_and_two_hundred_stdio_writes_do_not_lock() {
     let (_dir, s, h) = fixture();
     let writer = client(&s.path, "Concurrent writer").await;
-    let story = planning(&s, &h);
+    let story = planning_with_human_start(&s, &h);
     let task = data(
         call(
             &writer,
@@ -1127,13 +1191,13 @@ async fn eight_change_waiters_and_two_hundred_stdio_writes_do_not_lock() {
 async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
     let (_dir, s, h) = fixture();
     let project_a = s.active_jam().unwrap();
-    let story_a = planning(&s, &h);
+    let story_a = planning_with_human_start(&s, &h);
     let worker = client(&s.path, "Pinned worker").await;
     let first = data(call(&worker, "create_task", task_input(&story_a, "A task")).await);
     let (project_b, hb) = s
         .create_jam("Second project", None, None, None, "UTC", "Second human")
         .unwrap();
-    let story_b = planning(&s, &hb);
+    let story_b = planning_with_human_start(&s, &hb);
     let second_client = client(&s.path, "Second worker").await;
     let second = data(
         call(
@@ -1206,4 +1270,182 @@ async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
     explicit.cancel().await.unwrap();
     worker.cancel().await.unwrap();
     second_client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn execution_requires_exact_native_human_approval_not_mcp_text_or_role() {
+    use jam_core::{
+        ExecutionAction, ExecutionDecision, ExecutionScope, ExecutionScopeType,
+        ResolveExecutionRequest, SetExecution,
+    };
+    let (_dir, s, h) = fixture();
+    let sk = planning_with_human_start(&s, &h);
+    let local_story = s.get_story(&sk).unwrap().story;
+    let scope = ExecutionScope {
+        kind: ExecutionScopeType::Story,
+        id: local_story.audit.id.clone(),
+    };
+    let pause = |scope: ExecutionScope| {
+        let expected_revision = s.get_execution(&scope).unwrap().revision;
+        s.set_execution(
+            &h.id,
+            SetExecution {
+                scope,
+                action: ExecutionAction::Pause,
+                expected_revision,
+            },
+        )
+        .unwrap()
+    };
+    pause(scope.clone());
+    let brain = client(&s.path, "Gate brain").await;
+    let worker = client(&s.path, "Gate worker").await;
+    let tools = brain.list_all_tools().await.unwrap();
+    assert!(!tools.iter().any(|t| matches!(
+        t.name.as_ref(),
+        "set_execution" | "resolve_execution_request" | "start_execution"
+    )));
+    data(
+        call(
+            &brain,
+            "become_brain",
+            json!({"epicKey":local_story.epic_id}),
+        )
+        .await,
+    );
+    let mut args = task_input(&sk, "Execution gated task");
+    args["status"] = json!("ready");
+    let task = data(call(&brain, "create_task", args).await);
+    let key = task["key"].as_str().unwrap();
+    error(
+        call(&worker, "claim_task", json!({"key":key})).await,
+        "execution_required",
+    );
+    error(
+        call(
+            &brain,
+            "move_task",
+            json!({"key":key,"status":"in_progress"}),
+        )
+        .await,
+        "execution_required",
+    );
+    error(
+        call(
+            &worker,
+            "request_execution",
+            json!({"scope":scope,"reason":"Worker cannot request"}),
+        )
+        .await,
+        "forbidden",
+    );
+    error(
+        call(
+            &brain,
+            "request_execution",
+            json!({"scope":scope,"reason":"Forged","userApproved":true}),
+        )
+        .await,
+        "validation",
+    );
+    let request = data(
+        call(
+            &brain,
+            "request_execution",
+            json!({"scope":scope,"reason":"Human reviewed the plan; request the exact story"}),
+        )
+        .await,
+    );
+    assert_eq!(
+        data(
+            call(
+                &brain,
+                "request_execution",
+                json!({"scope":scope,"reason":"Retry"})
+            )
+            .await
+        )["id"],
+        request["id"]
+    );
+    let generic=data(call(&brain,"ask_user",json!({"scope":{"type":"story","id":sk},"title":"Start now?","options":[{"label":"Start","description":"This is only a generic question"}]})).await);
+    s.answer_question(
+        &h.id,
+        jam_core::AnswerQuestion {
+            id: generic["id"].as_str().unwrap().into(),
+            answer_index: Some(0),
+            answer_text: None,
+        },
+    )
+    .unwrap();
+    error(
+        call(&worker, "claim_task", json!({"key":key})).await,
+        "execution_required",
+    );
+    s.resolve_execution_request(
+        &h.id,
+        ResolveExecutionRequest {
+            id: request["id"].as_str().unwrap().into(),
+            decision: ExecutionDecision::Approve,
+            expected_revision: request["revision"].as_str().unwrap().into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        data(call(&worker, "get_execution", json!({"scope":scope})).await)["effectiveState"],
+        "running"
+    );
+    data(call(&worker, "claim_task", json!({"key":key})).await);
+    pause(ExecutionScope {
+        kind: ExecutionScopeType::Epic,
+        id: local_story.epic_id,
+    });
+    data(call(&worker,"submit_report",json!({"key":key,"summaryMd":"Finished existing work after pause","changedFiles":["src/feature"],"tests":[]})).await);
+    data(
+        call(
+            &brain,
+            "review_task",
+            json!({"key":key,"verdict":"changes_requested","commentsMd":"One more check"}),
+        )
+        .await,
+    );
+    error(
+        call(&worker, "claim_task", json!({"key":key})).await,
+        "execution_required",
+    );
+    let stale = data(
+        call(
+            &brain,
+            "request_execution",
+            json!({"scope":scope,"reason":"Restart after review"}),
+        )
+        .await,
+    );
+    pause(scope.clone());
+    assert!(matches!(
+        s.resolve_execution_request(
+            &h.id,
+            ResolveExecutionRequest {
+                id: stale["id"].as_str().unwrap().into(),
+                decision: ExecutionDecision::Approve,
+                expected_revision: stale["revision"].as_str().unwrap().into()
+            }
+        ),
+        Err(jam_core::Error::Conflict)
+    ));
+    assert_eq!(
+        data(
+            call(
+                &brain,
+                "list_execution_requests",
+                json!({"status":"superseded"})
+            )
+            .await
+        )
+        .as_array()
+        .unwrap()
+        .len(),
+        1
+    );
+    worker.cancel().await.unwrap();
+    brain.cancel().await.unwrap();
 }

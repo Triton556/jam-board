@@ -9,6 +9,7 @@ import {
   invalidatePlanning,
   questionsQuery,
 } from "../../lib/planning-queries";
+import { ExecutionControls } from "../execution/ExecutionControls";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
 import { BrainHandoff } from "./BrainHandoff";
@@ -103,6 +104,10 @@ export function StoryDrawer({
                 disabled={story.status === "archived"}
               />
             </div>
+            <ExecutionControls
+              key={`execution:${story.id}`}
+              scope={{ type: "story", id: story.id }}
+            />
             {questions.data?.some(
               (q) =>
                 q.status === "open" &&

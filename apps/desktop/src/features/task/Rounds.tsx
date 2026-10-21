@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Report, ReviewTask } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { Avatar, Button, Dialog, Stamp } from "../../components/ui";
@@ -11,25 +11,35 @@ export function ReviewDialog({
   report,
   close,
   onReview,
+  pending = false,
+  error,
 }: {
   report: Report;
+  pending?: boolean;
+  error?: string;
   close(): void;
   onReview(input: Pick<ReviewTask, "commentsMd" | "failedTests">): void;
 }) {
   const [comments, setComments] = useState(""),
     [failed, setFailed] = useState<string[]>([]);
   return (
-    <Dialog title="Request changes" onClose={close}>
+    <Dialog
+      title="Request changes"
+      onClose={() => {
+        if (!pending) close();
+      }}
+    >
       <label className="field">
         Comments
         <textarea
           aria-label="Review comments"
+          disabled={pending}
           value={comments}
           onChange={(e) => setComments(e.target.value)}
           required
         />
       </label>
-      <fieldset className="failed-tests">
+      <fieldset className="failed-tests" disabled={pending}>
         <legend>Failed tests from round {report.round}</legend>
         {report.tests.map((t) => (
           <label key={t.name}>
@@ -53,16 +63,23 @@ export function ReviewDialog({
           </label>
         ))}
       </fieldset>
+      <p className="small muted">
+        The task returns to Ready for another round. New work still needs scope
+        permission.
+      </p>
+      {error && <p role="alert">{error}</p>}
       <div className="dialog-actions">
-        <Button onClick={close}>Cancel</Button>
+        <Button disabled={pending} onClick={close}>
+          Cancel
+        </Button>
         <Button
           variant="primary"
-          disabled={!comments.trim()}
+          disabled={pending || !comments.trim()}
           onClick={() =>
             onReview({ commentsMd: comments.trim(), failedTests: failed })
           }
         >
-          Request changes
+          {pending ? "Saving review…" : "Request changes"}
         </Button>
       </div>
     </Dialog>
@@ -76,11 +93,21 @@ export function Rounds({
   members: Member[];
 }) {
   const [request, setRequest] = useState(false);
+  const [notice, setNotice] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (notice) heading.current?.focus();
+  }, [notice]);
   const client = useQueryClient();
   const review = useMutation({
     mutationFn: (input: ReviewTask) => api.reviewTask(input),
-    onSuccess: () => {
+    onSuccess: (_task, input) => {
       setRequest(false);
+      setNotice(
+        input.verdict === "accept"
+          ? "Result accepted. The task is Done."
+          : "Changes requested. The task is Ready for another round; new work still needs scope permission.",
+      );
       invalidatePlanning(client);
     },
   });
@@ -94,7 +121,14 @@ export function Rounds({
   ].sort((a, b) => a - b);
   return (
     <section className="task-section rounds">
-      <h2>Rounds</h2>
+      <h2 ref={heading} tabIndex={-1}>
+        Reports &amp; review
+      </h2>
+      {notice && (
+        <p role="status" className="execution-feedback">
+          {notice}
+        </p>
+      )}
       {!rounds.length && (
         <p className="muted">
           The worker's report and your review will appear here.
@@ -221,12 +255,23 @@ export function Rounds({
           >
             Accept
           </Button>
-          <Button onClick={() => setRequest(true)}>Request changes…</Button>
+          <Button
+            disabled={review.isPending}
+            onClick={() => {
+              review.reset();
+              setNotice("");
+              setRequest(true);
+            }}
+          >
+            Request changes…
+          </Button>
         </div>
       )}
       {request && latest && (
         <ReviewDialog
           report={latest}
+          pending={review.isPending}
+          error={review.error?.message}
           close={() => setRequest(false)}
           onReview={(input) =>
             review.mutate({
@@ -237,7 +282,7 @@ export function Rounds({
           }
         />
       )}{" "}
-      {review.error && <p role="alert">{review.error.message}</p>}
+      {review.error && !request && <p role="alert">{review.error.message}</p>}
     </section>
   );
 }

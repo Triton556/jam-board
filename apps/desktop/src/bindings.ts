@@ -61,6 +61,11 @@ export const commands = {
 	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
 	archiveRefEdge: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_edge", { id })),
 	updateRefGeometry: (input: GeometryInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
+	getExecution: (scope: ExecutionScope) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("get_execution", { scope })),
+	listExecution: () => typedError<ExecutionState[], ApiError_Serialize>(__TAURI_INVOKE("list_execution")),
+	setExecution: (input: SetExecution) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("set_execution", { input })),
+	listExecutionRequests: (status: "pending" | "approved" | "declined" | "superseded" | null) => typedError<ExecutionRequest[], ApiError_Serialize>(__TAURI_INVOKE("list_execution_requests", { status })),
+	resolveExecutionRequest: (input: ResolveExecutionRequest) => typedError<ExecutionRequest, ApiError_Serialize>(__TAURI_INVOKE("resolve_execution_request", { input })),
 	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
 	selectProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("select_project", { projectId })),
 	restoreProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("restore_project", { projectId })),
@@ -178,7 +183,7 @@ export type AnswerQuestion = {
 
 export type ApiError = ApiError_Serialize | ApiError_Deserialize;
 
-export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "not_ready" | "wrong_status" | "forbidden" | "internal";
+export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
 
 export type ApiError_Deserialize = {
 	code: ApiErrorCode,
@@ -479,6 +484,58 @@ export type EpicTree_Serialize = {
 	stories: StoryTree[],
 	journal: ActivityEvent_Serialize[],
 	openQuestions: Question[],
+};
+
+export type ExecutionAction = "start" | "pause";
+
+export type ExecutionDecision = "approve" | "decline";
+
+export type ExecutionEffectiveState = "running" | "paused";
+
+export type ExecutionOwnState = "inherit" | "running" | "paused";
+
+export type ExecutionRequest = {
+	id: string,
+	projectId: string,
+	scope: ExecutionScope,
+	scopeKey: string,
+	scopeTitle: string,
+	requestedBy: string,
+	reason: string,
+	status: ExecutionRequestStatus,
+	revision: string,
+	createdAt: string,
+	resolvedBy: string | null,
+	resolvedAt: string | null,
+};
+
+export type ExecutionRequestStatus = "pending" | "approved" | "declined" | "superseded";
+
+export type ExecutionScope = {
+	type: ExecutionScopeType,
+	id: string,
+};
+
+export type ExecutionScopeType = "epic" | "story";
+
+export type ExecutionSource = "scope" | "epic" | "none";
+
+export type ExecutionState = {
+	projectId: string,
+	scope: ExecutionScope,
+	scopeKey: string,
+	scopeTitle: string,
+	ownState: ExecutionOwnState,
+	effectiveState: ExecutionEffectiveState,
+	source: ExecutionSource,
+	revision: string,
+	canStart: boolean,
+	blockedReason: string | null,
+	inProgressCount: number,
+	readyCount: number,
+	runningStoryCount: number,
+	changedBy: string | null,
+	changedAt: string | null,
 };
 
 export type ExportPath = {
@@ -871,6 +928,12 @@ export type ResetInput = {
 	confirmName: string,
 };
 
+export type ResolveExecutionRequest = {
+	id: string,
+	decision: ExecutionDecision,
+	expectedRevision: string,
+};
+
 export type Review = {
 	id: string,
 	taskId: string,
@@ -897,6 +960,12 @@ export type RuntimeInfo = {
 export type Scope = {
 	type: string,
 	id: string,
+};
+
+export type SetExecution = {
+	scope: ExecutionScope,
+	action: ExecutionAction,
+	expectedRevision: string,
 };
 
 export type Settings = {

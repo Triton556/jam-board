@@ -215,7 +215,7 @@ impl Store {
         self.read(|c| {
             let selected=selected_jam(c).ok().map(|j|j.id);
             let pin=bound_project(c)?;
-            let mut statement=c.prepare(&format!("SELECT {JAM_COLUMNS},archived,(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.archived_at IS NULL),(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.archived_at IS NULL AND t.status='in_progress') FROM jams WHERE (?1 OR archived=0) AND (?2 IS NULL OR id=?2) ORDER BY archived,created_at DESC,id DESC"))?;
+            let mut statement=c.prepare(&format!("SELECT {JAM_COLUMNS},archived,(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.archived_at IS NULL),(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.status='in_progress') FROM jams WHERE (?1 OR archived=0) AND (?2 IS NULL OR id=?2) ORDER BY archived,created_at DESC,id DESC"))?;
             Ok(statement.query_map(params![include_archived,pin],|r|{let jam=jam_row(r)?;Ok(ProjectSummary{selected:selected.as_deref()==Some(&jam.id),jam,archived:r.get(11)?,task_count:r.get(12)?,in_progress_count:r.get(13)?})})?.collect::<std::result::Result<Vec<_>,_>>()?)
         })
     }

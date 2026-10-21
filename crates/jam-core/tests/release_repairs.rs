@@ -1,3 +1,4 @@
+mod support;
 use jam_core::*;
 use serde_json::{Value, json};
 
@@ -28,10 +29,20 @@ fn setup() -> (tempfile::TempDir, Store, Member, Member, Member, Story) {
             NewStory {
                 epic_key: e.key,
                 title: "Story".into(),
+                outcome_md: Some("Exercise task transitions".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "a".into(),
+                    criterion: "Checks pass".into(),
+                    mandatory: true,
+                    check: "Tests".into(),
+                }]),
                 ..Default::default()
             },
         )
         .unwrap();
+    s.set_story_status(&h.id, &story.key, "active", None)
+        .unwrap();
+    support::start_story(&s, &h.id, &story.key);
     (dir, s, h, brain, worker, story)
 }
 fn task(s: &Store, h: &Member, story: &Story) -> String {

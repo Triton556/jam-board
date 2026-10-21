@@ -15,6 +15,7 @@ import { StoryDrawer } from "./plan/StoryDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useBlocker: () => ({}),
   useRouterState: () => "/plan/JB-E1",
 }));
 beforeEach(async () => {

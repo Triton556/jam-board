@@ -300,10 +300,11 @@ export class MockPlanning {
         "validation",
         "Finish every story or provide overrideReason",
       );
+    const wasClosed = !!e.archivedAt || ["done", "archived"].includes(e.status);
     e.status = status;
     e.archivedAt = status === "archived" ? now() : null;
     e.updatedAt = now();
-    this.event("epic.status", key, e.id, { status });
+    this.event("epic.status", key, e.id, { status, wasClosed });
     return copy(e);
   }
   async setBrain(key: string, handle: string | null) {
@@ -392,10 +393,11 @@ export class MockPlanning {
         "validation",
         "Finish every task or provide overrideReason",
       );
+    const wasClosed = !!s.archivedAt || ["done", "archived"].includes(s.status);
     s.status = status;
     s.archivedAt = status === "archived" ? now() : null;
     s.updatedAt = now();
-    this.event("story.status", key, s.epicId, { status });
+    this.event("story.status", key, s.epicId, { status, wasClosed });
     return copy(s);
   }
   async reorderStory(key: string, beforeKey?: string) {

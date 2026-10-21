@@ -551,6 +551,9 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             if parent.audit.jam_id != j.id {
                 return Err(invalid("storyKey", "Choose a story in the active project"));
             }
+            if s == "in_progress" {
+                crate::execution::require_execution(c, &parent.audit.id)?;
+            }
             crate::workflow::validate_brief(&input.brief)?;
             let key = format!("{}-{}", j.key_prefix, j.task_seq + 1);
             let tid = id();
@@ -658,7 +661,10 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
  new.description_md=v;
  }
             if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
-            if let Some(v)=input.assignee_id { if let Some(id)=&v { member(c,id)?; crate::projects::join_member(c,&old.jam_id,id)?; } new.assignee_id=v; }
+            if let Some(v)=input.assignee_id {
+ if new.status=="in_progress" && v.is_some() && v!=old.assignee_id { crate::execution::require_execution(c,&old.story_id)?; }
+ if let Some(id)=&v { member(c,id)?; crate::projects::join_member(c,&old.jam_id,id)?; } new.assignee_id=v;
+ }
             if let Some(v)=input.priority {
  priority(&v)?;
  new.priority=v;
@@ -794,6 +800,9 @@ NULL AND key<>? ORDER BY position, key",
                     holder: member(c, holder)?.name,
                 });
             }
+            if old.status!="in_progress" || old.assignee_id.as_deref()!=Some(actor) {
+                crate::execution::require_execution(c,&old.story_id)?;
+            }
             let human=member(c,actor)?.kind=="human";
             let brain=crate::planning::task_epic(c,&old)?.brain_member_id.as_deref()==Some(actor);
             if !human&&old.status!="ready" {
@@ -884,6 +893,10 @@ NULL AND key<>? ORDER BY position, key",
             }
             if let Some(a) = assignee {
                 member(c, a)?;
+                if old.status == "in_progress" && old.assignee_id.as_deref() != Some(a) {
+                    crate::execution::require_execution(c, &old.story_id)?;
+                }
+                crate::projects::join_member(c, &old.jam_id, a)?;
             }
             c.execute(
                 "UPDATE tasks SET assignee_id=? WHERE id=?",
@@ -942,6 +955,9 @@ NULL AND key<>? ORDER BY position, key",
                 return Err(invalid("actor", "only a human can unarchive"));
             }
             let old = task(c, key)?;
+            // Restore visibility only: keep the exact status, holder and review round.
+            // Existing work may be released/reported while paused; any later claim,
+            // new holder or transition into In progress still needs execution authority.
             c.execute("UPDATE tasks SET archived_at=NULL WHERE id=?", [&old.id])?;
             touch(c, &old.id, actor)?;
             event(

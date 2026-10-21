@@ -199,6 +199,7 @@ it("creates on Enter, keeps the editor, ignores blank titles and cancels on Esca
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });
 it("moves with Space, Right, Space and supplies destination neighbors", async () => {
+  await mockApi.startAllDemoScopes();
   const user = userEvent.setup();
   const { Wrapper } = wrapper();
   const original = await api.listBoardTasks();

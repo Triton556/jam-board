@@ -106,8 +106,9 @@ export function WorkflowGuide() {
         <li>
           <strong>Start a scope</strong>
           <span>
-            Authorize a story or epic, not each worker. The brain organizes
-            execution within that scope.
+            Start a story or epic in Plan, or ask the brain in chat and approve
+            its Start request in Inbox. Authorize the scope, not each worker.
+            The brain organizes execution inside it.
           </span>
         </li>
         <li>

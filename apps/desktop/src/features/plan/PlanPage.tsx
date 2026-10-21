@@ -39,6 +39,7 @@ import {
 import { membersQuery, tasksQuery } from "../../lib/queries";
 import { statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { ExecutionControls } from "../execution/ExecutionControls";
 import { QuestionList } from "../inbox/InboxPage";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BrainHandoff, WorkflowGuide } from "./BrainHandoff";
@@ -469,6 +470,10 @@ function EpicDetail({
             disabled={archived}
           />
         </div>
+        <ExecutionControls
+          key={`execution:${e.id}`}
+          scope={{ type: "epic", id: e.id }}
+        />
         {menu && (
           <div className="button-row">
             <Button

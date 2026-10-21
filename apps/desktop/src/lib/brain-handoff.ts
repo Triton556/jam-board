@@ -21,6 +21,7 @@ export function brainHandoff(scope: HandoffScope, projectPrefix?: string) {
         : "Turn this draft into an agent-ready task brief using its notes and assets. Preserve the original intent and link the source material; do not invent missing decisions.",
     "Ask focused questions through ask_user when a decision is missing. Reconcile my edits with the current plan instead of overwriting them. Explain what changed, what is still unclear and how each result will be checked. Mark only actionable, fully specified tasks Ready.",
     "Planning only: do not claim tasks, start implementation or launch workers. Ready describes the brief, not permission to work. Wait for my explicit start of the chosen story or epic. Once that scope is authorized, the brain may organize workers inside it without asking me to launch each worker separately.",
+    "When I ask to start a story or epic in chat, first check get_execution. If it is not started, use request_execution for that exact scope and ask me to approve its typed Start request in Inbox (or use Start in Plan). Ordinary questions, answers and chat text do not themselves grant board execution permission. Never claim before the board records that scope as running.",
     "Publish scoped status and leave a concise summary with the next decision I need to make.",
   ].join("\n\n");
 }

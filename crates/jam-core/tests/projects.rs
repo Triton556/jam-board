@@ -1,3 +1,4 @@
+mod support;
 use jam_core::*;
 use std::{sync::Arc, thread, time::Duration};
 
@@ -324,7 +325,7 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
     let agent = s.identify_agent("Legacy worker", "codex").unwrap();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
-    c.execute_batch("DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
+    c.execute_batch("DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
     c.execute(
         "UPDATE tasks SET idempotency_key='legacy-token' WHERE id=?",
         [&legacy.task.id],
@@ -369,6 +370,24 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
 fn archival_guard_does_not_strand_running_work_or_target_a_new_selection() {
     let (_dir, s, a, h) = fixture();
     let t = task(&s, &h, "Running task");
+    s.update_story(
+        &h.id,
+        &t.task.story_key,
+        StoryPatch {
+            outcome_md: Some("Exercise archive safety".into()),
+            acceptance: Some(vec![Acceptance {
+                id: "a".into(),
+                criterion: "Safe archive".into(),
+                mandatory: true,
+                check: "Tests".into(),
+            }]),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    s.set_story_status(&h.id, &t.task.story_key, "active", None)
+        .unwrap();
+    support::start_story(&s, &h.id, &t.task.story_key);
     s.move_task(&h.id, &t.task.key, "in_progress", None, None)
         .unwrap();
     let before = s.activity_count().unwrap();
@@ -683,7 +702,14 @@ fn assigning_a_shared_profile_joins_the_project_without_copying_presence() {
         .unwrap();
     assert!(!joined.online);
     assert!(joined.member.status_text.is_empty());
+    let direct = pa
+        .identify_agent("Directly assigned profile", "codex")
+        .unwrap();
+    let second = task(&s, &hb, "Direct assignment B");
+    s.assign_task(&hb.id, &second.task.key, Some(&direct.id))
+        .unwrap();
     let export = s.export_jam().unwrap();
+    assert!(export.members.iter().any(|m| m.id == direct.id));
     assert!(export.members.iter().any(|m| m.id == agent.id));
     s.import_jam_json(&hb.id, &serde_json::to_string(&export).unwrap())
         .unwrap();

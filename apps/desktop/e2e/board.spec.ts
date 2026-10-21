@@ -29,8 +29,11 @@ test("demo loads all 22 cards and opens a task by URL", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
-test("pointer drag moves Ready into In progress", async ({ page }) => {
+test("pointer drag moves Ready into In progress after its scope is started", async ({
+  page,
+}) => {
   await demo(page);
+  await page.evaluate(() => window.__jamMock.startAllDemoScopes());
   const card = page.getByRole("button", { name: /Open JB-2:/ });
   const target = page.locator('[data-column="in_progress"] .column-heading');
   const from = await card.boundingBox();
@@ -118,6 +121,7 @@ test("keyboard drop works in Chromium and reduced motion retains agent feedback"
   page,
 }) => {
   await demo(page);
+  await page.evaluate(() => window.__jamMock.startAllDemoScopes());
   await page.getByRole("button", { name: /Open JB-2:/ }).focus();
   await page.keyboard.press("Space");
   await page.keyboard.press("ArrowRight");

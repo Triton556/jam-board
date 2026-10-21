@@ -68,6 +68,7 @@ impl Store {
                 "ALTER TABLE ref_items ADD COLUMN metadata TEXT; ALTER TABLE ref_frames ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0 CHECK(collapsed IN (0,1));",
             ),
             rusqlite_migration::M::up(include_str!("migration_v5.sql")),
+            rusqlite_migration::M::up(include_str!("migration_v6.sql")),
         ]);
         writer.pragma_update(None, "foreign_keys", "OFF")?;
         let migrated = migrations.to_latest(&mut writer);
