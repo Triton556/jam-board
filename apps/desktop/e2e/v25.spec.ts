@@ -174,6 +174,7 @@ test("canvas links fit content, frames are rough, handles stay quiet until neede
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   await page.goto("/references");
+  await page.waitForFunction(() => !!window.__jamMock);
   await page.evaluate(async () => {
     await window.__jamMock.simulateAgent({
       action: "reference.added",
