@@ -21,3 +21,4 @@ import "./styles/v22.css";
 
 import "./styles/v24b.css";
 import "./styles/agent-working.css";
+import "./styles/workflow.css";

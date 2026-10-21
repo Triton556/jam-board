@@ -46,7 +46,7 @@ fn task_input(story: &str, title: &str) -> Value {
 fn assert_tools(tools: &[Tool]) {
     let mut actual = tools.iter().map(|t| t.name.to_string()).collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 39);
+    assert_eq!(actual.len(), 40);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -1121,4 +1121,89 @@ async fn eight_change_waiters_and_two_hundred_stdio_writes_do_not_lock() {
         sent.duration_since(started).as_secs_f64()
     );
     writer.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
+    let (_dir, s, h) = fixture();
+    let project_a = s.active_jam().unwrap();
+    let story_a = planning(&s, &h);
+    let worker = client(&s.path, "Pinned worker").await;
+    let first = data(call(&worker, "create_task", task_input(&story_a, "A task")).await);
+    let (project_b, hb) = s
+        .create_jam("Second project", None, None, None, "UTC", "Second human")
+        .unwrap();
+    let story_b = planning(&s, &hb);
+    let second_client = client(&s.path, "Second worker").await;
+    let second = data(
+        call(
+            &second_client,
+            "create_task",
+            task_input(&story_b, "B task"),
+        )
+        .await,
+    );
+    let context = data(call(&worker, "get_session_context", json!({})).await);
+    assert_eq!(context["projectId"], project_a.id);
+    assert_eq!(context["keyPrefix"], project_a.key_prefix);
+    assert_eq!(context["canSwitchProject"], false);
+    assert_eq!(
+        data(call(&worker, "get_board", json!({})).await)["jam"]["id"],
+        project_a.id
+    );
+    assert_eq!(
+        data(call(&second_client, "get_session_context", json!({})).await)["projectId"],
+        project_b.id
+    );
+    error(
+        call(&worker, "get_task", json!({"key":second["key"]})).await,
+        "forbidden",
+    );
+    error(
+        call(&worker, "create_task", task_input(&story_b, "Wrong scope")).await,
+        "forbidden",
+    );
+    error(
+        call(
+            &worker,
+            "get_epic",
+            json!({"key":format!("{}-E1",project_b.key_prefix)}),
+        )
+        .await,
+        "forbidden",
+    );
+    let resource = worker
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "jam://task/{}",
+            second["key"].as_str().unwrap()
+        )))
+        .await;
+    assert!(resource.is_err());
+    assert_eq!(
+        data(call(&worker, "get_task", json!({"key":first["key"]})).await)["title"],
+        "A task"
+    );
+    // An explicit pin can connect to A while the human remains on B.
+    let mut cmd = tokio::process::Command::new(env!("CARGO_BIN_EXE_jam-board-mcp"));
+    cmd.arg("--db")
+        .arg(&s.path)
+        .arg("--project")
+        .arg(&project_a.key_prefix)
+        .env("JAM_BOARD_PROJECT", &project_b.id)
+        .env("JAM_AGENT_NAME", "Explicit worker");
+    let explicit = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-pin-test", "1"),
+    )
+    .serve(TokioChildProcess::new(cmd).unwrap())
+    .await
+    .unwrap();
+    assert_eq!(
+        data(call(&explicit, "get_session_context", json!({})).await)["projectId"],
+        project_a.id
+    );
+    assert_eq!(s.active_jam().unwrap().id, project_b.id);
+    explicit.cancel().await.unwrap();
+    worker.cancel().await.unwrap();
+    second_client.cancel().await.unwrap();
 }

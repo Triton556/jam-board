@@ -10,6 +10,7 @@ import {
   validateBrief,
 } from "./mock-planning";
 import { emptyCanvas, MockReferences } from "./mock-references";
+import type { ProjectSummary } from "./project-api";
 import { tagSuggestions, templateInfo } from "./project-template";
 import type { ReferenceInput } from "./references-api";
 import type {
@@ -65,7 +66,104 @@ export type AgentSimulation = {
   patch?: Omit<UpdateInput, "key" | "expectedUpdatedAt">;
 };
 const clone = <T>(value: T): T => structuredClone(value);
+type MockProjectSnapshot = {
+  state: AppState;
+  tasks: TaskDetail[];
+  planData: PlanData;
+  members: Member[];
+  assets: Asset[];
+  activity: ActivityEvent[];
+  canvasData: import("../bindings").ReferenceCanvas;
+  canvasViewportValue: string | null;
+  archived: boolean;
+};
 export class MockBridge implements JamApi {
+  private projects: Record<string, MockProjectSnapshot> = {};
+  private snapshot(archived = false): MockProjectSnapshot {
+    return clone({
+      state: this.state,
+      tasks: this.tasks,
+      planData: this.planData,
+      members: this.members,
+      assets: this.assets,
+      activity: this.activity,
+      canvasData: this.canvasData,
+      canvasViewportValue: this.canvasViewportValue,
+      archived,
+    });
+  }
+  private stashProject(archived = false) {
+    if (this.state.jam)
+      this.projects[this.state.jam.id] = this.snapshot(archived);
+  }
+  private openProject(project: MockProjectSnapshot) {
+    const theme = this.state.theme;
+    const { archived: _archived, ...data } = clone(project);
+    Object.assign(this, data);
+    this.state.theme = theme;
+    this.state.hasJam = true;
+    if (this.state.jam) delete this.projects[this.state.jam.id];
+    this.checkpoint();
+  }
+  private nextProjectPrefix() {
+    const used = new Set([
+      this.state.jam?.keyPrefix,
+      ...Object.values(this.projects).map((p) => p.state.jam?.keyPrefix),
+    ]);
+    let suffix = 1;
+    while (used.has(suffix === 1 ? "JB" : `JB${suffix}`)) suffix++;
+    return suffix === 1 ? "JB" : `JB${suffix}`;
+  }
+  async listProjects(includeArchived = false): Promise<ProjectSummary[]> {
+    await this.call("list_projects", { includeArchived });
+    const snapshots = [
+      ...Object.values(this.projects),
+      ...(this.state.jam ? [this.snapshot()] : []),
+    ];
+    return snapshots
+      .flatMap((p) =>
+        p.state.jam && (includeArchived || !p.archived)
+          ? [
+              {
+                ...p.state.jam,
+                archived: p.archived,
+                selected: p.state.jam?.id === this.state.jam?.id,
+                taskCount: p.tasks.filter((t) => !t.archivedAt).length,
+                inProgressCount: p.tasks.filter(
+                  (t) => !t.archivedAt && t.status === "in_progress",
+                ).length,
+              },
+            ]
+          : [],
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  async selectProject(projectId: string) {
+    await this.call("select_project", { projectId });
+    if (this.state.jam?.id === projectId) return clone(this.state);
+    const project = this.projects[projectId];
+    if (!project) throw new JamError("not_found", "Project not found");
+    if (project.archived)
+      throw new JamError("archived", "Restore this project first");
+    this.stashProject();
+    this.openProject(project);
+    return clone(this.state);
+  }
+  async restoreProject(projectId: string) {
+    await this.call("restore_project", { projectId });
+    if (this.state.jam?.id === projectId) return clone(this.state);
+    const project = this.projects[projectId];
+    if (!project) throw new JamError("not_found", "Project not found");
+    this.stashProject();
+    this.openProject(project);
+    return clone(this.state);
+  }
+  /** Unit-test fixture reset; unlike the product action this deliberately replaces all mock data. */
+  async resetDemo() {
+    this.projects = {};
+    this.state.jam = null;
+    return this.loadDemoJam();
+  }
   private canvasData = emptyCanvas();
   private canvas = new MockReferences({
     data: () => this.canvasData,
@@ -344,6 +442,7 @@ export class MockBridge implements JamApi {
         sessionStorage.setItem(
           "jam.mock",
           JSON.stringify({
+            projects: this.projects,
             skillPath: this.skillPath,
             canvasData: this.canvasData,
             canvasViewportValue: this.canvasViewportValue,
@@ -528,7 +627,6 @@ export class MockBridge implements JamApi {
     return this.getProject();
   }
   async createJam(input: NewJamInput) {
-    this.canvasData = emptyCanvas();
     await this.call("create_jam", input);
     if (
       !input.name.trim() ||
@@ -542,6 +640,11 @@ export class MockBridge implements JamApi {
         "validation",
         "Check the jam name, your name and dates",
       );
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
+    this.canvasData = emptyCanvas();
+    this.canvasViewportValue = null;
+    this.assets = [];
     const now = new Date().toISOString();
     const human: Member = {
       id: crypto.randomUUID(),
@@ -577,7 +680,7 @@ export class MockBridge implements JamApi {
             ? (input.milestoneAt ?? null)
             : null,
         taskSeq: 0,
-        keyPrefix: "JB",
+        keyPrefix: prefix,
         createdAt: now,
       },
     };
@@ -586,13 +689,38 @@ export class MockBridge implements JamApi {
   }
   async loadDemoJam() {
     await this.call("load_demo_jam");
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
     // TypeScript infers optional `undefined` keys for heterogeneous JSON unions;
     // the Rust exporter guarantees the wire types and JSON has no undefined.
-    const data = clone(fixture) as unknown as {
+    const ids = new Map<string, string>();
+    for (const item of [
+      ...fixture.details,
+      ...fixture.epics,
+      ...fixture.stories,
+      ...fixture.questions,
+      ...fixture.assets,
+    ])
+      ids.set(item.id, crypto.randomUUID());
+    const remapDemo = (value: unknown): unknown => {
+      if (typeof value === "string")
+        return ids.get(value) ?? value.replace(/^JB(?=-[ES]?\d+$)/, prefix);
+      if (Array.isArray(value)) return value.map(remapDemo);
+      if (value && typeof value === "object")
+        return Object.fromEntries(
+          Object.entries(value).map(([key, v]) => [key, remapDemo(v)]),
+        );
+      return value;
+    };
+    const data = remapDemo(clone(fixture)) as {
       app: AppState;
       members: Member[];
       details: TaskDetail[];
       activity: ActivityEvent[];
+      assets: Asset[];
+      epics: PlanData["epics"];
+      stories: PlanData["stories"];
+      questions: PlanData["questions"];
     };
     const now = new Date().toISOString();
     const jamId = crypto.randomUUID();
@@ -600,7 +728,9 @@ export class MockBridge implements JamApi {
     this.state = {
       ...data.app,
       theme: this.state.theme,
-      jam: data.app.jam ? { ...data.app.jam, id: jamId } : null,
+      jam: data.app.jam
+        ? { ...data.app.jam, id: jamId, keyPrefix: prefix }
+        : null,
     };
     if (this.state.jam)
       this.state.jam.endsAt = new Date(Date.now() + 31 * 3600000).toISOString();
@@ -617,12 +747,12 @@ export class MockBridge implements JamApi {
       epic: { ...task.epic, jamId },
       assets: task.assets.map((asset) => ({ ...asset, jamId })),
     }));
-    this.assets = clone(fixture.assets).map((asset) => ({ ...asset, jamId }));
+    this.assets = data.assets.map((asset) => ({ ...asset, jamId }));
     for (const task of this.tasks) task.history ??= task.activity;
     this.planData = clone({
-      epics: fixture.epics,
-      stories: fixture.stories,
-      questions: fixture.questions,
+      epics: data.epics,
+      stories: data.stories,
+      questions: data.questions,
     }) as PlanData;
     for (const e of this.planData.epics) e.jamId = jamId;
     for (const e of this.planData.stories) e.jamId = jamId;
@@ -1295,10 +1425,32 @@ export class MockBridge implements JamApi {
     await this.call("reset_jam", input);
     if (input.confirmName !== this.state.jam?.name)
       throw new JamError("validation", "Type the exact jam name");
-    for (const task of this.tasks) task.archivedAt ??= new Date().toISOString();
+    if (
+      this.tasks.some(
+        (task) => !task.archivedAt && task.status === "in_progress",
+      )
+    )
+      throw new JamError(
+        "validation",
+        "Tasks are still in progress. Pause new work and let running tasks finish or release them before archiving.",
+      );
     this.event("jam.archived", this.human());
+    this.stashProject(true);
     this.state.hasJam = false;
     this.state.jam = null;
+    this.tasks = [];
+    this.planData = { epics: [], stories: [], questions: [] };
+    this.assets = [];
+    this.activity = [];
+    this.canvasData = emptyCanvas();
+    const next = Object.values(this.projects)
+      .filter((p) => !p.archived)
+      .sort((a, b) =>
+        (b.state.jam?.createdAt ?? "").localeCompare(
+          a.state.jam?.createdAt ?? "",
+        ),
+      )[0];
+    if (next) this.openProject(next);
     this.checkpoint();
     return clone(this.state);
   }
@@ -1322,7 +1474,8 @@ export class MockBridge implements JamApi {
     const snapshot = clone(this.exported),
       actor = this.human(),
       theme = this.state.theme;
-    const prefix = `JB${(Number(this.state.jam?.keyPrefix.match(/\d+/)?.[0]) || 1) + 1}`;
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
     const oldKeys = new Map(
       snapshot.tasks.map((t, i) => [t.key, `${prefix}-${i + 1}`]),
     );
@@ -1461,6 +1614,8 @@ export class MockBridge implements JamApi {
   async mcpStatus() {
     await this.call("mcp_status");
     return {
+      projectId: this.state.jam?.id ?? null,
+      projectKeyPrefix: this.state.jam?.keyPrefix ?? null,
       httpEnabled: this.httpEnabled,
       running: this.httpEnabled,
       port: 47321,

@@ -288,7 +288,16 @@ impl Store {
         })
     }
     pub fn canvas_viewport(&self, actor: &str) -> Result<Option<String>> {
-        self.setting(&format!("canvas_viewport:{actor}"))
+        self.read(|c| {
+            let project = crate::service::jam(c)?;
+            use rusqlite::OptionalExtension;
+            Ok(c.query_row(
+                "SELECT value FROM settings WHERE key=?",
+                [format!("canvas_viewport:{}:{actor}", project.id)],
+                |r| r.get(0),
+            )
+            .optional()?)
+        })
     }
     pub fn set_canvas_viewport(&self, actor: &str, viewport: &str) -> Result<()> {
         let v: serde_json::Value = serde_json::from_str(viewport)?;
@@ -302,11 +311,15 @@ impl Store {
                 "Use finite x/y and zoom between 0.1 and 4",
             ));
         }
-        self.read(|c| {
+        self.write(|c| {
             crate::service::member(c, actor)?;
-            Ok(())
-        })?;
-        self.set_setting(&format!("canvas_viewport:{actor}"), viewport)
+            let project = crate::service::jam(c)?;
+            crate::projects::put_setting(
+                c,
+                &format!("canvas_viewport:{}:{actor}", project.id),
+                viewport,
+            )
+        })
     }
 }
 

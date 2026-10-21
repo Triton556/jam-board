@@ -3,12 +3,22 @@ use rusqlite::OptionalExtension;
 
 impl Store {
     pub fn current_member(&self) -> Result<Member> {
-        let id = self.setting("current_member_id")?.ok_or_else(|| {
-            invalid(
-                "currentMember",
-                "Choose who you are before changing the board",
-            )
-        })?;
+        let key = self
+            .project_id
+            .as_ref()
+            .map(|id| format!("project.{id}.current_member_id"));
+        let id = key
+            .as_deref()
+            .map(|key| self.setting(key))
+            .transpose()?
+            .flatten()
+            .or(self.setting("current_member_id")?)
+            .ok_or_else(|| {
+                invalid(
+                    "currentMember",
+                    "Choose who you are before changing the board",
+                )
+            })?;
         let member = self.get_member(&id)?;
         if member.kind != "human" {
             return Err(invalid(
@@ -41,7 +51,23 @@ impl Store {
         if member.kind != "human" {
             return Err(invalid("memberId", "Choose a human member"));
         }
-        self.set_setting("current_member_id", id)?;
+        self.write(|c| {
+            let j = crate::service::jam(c)?;
+            crate::projects::join_member(c, &j.id, id)?;
+            // A delayed identity edit on a captured project must not change another
+            // project's currently displayed human identity.
+            let selected = c
+                .query_row(
+                    "SELECT value FROM settings WHERE key='current_project_id'",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()?;
+            if selected.as_deref() == Some(&j.id) {
+                crate::projects::put_setting(c, "current_member_id", id)?;
+            }
+            crate::projects::put_setting(c, &format!("project.{}.current_member_id", j.id), id)
+        })?;
         self.app_state()
     }
     pub fn join_as_human(&self, name: &str) -> Result<AppState> {

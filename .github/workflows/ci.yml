@@ -33,6 +33,8 @@ jobs:
           cache-dependency-path: apps/desktop/package-lock.json
       - run: npm ci
         working-directory: apps/desktop
+      - name: Check release version consistency
+        run: node scripts/check-versions.mjs && node --test scripts/check-versions.test.mjs
       - name: Prepare sidecar for Tauri resource validation
         run: npm run prepare:sidecar
         working-directory: apps/desktop

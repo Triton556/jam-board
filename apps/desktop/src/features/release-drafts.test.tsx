@@ -19,7 +19,7 @@ vi.mock("@tanstack/react-router", async (original) => ({
 }));
 beforeEach(async () => {
   vi.restoreAllMocks();
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 function fixture(kind: "epic" | "story") {
   const client = new QueryClient({

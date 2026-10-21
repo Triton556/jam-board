@@ -5,7 +5,7 @@ import { TaskCard } from "./board/TaskCard";
 import { ReadOnlyBrief } from "./task/ReadOnlyBrief";
 
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 it("new jams use epic colors and cards expose both workflow flags", async () => {
   expect((await mockApi.getSettings()).colorBy).toBe("epic");

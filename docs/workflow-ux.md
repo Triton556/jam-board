@@ -1,0 +1,92 @@
+# Workflow and usability decisions
+
+This document records product decisions, their rationale and checks. It is not a
+claim of independent usability validation. The paper visual language and the
+agent-colored ring, pencil and handwritten status remain part of the design.
+
+## 1. A project is a separate board
+
+**Scenario:** work on more than one application without mixing plans or sending
+an existing agent to whichever board happens to be open.
+
+The project name in the top bar is a labeled navigation control. **Your projects**
+provides creation, opening and restoration in one place. A current-project badge
+and immutable key prefix make the destination recognizable. A connected MCP
+session stays pinned to its project; switching the human view is not a command
+to redirect or stop workers.
+
+The rationale follows the principles of visible state, familiar language and
+recognition rather than recall in [Nielsen's usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/).
+Our inference is that a hidden setting or an unlabeled icon would be insufficient
+for this high-consequence context switch.
+
+Checks: unique keys; old project restored unchanged; task edits resolved before
+leaving; in-flight saves remain scoped; selected-project lists refresh; archived
+projects are recoverable; agents cannot read or mutate another project's IDs.
+
+## 2. Reveal the hierarchy; do not invent another level
+
+**Scenario:** a person sees epics and task cards but cannot find the feature-sized
+planning layer.
+
+The hierarchy stays **Epic → Story → Task**. A story is described as a feature or
+outcome. The epic overview shows its story count as a direct action, with the task
+count alongside it. Story cards and the drawer retain acceptance criteria and
+implementation tasks. No separate Feature entity or migration is needed for
+terminology alone.
+
+Empty plans explain the next action and offer both manual creation and a brain
+handoff. [NN/G's guidance on empty states](https://www.nngroup.com/articles/empty-state-interface-design/)
+supports contextual explanation and a direct path to the useful next step. The
+optional workflow guide remains collapsed rather than imposing a tutorial.
+
+Checks: stories discoverable from the overview; empty/loading/error states
+distinguished; keyboard navigation and dismissal; narrow-window wrapping.
+
+## 3. Planning is not execution authorization
+
+**Scenario:** drop rough notes or assets, ask the brain to clarify and decompose,
+edit its proposal, then start work on an agreed story or epic.
+
+The planning handoff includes the exact entity key and expected project. It asks
+the brain to read sources, ask focused questions and reconcile human corrections.
+The dialog explains that copying the message does not launch an agent. Connection
+checking is read-only: it must not take a Ready task as a connectivity test.
+
+The separate execution policy must distinguish brief readiness from permission
+to start. A scope start authorizes the brain to organize workers within that
+scope, not to expand the project. Pause stops new work; already-running work may
+submit evidence. This is a domain rule, not merely reassuring UI copy.
+
+[Microsoft's HAX guidelines](https://www.microsoft.com/en-us/haxtoolkit/library/)
+recommend explicit capability boundaries, correction, disambiguation and clear
+consequences of actions. Applying them here means making planning, approval and
+execution distinct at the point of action. An agent-supplied `userApproved` flag
+is not evidence of a human decision.
+
+Checks: copy errors leave a selectable prompt; Cancel/Escape do not mutate data;
+Ready alone cannot authorize a worker; every work-entry API enforces the same
+scope policy; pause does not destroy reports; project switching preserves scope.
+
+## 4. State labels must describe the real process
+
+The five columns remain Backlog, Ready, In progress, Review and Done. Review is
+not yet accepted work. Planning status and execution permission are separate.
+An online agent is not proof that it is actively editing every assigned task.
+The animation should communicate the evidence available, not invented progress.
+
+The [Kanban Guide, May 2025](https://kanbanguides.org/the-kanban-guide/2025.5/)
+calls for an explicit workflow, started/finished points and control of work in
+progress. It does not prescribe this application's hierarchy, visual style,
+column names or numeric limits. We therefore use it to clarify policies rather
+than to import enterprise process. A limit on the In progress column should be
+named specifically and not disappear when an epic filter hides some work.
+
+## Verification boundaries
+
+Automated frontend tests use a deliberately isolated mock bridge. Rust tests
+verify domain rules and real stdio/HTTP behavior. A private mock preview can
+verify layout and interaction, but not filesystem operations, native dialogs,
+SQLite persistence or real agent execution. Those require native/runtime checks.
+No visual approval, unit-test pass or packaged binary substitutes for end-to-end
+human/brain/worker acceptance.

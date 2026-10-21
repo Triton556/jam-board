@@ -1,6 +1,6 @@
 use crate::{
     DesktopState, McpCallsChanged,
-    commands::{ApiError, execute, internal},
+    commands::{ApiError, execute, execute_unbound, internal},
 };
 use jam_core::*;
 use std::sync::Arc;
@@ -168,7 +168,8 @@ pub async fn get_settings(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<Settings> {
-    execute(&state, app, false, Store::get_settings).await
+    // Read-only application defaults are available before onboarding.
+    execute_unbound(&state, app, false, Store::get_settings).await
 }
 #[tauri::command]
 #[specta::specta]
@@ -191,8 +192,11 @@ pub async fn reset_jam(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState> {
-    execute(&state, app, true, move |s| {
-        s.reset_jam(&s.current_member()?.id, &input.confirm_name)
+    // Capture identity before scheduling; a later selection must not redirect archive.
+    let project = state.store.active_jam()?.id;
+    let actor = state.store.current_member()?.id;
+    execute_unbound(&state, app, true, move |s| {
+        s.archive_project(&actor, &project, &input.confirm_name)
     })
     .await
 }
@@ -241,8 +245,9 @@ pub async fn import_jam_json(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState> {
-    execute(&state, app, true, move |s| {
-        s.import_jam_file(&s.current_member()?.id, std::path::Path::new(&path))
+    let actor = state.store.current_member()?.id;
+    execute_unbound(&state, app, true, move |s| {
+        s.import_jam_file(&actor, std::path::Path::new(&path))
     })
     .await
 }

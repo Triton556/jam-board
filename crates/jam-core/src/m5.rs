@@ -251,6 +251,13 @@ impl Store {
     /// Only an existing registered local image can be added to the desktop asset scope.
     pub fn asset_preview_path(&self, id: &str) -> Result<Option<std::path::PathBuf>> {
         let location = self.read(|c| {
+            let project = c
+                .query_row("SELECT jam_id FROM assets WHERE id=?", [id], |r| {
+                    r.get::<_, String>(0)
+                })
+                .optional()?
+                .ok_or_else(|| Error::NotFound("asset".into()))?;
+            crate::projects::ensure_scope(c, &project)?;
             c.query_row("SELECT location FROM assets WHERE id=?", [id], |r| {
                 r.get::<_, String>(0)
             })
@@ -317,6 +324,7 @@ impl Store {
         }
         self.write(|c| {
             require_human(c, actor)?;
+            crate::projects::ensure_member_scope(c, &input.id)?;
             let old = member(c, &input.id)?;
             if old.kind == "agent" && input.avatar.is_some() {
                 return Err(invalid(
@@ -445,10 +453,51 @@ impl Store {
         self.get_settings()
     }
     pub fn reset_jam(&self, actor: &str, confirm_name: &str) -> Result<AppState> {
-        self.write(|c|{require_human(c,actor)?;let j=jam(c)?;if confirm_name!=j.name{return Err(invalid("confirmName","Type the exact jam name"));}
-            let changed=c.execute("UPDATE tasks SET archived_at=?,updated_at=?,updated_by=? WHERE jam_id=? AND archived_at IS NULL",params![now(),now(),actor,j.id])?;
-            c.execute("UPDATE jams SET archived=1 WHERE id=?",[&j.id])?;
-            event(c,Some(&j.id),actor,"jam.archived",None,serde_json::json!({"name":j.name,"tasks":changed}))
+        self.archive_project(actor, &self.active_jam()?.id, confirm_name)
+    }
+    pub fn archive_project(
+        &self,
+        actor: &str,
+        expected_project: &str,
+        confirm_name: &str,
+    ) -> Result<AppState> {
+        self.write(|c| {
+            require_human(c, actor)?;
+            if crate::projects::bound_project(c)?.is_some() {
+                return Err(Error::Forbidden(
+                    "Only the desktop may archive projects".into(),
+                ));
+            }
+            let j = jam(c)?;
+            if j.id != expected_project { return Err(Error::Conflict); }
+            let running:i64=c.query_row("SELECT count(*) FROM tasks WHERE jam_id=? AND status='in_progress' AND archived_at IS NULL",[&j.id],|r|r.get(0))?;
+            if running>0 { return Err(invalid("project",&format!("{running} tasks are still In progress. Pause new work, then let running tasks finish or release them before archiving."))); }
+            if confirm_name != j.name {
+                return Err(invalid("confirmName", "Type the exact project name"));
+            }
+            // Project archival must not erase individual task archive state.
+            c.execute("UPDATE jams SET archived=1 WHERE id=?", [&j.id])?;
+            event(
+                c,
+                Some(&j.id),
+                actor,
+                "jam.archived",
+                None,
+                serde_json::json!({"name":j.name}),
+            )?;
+            let next = c
+                .query_row(
+                    "SELECT id FROM jams WHERE archived=0 ORDER BY created_at DESC,id DESC LIMIT 1",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()?;
+            if let Some(next) = next {
+                crate::projects::select(c, &next, Some(actor))?;
+            } else {
+                c.execute("DELETE FROM settings WHERE key='current_project_id'", [])?;
+            }
+            Ok(())
         })?;
         self.app_state()
     }

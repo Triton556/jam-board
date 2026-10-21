@@ -22,7 +22,7 @@ vi.mock("@tanstack/react-router", async (original) => ({
 }));
 beforeEach(async () => {
   vi.restoreAllMocks();
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 function deferred() {
   let resolve!: () => void;

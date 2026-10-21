@@ -34,7 +34,7 @@ import { TaskDrawer } from "./TaskDrawer";
 import { taskPatch, taskSchema, taskValues } from "./task-form";
 
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   mockApi.setLatency(0);
   mockApi.calls.length = 0;
   useUiStore.setState({ taskChanges: {}, highlights: {}, toasts: [] });

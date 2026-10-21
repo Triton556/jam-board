@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 39);
+    assert_eq!(actual.len(), 40);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -143,4 +143,104 @@ async fn http_auth_origin_identity_port_and_tools() {
     client.cancel().await.unwrap();
     server.stop().await;
     drop(blocker);
+}
+
+#[tokio::test]
+async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
+    let d = tempfile::tempdir().unwrap();
+    let s = Arc::new(Store::open(d.path().join("projects.db")).unwrap());
+    let (first, h) = s
+        .create_jam("HTTP first", None, None, None, "UTC", "Human")
+        .unwrap();
+    let (second, _) = s
+        .create_jam("HTTP second", None, None, None, "UTC", "Other human")
+        .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        s.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Project", first.key_prefix.parse().unwrap());
+    headers.insert("X-Jam-Agent", "Pinned HTTP worker".parse().unwrap());
+    let http = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+    let transport = StreamableHttpClientTransport::with_client(
+        http,
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-pin", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    let read = || {
+        CallToolRequestParams::new("get_session_context")
+            .with_arguments(serde_json::json!({}).as_object().unwrap().clone())
+    };
+    let result = client.call_tool(read()).await.unwrap();
+    assert_eq!(result.structured_content.unwrap()["projectId"], first.id);
+    assert_eq!(s.active_jam().unwrap().id, second.id);
+    s.select_project(&first.id).unwrap();
+    s.select_project(&second.id).unwrap();
+    let result = client.call_tool(read()).await.unwrap();
+    assert_eq!(result.structured_content.unwrap()["projectId"], first.id);
+    // Agent changes still land in the pinned first project.
+    let created = client
+        .call_tool(
+            CallToolRequestParams::new("create_epic").with_arguments(
+                serde_json::json!({"title":"Pinned epic"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.structured_content.unwrap()["jamId"], first.id);
+    assert_eq!(s.get_project().unwrap().epics, 0);
+    let pinned = s.for_project(&first.id).unwrap();
+    assert_eq!(pinned.get_project().unwrap().epics, 1);
+    assert!(
+        pinned
+            .list_members()
+            .unwrap()
+            .iter()
+            .any(|m| m.member.name == "Pinned HTTP worker")
+    );
+    assert!(
+        s.list_members()
+            .unwrap()
+            .iter()
+            .all(|m| m.member.name != "Pinned HTTP worker")
+    );
+    // Archival blocks an existing session until that exact project is restored.
+    s.select_project(&first.id).unwrap();
+    s.reset_jam(&h.id, &first.name).unwrap();
+    let result = client.call_tool(read()).await.unwrap();
+    assert_eq!(result.is_error, Some(true));
+    assert_eq!(result.structured_content.unwrap()["code"], "archived");
+    s.restore_project(&first.id).unwrap();
+    assert_eq!(
+        client
+            .call_tool(read())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["projectId"],
+        first.id
+    );
+    client.cancel().await.unwrap();
+    server.stop().await;
 }

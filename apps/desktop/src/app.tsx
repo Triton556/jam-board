@@ -23,6 +23,7 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Boxes,
+  ChevronDown,
   Images,
   Inbox,
   LayoutDashboard,
@@ -90,6 +91,11 @@ import { Welcome } from "./features/onboarding/Welcome";
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((m) => ({
     default: m.SettingsPage,
+  })),
+);
+const ProjectsPage = lazy(() =>
+  import("./features/projects/ProjectsPage").then((m) => ({
+    default: m.ProjectsPage,
   })),
 );
 
@@ -410,9 +416,19 @@ function Shell() {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <div className="jam-name">
-            {board.data?.jam.name ?? app.data.jam?.name}
-          </div>
+          <Link
+            to="/projects"
+            className="project-switcher"
+            aria-label={`Projects · ${app.data.jam?.name}`}
+          >
+            <span className="project-switcher-label">
+              <small>PROJECT</small>
+              <strong className="project-switcher-title">
+                {app.data.jam?.name}
+              </strong>
+            </span>
+            <ChevronDown size={16} />
+          </Link>
           {board.data?.jam.theme && (
             <Stamp className="theme-stamp">{board.data.jam.theme}</Stamp>
           )}
@@ -639,6 +655,11 @@ const welcomeRoute = createRoute({
   path: "/welcome",
   component: Welcome,
 });
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
+  component: ProjectsPage,
+});
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
@@ -760,6 +781,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     indexRoute,
     welcomeRoute,
+    projectsRoute,
     shellRoute.addChildren([
       planRoute,
       epicRoute,

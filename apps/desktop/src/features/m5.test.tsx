@@ -12,7 +12,7 @@ import { assetKind, assetSchema } from "./assets/model";
 import { archiveConfirmed } from "./settings/SettingsPage";
 
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   mockApi.calls.length = 0;
 });
 it("infers every asset kind including query strings and Windows paths", () => {

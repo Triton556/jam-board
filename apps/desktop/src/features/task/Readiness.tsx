@@ -127,7 +127,7 @@ function ReadyDialog() {
             aria-label="Override reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Why is it safe to start with this brief?"
+            placeholder="Why is this brief ready despite the missing details?"
           />
           <small>
             Use at least 10 characters. This reason stays in the journal.

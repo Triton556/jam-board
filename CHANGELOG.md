@@ -3,6 +3,43 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.1] - 2026-10-21
+
+### Added
+
+- A persistent project picker: create separate boards, switch from the header,
+  archive projects and restore them without changing individual task archives.
+- Project-pinned MCP sessions and the read-only `get_session_context` tool.
+  Generated stdio and HTTP configurations explicitly select their project.
+- Scoped planning handoffs for a project, epic, story or task. Prompts preserve
+  human notes, ask focused questions and explicitly separate refinement from work.
+- An expandable workflow guide, visible epic-to-story navigation and a clearer
+  three-step agent setup with a read-only connection check.
+- Project isolation, migration, concurrency, stdio/HTTP pinning and UI regression
+  tests; an automated check keeps application, package and changelog versions aligned.
+
+### Changed
+
+- UI selection no longer redirects connected agents. Native operations capture
+  the initiating project, while MCP sessions keep an immutable project binding.
+- Member presence, statuses, board events, recent calls, questions, attachments
+  and references are project-scoped. Member profiles remain shared locally.
+- Creating or loading a demo project keeps existing projects accessible.
+  Archiving refuses while any task is In progress; finish or release that work first.
+- Setup no longer suggests claiming a task just to test the connection.
+  Ready describes a sufficiently specified brief, not human permission to execute.
+
+### Compatibility and migration
+
+- Database migration v5 initializes selection from the previously visible project
+  and backfills project membership. Existing hierarchy and task archives are retained;
+  old bulk-archived task flags are not guessed or automatically reversed.
+- MCP sessions without an explicit project pin capture the selected project at
+  initialization. Reconnect with `JAM_BOARD_PROJECT` / `--project` or
+  `X-Jam-Project` to target a different board; there is no agent-side switch tool.
+- This prerelease has 40 MCP tools. Durable story/epic execution approval gates
+  are a subsequent development slice, not a capability of this alpha.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added

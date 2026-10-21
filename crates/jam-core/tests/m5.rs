@@ -189,6 +189,20 @@ fn snapshot_roundtrip_renumbers_keys_maps_members_and_rejects_corruption() {
 #[test]
 fn archive_jam_keeps_all_records_and_settings_persist() {
     let (_d, s, actor) = setup();
+    assert!(s.reset_jam(&actor, "Cozy Jam 48").is_err());
+    for task in s
+        .list_tasks(
+            None,
+            TaskFilter {
+                status: Some(vec!["in_progress".into()]),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .tasks
+    {
+        s.release_task(&actor, &task.key, None).unwrap();
+    }
     let before = s.export_jam().unwrap();
     assert!(s.reset_jam(&actor, "cozy jam 48").is_err());
     let state = s.reset_jam(&actor, &before.jam.name).unwrap();
@@ -206,7 +220,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
             |r| r.get::<_, i64>(0)
         )
         .unwrap(),
-        22
+        0
     );
     assert_eq!(
         c.query_row("SELECT archived FROM jams", [], |r| r.get::<_, i64>(0))

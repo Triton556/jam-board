@@ -17,16 +17,21 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
+> Development prerelease: **0.3.0-alpha.1**. Multi-project sessions are implemented;
+> durable story/epic execution approval is not enforced in this alpha yet.
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.1.md).
+
 ## Features
 
 - 📝 Epics → stories → tasks, complete briefs and a live five-column board.
-- 🤖 MCP over stdio and authenticated loopback HTTP: 39 tools, hierarchy resources, planning/work/review prompts and `wait_for_changes`.
+- 🤖 MCP over stdio and authenticated loopback HTTP: project-pinned sessions, hierarchy resources, planning/work/review prompts and `wait_for_changes`.
 - ✨ Live agent changes, with a colored highlight and a toast.
 - 🔎 A virtual table tested with 2,000 tasks, with sortable columns and shareable URL filters.
 - 🤝 Conflict-safe editing that preserves your draft when an agent changes the same task.
 - 🎨 A References canvas, local media, team presence and an epic journal.
 - 💾 Local SQLite storage. No cloud, accounts or telemetry. JSON export/import and non-destructive archives.
 - 🌙 Light and dark paper themes, self-hosted fonts and optional paper-rustle sounds.
+- 🗂️ Separate project boards, a visible project switcher and recoverable project archives.
 
 ## Screenshots
 
@@ -45,6 +50,18 @@ Plan shows the Snowball run. Board, Inbox and References show the bundled demo i
 3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
 4. Workers claim tasks and submit reports with real test evidence. A human or the brain accepts them or requests another round.
 5. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
+
+**Where are features?** Open **Plan**, select an epic and choose **Stories** (or the story-count button in its overview). A story is the feature-sized outcome with acceptance criteria; its tasks are the implementation briefs. There is no additional Feature level.
+
+**Rough idea or corrections?** Use **Refine with brain** on an epic, story or task. Review and copy the scoped planning prompt into your connected agent's chat. It asks the brain to read existing notes and references, clarify gaps in Inbox, and reconcile your edits without starting implementation. Copying a prompt does not launch an agent.
+
+## Separate projects
+
+Click the project name at the top to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
+
+MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration for the selected project's prefix. Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
+
+**Settings → Data → Archive this project** keeps its data for **Your projects → Archived projects → Restore & open**. Finish or release In progress tasks before archiving. Archiving does not silently cancel workers or rewrite individual task archive flags. Data archived by older builds keeps its original per-task flags.
 
 ## Inbox
 
@@ -80,7 +97,7 @@ Jam Board is **Windows-first**; Linux and macOS runtime behavior is unverified. 
 
 The installer is **unsigned**. Windows SmartScreen may warn that the publisher is unknown. Only run an installer you trust; compare its SHA-256 with the release's `SHA256SUMS.txt`.
 
-Your database, MCP token and logs live in `%APPDATA%\dev.triton556.jamboard\`. Settings → Data opens the folder. Asset files remain at their original locations. The uninstaller is configured to preserve this data folder. **An installed upgrade to 0.2.0 and its data-retention behavior have not been verified.** Back up your project with Export JSON before upgrading. To remove data permanently, close the application and stdio agents, back up anything you need, then remove that folder yourself.
+Your database, MCP token and logs live in `%APPDATA%\dev.triton556.jamboard\`. Settings → Data opens the folder. Asset files remain at their original locations. The uninstaller is configured to preserve this data folder. **Installed upgrades and their data-retention behavior have not been verified for this prerelease.** Back up your project with Export JSON before upgrading. To remove data permanently, close the application and stdio agents, back up anything you need, then remove that folder yourself.
 
 ## Connect your agent
 
@@ -91,7 +108,7 @@ Open Settings → Agents for snippets containing your actual executable path and
 ```toml
 [mcp_servers.jam-board]
 command = 'C:\Path\To\jam-board-mcp.exe'
-env = { JAM_AGENT_NAME = "Codex" }
+env = { JAM_AGENT_NAME = "Codex", JAM_BOARD_PROJECT = "JB" }
 ```
 
 **Codex · HTTP** — keep Jam Board open and set `JAM_BOARD_TOKEN` in the environment inherited by Codex, using Copy in Settings:
@@ -100,24 +117,26 @@ env = { JAM_AGENT_NAME = "Codex" }
 [mcp_servers.jam-board-http]
 url = "http://127.0.0.1:47321/mcp"
 bearer_token_env_var = "JAM_BOARD_TOKEN"
-http_headers = { "X-Jam-Agent" = "Codex" }
+http_headers = { "X-Jam-Agent" = "Codex", "X-Jam-Project" = "JB" }
 ```
 
 **Claude Code · stdio** — run in PowerShell:
 
 ```powershell
-claude mcp add jam-board --env JAM_AGENT_NAME=Claude -- 'C:\Path\To\jam-board-mcp.exe'
+claude mcp add jam-board --env JAM_AGENT_NAME=Claude --env JAM_BOARD_PROJECT=JB -- 'C:\Path\To\jam-board-mcp.exe'
 ```
 
 **Claude Code · HTTP**:
 
 ```powershell
-claude mcp add --transport http jam-board http://127.0.0.1:47321/mcp --header 'Authorization: Bearer <token>' --header 'X-Jam-Agent: Claude'
+claude mcp add --transport http jam-board http://127.0.0.1:47321/mcp --header 'Authorization: Bearer <token>' --header 'X-Jam-Agent: Claude' --header 'X-Jam-Project: JB'
 ```
 
-Try: *“Use the jam-board MCP server: call get_board, then take the highest-priority unassigned Ready task, read its brief, claim it, and call submit_report when finished.”*
+Replace `JB` with your project's key prefix from Settings. Without an explicit prefix, a new session captures the currently selected project once; it never follows later UI switches.
 
-The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. Agents can recover activity with `list_changes_since`, then use `wait_for_changes` for reports, answers and edits; keep the returned `nextCursor`, including on timeout. See the [full MCP contract](docs/mcp.md) for all 39 tools and [v0.2 integration changes](docs/mcp.md#breaking-changes-in-v02).
+Try a read-only check first: *“Use the jam-board MCP server: call get_session_context, get_project and get_board. Tell me which project this connection belongs to and summarize its plan. Do not change the board, claim tasks or start workers.”*
+
+The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. Agents can recover activity with `list_changes_since`, then use `wait_for_changes` for reports, answers and edits; keep the returned `nextCursor`, including on timeout. See the [full MCP contract](docs/mcp.md) and [v0.2 integration changes](docs/mcp.md#breaking-changes-in-v02).
 
 ## How it works
 
@@ -154,6 +173,8 @@ npm run tauri dev
 From the repository root:
 
 ```powershell
+node scripts/check-versions.mjs
+node --test scripts/check-versions.test.mjs
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
@@ -172,6 +193,8 @@ npm run tauri build
 ```
 
 Playwright starts mock-backed Vite servers. Local tests use installed Chrome; CI uses Playwright Chromium. The `perf` project measures production wheel/flick/PageDown scenarios and is manual-only in CI. Set `VITE_MOCK_BRIDGE=1` before `npm run dev` to develop the UI without Tauri. The mock shares generated types and a fixture exported by `cargo run -p jam-core --example export-demo-fixture`.
+
+Set `JAM_BROWSER_PATH` to an already installed Chromium executable when it is not in Playwright's default Chrome location. This selects an executable only; it does not change browser or operating-system permissions. UI design decisions and their source rationale are recorded in [Workflow and usability](docs/workflow-ux.md).
 
 Release builds prepare the sidecar automatically. The NSIS installer is written beneath `target/release/bundle/nsis/`. `node scripts/m6-install-check.mjs` runs the explicit per-user installation check, refuses pre-existing default data, and removes only the fresh data it created after verifying uninstall retention. Development data and raw traces belong in `.dev-data`.
 

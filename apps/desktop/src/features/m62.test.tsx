@@ -11,7 +11,7 @@ import { TaskCard } from "./board/TaskCard";
 import { TaskTable } from "./table/TaskTable";
 
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   await mockApi.setSettings({ estimatesEnabled: false, colorBy: "none" });
 });
 it("loading a new mock demo uses fresh per-jam board preferences", async () => {
@@ -21,7 +21,7 @@ it("loading a new mock demo uses fresh per-jam board preferences", async () => {
     estimatesEnabled: true,
     wipLimit: 9,
   });
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   expect((await mockApi.appState()).jam?.id).not.toBe(before);
   expect(await mockApi.getSettings()).toMatchObject({
     colorBy: "epic",
