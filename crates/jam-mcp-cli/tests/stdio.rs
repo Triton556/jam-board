@@ -1449,3 +1449,88 @@ async fn execution_requires_exact_native_human_approval_not_mcp_text_or_role() {
     worker.cancel().await.unwrap();
     brain.cancel().await.unwrap();
 }
+
+#[tokio::test]
+async fn agent_done_needs_independent_review_and_archived_claims_can_be_released_over_stdio() {
+    let (_dir, s, h) = fixture();
+    let sk = planning_with_human_start(&s, &h);
+    let story = s.get_story(&sk).unwrap().story;
+    let brain = client(&s.path, "Independent review brain").await;
+    let worker = client(&s.path, "Recovery worker").await;
+    data(call(&brain, "become_brain", json!({"epicKey":story.epic_id})).await);
+    let mut done = task_input(&sk, "Cannot fabricate Done");
+    done["status"] = json!("done");
+    error(call(&brain, "create_task", done).await, "forbidden");
+    let mut args = task_input(&sk, "Brain's own work");
+    args["status"] = json!("ready");
+    let own = data(call(&brain, "create_task", args).await);
+    let key = own["key"].as_str().unwrap();
+    data(call(&brain, "claim_task", json!({"key":key})).await);
+    data(
+        call(
+            &brain,
+            "submit_report",
+            json!({"key":key,"summaryMd":"Own report","changedFiles":[],"tests":[]}),
+        )
+        .await,
+    );
+    for operation in ["move_task", "release_task"] {
+        error(
+            call(&brain, operation, json!({"key":key,"status":"done"})).await,
+            "forbidden",
+        );
+    }
+    error(
+        call(
+            &brain,
+            "review_task",
+            json!({"key":key,"verdict":"accept","commentsMd":"Own acceptance"}),
+        )
+        .await,
+        "forbidden",
+    );
+    data(call(&brain, "release_task", json!({"key":key})).await);
+    error(
+        call(&brain, "move_task", json!({"key":key,"status":"done"})).await,
+        "forbidden",
+    );
+    assert!(s.get_task(key).unwrap().reviews.is_empty());
+    s.move_task(&h.id, key, "done", None, None).unwrap();
+    assert!(s.get_task(key).unwrap().reviews.is_empty());
+    let mut args = task_input(&sk, "Claim survives parent archive");
+    args["status"] = json!("ready");
+    let task = data(call(&brain, "create_task", args).await);
+    let key = task["key"].as_str().unwrap();
+    data(call(&worker, "claim_task", json!({"key":key})).await);
+    s.set_epic_status(&h.id, &story.epic_id, "archived", None)
+        .unwrap();
+    let revision = s
+        .get_execution(&jam_core::ExecutionScope {
+            kind: jam_core::ExecutionScopeType::Story,
+            id: story.audit.id.clone(),
+        })
+        .unwrap()
+        .revision;
+    error(
+        call(&brain, "release_task", json!({"key":key})).await,
+        "validation",
+    );
+    let released = data(call(&worker, "release_task", json!({"key":key})).await);
+    assert_eq!(released["status"], "backlog");
+    assert!(released["assigneeId"].is_null());
+    let scope = data(
+        call(
+            &brain,
+            "get_execution",
+            json!({"scope":{"type":"story","id":story.audit.id}}),
+        )
+        .await,
+    );
+    assert_eq!(scope["effectiveState"], "paused");
+    assert_eq!(scope["revision"], revision);
+    assert!(s.get_task(key).unwrap().reports.is_empty());
+    let project = s.active_jam().unwrap();
+    s.reset_jam(&h.id, &project.name).unwrap();
+    worker.cancel().await.unwrap();
+    brain.cancel().await.unwrap();
+}

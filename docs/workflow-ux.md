@@ -100,6 +100,31 @@ Checks: success receipt survives card removal; focus stays in the relevant
 section; modal errors remain inside its accessible boundary; input survives a
 failed save; no duplicate pending submission; generic answers never authorize work.
 
+## 6. Keep navigation legible at an ordinary desktop size
+
+**Scenario:** at an 1180px window a person cannot identify the Plan icon or discover
+Draft epics because a compact layout hides labels and its filter. The compact
+main rail now retains text; the epic rail retains titles, planning state and its
+filter. A smaller width reduces detail rather than removing the means to find
+work. This applies recognition-over-recall, not a new navigation hierarchy.
+
+Normal execution controls show permission, counts and the next action. Inherited
+and partial grants remain explicit; repeated background explanation lives in a
+“How starting works” disclosure. The exact-scope confirmation still shows all
+consequences. [Progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
+supports this layering; the concrete layout is our inference, verified separately.
+
+Keyboard Enter retains the task-opening meaning advertised by its button; Space
+is the distinct drag action. [WAI-ARIA dialog guidance](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+requires focus inside the dialog and return to an appropriate workflow target.
+Native pointer focus already worked in the baseline; explicit activation focus
+also covers programmatic/accessibility activation without relying on pointer focus.
+
+**Honest activity:** a live agent heartbeat is not evidence of work on every task
+assigned to it. Fresh unscoped/other-task presence remains visible but quiet;
+matching task-scoped updates retain the colored paper ring, pencil and handwritten
+status. This follows the same visible-state/capability-boundary rationale above.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests

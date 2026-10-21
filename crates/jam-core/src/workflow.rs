@@ -120,7 +120,15 @@ pub(crate) fn transition(
     }
     let mut overridden = false;
     if target == "done" {
-        require_privileged(c, actor, &e)?;
+        // Agent completion must pass the independent current-round report review.
+        // Checking only the current holder is insufficient: releasing a claim or
+        // assigning it away must not turn an author's own report into approvable work.
+        if member(c, actor)?.kind != "human" {
+            return Err(Error::Forbidden(
+                "Agents must use review_task with an independent current-round report to mark work Done; an agent cannot approve its own work".into(),
+            ));
+        }
+        // Humans retain explicit manual completion, without fabricating a review.
     }
     if target == "ready" && target != t.status {
         let r = readiness(c, &t.key)?;

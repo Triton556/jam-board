@@ -43,10 +43,12 @@ export function PlanningStatus({
     },
   });
   return (
-    <div>
+    <div className="planning-status">
+      <span className="planning-status-label small muted">Plan status</span>
       <CustomSelect
-        label={`${level} status`}
+        label={`${level} plan status`}
         value={value}
+        disabled={update.isPending}
         onChange={(status) => update.mutate({ status })}
         options={["draft", "active", "done", "archived"].map((value) => ({
           value,

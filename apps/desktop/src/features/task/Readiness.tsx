@@ -13,7 +13,7 @@ export const readyLabels = {
   change: "Change",
   test: "Test",
   result: "Result",
-  story_active: "Story active",
+  story_active: "Story planned",
 };
 export function ReadinessStrip({
   readiness,
@@ -35,8 +35,10 @@ export function ReadinessStrip({
               data-readiness={code}
               data-missing={missing}
               title={
-                readiness.missing.find((i) => i.code === code)?.message ??
-                "Complete"
+                code === "story_active"
+                  ? "The story's plan status must be Active. This is not execution permission."
+                  : (readiness.missing.find((i) => i.code === code)?.message ??
+                    "Complete")
               }
               className={missing ? "muted" : "ok"}
             >

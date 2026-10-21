@@ -126,6 +126,7 @@ import { appQuery, boardQuery, membersQuery, tasksQuery } from "./lib/queries";
 import { paperRustle } from "./lib/sound";
 import type { Theme } from "./lib/types";
 import { useUiStore } from "./lib/ui-store";
+import { showReadyWindow } from "./lib/window-ready";
 
 const client = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, retry: false } },
@@ -240,34 +241,15 @@ function Root() {
     document.documentElement.dataset.ready = "true";
     if (!shown.current && isTauri()) {
       shown.current = true;
-      void new Promise<void>((resolve) => {
-        const wait = () =>
-          document.querySelector(
-            ".board-columns, .welcome, .identity, .feature-page, .table-page, [role=alert]",
-          )
-            ? resolve()
-            : requestAnimationFrame(wait);
-        wait();
-      })
-        .then(() => document.fonts.ready)
-        .then(
-          () =>
-            new Promise<void>((resolve) =>
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve()),
-              ),
-            ),
-        )
-        .then(() => getCurrentWindow().show())
-        .then(
-          () =>
-            new Promise<void>((resolve) =>
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve()),
-              ),
-            ),
-        )
-        .then(() => api.appReady());
+      void showReadyWindow({
+        fontsReady: document.fonts.ready,
+        show: () => getCurrentWindow().show(),
+        ready: () => api.appReady(),
+      }).catch((error) => {
+        useUiStore
+          .getState()
+          .error(`Could not finish opening the window: ${String(error)}`);
+      });
     }
     scheme.addEventListener("change", apply);
     return () => scheme.removeEventListener("change", apply);
@@ -391,7 +373,7 @@ function Shell() {
                 aria-label={name}
               >
                 <Icon size={20} />
-                {expanded && <span>{name}</span>}
+                <span className="nav-label">{name}</span>
                 {name === "Inbox" && <InboxBadge count={questionCount} />}
               </Link>
             </Tooltip>

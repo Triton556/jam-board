@@ -39,12 +39,12 @@ beforeEach(async () => {
   };
   useUiStore.setState({ now, highlights: {} });
 });
-it("uses scoped status text and fresh unscoped fallback", () => {
+it("uses scoped status text and clearly unconfirmed unscoped presence", () => {
   expect(agentWorking(task, member, now)?.text).toBe(
     "Worker · implementing snow tiles",
   );
   expect(agentWorking(task, { ...member, statusScope: null }, now)?.text).toBe(
-    "Worker is working…",
+    "Worker · task activity unconfirmed",
   );
   expect(
     agentWorking(task, { ...member, statusAt: ago(1200) }, now)?.mode,
@@ -88,7 +88,7 @@ it("checks exact online/fresh/stale boundaries and ignores a stale cached online
       { ...member, statusScope: null, statusAt: ago(600) },
       now,
     )?.mode,
-  ).toBe("active");
+  ).toBe("quiet");
   expect(
     agentWorking(
       task,
@@ -130,7 +130,7 @@ it("reduced motion leaves readable working text, a static ring/pencil and drawn 
 });
 it("renders the fallback and does not change arrival highlight into a work glow", () => {
   render(<TaskCard task={task} members={[{ ...member, statusScope: null }]} />);
-  expect(screen.getByText("Worker is working…")).toBeVisible();
+  expect(screen.getByText("Worker · task activity unconfirmed")).toBeVisible();
   expect(screen.getByTestId("task-card")).toHaveAttribute(
     "data-highlighted",
     "false",
@@ -234,4 +234,22 @@ it("paints fifty table rings from one CSS rotor without per-row animations", () 
   expect(container.querySelector(".working-animated")).toHaveStyle({
     animation: "none",
   });
+});
+
+it("an agent's activity on another task never animates this assigned card as working", () => {
+  const state = agentWorking(
+    task,
+    { ...member, statusScope: { type: "task", id: "another-task" } },
+    now,
+  );
+  expect(state?.mode).toBe("quiet");
+  expect(state?.text).toBe("Worker · active elsewhere");
+  expect(state?.tooltip).toContain("belongs to another task");
+  expect(
+    agentWorking(
+      task,
+      { ...member, statusScope: null, statusAt: ago(2520) },
+      now,
+    ),
+  ).toBeNull();
 });

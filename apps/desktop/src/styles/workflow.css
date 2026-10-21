@@ -289,3 +289,64 @@
   margin: 4px 0 0;
   line-height: 1.6;
 }
+.column-policy {
+  margin: -4px 2px 10px;
+  min-height: 28px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.column-policy.over-wip {
+  color: var(--ink);
+  font-weight: 650;
+}
+.execution-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  padding: 12px 16px;
+}
+.execution-controls > .execution-heading {
+  grid-column: 1;
+  grid-row: 1;
+}
+.execution-controls > .execution-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end;
+}
+.execution-controls > p,
+.execution-help {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.execution-help summary {
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  width: fit-content;
+}
+.execution-help p {
+  margin-bottom: 0;
+}
+@media (width < 700px) {
+  .execution-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .execution-controls > .execution-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+  }
+}
+.planning-status {
+  display: grid;
+  gap: 5px;
+}
+.planning-status-label {
+  font-size: 11px;
+}
+.epic-filter {
+  display: grid;
+  gap: 5px;
+}

@@ -949,6 +949,11 @@ export class MockBridge implements JamApi {
   ) {
     const jam = this.state.jam;
     if (!jam) throw new JamError("not_found", "No active jam");
+    if (input.status === "done" && actor.kind !== "human")
+      throw new JamError(
+        "forbidden",
+        "Agents must use independent report review to mark Done",
+      );
     const title = input.title.trim();
     if (!title || title.length > 140)
       throw new JamError("validation", "Use 1–140 characters", "title");
@@ -1109,14 +1114,10 @@ export class MockBridge implements JamApi {
     const before = this.tasks.find((t) => t.key === input.beforeKey);
     if (task.archivedAt)
       throw new JamError("archived", "Unarchive this task first");
-    if (
-      input.status === "done" &&
-      actor.kind !== "human" &&
-      task.epic.brainMemberId !== actor.id
-    )
+    if (input.status === "done" && actor.kind !== "human")
       throw new JamError(
         "forbidden",
-        "Only a human or the epic's brain may set Done",
+        "Agents must use independent report review to mark Done",
       );
     if (input.status === "ready" && task.status !== "ready")
       this.guardReady(task, actor, input.overrideReason);
@@ -1975,14 +1976,10 @@ export class MockBridge implements JamApi {
       next.brief = clone(input.brief);
     }
     if (input.status != null) {
-      if (
-        input.status === "done" &&
-        actor.kind !== "human" &&
-        task.epic.brainMemberId !== actor.id
-      )
+      if (input.status === "done" && actor.kind !== "human")
         throw new JamError(
           "forbidden",
-          "Only a human or the epic's brain may set Done",
+          "Agents must use independent report review to mark Done",
         );
       if (input.status === "ready" && task.status !== "ready")
         this.guardReady(next, actor);

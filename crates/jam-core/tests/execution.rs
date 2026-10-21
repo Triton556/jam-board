@@ -849,3 +849,215 @@ fn reopening_imported_closed_stories_cannot_inherit_a_new_parent_start() {
         );
     }
 }
+
+#[test]
+fn agent_completion_always_requires_independent_review_but_human_manual_done_remains() {
+    let f = fixture();
+    let s = &f.store;
+    let scope = story(&f.story);
+    let t = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Start);
+    s.claim_task(&f.brain.id, &t.task.key).unwrap();
+    s.submit_report(&f.brain.id, report(&t.task.key)).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+    let before = serde_json::to_value(s.get_task(&t.task.key).unwrap()).unwrap();
+    let seq = s.latest_seq().unwrap();
+    assert!(matches!(
+        s.review_task(
+            &f.brain.id,
+            ReviewTask {
+                key: t.task.key.clone(),
+                verdict: "accept".into(),
+                comments_md: "Self approval".into(),
+                failed_tests: None,
+            }
+        ),
+        Err(Error::Forbidden(_))
+    ));
+    assert!(matches!(
+        s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+        Err(Error::Forbidden(_))
+    ));
+    assert!(matches!(
+        s.move_task_with_override(
+            &f.brain.id,
+            &t.task.key,
+            "done",
+            None,
+            None,
+            Some("Planner override")
+        ),
+        Err(Error::Forbidden(_))
+    ));
+    assert!(matches!(
+        s.release_task(&f.brain.id, &t.task.key, Some("done")),
+        Err(Error::Forbidden(_))
+    ));
+    let mut direct = input(&f.story);
+    direct.status = Some("done".into());
+    assert!(matches!(
+        s.create_task(&f.brain.id, direct),
+        Err(Error::Forbidden(_))
+    ));
+    assert_eq!(s.latest_seq().unwrap(), seq);
+    assert_eq!(
+        serde_json::to_value(s.get_task(&t.task.key).unwrap()).unwrap(),
+        before
+    );
+    // Clearing/reassigning the holder does not erase current-round authorship.
+    for assignee in [None, Some(f.worker.id.as_str())] {
+        s.assign_task(&f.human.id, &t.task.key, assignee).unwrap();
+        assert!(matches!(
+            s.review_task(
+                &f.brain.id,
+                ReviewTask {
+                    key: t.task.key.clone(),
+                    verdict: "accept".into(),
+                    comments_md: "Changed holder".into(),
+                    failed_tests: None,
+                }
+            ),
+            Err(Error::Forbidden(_))
+        ));
+        assert!(matches!(
+            s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+            Err(Error::Forbidden(_))
+        ));
+    }
+    s.assign_task(&f.human.id, &t.task.key, Some(&f.brain.id))
+        .unwrap();
+    // Even relinquishing the claim cannot convert an author's evidence to approval.
+    s.release_task(&f.brain.id, &t.task.key, None).unwrap();
+    assert!(matches!(
+        s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+        Err(Error::Forbidden(_))
+    ));
+    assert!(s.get_task(&t.task.key).unwrap().reviews.is_empty());
+    s.move_task(&f.human.id, &t.task.key, "done", None, None)
+        .unwrap();
+    assert_eq!(s.get_task(&t.task.key).unwrap().task.status, "done");
+    assert!(
+        s.get_task(&t.task.key).unwrap().reviews.is_empty(),
+        "manual human completion is not fabricated evidence review"
+    );
+    let own = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Start);
+    s.claim_task(&f.human.id, &own.task.key).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+    s.release_task(&f.human.id, &own.task.key, Some("done"))
+        .unwrap();
+    assert_eq!(s.get_task(&own.task.key).unwrap().task.status, "done");
+    // Human's version-checked patch uses the same explicit manual policy.
+    let patched = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    s.update_current_task(TaskEditInput {
+        key: patched.task.key.clone(),
+        expected_updated_at: patched.task.updated_at,
+        patch: TaskPatch {
+            status: Some("done".into()),
+            ..Default::default()
+        },
+    })
+    .unwrap();
+    assert_eq!(s.get_task(&patched.task.key).unwrap().task.status, "done");
+}
+
+#[test]
+fn existing_claim_release_survives_pause_and_archived_task_or_parent_without_new_authority() {
+    for archived in ["none", "task", "story", "epic"] {
+        for human_recovery in [false, true] {
+            let f = fixture();
+            let s = &f.store;
+            let scope = story(&f.story);
+            let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+            change(s, &f.human, scope.clone(), ExecutionAction::Start);
+            s.claim_task(&f.worker.id, &task.task.key).unwrap();
+            change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+            match archived {
+                "task" => {
+                    s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+                }
+                "story" => {
+                    s.set_story_status(&f.human.id, &f.story.key, "archived", None)
+                        .unwrap();
+                }
+                "epic" => {
+                    s.set_epic_status(&f.human.id, &f.epic.key, "archived", None)
+                        .unwrap();
+                }
+                _ => {}
+            }
+            let before = s.get_task(&task.task.key).unwrap();
+            let grant = s.get_execution(&scope).unwrap();
+            let seq = s.latest_seq().unwrap();
+            assert!(
+                s.release_task(&f.brain.id, &task.task.key, None).is_err(),
+                "nonholder brain cannot cancel somebody else's claim"
+            );
+            assert_eq!(s.latest_seq().unwrap(), seq);
+            let actor = if human_recovery {
+                &f.human.id
+            } else {
+                &f.worker.id
+            };
+            let released = s.release_task(actor, &task.task.key, None).unwrap();
+            assert_eq!(released.status, "backlog");
+            assert!(released.assignee_id.is_none());
+            assert_eq!(released.archived_at, before.task.archived_at);
+            assert_eq!(released.review_round, before.task.review_round);
+            let after = s.get_task(&task.task.key).unwrap();
+            assert_eq!(after.story.status, before.story.status);
+            assert_eq!(after.epic.status, before.epic.status);
+            assert!(after.reports.is_empty());
+            assert!(after.reviews.is_empty());
+            assert_eq!(s.get_execution(&scope).unwrap().revision, grant.revision);
+            assert!(!running(s, &scope));
+            let events = s.list_changes_since(seq, None).unwrap();
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].action, "task.released");
+            assert!(s.claim_task(&f.worker.id, &task.task.key).is_err());
+            let project = s.active_jam().unwrap();
+            s.reset_jam(&f.human.id, &project.name).unwrap();
+        }
+    }
+}
+
+#[test]
+fn archived_claim_recovery_to_ready_preserves_readiness_validation() {
+    for archived in ["task", "story", "epic"] {
+        let f = fixture();
+        let s = &f.store;
+        let scope = story(&f.story);
+        let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+        change(s, &f.human, scope.clone(), ExecutionAction::Start);
+        s.claim_task(&f.worker.id, &task.task.key).unwrap();
+        change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+        match archived {
+            "task" => {
+                s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+            }
+            "story" => {
+                s.set_story_status(&f.human.id, &f.story.key, "archived", None)
+                    .unwrap();
+            }
+            "epic" => {
+                s.set_epic_status(&f.human.id, &f.epic.key, "archived", None)
+                    .unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let old = s.get_task(&task.task.key).unwrap().task;
+        let result = s.release_task(&f.worker.id, &task.task.key, Some("ready"));
+        if archived == "story" {
+            assert!(matches!(result, Err(Error::NotReady(_))));
+            let current = s.get_task(&task.task.key).unwrap().task;
+            assert_eq!(current.status, old.status);
+            assert_eq!(current.assignee_id, old.assignee_id);
+        } else {
+            let released = result.unwrap();
+            assert_eq!(released.status, "ready");
+            assert!(released.assignee_id.is_none());
+            assert_eq!(released.archived_at, old.archived_at);
+        }
+        assert!(!running(s, &scope));
+    }
+}
