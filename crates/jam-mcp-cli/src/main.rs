@@ -15,13 +15,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut args = std::env::args().skip(1);
     let mut db = None;
     let mut demo = false;
+    let mut project = std::env::var("JAM_BOARD_PROJECT").ok();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--db" => db = Some(PathBuf::from(args.next().ok_or("--db requires a path")?)),
+            "--project" => {
+                project = Some(
+                    args.next()
+                        .ok_or("--project requires a project ID or key prefix")?,
+                )
+            }
             "--seed-demo" => demo = true,
             "--help" | "-h" => {
                 eprintln!(
-                    "jam-board-mcp [--db <path>] [--seed-demo]\nMCP stdio server. Database precedence: --db, JAM_BOARD_DB, JAM_BOARD_DATA_DIR/jam.db, APPDATA."
+                    "jam-board-mcp [--db <path>] [--project <id-or-key-prefix>] [--seed-demo]\nMCP stdio server. Database precedence: --db, JAM_BOARD_DB, JAM_BOARD_DATA_DIR/jam.db, APPDATA."
                 );
                 return Ok(());
             }
@@ -43,6 +50,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::env::var("JAM_AGENT_NAME").ok(),
         Arc::new(Mutex::new(Default::default())),
     )
+    .with_project(project)
     .report_stdio_calls();
     tracing::info!("Jam Board stdio ready");
     let running = server.serve(rmcp::transport::stdio()).await?;

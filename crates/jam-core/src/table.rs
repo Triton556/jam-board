@@ -100,6 +100,12 @@ impl Store {
         };
         self.read(|connection| {
             let jam = crate::service::jam(connection)?;
+            if let Some(key) = input.epic.as_deref().filter(|v| !v.is_empty()) {
+                crate::planning::epic(connection, key)?;
+            }
+            if let Some(key) = input.story.as_deref().filter(|v| !v.is_empty()) {
+                crate::planning::story(connection, key)?;
+            }
             values.insert(0, Value::Text(jam.id));
             let from = format!(
                 "FROM tasks t JOIN stories s ON s.id=t.story_id JOIN epics e ON e.id=s.epic_id LEFT JOIN members m ON m.id=t.assignee_id WHERE {}",

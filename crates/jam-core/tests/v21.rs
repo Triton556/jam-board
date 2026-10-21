@@ -133,7 +133,7 @@ fn v01_fixture_migrates_without_losing_tasks_and_only_once() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        4
+        5
     );
     assert!(
         db.prepare("PRAGMA foreign_key_check")
@@ -614,7 +614,7 @@ fn project_templates_and_agent_status() {
     rusqlite::Connection::open(&s.path)
         .unwrap()
         .execute(
-            "UPDATE members SET status_at=? WHERE id=?",
+            "UPDATE project_members SET status_at=? WHERE member_id=?",
             rusqlite::params![old, brain.id],
         )
         .unwrap();

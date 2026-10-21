@@ -18,7 +18,7 @@ vi.mock("@tanstack/react-router", async (original) => ({
 }));
 vi.mock("../lib/sound", () => ({ paperRustle: vi.fn() }));
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   await mockApi.setSettings({ estimatesEnabled: true });
   vi.stubGlobal(
     "IntersectionObserver",

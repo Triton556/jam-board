@@ -11,6 +11,8 @@ type Failure = Box<dyn std::error::Error + Send + Sync>;
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct McpStatus {
+    pub project_id: Option<String>,
+    pub project_key_prefix: Option<String>,
     pub http_enabled: bool,
     pub running: bool,
     pub port: Option<u16>,
@@ -49,7 +51,10 @@ impl McpRuntime {
     pub async fn status(&self) -> Result<McpStatus, Failure> {
         let server = self.server.lock().await;
         let token = token(&self.data_dir)?;
+        let project = self.store.active_jam().ok();
         Ok(McpStatus {
+            project_id: project.as_ref().map(|j| j.id.clone()),
+            project_key_prefix: project.as_ref().map(|j| j.key_prefix.clone()),
             http_enabled: self.store.setting("mcp_http_enabled")?.as_deref() != Some("false"),
             running: server.is_some(),
             port: server.as_ref().map(|s| s.port).or(self
@@ -64,6 +69,9 @@ impl McpRuntime {
                 .lock()
                 .map_err(|_| "Call log unavailable")?
                 .iter()
+                .filter(|call| {
+                    call.project_id.as_deref() == project.as_ref().map(|j| j.id.as_str())
+                })
                 .cloned()
                 .collect(),
         })
@@ -104,11 +112,12 @@ impl McpRuntime {
     }
     pub async fn snippets(&self) -> Result<ConfigSnippets, Failure> {
         let status = self.status().await?;
-        Ok(config_snippets(
+        Ok(project_config_snippets(
             &status.sidecar_path,
             &status.data_dir,
             status.port.unwrap_or(47321),
             &self.reveal()?,
+            status.project_id.as_deref(),
         ))
     }
     pub async fn listen_stdio(self: &Arc<Self>) -> Result<(), Failure> {
@@ -186,24 +195,45 @@ pub(crate) fn report_stdio(store: &Store, call: &RecentCall) {
     let _ = send();
 }
 pub fn config_snippets(sidecar: &str, data_dir: &str, port: u16, bearer: &str) -> ConfigSnippets {
+    project_config_snippets(sidecar, data_dir, port, bearer, None)
+}
+pub fn project_config_snippets(
+    sidecar: &str,
+    data_dir: &str,
+    port: u16,
+    bearer: &str,
+    project: Option<&str>,
+) -> ConfigSnippets {
     let quoted = |s: &str| serde_json::to_string(s).expect("string encoding");
     let shell_quote = |s: &str| format!("'{}'", s.replace('\'', "''"));
+    let env = project
+        .map(|p| format!(", JAM_BOARD_PROJECT = {}", quoted(p)))
+        .unwrap_or_default();
+    let header = project
+        .map(|p| format!("\nhttp_headers = {{ \"X-Jam-Project\" = {} }}", quoted(p)))
+        .unwrap_or_default();
+    let cli_env = project
+        .map(|p| format!(" --env JAM_BOARD_PROJECT={}", shell_quote(p)))
+        .unwrap_or_default();
+    let cli_header = project
+        .map(|p| format!(" --header {}", shell_quote(&format!("X-Jam-Project: {p}"))))
+        .unwrap_or_default();
     ConfigSnippets {
         codex_stdio: format!(
-            "[mcp_servers.jam-board]\ncommand = {}\nenv = {{ JAM_AGENT_NAME = \"Codex\", JAM_BOARD_DATA_DIR = {} }}",
+            "[mcp_servers.jam-board]\ncommand = {}\nenv = {{ JAM_AGENT_NAME = \"Codex\", JAM_BOARD_DATA_DIR = {}{env} }}",
             quoted(sidecar),
             quoted(data_dir)
         ),
         codex_http: format!(
-            "# Set JAM_BOARD_TOKEN to {bearer} in your environment.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\""
+            "# Set JAM_BOARD_TOKEN to {bearer} in your environment.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\"{header}"
         ),
         claude_stdio: format!(
-            "claude mcp add jam-board --env JAM_AGENT_NAME=Claude --env JAM_BOARD_DATA_DIR={} -- {}",
+            "claude mcp add jam-board --env JAM_AGENT_NAME=Claude --env JAM_BOARD_DATA_DIR={}{cli_env} -- {}",
             shell_quote(data_dir),
             shell_quote(sidecar)
         ),
         claude_http: format!(
-            "claude mcp add --transport http jam-board http://127.0.0.1:{port}/mcp --header \"Authorization: Bearer {bearer}\" --header \"X-Jam-Agent: Claude\""
+            "claude mcp add --transport http jam-board http://127.0.0.1:{port}/mcp --header \"Authorization: Bearer {bearer}\" --header \"X-Jam-Agent: Claude\"{cli_header}"
         ),
     }
 }
@@ -220,6 +250,7 @@ mod tests {
         let runtime = McpRuntime::new(store.clone(), "sidecar.exe".into()).unwrap();
         runtime.listen_stdio().await.unwrap();
         let call = RecentCall {
+            project_id: None,
             at: jam_core::now(),
             agent: "Codex".into(),
             tool: "get_board".into(),

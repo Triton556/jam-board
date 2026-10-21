@@ -3,15 +3,20 @@ use rusqlite::{Connection, OptionalExtension};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
 
-pub struct Store {
-    pub(crate) writer: Mutex<Connection>,
+struct Connections {
+    writer: Mutex<Connection>,
     readers: [Mutex<Connection>; 2],
     next_reader: AtomicUsize,
+}
+#[derive(Clone)]
+pub struct Store {
+    connections: Arc<Connections>,
+    pub(crate) project_id: Option<String>,
     pub path: PathBuf,
 }
 
@@ -37,7 +42,8 @@ pub fn resolve_db_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
 pub(crate) fn connect(path: &Path) -> Result<Connection> {
     let c = Connection::open(path)?;
     c.busy_timeout(std::time::Duration::from_millis(5000))?;
-    c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")?;
+    c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;
+CREATE TEMP TABLE jam_project_context(project_id TEXT); INSERT INTO jam_project_context VALUES (NULL);")?;
     Ok(c)
 }
 impl Store {
@@ -61,24 +67,37 @@ impl Store {
             rusqlite_migration::M::up(
                 "ALTER TABLE ref_items ADD COLUMN metadata TEXT; ALTER TABLE ref_frames ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0 CHECK(collapsed IN (0,1));",
             ),
+            rusqlite_migration::M::up(include_str!("migration_v5.sql")),
         ]);
         writer.pragma_update(None, "foreign_keys", "OFF")?;
         let migrated = migrations.to_latest(&mut writer);
         writer.pragma_update(None, "foreign_keys", "ON")?;
         migrated?;
         Ok(Self {
-            writer: Mutex::new(writer),
-            readers: [Mutex::new(connect(path)?), Mutex::new(connect(path)?)],
-            next_reader: AtomicUsize::new(0),
+            connections: Arc::new(Connections {
+                writer: Mutex::new(writer),
+                readers: [Mutex::new(connect(path)?), Mutex::new(connect(path)?)],
+                next_reader: AtomicUsize::new(0),
+            }),
+            project_id: None,
             path: path.into(),
         })
     }
     pub(crate) fn read<T>(&self, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        let i = self.next_reader.fetch_add(1, Ordering::Relaxed) % 2;
-        let c = self.readers[i]
+        let i = self.connections.next_reader.fetch_add(1, Ordering::Relaxed) % 2;
+        let c = self.connections.readers[i]
             .lock()
             .map_err(|_| invalid("database", "reader lock poisoned"))?;
+        // The connection mutex covers context installation and the entire transaction.
+        // Every borrower resets it, including unbound readers; no task/thread-local state.
+        c.execute(
+            "UPDATE temp.jam_project_context SET project_id=?",
+            [&self.project_id],
+        )?;
         let tx = c.unchecked_transaction()?;
+        if self.project_id.is_some() {
+            crate::projects::selected_jam(&tx)?;
+        }
         let value = f(&tx)?;
         tx.commit()?;
         Ok(value)
@@ -88,10 +107,18 @@ impl Store {
         f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
         let mut c = self
+            .connections
             .writer
             .lock()
             .map_err(|_| invalid("database", "writer lock poisoned"))?;
+        c.execute(
+            "UPDATE temp.jam_project_context SET project_id=?",
+            [&self.project_id],
+        )?;
         let tx = c.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        if self.project_id.is_some() {
+            crate::projects::selected_jam(&tx)?;
+        }
         let value = f(&tx)?;
         tx.commit()?;
         Ok(value)

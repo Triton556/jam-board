@@ -1,17 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { Copy, Eye, FolderOpen, RefreshCw, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { version } from "../../../package.json";
 import wave from "../../assets/chibi/danil-wave-256.webp";
 import { Button, Dialog, IconButton, Select, Tabs } from "../../components/ui";
 import { CodeBlock, PageHeading, Switch } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
 import { api } from "../../lib/api";
+import { connectionPrompt } from "../../lib/brain-handoff";
 import { makeSnippets } from "../../lib/mcp-config";
-import { appQuery } from "../../lib/queries";
+import { acceptProjectSelection } from "../../lib/project-selection";
+import { appQuery, boardQuery } from "../../lib/queries";
 import { paperRustle } from "../../lib/sound";
 import type { ConfigSnippets, Theme } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { BrainHandoff, WorkflowGuide } from "../plan/BrainHandoff";
 import { ProjectSettings } from "./ProjectSettings";
 import { SkillSetup } from "./SkillSetup";
 
@@ -27,8 +31,7 @@ const keys: (keyof ConfigSnippets)[] = [
   "claudeStdio",
   "claudeHttp",
 ];
-export const tryPrompt =
-  "Use the jam-board MCP server: call get_board, then take the highest-priority unassigned Ready task, read its brief, claim it, and submit_report when finished.";
+export const tryPrompt = connectionPrompt;
 export function archiveConfirmed(name: string, typed: string) {
   return name.length > 0 && name === typed;
 }
@@ -40,6 +43,10 @@ export function SettingsPage({
   const client = useQueryClient();
   const navigate = useNavigate();
   const app = useQuery(appQuery);
+  const board = useQuery({ ...boardQuery, enabled: !!app.data?.hasJam });
+  const workingCount =
+    board.data?.columns.find((column) => column.status === "in_progress")
+      ?.count ?? 0;
   const status = useQuery({
     queryKey: ["mcpStatus"],
     queryFn: () => api.mcpStatus(),
@@ -60,6 +67,7 @@ export function SettingsPage({
   const [typed, setTyped] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  useBlocker({ shouldBlockFn: () => busy, enableBeforeUnload: busy });
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -109,9 +117,11 @@ export function SettingsPage({
     state: Awaited<ReturnType<typeof api.appState>>,
     to: "/board" | "/welcome",
   ) => {
-    client.setQueryData(["app"], state);
-    await client.invalidateQueries();
-    await navigate({ to });
+    await acceptProjectSelection(client, state);
+    await navigate({
+      to: to === "/welcome" && state.hasJam ? "/projects" : to,
+      ignoreBlocker: true,
+    });
   };
   return (
     <main className="feature-page settings-page">
@@ -138,6 +148,38 @@ export function SettingsPage({
           {section === "Project" && <ProjectSettings />}
           {section === "Agents" && (
             <>
+              <WorkflowGuide />
+              <SettingsSection
+                title="Set up in three steps"
+                description="MCP connects the board. The playbook teaches the workflow. Your brain chat plans and coordinates the work."
+              >
+                <SettingsRow
+                  label="1 · Connect MCP"
+                  hint="Choose one transport below: stdio runs its own sidecar; HTTP needs Jam Board open."
+                >
+                  <span>
+                    Use the configuration for this project, then restart or
+                    reconnect your agent.
+                  </span>
+                </SettingsRow>
+                <SettingsRow
+                  label="2 · Check the connection"
+                  hint="The test prompt below only reads the board. It does not take a task."
+                >
+                  <Button onClick={() => void run(() => copy(tryPrompt))}>
+                    Copy connection check
+                  </Button>
+                </SettingsRow>
+                <SettingsRow
+                  label="3 · Plan with a brain"
+                  hint="Install the local skill below if needed, then give your connected agent a planning scope."
+                >
+                  <BrainHandoff
+                    scope={{ type: "project" }}
+                    label="Prepare planning prompt"
+                  />
+                </SettingsRow>
+              </SettingsSection>
               <SettingsSection
                 title="Your AI teammates"
                 description="Connect locally. Your board stays on this computer."
@@ -273,7 +315,7 @@ export function SettingsPage({
                     )}
                   </div>
                 </SettingsRow>
-                <SettingsRow label="Try it">
+                <SettingsRow label="Read-only connection check">
                   <p>{tryPrompt}</p>
                   <Button onClick={() => void run(() => copy(tryPrompt))}>
                     Copy prompt
@@ -333,24 +375,25 @@ export function SettingsPage({
               </SettingsRow>
               <SettingsRow
                 label="A fresh page"
-                hint="A demo makes a new active jam. Your current jam stays in history."
+                hint="A demo creates a separate project. Your current board remains available under Your projects."
               >
                 <Button onClick={() => setConfirm("demo")}>
                   Load demo jam
                 </Button>
               </SettingsRow>
               <SettingsRow
-                label="Archive this jam"
-                hint="Archive every task and return to the welcome screen. Nothing is deleted."
+                label="Archive this project"
+                hint="Hide the project without changing its tasks or history. Restore it later under Your projects → Archived projects."
               >
                 <Button
                   variant="danger"
                   onClick={() => {
                     setTyped("");
+                    setNotice("");
                     setConfirm("archive");
                   }}
                 >
-                  Archive this jam
+                  Archive this project
                 </Button>
               </SettingsRow>
             </SettingsSection>
@@ -478,7 +521,7 @@ export function SettingsPage({
                 <img src={wave} width={72} height={72} alt="Danil waving" />
                 <div>
                   <h2>Jam Board</h2>
-                  <span className="mono muted">Version 0.2.0</span>
+                  <span className="mono muted">Version {version}</span>
                 </div>
               </header>
               <div className="settings-rows">
@@ -533,7 +576,7 @@ export function SettingsPage({
               ? "Regenerate MCP token?"
               : confirm === "demo"
                 ? "Load a demo jam?"
-                : "Archive this jam"
+                : "Archive this project"
           }
           onClose={() => setConfirm(null)}
         >
@@ -542,17 +585,24 @@ export function SettingsPage({
               <p>Existing HTTP connections will stop working.</p>
             ) : confirm === "demo" ? (
               <p>
-                A new demo jam will become active; your current jam stays in
-                history.
+                A separate demo project will become active. Your current board
+                remains available under Your projects.
               </p>
             ) : (
               <>
                 <p>
                   Type <strong>{app.data?.jam?.name}</strong> to archive this
-                  jam.
+                  project. Its tasks, reports and references are kept.
                 </p>
+                {workingCount > 0 && (
+                  <p className="notice" role="status">
+                    {workingCount} tasks are still in progress. Pause new work
+                    and let running tasks finish or release them before
+                    archiving. Switching projects is safe without archiving.
+                  </p>
+                )}
                 <label>
-                  Jam name
+                  Project name
                   <input
                     value={typed}
                     onChange={(e) => setTyped(e.target.value)}
@@ -567,7 +617,8 @@ export function SettingsPage({
                 disabled={
                   busy ||
                   (confirm === "archive" &&
-                    !archiveConfirmed(app.data?.jam?.name ?? "", typed))
+                    (!archiveConfirmed(app.data?.jam?.name ?? "", typed) ||
+                      workingCount > 0))
                 }
                 onClick={() =>
                   void run(async () => {
@@ -590,9 +641,10 @@ export function SettingsPage({
                   ? "Regenerate token"
                   : confirm === "demo"
                     ? "Load demo jam"
-                    : "Archive jam"}
+                    : "Archive project"}
               </Button>
             </div>
+            {notice && <p role="alert">{notice}</p>}
           </div>
         </Dialog>
       )}

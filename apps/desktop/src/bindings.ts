@@ -61,6 +61,9 @@ export const commands = {
 	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
 	archiveRefEdge: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_edge", { id })),
 	updateRefGeometry: (input: GeometryInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
+	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
+	selectProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("select_project", { projectId })),
+	restoreProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("restore_project", { projectId })),
 	/**  A local first-content-frame receipt for reproducible release measurements. */
 	appReady: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("app_ready")),
 	appState: () => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("app_state")),
@@ -553,6 +556,8 @@ export type LinkedTask = {
 export type McpCallsChanged = Record<string, never>;
 
 export type McpStatus = {
+	projectId: string | null,
+	projectKeyPrefix: string | null,
 	httpEnabled: boolean,
 	running: boolean,
 	port: number | null,
@@ -690,6 +695,13 @@ export type ProjectEditInput = {
 	timezone: string | null,
 };
 
+export type ProjectSummary = {
+	archived: boolean,
+	selected: boolean,
+	taskCount: number,
+	inProgressCount: number,
+} & Jam;
+
 export type Question = {
 	id: string,
 	jamId: string,
@@ -737,6 +749,7 @@ export type ReadyInput = {
 };
 
 export type RecentCall = {
+	projectId?: string | null,
 	at: string,
 	error: string | null,
 	agent: string,

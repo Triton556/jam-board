@@ -48,7 +48,7 @@ let members: Member[];
 let task: TaskSummary;
 beforeEach(async () => {
   mockApi.setLatency(0);
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   members = await mockApi.listMembers();
   const board = await mockApi.listBoardTasks();
   task = board.in_progress.find(

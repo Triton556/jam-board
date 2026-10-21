@@ -23,7 +23,7 @@ const ago = (seconds: number) => new Date(now - seconds * 1000).toISOString();
 let member: Member, task: TaskSummary;
 beforeEach(async () => {
   motion.reduced = false;
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   member = (await mockApi.listMembers()).find(
     (m) => m.kind === "agent",
   ) as Member;

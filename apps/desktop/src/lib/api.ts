@@ -1,4 +1,5 @@
 import type { PlanningApi } from "./planning-api";
+import type { ProjectsApi } from "./project-api";
 import type { ReferencesApi } from "./references-api";
 import { tauriApi } from "./tauri-bridge";
 import type {
@@ -33,7 +34,7 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
-export interface JamApi extends PlanningApi, ReferencesApi {
+export interface JamApi extends PlanningApi, ReferencesApi, ProjectsApi {
   getProject(): Promise<import("../bindings").Project>;
   updateProject(
     input: Partial<import("../bindings").ProjectEditInput> & {

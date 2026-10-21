@@ -12,6 +12,7 @@
   "get_board",
   "get_epic",
   "get_project",
+  "get_session_context",
   "get_task",
   "link_reference",
   "list_assets",

@@ -30,6 +30,7 @@ import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { memberColors, WorkloadBar } from "../../components/ui/m5";
 import { api } from "../../lib/api";
+import { brainHandoff } from "../../lib/brain-handoff";
 import {
   epicsQuery,
   invalidatePlanning,
@@ -40,6 +41,7 @@ import { statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { QuestionList } from "../inbox/InboxPage";
 import { ReferencesSection } from "../references/ReferencesSection";
+import { BrainHandoff, WorkflowGuide } from "./BrainHandoff";
 import { Journal } from "./Journal";
 import { epicProgress } from "./journal-model";
 import {
@@ -51,8 +53,7 @@ import {
 import { PlanningInput } from "./PlanningInput";
 import { intentFields } from "./StoryDrawer";
 import { TaskRows } from "./TaskRows";
-export const brainPrompt =
-  "Use the jam-board MCP server and its plan_epic prompt. Follow requirements-interview.md and task-brief-and-acceptance.md: interview me in rounds, play back Goal / Done when / Not included / Decided, then create an epic, stories and complete task briefs using brief-writing.md. Ask me to choose the worker model; mark only actionable tasks Ready and publish your scoped status.";
+export const brainPrompt = brainHandoff({ type: "project" });
 const overviewFields = [
   ["goalMd", "Goal and audience", "Who is this for, and what should change?"],
   ["doneWhenMd", "Done when", "What will you look at to call it done?"],
@@ -252,18 +253,21 @@ export function PlanPage({
         </div>
       </aside>
       <div className="plan-detail">
+        <WorkflowGuide />
         {!epics.data?.length ? (
           <EmptyState image={duo} size={180} text="No epics yet">
-            <p>Ask your brain agent to plan an epic, or create one yourself.</p>
+            <p>
+              Start with a goal. Add stories for its features or outcomes, then
+              tasks for the work.
+            </p>
             <div className="button-row">
               <Button variant="primary" onClick={() => setCreating(true)}>
                 New epic
               </Button>
-              <Button
-                onClick={() => void navigator.clipboard.writeText(brainPrompt)}
-              >
-                Copy brain prompt
-              </Button>
+              <BrainHandoff
+                scope={{ type: "project" }}
+                label="Plan with brain"
+              />
             </div>
           </EmptyState>
         ) : selected.isPending ? (
@@ -439,6 +443,32 @@ function EpicDetail({
             ]}
           />
         </div>
+        <nav className="scope-hierarchy" aria-label="Epic hierarchy">
+          <span>
+            Epic <strong>{e.key}</strong>
+          </span>
+          <span aria-hidden="true">→</span>
+          <Button onClick={() => setTab("Stories")}>
+            {tree.stories.length}{" "}
+            {tree.stories.length === 1 ? "story" : "stories"} · features &
+            outcomes
+          </Button>
+          <span aria-hidden="true">→</span>
+          <span>
+            {tree.stories.reduce((total, row) => total + row.tasks.length, 0)}{" "}
+            tasks
+          </span>
+          <p className="hierarchy-note">
+            Stories live inside this epic. Open them to see their acceptance
+            criteria and tasks.
+          </p>
+        </nav>
+        <div className="planning-tools">
+          <BrainHandoff
+            scope={{ type: "epic", key: e.key }}
+            disabled={archived}
+          />
+        </div>
         {menu && (
           <div className="button-row">
             <Button
@@ -563,6 +593,10 @@ function EpicDetail({
           </div>
         ) : tab === "Stories" ? (
           <>
+            <p className="muted">
+              A story describes a feature or outcome. Its tasks carry the
+              implementation briefs.
+            </p>
             <div className="section-heading">
               <h2>Stories</h2>
               <Button

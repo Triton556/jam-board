@@ -5,36 +5,18 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn jam(c: &Connection) -> Result<Jam> {
-    c.query_row(
-        "SELECT id, name, theme, starts_at, ends_at, timezone, task_seq, key_prefix,
-created_at,template,milestone_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY created_at DESC,id DESC LIMIT 1)",
-        [],
-        |r| {
-            Ok(Jam {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                theme: r.get(2)?,
-                starts_at: r.get(3)?,
-                ends_at: r.get(4)?,
-                timezone: r.get(5)?,
-                task_seq: r.get(6)?,
-                key_prefix: r.get(7)?,
-                created_at: r.get(8)?,template:r.get(9)?,milestone_at:r.get(10)?,
-            })
-        },
-    )
-    .optional()?
-    .ok_or_else(|| Error::NotFound("active jam".into()))
+    crate::projects::selected_jam(c)
 }
 pub(crate) fn member(c: &Connection, id: &str) -> Result<Member> {
-    c.query_row(
+    let m = c.query_row(
         "SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
 FROM members WHERE id=?",
         [id],
         member_row,
     )
     .optional()?
-    .ok_or_else(|| Error::NotFound(format!("member {id}")))
+    .ok_or_else(|| Error::NotFound(format!("member {id}")))?;
+    crate::projects::project_member(c, m)
 }
 pub(crate) fn member_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Member> {
     Ok(Member {
@@ -104,6 +86,15 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
         )
         .optional()?
         .ok_or_else(|| Error::NotFound(key.into()))?;
+    crate::projects::ensure_scope(c, &t.jam_id)?;
+    t.idempotency_key = c
+        .query_row(
+            "SELECT token FROM task_idempotency WHERE task_id=?",
+            [&t.id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .or(t.idempotency_key);
     t.tags = tags(c, &t.id)?;
     t.comment_count = c.query_row(
         "SELECT count(*) FROM comments WHERE task_id=?",
@@ -160,6 +151,9 @@ pub(crate) fn event(
     task_id: Option<&str>,
     payload: Value,
 ) -> Result<()> {
+    if let Some(project) = jam_id {
+        crate::projects::join_member(c, project, actor)?;
+    }
     let epic_id = if let Some(eid) = payload["epicId"].as_str() {
         Some(eid.to_string())
     } else if let Some(tid) = task_id {
@@ -279,7 +273,10 @@ impl Store {
         self.read(jam)
     }
     pub fn get_member(&self, id: &str) -> Result<Member> {
-        self.read(|c| member(c, id))
+        self.read(|c| {
+            crate::projects::ensure_member_scope(c, id)?;
+            member(c, id)
+        })
     }
     pub fn create_jam(
         &self,
@@ -344,6 +341,7 @@ number+=1;
 }
             c.execute("INSERT INTO jams(id, name, theme, starts_at, ends_at, timezone, key_prefix,
 created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params![jid,name,theme,starts_at,ends_at,timezone,prefix,stamp,template,milestone])?;
+            crate::projects::select(c,&jid,Some(&mid))?;
             event(c,Some(&jid),&mid,"jam.updated",None,json!({
 "name":[null,name],"created":true,"humanJoined":mid}
 ))?;
@@ -418,6 +416,7 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
                 "memberId":mid,"name":name}
                 ),
             )?;
+            crate::projects::join_member(c, &jid, &mid)?;
             member(c, &mid)
         })
     }
@@ -454,10 +453,22 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
                 if m.kind != "agent" {
                     return Err(invalid("agent", "handle belongs to a human"));
                 }
+                let j = jam(c)?;
+                let joined = crate::projects::join_member(c, &j.id, &mid)?;
                 c.execute(
-                    "UPDATE members SET last_seen_at=? WHERE id=?",
-                    params![now(), mid],
+                    "UPDATE project_members SET last_seen_at=? WHERE jam_id=? AND member_id=?",
+                    params![now(), j.id, mid],
                 )?;
+                if joined {
+                    event(
+                        c,
+                        Some(&j.id),
+                        &mid,
+                        "member.joined",
+                        None,
+                        json!({"name":name,"handle":handle}),
+                    )?;
+                }
                 return member(c, &mid);
             }
             let used = c
@@ -486,17 +497,24 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
                 "name":name,"handle":handle}
                 ),
             )?;
+            if let Ok(j) = jam(c) {
+                c.execute(
+                    "UPDATE project_members SET last_seen_at=? WHERE jam_id=? AND member_id=?",
+                    params![stamp, j.id, mid],
+                )?;
+            }
             member(c, &mid)
         })
     }
     pub fn create_task(&self, actor: &str, input: CreateTask) -> Result<TaskDetail> {
         let key = self.write(|c| {
             member(c, actor)?;
+            let j = jam(c)?;
             if let Some(token) = &input.idempotency_key
                 && let Some(key) = c
                     .query_row(
-                        "SELECT key FROM tasks WHERE created_by=? AND idempotency_key=?",
-                        [actor, token],
+                        "SELECT t.key FROM task_idempotency i JOIN tasks t ON t.id=i.task_id WHERE i.jam_id=? AND i.actor_id=? AND i.token=?",
+                        params![j.id, actor, token],
                         |r| r.get::<_, String>(0),
                     )
                     .optional()?
@@ -510,7 +528,6 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             priority(p)?;
             estimate(input.estimate)?;
             let due_at = utc_date(input.due_at.as_deref())?;
-            let j = jam(c)?;
             let parent = crate::planning::story(
                 c,
                 input
@@ -559,10 +576,13 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     actor,
                     stamp,
                     stamp,
-                    input.idempotency_key,
+                    Option::<String>::None,
                     parent.audit.id
                 ],
             )?;
+            if let Some(token) = &input.idempotency_key {
+                c.execute("INSERT INTO task_idempotency(jam_id,actor_id,token,task_id) VALUES (?,?,?,?)", params![j.id, actor, token, tid])?;
+            }
             crate::planning::patch_record(c, "tasks", &tid, &serde_json::to_value(&input.brief)?)?;
             if s == "ready" {
                 let r = crate::workflow::readiness(c, &key)?;
@@ -638,7 +658,7 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
  new.description_md=v;
  }
             if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
-            if let Some(v)=input.assignee_id { if let Some(id)=&v { member(c,id)?; } new.assignee_id=v; }
+            if let Some(v)=input.assignee_id { if let Some(id)=&v { member(c,id)?; crate::projects::join_member(c,&old.jam_id,id)?; } new.assignee_id=v; }
             if let Some(v)=input.priority {
  priority(&v)?;
  new.priority=v;
@@ -1164,8 +1184,9 @@ NULL AND key<>? ORDER BY position, key",
         self.read(|c| {
 let j=jam(c).ok();
  let members=c.prepare("SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
-FROM members ORDER BY created_at, id")?.query_map([],member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
+FROM members WHERE (?1 IS NULL OR id IN (SELECT member_id FROM project_members WHERE jam_id=?1)) ORDER BY created_at, id")?.query_map([j.as_ref().map(|j|&j.id)],member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
             members.into_iter().map(|m| {
+let m=crate::projects::project_member(c,m)?;
 let counts=c.prepare("SELECT status, count(*) FROM tasks WHERE assignee_id=? AND jam_id=? AND
 archived_at IS NULL GROUP BY status")?.query_map(params![m.id,j.as_ref().map(|j|&j.id)],|r|Ok((r.get::<_,String>(0)?,r.get::<_,i64>(1)?)))?.collect::<std::result::Result<BTreeMap<_,_>,_>>()?;
                 let working=c.prepare("SELECT key FROM tasks WHERE assignee_id=? AND jam_id=? AND status='in_progress'
@@ -1215,7 +1236,7 @@ BY position, key"))?.query_map([&j.id],task_row)?.collect::<std::result::Result<
             let seconds=deadline.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).map(|t|(t-time::OffsetDateTime::now_utc()).whole_seconds().max(0));
             Ok(json!({
 "jam":{
-"name":j.name,"theme":j.theme,"endsAt":deadline,"timeLeft":seconds,"template":j.template,"milestoneAt":j.milestone_at}
+"id":j.id,"keyPrefix":j.key_prefix,"name":j.name,"theme":j.theme,"endsAt":deadline,"timeLeft":seconds,"template":j.template,"milestoneAt":j.milestone_at}
 ,"columns":STATUSES.iter().map(|s|json!({
 "status":s,"count":ts.iter().filter(|t|&t.status==s).count()}
 )).collect::<Vec<_>>(),"inProgress":ts.iter().filter(|t|t.status=="in_progress").map(summarize).collect::<Vec<_>>(),"myTasks":ts.iter().filter(|t|actor.is_some()&&t.assignee_id.as_deref()==actor).map(summarize).collect::<Vec<_>>() }

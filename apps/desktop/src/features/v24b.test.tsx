@@ -14,6 +14,7 @@ import { SkillSetup } from "./settings/SkillSetup";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useBlocker: () => ({}),
 }));
 function wrap(node: React.ReactNode) {
   return render(
@@ -29,7 +30,7 @@ function wrap(node: React.ReactNode) {
   );
 }
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   mockApi.calls.length = 0;
 });
 afterEach(() => {

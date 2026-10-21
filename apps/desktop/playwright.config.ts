@@ -10,7 +10,11 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 1360, height: 860 },
     browserName: "chromium",
-    channel: process.env.CI ? undefined : "chrome",
+    channel:
+      process.env.JAM_BROWSER_PATH || process.env.CI ? undefined : "chrome",
+    launchOptions: process.env.JAM_BROWSER_PATH
+      ? { executablePath: process.env.JAM_BROWSER_PATH }
+      : undefined,
     headless: true,
     trace: "retain-on-failure",
   },

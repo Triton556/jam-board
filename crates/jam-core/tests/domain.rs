@@ -388,7 +388,7 @@ fn dates_are_stored_as_utc() {
 }
 
 #[test]
-fn demo_reload_keeps_existing_history_and_60_new_events() {
+fn demo_reload_keeps_existing_history_and_project_join_events() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
     std::fs::create_dir_all(&base).unwrap();
     let d = tempfile::tempdir_in(base).unwrap();
@@ -399,7 +399,7 @@ fn demo_reload_keeps_existing_history_and_60_new_events() {
     let j = s.seed_demo().unwrap();
     assert_eq!(j.key_prefix, "JB2");
     assert_eq!(j.task_seq, 22);
-    assert_eq!(s.activity_count().unwrap(), 122);
+    assert_eq!(s.activity_count().unwrap(), 124);
     assert_eq!(
         s.list_tasks(None, TaskFilter::default())
             .unwrap()

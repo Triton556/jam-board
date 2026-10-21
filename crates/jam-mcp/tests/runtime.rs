@@ -67,3 +67,45 @@ fn snippets_escape_windows_paths_as_valid_toml_strings() {
             .contains("Authorization: Bearer test-placeholder")
     );
 }
+
+#[tokio::test]
+async fn snippets_and_recent_calls_follow_selected_project_but_never_retarget_sessions() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(jam_core::Store::open(dir.path().join("jam.db")).unwrap());
+    let (a, _) = store
+        .create_jam("Board A", None, None, None, "UTC", "Human")
+        .unwrap();
+    let runtime = jam_mcp::McpRuntime::new(store.clone(), "sidecar.exe".into()).unwrap();
+    let a_snippets = runtime.snippets().await.unwrap();
+    assert!(
+        a_snippets
+            .codex_stdio
+            .contains(&format!("JAM_BOARD_PROJECT = {:?}", a.id))
+    );
+    assert!(
+        a_snippets
+            .codex_http
+            .contains(&format!("\"X-Jam-Project\" = {:?}", a.id))
+    );
+    assert!(
+        a_snippets
+            .claude_stdio
+            .contains(&format!("JAM_BOARD_PROJECT='{}'", a.id))
+    );
+    assert!(
+        a_snippets
+            .claude_http
+            .contains(&format!("'X-Jam-Project: {}'", a.id))
+    );
+    let (b, _) = store
+        .create_jam("Board B", None, None, None, "UTC", "Human")
+        .unwrap();
+    let b_snippets = runtime.snippets().await.unwrap();
+    assert!(b_snippets.codex_stdio.contains(&b.id));
+    assert!(!b_snippets.codex_stdio.contains(&a.id));
+    let status = runtime.status().await.unwrap();
+    assert_eq!(status.project_id, Some(b.id));
+    assert_eq!(status.project_key_prefix, Some(b.key_prefix));
+    // A previously copied connection string retains A's immutable id.
+    assert!(a_snippets.codex_stdio.contains(&a.id));
+}

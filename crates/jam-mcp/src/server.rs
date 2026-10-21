@@ -3,11 +3,13 @@ use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestConte
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentCall {
+    #[serde(default)]
+    pub project_id: Option<String>,
     pub at: String,
     pub error: Option<String>,
     pub agent: String,
@@ -16,9 +18,22 @@ pub struct RecentCall {
 }
 pub type RecentCalls = Arc<Mutex<std::collections::VecDeque<RecentCall>>>;
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct SessionContext {
+    project_id: String,
+    key_prefix: String,
+    project_name: String,
+    binding: String,
+    can_switch_project: bool,
+}
+
 #[derive(Clone)]
 pub struct JamServer {
     store: Arc<Store>,
+    session_store: Arc<OnceLock<Arc<Store>>>,
+    session_identity: Arc<OnceLock<(String, String)>>,
+    project_hint: Option<String>,
     agent_name: Option<String>,
     recent: RecentCalls,
     report_stdio: bool,
@@ -27,16 +42,69 @@ impl JamServer {
     pub fn new(store: Arc<Store>, agent_name: Option<String>, recent: RecentCalls) -> Self {
         Self {
             store,
+            session_store: Arc::new(OnceLock::new()),
+            session_identity: Arc::new(OnceLock::new()),
+            project_hint: None,
             agent_name,
             recent,
             report_stdio: false,
         }
+    }
+    pub fn with_project(mut self, project: Option<String>) -> Self {
+        self.project_hint = project;
+        self
+    }
+    fn session_store(&self) -> jam_core::Result<Arc<Store>> {
+        self.session_store.get().cloned().ok_or_else(|| {
+            jam_core::Error::Forbidden(
+                "Initialize this session with a project before making calls".into(),
+            )
+        })
+    }
+    async fn bind_project(&self, ctx: &RequestContext<RoleServer>) -> Result<(), ErrorData> {
+        let header = ctx
+            .extensions
+            .get::<axum::http::request::Parts>()
+            .and_then(|parts| parts.headers.get("X-Jam-Project"))
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let requested = header.or_else(|| self.project_hint.clone());
+        let base = self.store.clone();
+        let scoped = tokio::task::spawn_blocking(move || {
+            let selected = requested
+                .map(Ok)
+                .unwrap_or_else(|| base.active_jam().map(|j| j.id))?;
+            base.for_project(&selected).map(Arc::new)
+        })
+        .await
+        .map_err(internal)?
+        .map_err(|e| {
+            ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
+        })?;
+        if let Some(existing) = self.session_store.get() {
+            if existing.bound_project_id().map_err(internal)?
+                != scoped.bound_project_id().map_err(internal)?
+            {
+                return Err(ErrorData::invalid_params(
+                    "This session is already bound. Reconnect to change projects.",
+                    None,
+                ));
+            }
+        } else {
+            self.session_store
+                .set(scoped)
+                .map_err(|_| ErrorData::internal_error("Session binding raced", None))?;
+        }
+        Ok(())
     }
     pub fn report_stdio_calls(mut self) -> Self {
         self.report_stdio = true;
         self
     }
     fn identity(&self, ctx: &RequestContext<RoleServer>) -> (String, String) {
+        if let Some(identity) = self.session_identity.get() {
+            return identity.clone();
+        }
         let info = ctx
             .client_info()
             .map(|i| i.name)
@@ -64,18 +132,29 @@ impl JamServer {
     }
     async fn heartbeat(&self, ctx: &RequestContext<RoleServer>) -> Result<Member, ErrorData> {
         let (name, client) = self.identity(ctx);
-        let store = self.store.clone();
+        let store = self.session_store().map_err(internal)?;
         tokio::task::spawn_blocking(move || store.identify_agent(&name, &client))
             .await
             .map_err(internal)?
             .map_err(internal)
     }
     fn execute(&self, actor: &Member, name: &str, args: Value) -> jam_core::Result<Value> {
-        let store = &self.store;
-        if let Some(result) = crate::v2::execute(store, actor, name, args.clone()) {
+        let store = self.session_store()?;
+        if let Some(result) = crate::v2::execute(&store, actor, name, args.clone()) {
             return result;
         }
         match name {
+            "get_session_context" => {
+                parse::<Empty>(args)?;
+                let project = store.active_jam()?;
+                value(SessionContext {
+                    project_id: project.id,
+                    key_prefix: project.key_prefix,
+                    project_name: project.name,
+                    binding: "session".into(),
+                    can_switch_project: false,
+                })
+            }
             "get_board" => {
                 parse::<Empty>(args)?;
                 store.board(Some(&actor.id))
@@ -222,6 +301,7 @@ pub(crate) fn tool<T: JsonSchema>(
         "create_task" | "update_task" | "get_task" | "claim_task" => {
             Some(schema::<jam_core::TaskDetail>())
         }
+        "get_session_context" => Some(schema::<SessionContext>()),
         "list_tasks" => Some(schema::<jam_core::TaskPage>()),
         "move_task" | "release_task" | "archive_task" => Some(schema::<jam_core::TaskSummary>()),
         "add_comment" => Some(schema::<jam_core::Comment>()),
@@ -252,6 +332,11 @@ pub(crate) fn tool<T: JsonSchema>(
 }
 fn tools() -> Vec<Tool> {
     let mut list = vec![
+        tool::<Empty>(
+            "get_session_context",
+            "Read this session's pinned project identity. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
+            true,
+        ),
         tool::<Empty>(
             "get_board",
             "Read the active jam, column counts, in-progress work, your tasks, and online agents. timeLeft is seconds until the deadline, clamped to zero.",
@@ -324,11 +409,13 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, ErrorData> {
         ctx.peer.set_peer_info(request.clone());
+        self.bind_project(&ctx).await?;
+        let _ = self.session_identity.set(self.identity(&ctx));
         self.heartbeat(&ctx).await?;
         self.negotiate_initialize(&request)
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Plan your game jam with your AI teammates. Use task keys such as JB-12. Claim a Ready task with claim_task before working, then submit_report with results and test evidence. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your game jam with your AI teammates. Use task keys such as JB-12. Claim a Ready task with claim_task before working, then submit_report with results and test evidence. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -352,7 +439,7 @@ impl ServerHandler for JamServer {
         let record_name = tool_name.clone();
         let args = Value::Object(request.arguments.unwrap_or_default());
         let result = tokio::task::spawn_blocking(move || {
-            let actor = this.store.identify_agent(&name, &client)?;
+            let actor = this.session_store()?.identify_agent(&name, &client)?;
             this.execute(&actor, &tool_name, args)
         })
         .await;
@@ -366,6 +453,10 @@ impl ServerHandler for JamServer {
         let ok = result.is_ok();
         let (agent, _) = self.identity(&ctx);
         let call = RecentCall {
+            project_id: self
+                .session_store()
+                .ok()
+                .and_then(|s| s.bound_project_id().ok().flatten()),
             at: jam_core::now(),
             error: result.as_ref().err().map(ToString::to_string),
             agent,
@@ -447,7 +538,7 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
         let actor = self.heartbeat(&ctx).await?;
-        let store = self.store.clone();
+        let store = self.session_store().map_err(internal)?;
         let uri = request.uri;
         let text = tokio::task::spawn_blocking({
             let uri = uri.clone();

@@ -33,7 +33,7 @@ vi.mock("@tanstack/react-router", async (original) => ({
   useNavigate: () => vi.fn(),
 }));
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   mockApi.calls.length = 0;
   useUiStore.setState({ toasts: [], highlights: {}, readyRequest: null });
 });

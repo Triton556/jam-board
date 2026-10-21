@@ -41,6 +41,7 @@ import type { TaskDetail, UpdateInput } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
+import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
@@ -346,6 +347,15 @@ export function TaskEditor({
           </button>
         </div>
       )}
+      <div className="planning-tools">
+        <BrainHandoff
+          scope={{ type: "task", key: task.key }}
+          disabled={readonly}
+        />
+        <span className="small muted">
+          Save your notes before asking the brain to read them.
+        </span>
+      </div>
       <form
         id="task-form"
         onSubmit={handleSubmit((value) => submit(value))}

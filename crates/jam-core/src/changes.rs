@@ -15,6 +15,7 @@ pub const ACTIVITY_ACTIONS: &[&str] = &[
     "epic.updated",
     "jam.archived",
     "jam.imported",
+    "jam.restored",
     "jam.updated",
     "member.joined",
     "member.updated",
@@ -77,8 +78,8 @@ impl Store {
         self.write(|c| {
             crate::service::member(c, actor)?;
             c.execute(
-                "UPDATE members SET last_seen_at=? WHERE id=?",
-                params![now(), actor],
+                "UPDATE project_members SET last_seen_at=? WHERE jam_id=? AND member_id=?",
+                params![now(), project, actor],
             )?;
             Ok(())
         })?;
@@ -88,7 +89,18 @@ impl Store {
         loop {
             let mut events = Vec::new();
             {
-                let mut stmt = feed.connection.prepare(
+                let snapshot = feed.connection.unchecked_transaction()?;
+                let archived: bool = snapshot.query_row(
+                    "SELECT archived FROM jams WHERE id=?",
+                    [&project],
+                    |r| r.get(0),
+                )?;
+                if archived {
+                    return Err(Error::Archived(
+                        "This project's wait ended because it was archived".into(),
+                    ));
+                }
+                let mut stmt = snapshot.prepare(
                     "SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id,a.jam_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>? ORDER BY a.seq ASC"
                 )?;
                 let mut rows = stmt.query([feed.last_seq])?;

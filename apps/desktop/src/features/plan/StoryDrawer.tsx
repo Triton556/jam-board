@@ -11,6 +11,7 @@ import {
 } from "../../lib/planning-queries";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
+import { BrainHandoff } from "./BrainHandoff";
 import {
   NewTaskDialog,
   PlanningStatus,
@@ -96,6 +97,12 @@ export function StoryDrawer({
               entityKey={storyKey}
               value={story.status}
             />
+            <div className="planning-tools">
+              <BrainHandoff
+                scope={{ type: "story", key: story.key }}
+                disabled={story.status === "archived"}
+              />
+            </div>
             {questions.data?.some(
               (q) =>
                 q.status === "open" &&

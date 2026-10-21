@@ -99,6 +99,9 @@ pub(crate) fn fetch<T: DeserializeOwned>(
         )
         .optional()?
         .ok_or_else(|| Error::NotFound(format!("{table} {key}")))?;
+    if let Some(project) = value.get("jamId").and_then(Value::as_str) {
+        crate::projects::ensure_scope(c, project)?;
+    }
     Ok(serde_json::from_value(value)?)
 }
 pub(crate) fn records<T: DeserializeOwned>(
@@ -109,7 +112,13 @@ pub(crate) fn records<T: DeserializeOwned>(
 ) -> Result<Vec<T>> {
     c.prepare(&format!("SELECT * FROM {table} WHERE {filter}"))?
         .query_map(values, row_value)?
-        .map(|r| Ok(serde_json::from_value(r?)?))
+        .map(|r| {
+            let value = r?;
+            if let Some(project) = value.get("jamId").and_then(Value::as_str) {
+                crate::projects::ensure_scope(c, project)?;
+            }
+            Ok(serde_json::from_value(value)?)
+        })
         .collect()
 }
 fn sql_value(v: &Value) -> SqlValue {
@@ -588,6 +597,7 @@ impl Store {
                 )
                 .optional()?
                 .ok_or_else(|| Error::NotFound(format!("agent {handle}")))?;
+            crate::projects::join_member(c, &e.audit.jam_id, &id)?;
             c.execute(
                 "UPDATE epics SET brain_member_id=?,updated_by=?,updated_at=? WHERE id=?",
                 params![id, actor, now(), e.audit.id],

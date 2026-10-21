@@ -165,10 +165,13 @@ pub(crate) fn scope(c: &Connection, s: &Scope) -> Result<(Scope, Option<String>,
             (s.audit.id, s.audit.jam_id, Some(s.epic_id), None)
         }
         "task" => {
-            let t = task(c, &s.id).or_else(|_| {
-                let key: String =
-                    c.query_row("SELECT key FROM tasks WHERE id=?", [&s.id], |r| r.get(0))?;
-                task(c, &key)
+            let t = task(c, &s.id).or_else(|error| match error {
+                Error::NotFound(_) => {
+                    let key: String =
+                        c.query_row("SELECT key FROM tasks WHERE id=?", [&s.id], |r| r.get(0))?;
+                    task(c, &key)
+                }
+                other => Err(other),
             })?;
             if t.archived_at.is_some() {
                 return Err(Error::Archived(t.key));
@@ -397,6 +400,6 @@ if input.answer_index.is_none()&&text.is_none(){return Err(invalid("answer","Cho
         if text.chars().count() > 120 {
             return Err(invalid("text", "Use at most 120 characters"));
         }
-        self.write(|c|{member(c,actor)?;let resolved=target.as_ref().map(|s|scope(c,s)).transpose()?;let normalized=resolved.as_ref().map(|(s,_,_)|serde_json::to_string(s)).transpose()?;let stamp=now();c.execute("UPDATE members SET status_text=?,status_scope_json=?,status_at=?,last_seen_at=? WHERE id=?",params![text,normalized,stamp,stamp,actor])?;v2_event(c,actor,resolved.as_ref().and_then(|x|x.1.as_deref()),"agent.status",resolved.as_ref().and_then(|x|x.2.as_deref()),json!({"text":text}))?;member(c,actor)})
+        self.write(|c|{member(c,actor)?;let resolved=target.as_ref().map(|s|scope(c,s)).transpose()?;let normalized=resolved.as_ref().map(|(s,_,_)|serde_json::to_string(s)).transpose()?;let stamp=now();let project=crate::service::jam(c)?.id;crate::projects::join_member(c,&project,actor)?;c.execute("UPDATE project_members SET status_text=?,status_scope_json=?,status_at=?,last_seen_at=? WHERE jam_id=? AND member_id=?",params![text,normalized,stamp,stamp,project,actor])?;v2_event(c,actor,resolved.as_ref().and_then(|x|x.1.as_deref()),"agent.status",resolved.as_ref().and_then(|x|x.2.as_deref()),json!({"text":text}))?;member(c,actor)})
     }
 }

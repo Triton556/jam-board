@@ -129,21 +129,28 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
     .poll(() => page.evaluate(() => window.__jamMock.revealMcpToken()))
     .not.toBe(token);
 });
-test("Archiving a jam requires its exact name and returns to onboarding", async ({
+test("Archiving a project requires idle workers and its exact name, and keeps a restorable archive", async ({
   page,
 }) => {
   await demo(page);
+  await page.evaluate(async () => {
+    const tasks = await window.__jamMock.listBoardTasks();
+    for (const task of tasks.in_progress)
+      await window.__jamMock.moveTask({ key: task.key, status: "backlog" });
+  });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Data", exact: true }).click();
   await page
-    .getByRole("button", { name: "Archive this jam", exact: true })
+    .getByRole("button", { name: "Archive this project", exact: true })
     .click();
-  await page.getByRole("dialog").getByLabel("Jam name").fill("cozy jam 48");
+  await page.getByRole("dialog").getByLabel("Project name").fill("cozy jam 48");
   await expect(
-    page.getByRole("button", { name: "Archive jam", exact: true }),
+    page.getByRole("button", { name: "Archive project", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("dialog").getByLabel("Jam name").fill("Cozy Jam 48");
-  await page.getByRole("button", { name: "Archive jam", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Project name").fill("Cozy Jam 48");
+  await page
+    .getByRole("button", { name: "Archive project", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "What are we making?" }),
   ).toBeVisible();
