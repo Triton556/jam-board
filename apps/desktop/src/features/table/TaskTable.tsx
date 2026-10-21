@@ -15,19 +15,24 @@ import {
   Stamp,
   TagInput,
 } from "../../components/ui";
+import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Switch } from "../../components/ui/m5";
+import { NewTaskButton } from "../../components/ui/NewTaskButton";
+import { agentWorking, useWorkingClock } from "../../lib/agent-working";
 import { api } from "../../lib/api";
 import { avatarInitials } from "../../lib/avatar-initials";
+import { epicsQuery, storiesQuery } from "../../lib/planning-queries";
 import { membersQuery, useBoardSettings } from "../../lib/queries";
 import type { Member, TaskSummary } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { StoryPicker } from "../plan/PlanningControls";
 import type { TableSearch } from "./search";
 import { nextSort, tableQuery } from "./search";
 import { TableRow } from "./TableRow";
 import { tableTime, useTableClock } from "./table-time";
-
 import { useTableVirtualizer } from "./use-table-virtualizer";
+import { WorkingLayer } from "./WorkingLayer";
 
 type Highlight = ReturnType<typeof useUiStore.getState>["highlights"][string];
 
@@ -41,12 +46,16 @@ const focusNewInput = (node: HTMLInputElement | null) => {
 
 const columns = [
   ["key", "Key"],
+  ["epic", "Epic"],
+  ["story", "Story"],
   ["title", "Title"],
   ["status", "Status"],
   ["priority", "Priority"],
   ["assignee", "Assignee"],
   ["tags", "Tags"],
   ["estimate", "Est."],
+  ["ready", "Ready"],
+  ["flags", "Flags"],
   ["updatedAt", "Updated"],
 ] as const;
 export function TaskTable({
@@ -59,6 +68,16 @@ export function TaskTable({
   open(key: string): void;
 }) {
   const { settings } = useBoardSettings();
+  const epics = useQuery(epicsQuery),
+    stories = useQuery(storiesQuery);
+  const [newStory, setNewStory] = useState(() => {
+    try {
+      return localStorage.getItem("jam.lastStory") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const validStory = !!stories.data?.some((s) => s.key === newStory);
   const estimatesEnabled = settings?.estimatesEnabled ?? false;
   const query = tableQuery(search);
   if (!estimatesEnabled && query.sort?.field === "estimate")
@@ -66,7 +85,7 @@ export function TaskTable({
   const client = useQueryClient();
   const [creating, setCreating] = useState(false),
     [newTitle, setNewTitle] = useState(""),
-    [newStatus, setNewStatus] = useState("todo"),
+    [newStatus, setNewStatus] = useState("backlog"),
     [newPriority, setNewPriority] = useState("medium");
   const [pinned, setPinned] = useState<TaskSummary[]>([]);
   const filterKey = JSON.stringify([
@@ -76,6 +95,11 @@ export function TaskTable({
     search.tags,
     search.archived,
     search.sort,
+    search.epic,
+    search.story,
+    search.ready,
+    search.changes,
+    search.info,
   ]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: A filter transition releases pinned newly created rows.
   useEffect(() => {
@@ -90,7 +114,8 @@ export function TaskTable({
     mutationFn: () =>
       api.createTask({
         title: newTitle.trim(),
-        status: newStatus as "todo",
+        storyKey: newStory,
+        status: newStatus as "backlog",
         priority: newPriority,
       }),
     onSuccess: (task) => {
@@ -126,6 +151,25 @@ export function TaskTable({
   changeRef.current = change;
   const searchState = useRef(search);
   searchState.current = search;
+  const openedTask = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (search.task) {
+      openedTask.current = search.task;
+      return;
+    }
+    const key = openedTask.current;
+    openedTask.current = undefined;
+    if (!key) return;
+    // A cold detail request can replace the loading Drawer with the editor.
+    // Restore the logical row after both modal cleanups, not a detached node
+    // captured by an intermediate modal's focus trap.
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-task-key="${CSS.escape(key)}"]`)
+        ?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [search.task]);
   useEffect(() => setText(search.q ?? ""), [search.q]);
   useEffect(() => {
     if (text === (searchState.current.q ?? "")) return;
@@ -168,7 +212,12 @@ export function TaskTable({
     search.status ||
     search.assignee ||
     search.tags ||
-    search.archived
+    search.archived ||
+    search.epic ||
+    search.story ||
+    search.ready ||
+    search.changes ||
+    search.info
   );
   const clear = () => change({ sort: search.sort, task: search.task });
   return (
@@ -182,9 +231,7 @@ export function TaskTable({
           <span className="muted task-count">
             {tasks.data?.total ?? 0} tasks
           </span>
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            + New task
-          </Button>
+          <NewTaskButton onClick={() => setCreating(true)} />
         </div>
       </div>
       <div className="table-filters">
@@ -249,16 +296,77 @@ export function TaskTable({
             change({ ...search, tags: v.join(",") || undefined })
           }
         />
+        <CustomSelect
+          label="Filter epic"
+          value={search.epic ?? ""}
+          onChange={(epic) =>
+            change({ ...search, epic: epic || undefined, story: undefined })
+          }
+          options={[
+            { value: "", label: "All epics" },
+            ...(epics.data ?? [])
+              .filter((e) => !e.archivedAt)
+              .map((e) => ({
+                value: e.key,
+                label: `${e.key} · ${e.title}`,
+                color: `var(--${e.color})`,
+              })),
+          ]}
+        />
+        <CustomSelect
+          label="Filter story"
+          value={search.story ?? ""}
+          onChange={(story) => change({ ...search, story: story || undefined })}
+          options={[
+            { value: "", label: "All stories" },
+            ...(stories.data ?? [])
+              .filter(
+                (s) =>
+                  !search.epic ||
+                  epics.data?.find((e) => e.key === search.epic)?.id ===
+                    s.epicId,
+              )
+              .map((s) => ({ value: s.key, label: `${s.key} · ${s.title}` })),
+          ]}
+        />
+        <Select
+          aria-label="Filter readiness"
+          value={search.ready ?? ""}
+          onChange={(e) =>
+            change({
+              ...search,
+              ready: (e.target.value as "1" | "0") || undefined,
+            })
+          }
+        >
+          <option value="">Any readiness</option>
+          <option value="1">Ready brief</option>
+          <option value="0">Incomplete brief</option>
+        </Select>
+        <Switch
+          label="Changes requested"
+          checked={search.changes === "1"}
+          onChange={(v) => change({ ...search, changes: v ? "1" : undefined })}
+        />
+        <Switch
+          label="Needs info"
+          checked={search.info === "1"}
+          onChange={(v) => change({ ...search, info: v ? "1" : undefined })}
+        />
         <Switch
           label="Show archived"
           checked={search.archived === "1"}
           onChange={(v) => change({ ...search, archived: v ? "1" : undefined })}
         />
-        {filtered && (
-          <Button variant="ghost" onClick={clear}>
-            Clear filters
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          onClick={clear}
+          disabled={!filtered}
+          aria-hidden={!filtered}
+          style={{ visibility: filtered ? "visible" : "hidden" }}
+        >
+          Clear filters
+        </Button>
       </div>
       {tasks.error ? (
         <p role="alert">{tasks.error.message}</p>
@@ -293,7 +401,9 @@ export function TaskTable({
                             : "none"
                         }
                       >
-                        {field === "tags" ? (
+                        {["tags", "epic", "story", "ready", "flags"].includes(
+                          field,
+                        ) ? (
                           label
                         ) : (
                           <button
@@ -340,7 +450,11 @@ export function TaskTable({
                           )
                         ) {
                           e.preventDefault();
-                          if (newTitle.trim() && !create.isPending)
+                          if (
+                            newTitle.trim() &&
+                            validStory &&
+                            !create.isPending
+                          )
                             create.mutate();
                         }
                       }}
@@ -352,6 +466,12 @@ export function TaskTable({
                         maxLength={140}
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
+                      />
+                      <StoryPicker
+                        label="New task story"
+                        value={newStory}
+                        onChange={setNewStory}
+                        remember
                       />
                       <Select
                         aria-label="New task status"
@@ -376,7 +496,9 @@ export function TaskTable({
                         ))}
                       </Select>
                       <Button
-                        disabled={!newTitle.trim() || create.isPending}
+                        disabled={
+                          !newTitle.trim() || !validStory || create.isPending
+                        }
                         onClick={() => create.mutate()}
                       >
                         Create
@@ -431,6 +553,7 @@ function VirtualTaskTable({
   );
   const virtual = useTableVirtualizer(scroll, rows.length, itemKey);
   const tick = useTableClock();
+  const workingNow = useWorkingClock();
   const display = useMemo(
     () =>
       new Map(rows.map((task) => [task.key, tableTime(task.updatedAt, tick)])),
@@ -527,6 +650,7 @@ function VirtualTaskTable({
                 estimatesEnabled={estimatesEnabled}
                 hiddenByFilters={hiddenKeys.has(task.key)}
                 assignee={person?.member}
+                working={agentWorking(task, person?.member, workingNow)}
                 initials={person?.initials ?? ""}
                 highlightUntil={glow?.until ?? 0}
                 highlightColor={glow?.color}
@@ -537,6 +661,21 @@ function VirtualTaskTable({
               />
             );
           })}
+          <WorkingLayer
+            rows={virtualItems.map((item) => {
+              const task = rows[item.index];
+              return {
+                key: task?.key ?? String(item.index),
+                state: task
+                  ? agentWorking(
+                      task,
+                      people.get(task.assigneeId ?? "")?.member,
+                      workingNow,
+                    )
+                  : null,
+              };
+            })}
+          />
         </tbody>
       </table>
     </div>

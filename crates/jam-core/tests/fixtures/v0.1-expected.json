@@ -1,0 +1,220 @@
+{
+  "sourceHead": "baa8dafa843793bdf6117d7d71cc82683422b2f0",
+  "taskCount": 32,
+  "counts": [
+    {
+      "status": "backlog",
+      "count": 6
+    },
+    {
+      "status": "done",
+      "count": 7
+    },
+    {
+      "status": "in_progress",
+      "count": 6
+    },
+    {
+      "status": "review",
+      "count": 4
+    },
+    {
+      "status": "todo",
+      "count": 9
+    }
+  ],
+  "tasks": [
+    {
+      "key": "JB-1",
+      "title": "Cozy cabin ending sketch",
+      "description_md": "## Goal\n\nCozy cabin ending sketch. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-10",
+      "title": "SFX: footsteps on snow",
+      "description_md": "## Goal\n\nSFX: footsteps on snow. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-11",
+      "title": "Save/load settings",
+      "description_md": "## Goal\n\nSave/load settings. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-12",
+      "title": "Pause menu",
+      "description_md": "## Goal\n\nPause menu. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-13",
+      "title": "Particles for light pickup",
+      "description_md": "## Goal\n\nParticles for light pickup. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-14",
+      "title": "Playtest round 1 notes",
+      "description_md": "## Goal\n\nPlaytest round 1 notes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-15",
+      "title": "Tune lantern battery curve",
+      "description_md": "## Goal\n\nTune lantern battery curve. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-16",
+      "title": "Light puzzle: frozen bridge",
+      "description_md": "## Goal\n\nLight puzzle: frozen bridge. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-17",
+      "title": "Cabin interior sprites",
+      "description_md": "## Goal\n\nCabin interior sprites. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-18",
+      "title": "Wind loop and transitions",
+      "description_md": "## Goal\n\nWind loop and transitions. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-19",
+      "title": "Keyboard remapping",
+      "description_md": "## Goal\n\nKeyboard remapping. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-2",
+      "title": "Optional firefly companion",
+      "description_md": "## Goal\n\nOptional firefly companion. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-20",
+      "title": "Collectible star feedback",
+      "description_md": "## Goal\n\nCollectible star feedback. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-21",
+      "title": "Camera follow smoothing",
+      "description_md": "## Goal\n\nCamera follow smoothing. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "in_progress"
+    },
+    {
+      "key": "JB-22",
+      "title": "Review snow collision edges",
+      "description_md": "## Goal\n\nReview snow collision edges. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "review"
+    },
+    {
+      "key": "JB-23",
+      "title": "Credits screen",
+      "description_md": "## Goal\n\nCredits screen. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "review"
+    },
+    {
+      "key": "JB-24",
+      "title": "Mix pickup chimes",
+      "description_md": "## Goal\n\nMix pickup chimes. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "review"
+    },
+    {
+      "key": "JB-25",
+      "title": "Checkpoint lantern animation",
+      "description_md": "## Goal\n\nCheckpoint lantern animation. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "review"
+    },
+    {
+      "key": "JB-26",
+      "title": "Project scaffolding",
+      "description_md": "## Goal\n\nProject scaffolding. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-27",
+      "title": "Main character silhouette",
+      "description_md": "## Goal\n\nMain character silhouette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-28",
+      "title": "Input action map",
+      "description_md": "## Goal\n\nInput action map. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-29",
+      "title": "First snowy level blockout",
+      "description_md": "## Goal\n\nFirst snowy level blockout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-3",
+      "title": "Snow trail variations",
+      "description_md": "## Goal\n\nSnow trail variations. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-30",
+      "title": "UI paper palette",
+      "description_md": "## Goal\n\nUI paper palette. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-31",
+      "title": "Lantern pickup prototype",
+      "description_md": "## Goal\n\nLantern pickup prototype. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-32",
+      "title": "Export preset: Windows",
+      "description_md": "## Goal\n\nExport preset: Windows. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "done"
+    },
+    {
+      "key": "JB-4",
+      "title": "Accessibility: color cues",
+      "description_md": "## Goal\n\nAccessibility: color cues. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-5",
+      "title": "Weather ambience layers",
+      "description_md": "## Goal\n\nWeather ambience layers. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-6",
+      "title": "Controller rumble ideas",
+      "description_md": "## Goal\n\nController rumble ideas. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "backlog"
+    },
+    {
+      "key": "JB-7",
+      "title": "Player movement: coyote time & jump buffer",
+      "description_md": "## Goal\n\nPlayer movement: coyote time & jump buffer. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-8",
+      "title": "Lantern glow shader",
+      "description_md": "## Goal\n\nLantern glow shader. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    },
+    {
+      "key": "JB-9",
+      "title": "Title screen layout",
+      "description_md": "## Goal\n\nTitle screen layout. Keep the experience warm, readable, and small enough for the jam.\n\n- [ ] Implement\n- [ ] Playtest",
+      "status": "todo"
+    }
+  ]
+}

@@ -4,13 +4,17 @@ import { ArrowUpRight, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, Kbd } from "../../components/ui";
 import { api } from "../../lib/api";
+import { epicsQuery } from "../../lib/planning-queries";
 import { tasksQuery } from "../../lib/queries";
 import { useUiStore } from "../../lib/ui-store";
 
 const destinations = [
+  "Plan",
+  "Inbox",
   "Board",
   "Table",
   "Assets",
+  "References",
   "Team",
   "Activity",
   "Settings",
@@ -31,6 +35,7 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const tasks = useQuery(tasksQuery);
+  const epics = useQuery(epicsQuery);
   const runtime = useQuery({
     queryKey: ["runtime"],
     queryFn: () => api.runtimeInfo(),
@@ -57,7 +62,48 @@ export function CommandPalette({
         void navigate({ to: "/board", search: { task: task.key } });
       },
     })),
+    ...(epics.data ?? [])
+      .filter((e) =>
+        `${e.key} ${e.title}`.toLowerCase().includes(query.toLowerCase()),
+      )
+      .slice(0, 8)
+      .map((e) => ({
+        id: e.key,
+        group: "Epics",
+        label: `Go to epic ${e.key} · ${e.title}`,
+        run: () => {
+          void navigate({ to: "/plan/$epicKey", params: { epicKey: e.key } });
+        },
+      })),
     ...[
+      {
+        id: "new-epic",
+        label: "New epic",
+        run: () => {
+          void navigate({ to: "/plan", search: { create: "epic" } });
+        },
+      },
+      {
+        id: "new-story",
+        label: "New story in…",
+        run: () => {
+          const e = epics.data?.find((e) => e.status !== "archived");
+          if (e)
+            void navigate({
+              to: "/plan/$epicKey",
+              params: { epicKey: e.key },
+              search: { create: "story", tab: "Stories" },
+            });
+        },
+      },
+      {
+        id: "inbox",
+        label: "Open inbox",
+        hint: "G I",
+        run: () => {
+          void navigate({ to: "/inbox" });
+        },
+      },
       { id: "new", label: "New task", hint: "N", run: newTask },
       ...(tasks.data && Object.values(tasks.data).every((t) => !t.length)
         ? [

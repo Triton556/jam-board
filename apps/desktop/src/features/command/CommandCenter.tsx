@@ -59,6 +59,8 @@ export function CommandCenter({
             {[
               ["N", "New task"],
               ["/", "Search in table"],
+              ["G P", "Plan"],
+              ["G I", "Inbox"],
               ["G B", "Board"],
               ["G T", "Table"],
               ["G A", "Activity"],

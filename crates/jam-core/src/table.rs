@@ -1,10 +1,34 @@
 use crate::*;
+#[cfg(debug_assertions)]
+use rusqlite::OptionalExtension;
 use rusqlite::{params_from_iter, types::Value};
 
 impl Store {
     pub fn query_tasks(&self, input: TaskQuery) -> Result<TaskListPage> {
         let mut filters = vec!["t.jam_id=?".to_string()];
         let mut values = Vec::<Value>::new();
+        for (value, column) in [(&input.epic, "e"), (&input.story, "s")] {
+            if let Some(value) = value.as_ref().filter(|v| !v.is_empty()) {
+                filters.push(format!("({column}.key=? OR {column}.id=?)"));
+                values.extend([Value::Text(value.clone()), Value::Text(value.clone())]);
+            }
+        }
+        for (value, expression) in [
+            (input.changes_requested, "t.changes_requested"),
+            (
+                input.needs_info,
+                "EXISTS(SELECT 1 FROM questions q WHERE q.scope_type='task' AND q.scope_id=t.id AND q.status='open')",
+            ),
+            (
+                input.ready,
+                "(length(trim(t.goal_md))>0 AND length(trim(t.where_md))>0 AND length(trim(t.result_md))>0 AND s.status='active' AND EXISTS(SELECT 1 FROM json_each(t.changes_json) j WHERE length(trim(json_extract(j.value,'$.title')))>0 AND length(trim(json_extract(j.value,'$.required')))>0) AND EXISTS(SELECT 1 FROM json_each(t.tests_json) j WHERE length(trim(json_extract(j.value,'$.setup')))>0 AND length(trim(json_extract(j.value,'$.expected')))>0))",
+            ),
+        ] {
+            if let Some(value) = value {
+                filters.push(format!("({expression})=?"));
+                values.push(Value::Integer(i64::from(value)));
+            }
+        }
         if !input.include_archived.unwrap_or(false) {
             filters.push("t.archived_at IS NULL".into());
         }
@@ -53,7 +77,7 @@ impl Store {
                 "key" => numeric_key,
                 "title" => "t.title COLLATE NOCASE",
                 "status" => {
-                    "CASE t.status WHEN 'backlog' THEN 0 WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'review' THEN 3 ELSE 4 END"
+                    "CASE t.status WHEN 'backlog' THEN 0 WHEN 'ready' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'review' THEN 3 ELSE 4 END"
                 }
                 "priority" => {
                     "CASE t.priority WHEN 'low' THEN 0 WHEN 'medium' THEN 1 WHEN 'high' THEN 2 ELSE 3 END"
@@ -78,7 +102,7 @@ impl Store {
             let jam = crate::service::jam(connection)?;
             values.insert(0, Value::Text(jam.id));
             let from = format!(
-                "FROM tasks t LEFT JOIN members m ON m.id=t.assignee_id WHERE {}",
+                "FROM tasks t JOIN stories s ON s.id=t.story_id JOIN epics e ON e.id=s.epic_id LEFT JOIN members m ON m.id=t.assignee_id WHERE {}",
                 filters.join(" AND ")
             );
             let total: i64 = connection.query_row(
@@ -132,10 +156,12 @@ impl Store {
             return Err(invalid("n", "Use at most 5000 tasks"));
         }
         let actor = self.current_member()?;
+        let story=self.read(|c|{let j=crate::service::jam(c)?;Ok(c.query_row("SELECT key FROM stories WHERE jam_id=? AND archived_at IS NULL ORDER BY position,id LIMIT 1",[j.id],|r|r.get::<_,String>(0)).optional()?)})?.map(Ok).unwrap_or_else(||self.default_task_story(&actor.id).map(|s|s.key))?;
         for i in 0..n {
             self.create_task(
                 &actor.id,
                 CreateTask {
+                    story_key: Some(story.clone()),
                     title: format!("Bulk task {}: lantern playtest", i + 1),
                     tags: Some(vec!["tech".into()]),
                     ..Default::default()

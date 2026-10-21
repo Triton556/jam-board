@@ -1,0 +1,213 @@
+/* All motion uses the document's CSS timeline. The application tick only
+   expires presence; one shared observer pauses offscreen subtrees. */
+.working-avatar {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.working-avatar .avatar,
+.working-avatar .table-avatar {
+  border-color: transparent !important;
+}
+.working-ring {
+  display: block;
+  will-change: transform;
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  overflow: visible;
+  pointer-events: none;
+  animation: working-turn 8s linear infinite;
+}
+.working-ring-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.working-ring circle {
+  fill: none;
+  stroke: var(--working-color);
+  stroke-width: 2px;
+  stroke-dasharray: 4 3;
+}
+.working-avatar.compact .table-avatar {
+  width: 16px;
+  height: 16px;
+  flex-basis: 16px;
+  font-size: 8px;
+}
+.working-avatar.compact .working-ring {
+  inset: 0;
+  width: 16px;
+  height: 16px;
+}
+.table-ring-anchor {
+  will-change: auto;
+}
+.task-table tbody tr.table-working-layer-row {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  content-visibility: visible;
+  z-index: 1;
+  pointer-events: none;
+}
+.table-working-layer-row > td {
+  grid-column: 7;
+  height: 100%;
+  padding: 0;
+}
+.table-working-layer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.table-working-layer.table-working-rotor {
+  animation: working-table-turn 8s linear infinite;
+}
+@keyframes working-table-turn {
+  to {
+    stroke-dashoffset: -42;
+  }
+}
+.working-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  margin: 9px 0 5px;
+  color: var(--ink);
+  min-width: 0;
+}
+.working-pencil {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  will-change: transform;
+  color: var(--working-color);
+  flex-shrink: 0;
+  transform-origin: 30% 85%;
+  animation: working-write 1.2s ease-in-out infinite;
+}
+.working-copy {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 16px / 19px var(--font-hand);
+  padding-bottom: 3px;
+}
+.working-underline {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 6px;
+  pointer-events: none;
+}
+.working-underline path {
+  fill: none;
+  stroke: var(--working-color);
+  stroke-width: 1.3px;
+  stroke-dasharray: 100;
+  animation: working-draw 2.8s linear infinite;
+}
+.working-pill {
+  text-transform: none;
+  letter-spacing: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--r-chip);
+  background: color-mix(in srgb, var(--working-color) 14%, var(--card));
+  color: var(--ink);
+  font-size: 13px;
+}
+.working-pill > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.working-line.quiet {
+  color: var(--ink-2);
+}
+.quiet .working-animated {
+  animation: none;
+  will-change: auto;
+}
+.quiet .working-underline {
+  opacity: 0.5;
+}
+[data-working-visible="false"] .working-animated {
+  animation-play-state: paused;
+  will-change: auto;
+}
+.task-status-field {
+  grid-column: 1 / -1;
+}
+.task-status-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.task-status-control > .custom-select {
+  width: 154px;
+  flex-shrink: 0;
+}
+.assignee-cell .working-pencil {
+  width: 14px;
+  height: 14px;
+}
+@keyframes working-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes working-write {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes working-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 1;
+  }
+  57.14%,
+  85.71% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-animated {
+    animation: none !important;
+    transform: none;
+    will-change: auto;
+  }
+  .working-underline path {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}

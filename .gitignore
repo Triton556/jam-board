@@ -8,14 +8,3 @@
 /apps/desktop/src-tauri/binaries/
 /apps/desktop/src-tauri/gen/
 /events.jsonl
-
-# Local development history (not published)
-docs/briefs/
-docs/report-*
-docs/plan.md
-docs/decisions.md
-docs/media/*
-!docs/media/demo.gif
-!docs/media/readme-*.jpg
-final.md
-BRIEF.md

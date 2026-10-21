@@ -74,22 +74,12 @@ impl Store {
         if !(1..=40).contains(&input.your_name.trim().chars().count()) {
             return Err(invalid("yourName", "Use 1–40 characters"));
         }
-        let format = &time::format_description::well_known::Rfc3339;
-        let start = time::OffsetDateTime::parse(&input.starts_at, format)
-            .map_err(|_| invalid("startsAt", "Use a valid date and time"))?;
-        let end = time::OffsetDateTime::parse(&input.ends_at, format)
-            .map_err(|_| invalid("endsAt", "Use a valid date and time"))?;
-        if end <= start {
-            return Err(invalid("endsAt", "End must be after start"));
+        let template = input.template.as_deref().unwrap_or("game_jam");
+        crate::planning::validate_template(template)?;
+        if template == "game_jam" {
+            crate::planning::validate_project_dates(Some(&input.starts_at), Some(&input.ends_at))?;
         }
-        self.create_jam(
-            input.name.trim(),
-            input.theme.as_deref(),
-            Some(&input.starts_at),
-            Some(&input.ends_at),
-            &input.timezone,
-            input.your_name.trim(),
-        )?;
+        self.create_project_record(&input)?;
         self.app_state()
     }
     pub fn set_theme(&self, theme: &str) -> Result<()> {
@@ -146,7 +136,10 @@ impl Store {
             Ok(filtered)
         })
     }
-    pub fn create_current_task(&self, input: CreateTask) -> Result<TaskDetail> {
+    pub fn create_current_task(&self, mut input: CreateTask) -> Result<TaskDetail> {
+        if input.story_key.is_none() {
+            input.story_key = Some(self.default_task_story(&self.current_member()?.id)?.key);
+        }
         self.create_task(&self.current_member()?.id, input)
     }
     pub fn move_current_task(
@@ -157,5 +150,42 @@ impl Store {
         after: Option<&str>,
     ) -> Result<TaskSummary> {
         self.move_task(&self.current_member()?.id, key, status, before, after)
+    }
+}
+
+impl Store {
+    /// The v0.1 quick-create UI has no hierarchy picker until V2.2.
+    pub fn default_task_story(&self, actor: &str) -> Result<Story> {
+        if self.get_member(actor)?.kind != "human" {
+            return Err(Error::Forbidden("Agents must supply storyKey".into()));
+        }
+        if let Some(story) = self.read(|c| {
+            let j = crate::service::jam(c)?;
+            Ok(crate::planning::records::<Story>(
+                c,
+                "stories",
+                "jam_id=? AND title='Unplanned work' AND archived_at IS NULL ORDER BY position,id",
+                &[&j.id],
+            )?
+            .into_iter()
+            .next())
+        })? {
+            return Ok(story);
+        }
+        let epic = self.create_epic(
+            actor,
+            NewEpic {
+                title: "Unplanned work".into(),
+                ..Default::default()
+            },
+        )?;
+        self.create_story(
+            actor,
+            NewStory {
+                epic_key: epic.key,
+                title: "Unplanned work".into(),
+                ..Default::default()
+            },
+        )
     }
 }

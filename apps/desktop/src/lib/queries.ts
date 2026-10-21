@@ -83,6 +83,8 @@ export function useMoveTask() {
       useUiStore
         .getState()
         .error(`Couldn't move ${input.key} — ${error.message}`);
+      if ("code" in error && error.code === "not_ready")
+        useUiStore.setState({ readyRequest: input });
     },
     onSettled: () => client.invalidateQueries({ queryKey: ["boardTasks"] }),
   });

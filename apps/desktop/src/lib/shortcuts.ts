@@ -16,8 +16,20 @@ export function shortcutAction(
   const key = event.key.toLowerCase();
   if ((event.ctrlKey || event.metaKey) && key === "k") return "palette";
   if (event.ctrlKey || event.metaKey) return null;
-  if (previousG > 0 && now - previousG < 800 && ["b", "t", "a"].includes(key))
-    return key === "b" ? "/board" : key === "t" ? "/table" : "/activity";
+  if (
+    previousG > 0 &&
+    now - previousG < 800 &&
+    ["b", "t", "a", "p", "i"].includes(key)
+  )
+    return key === "b"
+      ? "/board"
+      : key === "t"
+        ? "/table"
+        : key === "p"
+          ? "/plan"
+          : key === "i"
+            ? "/inbox"
+            : "/activity";
   return key === "g"
     ? "prefix"
     : key === "n"

@@ -89,6 +89,9 @@ p {
   outline: 2px solid var(--coral);
   outline-offset: 2px;
 }
+:focus:not(:focus-visible) {
+  outline: none;
+}
 .muted,
 .optional {
   color: var(--ink-2);
@@ -111,12 +114,12 @@ p {
   white-space: nowrap;
 }
 .button.primary {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 .button.primary:hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
+  background: var(--primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 7px #2b262226;
 }
@@ -340,7 +343,7 @@ p {
   cursor: pointer;
   width: 100%;
 }
-.theme-control:focus-within {
+.theme-control:has(:focus-visible) {
   outline: 2px solid var(--coral);
   outline-offset: 2px;
   border-radius: 8px;
@@ -568,7 +571,9 @@ p {
 [data-theme="dark"] .sticker-wrap {
   --card-mix: 22%;
 }
-[data-theme="dark"] [data-color-by="assignee"] :is(.card-key, .card-footer) {
+[data-theme="dark"]
+  :is([data-color-by="assignee"], [data-color-by="epic"])
+  :is(.card-key, .card-footer) {
   color: var(--ink);
 }
 .card-key {
@@ -1117,6 +1122,11 @@ input[aria-invalid="true"] {
 .table-scroll[data-scrolling] tbody tr:hover {
   background: var(--card);
 }
+/* Rows own their click/key behavior. Skip decorative cell hit tests during
+   scrolling without disabling row clicks or keyboard focus. */
+:where(.table-scroll[data-scrolling] tbody) td {
+  pointer-events: none;
+}
 .task-table tbody tr.focused {
   box-shadow: inset 3px 0 var(--coral);
 }
@@ -1270,27 +1280,42 @@ input[aria-invalid="true"] {
   grid-column: 1 / -1;
 }
 .segmented {
-  display: flex;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-input);
-  overflow: hidden;
-  background: var(--paper);
-  min-height: 38px;
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--paper-2);
+  padding: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 .segmented button {
-  flex: 1;
   border: 0;
-  border-right: 1px solid var(--line-soft);
+  border-radius: 8px;
   background: transparent;
-  padding: 6px;
-  font-size: 12px;
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
-.segmented button:last-child {
-  border: 0;
+.segmented button[aria-checked="false"]:hover {
+  background: color-mix(in srgb, var(--card) 60%, transparent);
 }
-.segmented button[aria-pressed="true"] {
+.segmented button[aria-checked="true"] {
   background: var(--card);
-  box-shadow: inset 0 -2px var(--coral);
+  box-shadow: 0 1px 2px rgba(43, 38, 34, 0.12);
+  color: var(--ink);
+  font-weight: 600;
+}
+.segmented-large button {
+  height: 40px;
 }
 .combobox {
   position: relative;
@@ -1706,14 +1731,6 @@ kbd {
   margin: 0;
   padding: 0;
 }
-.task-form .segmented {
-  border: 1px solid var(--line-soft);
-  padding: 0;
-}
-
-.task-field-grid .segmented small {
-  font-size: 9px;
-}
 
 /* Fixed-height flow rows share one translated virtual window. */
 .table-title-text {
@@ -1767,7 +1784,7 @@ kbd {
   display: inline-block;
   width: auto;
   flex: 0 0 auto;
-  color: var(--ink-2);
+  color: inherit;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -1807,7 +1824,7 @@ kbd {
   background: transparent;
   border-color: color-mix(in srgb, currentColor 30%, transparent);
   color: inherit;
-  opacity: 0.7;
+  opacity: 1;
   white-space: nowrap;
 }
 .status-filters button {
@@ -1834,20 +1851,11 @@ kbd {
 .custom-select .input-like {
   min-height: 40px;
 }
-.task-field-grid .segmented {
-  height: 48px;
-  min-height: 48px;
-}
 .task-field-grid .custom-select .input-like {
   height: 48px;
 }
-.task-field-grid :where(.segmented) button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 4px;
+.task-field-grid .field:has([aria-label="Priority"]) {
+  grid-column: 1 / -1;
 }
 .task-field-grid .segmented .priority svg {
   width: 16px;
@@ -1970,4 +1978,50 @@ kbd {
   font:
     13px "Manrope Variable",
     sans-serif;
+}
+
+:root {
+  --st-ready: var(--st-todo);
+}
+.card-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.flag-changes {
+  color: var(--danger);
+  background: var(--card);
+}
+.flag-info {
+  color: var(--ink);
+  background: var(--butter);
+}
+.readonly-brief h3,
+.readonly-report h3 {
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
+.readonly-brief h4 {
+  font-size: 14px;
+}
+.readonly-brief p {
+  margin: 6px 0;
+}
+.brief-change,
+.brief-test {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  padding: 12px;
+  margin: 8px 0;
+}
+.readonly-brief,
+.readonly-report,
+.readonly-review {
+  overflow-wrap: anywhere;
+}
+.brief-test code {
+  display: block;
+  white-space: pre-wrap;
+  font-size: 12px;
 }

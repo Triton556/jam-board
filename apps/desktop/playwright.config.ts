@@ -15,10 +15,15 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "functional", testIgnore: "**/perf/**" },
+    { name: "functional", testIgnore: ["**/perf/**", "**/perf-canvas/**"] },
     {
       name: "perf",
       testMatch: "**/perf/*.spec.ts",
+      use: { baseURL: "http://127.0.0.1:1422", trace: "off" },
+    },
+    {
+      name: "perf-canvas",
+      testMatch: "**/perf-canvas/*.spec.ts",
       use: { baseURL: "http://127.0.0.1:1422", trace: "off" },
     },
   ],

@@ -8,15 +8,68 @@ fn setup() -> (tempfile::TempDir, Store, Member, Member, Member) {
     let (_, h) = s
         .create_jam("Test jam", None, None, None, "UTC", "Human")
         .unwrap();
+    let e = s
+        .create_epic(
+            &h.id,
+            NewEpic {
+                title: "Domain fixture".into(),
+                goal_md: Some("Test domain behavior".into()),
+                done_when_md: Some("All assertions pass".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let st = s
+        .create_story(
+            &h.id,
+            NewStory {
+                epic_key: e.key,
+                title: "Domain fixture".into(),
+                outcome_md: Some("Exercise the public service".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "1".into(),
+                    criterion: "Assertions pass".into(),
+                    mandatory: true,
+                    check: "cargo test".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    s.set_story_status(&h.id, &st.key, "active", None).unwrap();
     let a = s.identify_agent("Codex", "codex").unwrap();
     let b = s.identify_agent("Claude", "claude-code").unwrap();
     (dir, s, h, a, b)
 }
 fn create(s: &Store, a: &Member, name: &str) -> TaskDetail {
+    if s.get_story(&format!("{}-S1", s.active_jam().unwrap().key_prefix))
+        .is_err()
+    {
+        let st = s.default_task_story(&a.id).unwrap();
+        s.update_story(
+            &a.id,
+            &st.key,
+            StoryPatch {
+                outcome_md: Some("Exercise the new project".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "1".into(),
+                    criterion: "Assertions pass".into(),
+                    mandatory: true,
+                    check: "cargo test".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        s.set_story_status(&a.id, &st.key, "active", None).unwrap();
+    }
     s.create_task(
         &a.id,
         CreateTask {
+            story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
+            brief: fixture_brief(),
             title: name.into(),
+            status: Some("ready".into()),
             ..Default::default()
         },
     )
@@ -28,6 +81,8 @@ fn numbering_tags_and_idempotency() {
     let (_d, s, h, _, _) = setup();
     let n = s.activity_count().unwrap();
     let input = CreateTask {
+        story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
+        brief: fixture_brief(),
         title: "One".into(),
         idempotency_key: Some("external-1".into()),
         tags: Some(vec![" Art ".into(), "ART".into(), " ui ".into()]),
@@ -43,6 +98,8 @@ fn numbering_tags_and_idempotency() {
         s.create_task(
             &h.id,
             CreateTask {
+                story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
+                brief: fixture_brief(),
                 title: "".into(),
                 ..Default::default()
             }
@@ -63,7 +120,7 @@ fn positions_neighbors_and_renumber() {
         .move_task(
             &h.id,
             &c.task.key,
-            "todo",
+            "ready",
             Some(&b.task.key),
             Some(&a.task.key),
         )
@@ -73,21 +130,21 @@ fn positions_neighbors_and_renumber() {
         s.move_task(
             &h.id,
             &c.task.key,
-            "todo",
+            "ready",
             Some(&a.task.key),
             Some(&b.task.key)
         )
         .is_err()
     );
     for _ in 0..40 {
-        s.move_task(&h.id, &c.task.key, "todo", Some(&b.task.key), None)
+        s.move_task(&h.id, &c.task.key, "ready", Some(&b.task.key), None)
             .unwrap();
         let rows = s.list_tasks(None, TaskFilter::default()).unwrap().tasks;
         assert!(
             rows.windows(2)
                 .all(|r| r[1].position - r[0].position >= 1e-6)
         );
-        s.move_task(&h.id, &a.task.key, "todo", Some(&b.task.key), None)
+        s.move_task(&h.id, &a.task.key, "ready", Some(&b.task.key), None)
             .unwrap();
         let rows = s.list_tasks(None, TaskFilter::default()).unwrap().tasks;
         assert!(
@@ -110,32 +167,38 @@ fn claim_release_all_branches() {
             .create_task(
                 &h.id,
                 CreateTask {
+                    story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
+                    brief: fixture_brief(),
                     title: status.into(),
                     status: Some(status.into()),
                     ..Default::default()
                 },
             )
             .unwrap();
+        if status != "ready" {
+            assert!(matches!(
+                s.claim_task(&a.id, &t.task.key),
+                Err(Error::NotReady(_) | Error::WrongStatus(_))
+            ));
+            s.mark_ready(&h.id, &t.task.key, None).unwrap();
+        }
         let n = s.activity_count().unwrap();
         let claimed = s.claim_task(&a.id, &t.task.key).unwrap();
-        assert_eq!(
-            claimed.task.status,
-            if ["backlog", "todo"].contains(&status) {
-                "in_progress"
-            } else {
-                status
-            }
-        );
+        assert_eq!(claimed.task.status, "in_progress");
         assert_eq!(s.activity_count().unwrap(), n + 1);
-        s.claim_task(&a.id, &t.task.key).unwrap();
+        assert!(matches!(
+            s.claim_task(&a.id, &t.task.key),
+            Err(Error::WrongStatus(_))
+        ));
         assert!(
             matches!(s.claim_task(&b.id,&t.task.key),Err(Error::ClaimConflict{holder}) if holder=="Codex")
         );
         assert!(s.release_task(&b.id, &t.task.key, None).is_err());
         assert_eq!(
             s.release_task(&a.id, &t.task.key, None).unwrap().status,
-            "todo"
+            "backlog"
         );
+        s.mark_ready(&h.id, &t.task.key, None).unwrap();
         s.claim_task(&a.id, &t.task.key).unwrap();
         let released = s.release_task(&h.id, &t.task.key, Some("review")).unwrap();
         assert_eq!(released.status, "review");
@@ -171,9 +234,8 @@ fn archive_blocks_all_edits_and_human_unarchives() {
         s.archive_task(&a.id, key, None).map(|_| ()),
     ];
     assert!(
-        errors
-            .into_iter()
-            .all(|e| matches!(e, Err(Error::Archived(_))))
+        errors.iter().all(|e| matches!(e, Err(Error::Archived(_)))),
+        "{errors:?}"
     );
     assert!(s.unarchive_task(&b.id, key).is_err());
     s.unarchive_task(&h.id, key).unwrap();
@@ -271,7 +333,7 @@ fn demo_has_required_shape() {
     let d = tempfile::tempdir_in(base).unwrap();
     let s = Store::open(d.path().join("jam.db")).unwrap();
     s.seed_demo().unwrap();
-    assert_eq!(s.activity_count().unwrap(), 60);
+    assert_eq!(s.activity_count().unwrap(), 62);
     let b = s.board(None).unwrap();
     let counts = b["columns"]
         .as_array()
@@ -279,7 +341,7 @@ fn demo_has_required_shape() {
         .iter()
         .map(|c| c["count"].as_u64().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(counts, [6, 9, 6, 4, 7]);
+    assert_eq!(counts, [6, 9, 3, 1, 3]);
     assert_eq!(s.list_assets(None, None).unwrap().len(), 8);
     assert_eq!(s.list_members().unwrap().len(), 5);
 }
@@ -314,6 +376,8 @@ fn dates_are_stored_as_utc() {
         .create_task(
             &h.id,
             CreateTask {
+                story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
+                brief: fixture_brief(),
                 title: "Offset date".into(),
                 due_at: Some("2026-10-20T10:00:00+10:00".into()),
                 ..Default::default()
@@ -334,16 +398,34 @@ fn demo_reload_keeps_existing_history_and_60_new_events() {
     let first = serde_json::to_value(first_feed.poll().unwrap()).unwrap();
     let j = s.seed_demo().unwrap();
     assert_eq!(j.key_prefix, "JB2");
-    assert_eq!(j.task_seq, 32);
-    assert_eq!(s.activity_count().unwrap(), 120);
+    assert_eq!(j.task_seq, 22);
+    assert_eq!(s.activity_count().unwrap(), 122);
     assert_eq!(
         s.list_tasks(None, TaskFilter::default())
             .unwrap()
             .tasks
             .len(),
-        32
+        22
     );
     let mut feed = ChangeFeed::open(&s.path, 0).unwrap();
     let all = feed.poll().unwrap();
-    assert_eq!(serde_json::to_value(&all[..60]).unwrap(), first);
+    assert_eq!(serde_json::to_value(&all[..62]).unwrap(), first);
+}
+
+fn fixture_brief() -> TaskBrief {
+    TaskBrief {
+        goal_md: "Exercise domain behavior".into(),
+        where_md: "fixture.rs".into(),
+        changes: vec![Change {
+            title: "Fixture change".into(),
+            required: "Preserve the assertion contract".into(),
+            ..Default::default()
+        }],
+        tests: vec![BriefTest {
+            setup: "Run the fixture".into(),
+            expected: "The assertion passes".into(),
+        }],
+        result_md: "Report actual assertions".into(),
+        ..Default::default()
+    }
 }

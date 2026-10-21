@@ -69,10 +69,10 @@ it("asset dialog switches modes and only creates a validated asset", async () =>
 });
 it("workload bar uses proportional widths and handles no tasks", () => {
   const { container, rerender } = render(
-    <WorkloadBar counts={{ todo: 3, done: 1 }} />,
+    <WorkloadBar counts={{ ready: 3, done: 1 }} />,
   );
   expect(screen.getByRole("img", { name: "4 tasks" })).toBeVisible();
-  expect(container.querySelector('[title="To do: 3"]')).toHaveStyle({
+  expect(container.querySelector('[title="Ready: 3"]')).toHaveStyle({
     width: "75%",
   });
   rerender(<WorkloadBar counts={{}} />);
@@ -121,7 +121,11 @@ it("paper sound is limited to one event per 400ms", () => {
   expect(canRustle(1000, -Infinity)).toBe(true);
 });
 it("mock import maps handles, preserves teammates and rewrites linked IDs", async () => {
-  const old = await mockApi.getTask("JB-7");
+  await mockApi.addComment({
+    key: "JB-2",
+    bodyMd: "Keep the sprite outline crisp.",
+  });
+  const old = await mockApi.getTask("JB-2");
   const exported = await mockApi.exportJamJson();
   const added = await mockApi.createMember({
     name: "New teammate",
@@ -129,7 +133,7 @@ it("mock import maps handles, preserves teammates and rewrites linked IDs", asyn
     avatar: null,
   });
   await mockApi.importJamJson(exported.path);
-  const imported = await mockApi.getTask("JB2-7");
+  const imported = await mockApi.getTask("JB2-2");
   expect(imported.id).not.toBe(old.id);
   expect(imported.assets[0]?.id).not.toBe(old.assets[0]?.id);
   expect(imported.comments.every((c) => c.taskId === imported.id)).toBe(true);

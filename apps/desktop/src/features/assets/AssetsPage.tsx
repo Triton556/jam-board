@@ -20,6 +20,7 @@ import {
   Dialog,
   EmptyState,
   IconButton,
+  SegmentedControl,
   Select,
   Stamp,
   Tabs,
@@ -352,20 +353,19 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
     <main className="feature-page">
       <PageHeading title="Assets" note="everything the game is made of">
         <div className="button-row">
-          <IconButton
-            label="Grid view"
-            aria-pressed={settings?.assetsView !== "list"}
-            onClick={() => update({ assetsView: "grid" })}
-          >
-            <LayoutGrid size={18} />
-          </IconButton>
-          <IconButton
-            label="List view"
-            aria-pressed={settings?.assetsView === "list"}
-            onClick={() => update({ assetsView: "list" })}
-          >
-            <List size={18} />
-          </IconButton>
+          <SegmentedControl
+            label="Assets view"
+            value={settings?.assetsView ?? "grid"}
+            onChange={(assetsView) => update({ assetsView })}
+            options={[
+              {
+                value: "grid",
+                label: <LayoutGrid size={18} />,
+                title: "Grid view",
+              },
+              { value: "list", label: <List size={18} />, title: "List view" },
+            ]}
+          />
           <Button variant="primary" onClick={() => setEdit(true)}>
             Add asset
           </Button>

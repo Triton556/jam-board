@@ -2,13 +2,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-pub const STATUSES: [&str; 5] = ["backlog", "todo", "in_progress", "review", "done"];
+pub const STATUSES: [&str; 5] = ["backlog", "ready", "in_progress", "review", "done"];
 pub const PRIORITIES: [&str; 4] = ["low", "medium", "high", "critical"];
 pub const MEMBER_COLORS: [&str; 6] = [
     "#5B8DEF", "#E0679A", "#3FA37A", "#9B7BE0", "#F07E5F", "#D8A630",
 ];
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Jam {
     pub id: String,
@@ -20,6 +20,10 @@ pub struct Jam {
     pub task_seq: i64,
     pub key_prefix: String,
     pub created_at: String,
+    #[serde(default = "default_template")]
+    pub template: String,
+    #[serde(default)]
+    pub milestone_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -34,6 +38,12 @@ pub struct Member {
     pub client: Option<String>,
     pub last_seen_at: Option<String>,
     pub created_at: String,
+    #[serde(default)]
+    pub status_text: String,
+    #[serde(default)]
+    pub status_scope: Option<crate::Scope>,
+    #[serde(default)]
+    pub status_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -57,7 +67,7 @@ impl From<&Member> for MemberRef {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSummary {
     pub id: String,
@@ -79,6 +89,24 @@ pub struct TaskSummary {
     pub idempotency_key: Option<String>,
     pub tags: Vec<String>,
     pub comment_count: i64,
+    #[serde(default)]
+    pub story_id: String,
+    #[serde(default)]
+    pub story_key: String,
+    #[serde(default)]
+    pub ready: bool,
+    #[serde(default)]
+    pub epic_id: String,
+    #[serde(default)]
+    pub epic_key: String,
+    #[serde(default)]
+    pub epic_color: String,
+    #[serde(default)]
+    pub changes_requested: bool,
+    #[serde(default)]
+    pub needs_info: bool,
+    #[serde(default)]
+    pub review_round: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -90,6 +118,14 @@ pub struct TaskDetail {
     pub comments: Vec<Comment>,
     pub activity: Vec<ActivityEvent>,
     pub history: Vec<ActivityEvent>,
+    pub brief: crate::TaskBrief,
+    #[serde(default)]
+    pub ancestor_questions: Vec<crate::Question>,
+    pub story: crate::Story,
+    pub epic: crate::Epic,
+    pub reports: Vec<crate::Report>,
+    pub reviews: Vec<crate::Review>,
+    pub references: Vec<crate::RefItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -103,6 +139,8 @@ pub struct Asset {
     pub notes: Option<String>,
     pub created_by: String,
     pub created_at: String,
+    #[serde(default = "default_asset_role")]
+    pub role: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -125,6 +163,10 @@ pub struct ActivityEvent {
     #[specta(type = JsonPayload)]
     pub payload: serde_json::Value,
     pub created_at: String,
+    #[serde(default)]
+    pub epic_id: Option<String>,
+    #[serde(default)]
+    pub sentence: String,
 }
 
 /// Named, recursive metadata for the JSON wire format. Keeping this named avoids
@@ -151,6 +193,9 @@ pub struct CreateTask {
     pub estimate: Option<i64>,
     pub due_at: Option<String>,
     pub idempotency_key: Option<String>,
+    pub story_key: Option<String>,
+    #[serde(flatten)]
+    pub brief: crate::TaskBrief,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -162,6 +207,10 @@ pub struct NewJamInput {
     pub ends_at: String,
     pub timezone: String,
     pub your_name: String,
+    #[serde(default)]
+    pub template: Option<String>,
+    #[serde(default)]
+    pub milestone_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -179,6 +228,8 @@ pub struct BoardSummary {
     pub in_progress: Vec<BoardTask>,
     pub my_tasks: Vec<BoardTask>,
     pub online_agents: Vec<MemberStats>,
+    pub tag_suggestions: Vec<String>,
+    pub open_question_count: i64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -187,6 +238,8 @@ pub struct BoardJam {
     pub theme: Option<String>,
     pub ends_at: Option<String>,
     pub time_left: Option<i64>,
+    pub template: String,
+    pub milestone_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct BoardColumn {
@@ -194,12 +247,23 @@ pub struct BoardColumn {
     pub count: i64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct BoardTask {
     pub key: String,
     pub title: String,
     pub priority: String,
     pub status: String,
     pub assignee: Option<MemberRef>,
+    pub changes_requested: bool,
+    pub needs_info: bool,
+    pub epic_key: String,
+}
+
+fn default_template() -> String {
+    "game_jam".into()
+}
+fn default_asset_role() -> String {
+    "asset".into()
 }
 pub type BoardTasks = std::collections::BTreeMap<String, Vec<TaskSummary>>;
 
@@ -225,6 +289,8 @@ pub(crate) fn nullable<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskPatch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brief: Option<crate::TaskBrief>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -268,6 +334,11 @@ pub struct TaskEditInput {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskQuery {
+    pub epic: Option<String>,
+    pub story: Option<String>,
+    pub ready: Option<bool>,
+    pub changes_requested: Option<bool>,
+    pub needs_info: Option<bool>,
     pub status: Option<Vec<String>>,
     pub assignee: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -301,6 +372,11 @@ pub struct TaskFilter {
     pub include_archived: Option<bool>,
     pub limit: Option<usize>,
     pub cursor: Option<String>,
+    pub epic: Option<String>,
+    pub story: Option<String>,
+    pub ready: Option<bool>,
+    pub changes_requested: Option<bool>,
+    pub needs_info: Option<bool>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -318,4 +394,5 @@ pub struct MemberStats {
     pub counts: std::collections::BTreeMap<String, i64>,
     pub online: bool,
     pub working_on: Vec<String>,
+    pub status_stale: bool,
 }

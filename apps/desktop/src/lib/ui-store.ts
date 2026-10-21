@@ -4,6 +4,7 @@ export type ToastMessage = {
   id: string;
   text: string;
   taskKey?: string;
+  href?: string;
   actor?: ActivityEvent["actor"];
   until: number;
   pausedAt?: number;
@@ -16,6 +17,7 @@ type UiState = {
   sidebarExpanded: boolean;
   soundEnabled: boolean;
   quickColumn: string | null;
+  readyRequest: import("./types").MoveInput | null;
   taskChanges: Record<string, ActivityEvent>;
   boardEvents: ActivityEvent[];
   toggleSidebar(): void;
@@ -40,6 +42,7 @@ export const useUiStore = create<UiState>((set) => ({
   sidebarExpanded: savedSidebar(),
   soundEnabled: false,
   quickColumn: null,
+  readyRequest: null,
   taskChanges: {},
   boardEvents: [],
   toggleSidebar: () =>
@@ -63,6 +66,19 @@ export const useUiStore = create<UiState>((set) => ({
       for (const event of events) {
         if (event.taskKey) taskChanges[event.taskKey] = event;
         if (event.actor.kind !== "agent") continue;
+        if (event.action === "agent.status") continue;
+        if (
+          event.action.startsWith("reference.") &&
+          event.payload &&
+          typeof event.payload === "object" &&
+          !Array.isArray(event.payload) &&
+          typeof event.payload.itemId === "string"
+        )
+          highlights[event.payload.itemId] = {
+            color: event.actor.color,
+            until: now + 4000,
+            action: event.action,
+          };
         if (event.taskKey)
           highlights[event.taskKey] = {
             color: event.actor.color,
@@ -70,12 +86,25 @@ export const useUiStore = create<UiState>((set) => ({
             action: event.action,
           };
         agentPulse[event.actor.handle] = now + 2000;
+        if (
+          ![
+            "task.created",
+            "task.moved",
+            "task.claimed",
+            "comment.added",
+            "report.submitted",
+            "review.recorded",
+            "question.asked",
+          ].includes(event.action)
+        )
+          continue;
         toasts = [
           ...toasts,
           {
             id: `${event.seq}-${crypto.randomUUID()}`,
             text: eventText(event),
             taskKey: event.taskKey ?? undefined,
+            href: event.action === "question.asked" ? "/inbox" : undefined,
             actor: event.actor,
             until: now + 5000,
           },
@@ -132,6 +161,11 @@ export const useUiStore = create<UiState>((set) => ({
     })),
 }));
 export function eventText(event: ActivityEvent) {
+  if (event.action === "question.asked") {
+    const payload = event.payload as { title?: string };
+    return `${event.actor.name} asked: ${payload?.title ?? "a question"}`;
+  }
+  if (event.sentence) return event.sentence;
   const payload =
     event.payload &&
     typeof event.payload === "object" &&
@@ -144,7 +178,7 @@ export function eventText(event: ActivityEvent) {
   const title = typeof payload.title === "string" ? payload.title : "";
   const verbs: Record<string, string> = {
     "task.created": `created ${event.taskKey}${title ? ` · ${title}` : ""}`,
-    "task.moved": `moved ${event.taskKey}${typeof status === "string" ? ` to ${status === "in_progress" ? "In progress" : status === "todo" ? "To do" : status[0]?.toUpperCase() + status.slice(1)}` : ""}`,
+    "task.moved": `moved ${event.taskKey}${typeof status === "string" ? ` to ${status === "in_progress" ? "In progress" : status === "ready" ? "Ready" : status[0]?.toUpperCase() + status.slice(1)}` : ""}`,
     "task.claimed": `claimed ${event.taskKey}`,
     "comment.added": `commented on ${event.taskKey}`,
   };

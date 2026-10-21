@@ -5,7 +5,7 @@ async function demo(page: import("@playwright/test").Page) {
   await page
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
-  await expect(page.getByTestId("task-card")).toHaveCount(32);
+  await expect(page.getByTestId("task-card")).toHaveCount(22);
 }
 test("URL asset can be linked from Assets and appears in the task panel", async ({
   page,
@@ -73,7 +73,7 @@ test("Activity filters agents, loads earlier events and holds new events while r
         key: "JB-1",
       });
   });
-  await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await page.getByRole("radio", { name: "Agents", exact: true }).click();
   await expect
     .poll(() => page.locator(".activity-entry").count())
     .toBeGreaterThan(0);
@@ -87,9 +87,9 @@ test("Activity filters agents, loads earlier events and holds new events while r
     }),
   );
   await expect(
-    page.getByRole("button", { name: "1 new events ↑" }),
+    page.getByRole("button", { name: "1 new steps ↑" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "1 new events ↑" }).click();
+  await page.getByRole("button", { name: "1 new steps ↑" }).click();
   await expect(
     page
       .locator(".activity-entry")
@@ -103,11 +103,13 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await demo(page);
   await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Agents", exact: true }).click();
   await page.getByRole("tab", { name: "Claude Code · HTTP" }).click();
   const token = await page.evaluate(() => window.__jamMock.revealMcpToken());
-  await expect(page.locator(".code-block")).not.toContainText(token);
+  await expect(page.locator(".code-block").first()).not.toContainText(token);
   await page
     .locator(".code-block")
+    .first()
     .getByRole("button", { name: "Copy", exact: true })
     .click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
@@ -143,12 +145,12 @@ test("Archiving a jam requires its exact name and returns to onboarding", async 
   await page.getByRole("dialog").getByLabel("Jam name").fill("Cozy Jam 48");
   await page.getByRole("button", { name: "Archive jam", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Let's plan a jam" }),
+    page.getByRole("heading", { name: "What are we making?" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
-  await expect(page.getByTestId("task-card")).toHaveCount(32);
+  await expect(page.getByTestId("task-card")).toHaveCount(22);
 });
 test("Export and Import round-trip through the mock temporary snapshot", async ({
   page,
@@ -161,6 +163,6 @@ test("Export and Import round-trip through the mock temporary snapshot", async (
     page.getByText("Exported to mock://jam-export.json"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Import JSON" }).click();
-  await expect(page.getByTestId("task-card")).toHaveCount(32);
+  await expect(page.getByTestId("task-card")).toHaveCount(22);
   await expect(page.locator('[data-key="JB2-1"]')).toBeVisible();
 });

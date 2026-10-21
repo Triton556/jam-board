@@ -2,6 +2,31 @@ import type { ReactNode } from "react";
 import type { ActivityEvent, Status } from "../../lib/types";
 import { labels } from "../../lib/types";
 export function EventWords({ event: e }: { event: ActivityEvent }) {
+  if (e.sentence) {
+    const rest = e.sentence.startsWith(e.actor.name)
+      ? e.sentence.slice(e.actor.name.length).trimStart()
+      : e.sentence;
+    const key =
+      e.taskKey ??
+      (typeof (e.payload as Record<string, unknown>)?.key === "string"
+        ? String((e.payload as Record<string, unknown>).key)
+        : null);
+    const index = key ? rest.indexOf(key) : -1;
+    return (
+      <>
+        <b>{e.actor.name}</b>{" "}
+        {key && index >= 0 ? (
+          <>
+            {rest.slice(0, index)}
+            <b className="mono">{key}</b>
+            {rest.slice(index + key.length)}
+          </>
+        ) : (
+          rest
+        )}
+      </>
+    );
+  }
   const payload = e.payload as Record<string, unknown>,
     key = <b className="mono">{e.taskKey}</b>;
   const status = Array.isArray(payload.status)

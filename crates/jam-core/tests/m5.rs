@@ -83,6 +83,7 @@ fn assets_links_and_preview_are_scoped_and_each_mutation_has_one_event() {
 fn member_identity_is_immutable_and_statistics_include_work() {
     let (_d, s, actor) = setup();
     let a = s.identify_agent("Codex", "codex").unwrap();
+    s.mark_ready(&actor, "JB-1", None).unwrap();
     s.claim_task(&a.id, "JB-1").unwrap();
     let updated = s
         .edit_member(
@@ -164,7 +165,7 @@ fn snapshot_roundtrip_renumbers_keys_maps_members_and_rejects_corruption() {
     let state = s.import_jam_json(&actor, &raw).unwrap();
     assert_ne!(state.jam.unwrap().id, old);
     let imported = s.export_jam().unwrap();
-    assert_eq!(imported.tasks.len(), 32);
+    assert_eq!(imported.tasks.len(), 22);
     assert_eq!(imported.assets.len(), 8);
     assert_eq!(imported.members.len(), old_members);
     assert!(imported.tasks.iter().all(|t| t.key.starts_with("JB2-")));
@@ -196,7 +197,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
     assert_eq!(
         c.query_row("SELECT COUNT(*) FROM tasks", [], |r| r.get::<_, i64>(0))
             .unwrap(),
-        32
+        22
     );
     assert_eq!(
         c.query_row(
@@ -205,7 +206,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
             |r| r.get::<_, i64>(0)
         )
         .unwrap(),
-        32
+        22
     );
     assert_eq!(
         c.query_row("SELECT archived FROM jams", [], |r| r.get::<_, i64>(0))
@@ -232,7 +233,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
 fn board_settings_are_scoped_and_validated() {
     let (_d, s, _actor) = setup();
     let initial = s.get_settings().unwrap();
-    assert_eq!(initial.color_by, "none");
+    assert_eq!(initial.color_by, "epic");
     assert!(!initial.estimates_enabled);
     assert_eq!(initial.wip_limit, 6);
     s.set_settings(SettingsPatch {
@@ -245,10 +246,10 @@ fn board_settings_are_scoped_and_validated() {
     assert!(s.get_settings().unwrap().estimates_enabled);
     s.seed_demo().unwrap();
     assert!(!s.get_settings().unwrap().estimates_enabled);
-    assert_eq!(s.get_settings().unwrap().color_by, "none");
+    assert_eq!(s.get_settings().unwrap().color_by, "epic");
     assert!(
         s.set_settings(SettingsPatch {
-            color_by: Some("epic".into()),
+            color_by: Some("rainbow".into()),
             ..Default::default()
         })
         .is_err()

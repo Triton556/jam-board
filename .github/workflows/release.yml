@@ -34,8 +34,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $files = Get-ChildItem target/release/bundle/nsis/*-setup.exe
-          if (-not $files) { throw 'NSIS installer missing' }
-          $lines = $files | ForEach-Object { "$( (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLower() )  $($_.Name)" }
-          [IO.File]::WriteAllLines("$PWD/SHA256SUMS.txt", $lines, [Text.UTF8Encoding]::new($false))
+          $uploaded = Join-Path $env:RUNNER_TEMP 'jam-uploaded-installers'
+          gh release download ${{ github.ref_name }} --pattern '*-setup.exe' --dir $uploaded
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read uploaded installer assets' }
+          ./scripts/release-checksums.ps1 -LocalDirectory target/release/bundle/nsis -UploadedDirectory $uploaded -OutputPath "$PWD/SHA256SUMS.txt"
           gh release upload ${{ github.ref_name }} SHA256SUMS.txt --clobber

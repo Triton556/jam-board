@@ -13,6 +13,9 @@ pub enum ApiErrorCode {
     Validation,
     Archived,
     Conflict,
+    NotReady,
+    WrongStatus,
+    Forbidden,
     Internal,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -30,6 +33,9 @@ impl From<jam_core::Error> for ApiError {
             Error::Validation { field, .. } => (ApiErrorCode::Validation, Some(field.clone())),
             Error::Archived(_) => (ApiErrorCode::Archived, None),
             Error::Conflict => (ApiErrorCode::Conflict, None),
+            Error::NotReady(_) => (ApiErrorCode::NotReady, None),
+            Error::WrongStatus(_) => (ApiErrorCode::WrongStatus, None),
+            Error::Forbidden(_) => (ApiErrorCode::Forbidden, None),
             _ => (ApiErrorCode::Internal, None),
         };
         Self {
@@ -78,6 +84,7 @@ pub struct MoveInput {
     pub status: String,
     pub before_key: Option<String>,
     pub after_key: Option<String>,
+    pub override_reason: Option<String>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -175,11 +182,13 @@ pub async fn move_task(
     app: tauri::AppHandle,
 ) -> Result<TaskSummary, ApiError> {
     execute(&state, app, true, move |s| {
-        s.move_current_task(
+        s.move_task_with_override(
+            &s.current_member()?.id,
             &input.key,
             &input.status,
             input.before_key.as_deref(),
             input.after_key.as_deref(),
+            input.override_reason.as_deref(),
         )
     })
     .await

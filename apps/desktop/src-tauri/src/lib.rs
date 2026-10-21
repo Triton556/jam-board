@@ -3,8 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_specta::Event;
+mod canvas_commands;
 pub mod commands;
 mod m5_commands;
+mod skill_commands;
+mod skill_runner;
+mod v2_commands;
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct McpCallsChanged {}
 
@@ -21,6 +25,10 @@ pub struct BoardChanged {
 pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
     macro_rules! desktop_commands {
         ($($extra:ident),*) => { tauri_specta::collect_commands![
+            skill_commands::pick_folder,skill_commands::skill_saved_path,skill_commands::skill_check,skill_commands::cancel_skill,skill_commands::run_skill,
+            canvas_commands::reference_canvas,canvas_commands::canvas_geometry,canvas_commands::canvas_archive,canvas_commands::reference_metadata,canvas_commands::update_ref_edge,canvas_commands::clipboard_reference,canvas_commands::fetch_reference_preview,canvas_commands::clear_reference_preview,canvas_commands::canvas_viewport,canvas_commands::reference_media,
+            v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
+            v2_commands::get_project,v2_commands::update_project,v2_commands::list_epics,v2_commands::get_epic,v2_commands::get_story,v2_commands::create_epic,v2_commands::update_epic,v2_commands::set_epic_status,v2_commands::create_story,v2_commands::update_story,v2_commands::set_story_status,v2_commands::update_task_brief,v2_commands::check_ready,v2_commands::mark_ready,v2_commands::answer_question,v2_commands::ask_user,v2_commands::withdraw_question,v2_commands::list_questions,v2_commands::review_task,v2_commands::submit_report,v2_commands::set_brain,v2_commands::list_changes_since,v2_commands::epic_journal,v2_commands::add_reference,v2_commands::list_references,v2_commands::update_reference,v2_commands::link_reference,v2_commands::unlink_reference,v2_commands::archive_reference,v2_commands::list_ref_frames,v2_commands::create_ref_frame,v2_commands::update_ref_frame,v2_commands::archive_ref_frame,v2_commands::list_ref_edges,v2_commands::create_ref_edge,v2_commands::archive_ref_edge,v2_commands::update_ref_geometry,
             commands::app_ready, commands::app_state, commands::create_jam, commands::load_demo_jam,
             commands::set_current_member, commands::add_self, commands::get_board,
             commands::list_board_tasks, commands::get_task, commands::create_task,
@@ -32,7 +40,11 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
     }
     let builder = tauri_specta::Builder::new()
         .dangerously_cast_bigints_to_number()
-        .events(tauri_specta::collect_events![BoardChanged, McpCallsChanged]);
+        .events(tauri_specta::collect_events![
+            BoardChanged,
+            McpCallsChanged,
+            skill_commands::SkillOutput
+        ]);
     #[cfg(debug_assertions)]
     let builder = builder.commands(desktop_commands!(seed_bulk));
     #[cfg(not(debug_assertions))]
@@ -69,6 +81,7 @@ pub fn run() {
     )))
     .expect("export event types");
     tauri::Builder::default()
+        .manage(skill_commands::SkillRuntime::default())
         .invoke_handler(bridge.invoke_handler())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(w) = app.get_webview_window("main") {

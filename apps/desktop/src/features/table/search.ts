@@ -11,6 +11,11 @@ export const sortFields = [
   "updatedAt",
 ] as const;
 export const tableSearchSchema = z.object({
+  epic: z.string().max(100).catch("").optional(),
+  story: z.string().max(100).catch("").optional(),
+  ready: z.enum(["1", "0"]).optional().catch(undefined),
+  changes: z.literal("1").optional().catch(undefined),
+  info: z.literal("1").optional().catch(undefined),
   q: z.string().max(500).catch("").optional(),
   status: z
     .string()
@@ -68,6 +73,11 @@ export function validateTableSearch(raw: Record<string, unknown>): TableSearch {
 export function tableQuery(search: TableSearch): TaskQuery {
   const [field, dir] = (search.sort ?? "updatedAt:desc").split(":");
   return {
+    epic: search.epic || null,
+    story: search.story || null,
+    ready: search.ready === undefined ? null : search.ready === "1",
+    changesRequested: search.changes ? true : null,
+    needsInfo: search.info ? true : null,
     text: search.q || null,
     status: search.status?.split(",") ?? null,
     assignee: search.assignee || null,

@@ -63,9 +63,9 @@ fn board_read_is_not_limited_to_the_mcp_page_size() {
         .unwrap();
     }
     let tasks = s.list_board_tasks().unwrap();
-    assert_eq!(tasks["todo"].len(), 251);
-    assert_eq!(tasks["todo"].first().unwrap().key, "JB-1");
-    assert_eq!(tasks["todo"].last().unwrap().key, "JB-251");
+    assert_eq!(tasks["backlog"].len(), 251);
+    assert_eq!(tasks["backlog"].first().unwrap().key, "JB-1");
+    assert_eq!(tasks["backlog"].last().unwrap().key, "JB-251");
 }
 #[test]
 fn all_board_tasks_are_grouped_ordered_and_have_counts() {
@@ -73,7 +73,7 @@ fn all_board_tasks_are_grouped_ordered_and_have_counts() {
     s.seed_demo().unwrap();
     let board = s.list_board_tasks().unwrap();
     assert_eq!(board.len(), 5);
-    assert_eq!(board.values().map(Vec::len).sum::<usize>(), 32);
+    assert_eq!(board.values().map(Vec::len).sum::<usize>(), 22);
     for (status, tasks) in board {
         assert!(
             tasks
@@ -91,7 +91,7 @@ fn all_board_tasks_are_grouped_ordered_and_have_counts() {
     let actor = s.current_member().unwrap();
     s.add_comment(&actor.id, &t.task.key, "A note").unwrap();
     assert_eq!(
-        s.list_board_tasks().unwrap()["todo"]
+        s.list_board_tasks().unwrap()["backlog"]
             .iter()
             .find(|task| task.key == t.task.key)
             .unwrap()
@@ -105,7 +105,7 @@ fn all_board_tasks_are_grouped_ordered_and_have_counts() {
             .values()
             .map(Vec::len)
             .sum::<usize>(),
-        32
+        22
     );
 }
 #[test]
@@ -118,6 +118,8 @@ fn onboarding_and_theme_validation() {
         ends_at: "2026-10-21T00:00:00Z".into(),
         timezone: "UTC".into(),
         your_name: "Danil".into(),
+        template: None,
+        milestone_at: None,
     };
     input.ends_at = input.starts_at.clone();
     assert!(s.onboard(input.clone()).is_err());

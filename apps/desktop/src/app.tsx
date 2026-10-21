@@ -23,7 +23,10 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Boxes,
+  Images,
+  Inbox,
   LayoutDashboard,
+  ListTree,
   Moon,
   Plus,
   Settings,
@@ -40,11 +43,29 @@ import {
   Button,
   EmptyState,
   IconButton,
-  Kbd,
-  SegmentedControl,
   Stamp,
   Tooltip,
 } from "./components/ui";
+import { BoardHeader } from "./features/board/BoardHeader";
+import { EpicFilters } from "./features/board/EpicFilters";
+import { ProjectTiming } from "./features/onboarding/ProjectTiming";
+import type { PlanSearch } from "./features/plan/PlanPage";
+
+const PlanPage = lazy(() =>
+  import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage })),
+);
+const InboxPage = lazy(() =>
+  import("./features/inbox/InboxPage").then((m) => ({ default: m.InboxPage })),
+);
+const StoryDrawer = lazy(() =>
+  import("./features/plan/StoryDrawer").then((m) => ({
+    default: m.StoryDrawer,
+  })),
+);
+
+import { ReadinessDialog } from "./features/task/Readiness";
+import { AgentStatus, InboxBadge } from "./features/team/AgentStatus";
+import { questionsQuery } from "./lib/planning-queries";
 
 const ActivityPage = lazy(() =>
   import("./features/activity/ActivityPage").then((m) => ({
@@ -56,11 +77,15 @@ const AssetsPage = lazy(() =>
     default: m.AssetsPage,
   })),
 );
+const ReferencesPage = lazy(() =>
+  import("./features/references/ReferencesPage").then((m) => ({
+    default: m.ReferencesPage,
+  })),
+);
 
 import { Board } from "./features/board/Board";
 import { CommandCenter } from "./features/command/CommandCenter";
 import { Welcome } from "./features/onboarding/Welcome";
-import { useBoardSettings } from "./lib/queries";
 
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((m) => ({
@@ -99,9 +124,12 @@ const client = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, retry: false } },
 });
 const navigation = [
+  { path: "/plan", name: "Plan", icon: ListTree },
   { path: "/board", name: "Board", icon: LayoutDashboard },
   { path: "/table", name: "Table", icon: Table2 },
+  { path: "/inbox", name: "Inbox", icon: Inbox },
   { path: "/assets", name: "Assets", icon: Boxes },
+  { path: "/references", name: "References", icon: Images },
   { path: "/team", name: "Team", icon: Users },
   { path: "/activity", name: "Activity", icon: Activity },
   { path: "/settings", name: "Settings", icon: Settings },
@@ -143,7 +171,10 @@ function Root() {
     );
     const stop = api.onBoardChanged((events) => {
       for (const event of events) {
-        if (event.action.startsWith("jam."))
+        if (
+          event.action.startsWith("jam.") ||
+          event.action === "project.updated"
+        )
           void queryClient.invalidateQueries({ queryKey: ["app"] });
         if (event.taskKey)
           void queryClient.invalidateQueries({
@@ -153,19 +184,30 @@ function Root() {
           void queryClient.invalidateQueries({ queryKey: ["members"] });
       }
       for (const queryKey of [
+        ["project"],
         ["boardTasks"],
         ["board"],
         ["activity"],
         ["tableTasks"],
         ["tags"],
         ["assets"],
+        ["references"],
         ["members"],
+        ["epics"],
+        ["epic"],
+        ["stories"],
+        ["story"],
+        ["questions"],
+        ["journal"],
+        ["readiness"],
       ])
         void queryClient.invalidateQueries({ queryKey });
       useUiStore.getState().receive(events);
       if (
         useUiStore.getState().soundEnabled &&
-        events.some((e) => e.actor.kind === "agent")
+        events.some(
+          (e) => e.actor.kind === "agent" && e.action !== "agent.status",
+        )
       )
         paperRustle();
     });
@@ -236,6 +278,7 @@ function Root() {
         <Outlet />
       </Suspense>
       <Toasts />
+      <ReadinessDialog />
     </AvatarMembersContext>
   );
 }
@@ -284,27 +327,6 @@ function WhoAreYou() {
     </main>
   );
 }
-function Countdown({ endsAt }: { endsAt: string | null }) {
-  const now = useUiStore((s) => Math.floor(s.now / 1000));
-  if (!endsAt) return null;
-  const left = Math.max(0, Math.floor(Date.parse(endsAt) / 1000 - now));
-  const text = left
-    ? `${Math.floor(left / 3600)
-        .toString()
-        .padStart(2, "0")}:${Math.floor((left / 60) % 60)
-        .toString()
-        .padStart(2, "0")}:${(left % 60).toString().padStart(2, "0")} left`
-    : "Jam over";
-  return (
-    <span
-      className={`countdown ${left < 10800 ? "ending" : ""}`}
-      role="timer"
-      aria-label="Jam time remaining"
-    >
-      {text}
-    </span>
-  );
-}
 function Shell() {
   const app = useQuery(appQuery);
   const board = useQuery({ ...boardQuery, enabled: !!app.data?.hasJam });
@@ -325,12 +347,15 @@ function Shell() {
     },
     onError: (error) => useUiStore.getState().error(error.message),
   });
+  const questions = useQuery(questionsQuery);
+  const questionCount =
+    questions.data?.filter((q) => q.status === "open").length ?? 0;
   const newTask = useCallback(() => {
     if (location === "/table") {
       window.dispatchEvent(new Event("table-new-task"));
       return;
     }
-    useUiStore.getState().setQuickColumn("todo");
+    useUiStore.getState().setQuickColumn("backlog");
     void navigate({ to: "/board" });
   }, [navigate, location]);
   if (!app.data?.hasJam) return <Welcome />;
@@ -349,11 +374,12 @@ function Shell() {
             <Tooltip key={path} text={name}>
               <Link
                 to={path}
-                className={`nav-link ${location === path ? "selected" : ""}`}
+                className={`nav-link ${location === path || location.startsWith(`${path}/`) ? "selected" : ""}`}
                 aria-label={name}
               >
                 <Icon size={20} />
                 {expanded && <span>{name}</span>}
+                {name === "Inbox" && <InboxBadge count={questionCount} />}
               </Link>
             </Tooltip>
           ))}
@@ -394,6 +420,15 @@ function Shell() {
           <IconButton label="New task · N" onClick={newTask}>
             <Plus size={17} />
           </IconButton>
+          <button
+            className="icon-button top-inbox"
+            type="button"
+            aria-label="Open inbox"
+            onClick={() => void navigate({ to: "/inbox" })}
+          >
+            <Inbox size={18} />
+            <InboxBadge count={questionCount} />
+          </button>
           <CommandCenter
             newTask={newTask}
             toggleTheme={() =>
@@ -404,7 +439,11 @@ function Shell() {
               )
             }
           />
-          <Countdown endsAt={app.data.jam?.endsAt ?? null} />
+          <ProjectTiming
+            template={app.data.jam?.template}
+            endsAt={app.data.jam?.endsAt ?? null}
+            milestoneAt={app.data.jam?.milestoneAt}
+          />
           <div className="agent-stack">
             {board.data?.onlineAgents
               .filter(
@@ -412,15 +451,11 @@ function Shell() {
                   now * 1000 - Date.parse(agent.lastSeenAt ?? "") < 120000,
               )
               .map((agent) => (
-                <Tooltip
+                <AgentStatus
                   key={agent.id}
-                  text={`${agent.name}${agent.workingOn.length ? ` · working on ${agent.workingOn.join(", ")}` : " · online"}`}
-                >
-                  <span className="agent-presence">
-                    <Avatar member={agent} size={30} />
-                    {pulse[agent.handle] && <span className="pulse-dot" />}
-                  </span>
-                </Tooltip>
+                  member={agent}
+                  pulse={!!pulse[agent.handle]}
+                />
               ))}
           </div>
         </header>
@@ -430,48 +465,30 @@ function Shell() {
   );
 }
 function BoardRoute() {
-  const { settings, update } = useBoardSettings();
   const search = boardRoute.useSearch();
   const navigate = useNavigate();
   const open = useCallback(
     (task: string) => {
-      void navigate({ to: "/board", search: { task } });
+      void navigate({ to: "/board", search: { ...search, task } });
     },
-    [navigate],
+    [navigate, search],
   );
   const close = useCallback(() => {
-    void navigate({ to: "/board", search: {} });
-  }, [navigate]);
+    void navigate({ to: "/board", search: { ...search, task: undefined } });
+  }, [navigate, search]);
   return (
     <>
-      <div className="board-intro">
-        <div>
-          <span className="eyebrow">MAKE SOMETHING SMALL & WONDERFUL</span>
-          <h1>
-            The jam board<span className="heading-star">✳</span>
-          </h1>
-        </div>
-        <div className="board-actions">
-          <span className="muted">Color by:</span>
-          <SegmentedControl
-            label="Color by"
-            value={settings?.colorBy ?? "none"}
-            onChange={(v) => update({ colorBy: v })}
-            options={[
-              { value: "none", label: "None" },
-              { value: "assignee", label: "Assignee" },
-            ]}
-          />
-          <Button
-            variant="primary"
-            onClick={() => useUiStore.getState().setQuickColumn("todo")}
-          >
-            <Plus size={17} />
-            New task <Kbd>N</Kbd>
-          </Button>
-        </div>
-      </div>
-      <Board open={open} />
+      <BoardHeader />
+      <EpicFilters
+        value={search.epics?.split(",") ?? []}
+        onChange={(keys) =>
+          void navigate({
+            to: "/board",
+            search: { ...search, epics: keys.join(",") || undefined },
+          })
+        }
+      />
+      <Board open={open} epicKeys={search.epics?.split(",") ?? []} />
       {search.task && <TaskDrawer taskKey={search.task} close={close} />}
     </>
   );
@@ -514,12 +531,18 @@ function FeatureRoute({ name }: { name: string }) {
     | "/assets"
     | "/team"
     | "/activity"
-    | "/settings";
+    | "/settings"
+    | "/inbox";
+
   const openTask = (task: string) =>
     void navigate({ to: path, search: { section: search.section, task } });
   return (
     <>
-      {name === "Assets" ? (
+      {name === "References" ? (
+        <ReferencesPage />
+      ) : name === "Inbox" ? (
+        <InboxPage />
+      ) : name === "Assets" ? (
         <AssetsPage openTask={openTask} />
       ) : name === "Team" ? (
         <TeamPage
@@ -573,11 +596,16 @@ function Toasts() {
         >
           {toast.actor && <Avatar member={toast.actor} size={32} />}
           <span>{toast.text}</span>
-          {toast.taskKey && (
+          {(toast.taskKey || toast.href) && (
             <Button
               variant="ghost"
               onClick={() =>
-                void navigate({ to: "/board", search: { task: toast.taskKey } })
+                toast.href
+                  ? void navigate({ to: "/inbox" })
+                  : void navigate({
+                      to: "/board",
+                      search: { task: toast.taskKey },
+                    })
               }
             >
               View
@@ -619,18 +647,32 @@ const shellRoute = createRoute({
 const boardRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/board",
-  validateSearch: (search: Record<string, unknown>): { task?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { task?: string; epics?: string } => ({
+    epics:
+      typeof search.epics === "string"
+        ? search.epics
+            .split(",")
+            .filter((k) => /^[A-Za-z0-9]+-E[0-9]+$/.test(k))
+            .join(",") || undefined
+        : undefined,
     task: typeof search.task === "string" ? search.task : undefined,
   }),
   component: BoardRoute,
 });
 const placeholders = navigation
-  .filter((item) => item.path !== "/board" && item.path !== "/table")
+  .filter(
+    (item) =>
+      item.path !== "/board" && item.path !== "/table" && item.path !== "/plan",
+  )
   .map((item) =>
     createRoute({
       getParentRoute: () => shellRoute,
       path: item.path,
-      validateSearch: (search: Record<string, unknown>) => ({
+      validateSearch: (
+        search: Record<string, unknown>,
+      ): { task?: string; section?: string } => ({
         task: typeof search.task === "string" ? search.task : undefined,
         section:
           typeof search.section === "string" ? search.section : undefined,
@@ -638,6 +680,66 @@ const placeholders = navigation
       component: () => <FeatureRoute name={item.name} />,
     }),
   );
+function PlanRoute() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({
+    select: (s) => s.location.search,
+  }) as PlanSearch;
+  const navigate = useNavigate();
+  const epicKey = pathname.split("/")[2];
+  const update = (patch: PlanSearch) => {
+    void navigate({
+      to: epicKey ? "/plan/$epicKey" : "/plan",
+      params: { epicKey: epicKey ?? "" },
+      search: { ...search, ...patch },
+    });
+  };
+  return (
+    <>
+      <PlanPage
+        epicKey={epicKey}
+        search={search}
+        openTask={(task) => update({ task })}
+        openStory={(story) => update({ story })}
+      />
+      {search.story && (
+        <StoryDrawer
+          storyKey={search.story}
+          close={() => update({ story: undefined })}
+          openTask={(task) => update({ task })}
+        />
+      )}{" "}
+      {search.task && (
+        <TaskDrawer
+          taskKey={search.task}
+          close={() => update({ task: undefined })}
+        />
+      )}
+    </>
+  );
+}
+const planSearch = (raw: Record<string, unknown>): PlanSearch => ({
+  tab:
+    typeof raw.tab === "string" &&
+    ["Overview", "Stories", "Journal", "Questions"].includes(raw.tab)
+      ? raw.tab
+      : undefined,
+  story: typeof raw.story === "string" ? raw.story : undefined,
+  task: typeof raw.task === "string" ? raw.task : undefined,
+  create: typeof raw.create === "string" ? raw.create : undefined,
+});
+const planRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/plan",
+  validateSearch: planSearch,
+  component: PlanRoute,
+});
+const epicRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/plan/$epicKey",
+  validateSearch: planSearch,
+  component: PlanRoute,
+});
 const tableRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/table",
@@ -658,7 +760,13 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     indexRoute,
     welcomeRoute,
-    shellRoute.addChildren([boardRoute, tableRoute, ...placeholders]),
+    shellRoute.addChildren([
+      planRoute,
+      epicRoute,
+      boardRoute,
+      tableRoute,
+      ...placeholders,
+    ]),
   ]),
 });
 declare module "@tanstack/react-router" {

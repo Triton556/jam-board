@@ -15,11 +15,13 @@ export function Switch({
   checked,
   onChange,
   disabled = false,
+  stateText = false,
 }: {
   label: string;
   checked: boolean;
   onChange(v: boolean): void;
   disabled?: boolean;
+  stateText?: boolean;
 }) {
   return (
     <label className="switch-label">
@@ -34,7 +36,7 @@ export function Switch({
       >
         <span />
       </button>
-      {label}
+      {stateText ? (checked ? "On" : "Off") : label}
     </label>
   );
 }

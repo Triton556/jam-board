@@ -31,7 +31,7 @@ export type UpdateInput = TaskEditInput_Deserialize;
 export type TaskQuery = Partial<WireTaskQuery>;
 export const statuses = [
   "backlog",
-  "todo",
+  "ready",
   "in_progress",
   "review",
   "done",
@@ -39,7 +39,7 @@ export const statuses = [
 export type Status = (typeof statuses)[number];
 export const labels: Record<Status, string> = {
   backlog: "Backlog",
-  todo: "To do",
+  ready: "Ready",
   in_progress: "In progress",
   review: "Review",
   done: "Done",
@@ -54,16 +54,19 @@ export type CreateInput = {
   tags?: string[];
   estimate?: number;
   dueAt?: string;
+  storyKey?: string;
+  brief?: import("../bindings").TaskBrief;
 };
 export type MoveInput = {
   key: string;
   status: Status;
   beforeKey?: string;
   afterKey?: string;
+  overrideReason?: string;
 };
 export const emptyBoard = (): BoardTasks => ({
   backlog: [],
-  todo: [],
+  ready: [],
   in_progress: [],
   review: [],
   done: [],
@@ -105,4 +108,4 @@ export type NewMember = Omit<WireNewMember, "avatar"> & {
   avatar?: string | null;
 };
 export type SettingsPatch = Partial<WireSettingsPatch>;
-export type ColorBy = "none" | "assignee";
+export type ColorBy = "none" | "assignee" | "epic";

@@ -12,6 +12,7 @@ import { api } from "../../lib/api";
 import { membersQuery } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
 import type { Member } from "../../lib/types";
+import { AgentStatusLine } from "./AgentStatus";
 export function MemberDialog({
   member,
   close,
@@ -138,6 +139,7 @@ export function TeamPage({
                     <Avatar member={m} size={48} />
                     <div>
                       <h3>{m.name}</h3>
+                      {kind === "agent" && <AgentStatusLine member={m} />}
                       <small className="mono muted">@{m.handle}</small>
                     </div>
                     <Button

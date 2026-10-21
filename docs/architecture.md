@@ -18,7 +18,7 @@ flowchart LR
 
 ## Processes and crates
 
-`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to twelve MCP tools, resources, a prompt and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
+`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to 39 MCP tools, resources, three prompts and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
 
 The installer places `jam-board.exe` and `jam-board-mcp.exe` together. Installed processes use `%APPDATA%\dev.triton556.jamboard\jam.db`. Development sets `JAM_BOARD_DATA_DIR` to a directory inside `.dev-data`. The CLI resolves `--db`, then `JAM_BOARD_DB`, then `JAM_BOARD_DATA_DIR/jam.db`, then the platform default. The HTTP server exists only while the desktop is open; stdio can work independently.
 
@@ -52,6 +52,53 @@ Feature screens, the table, task drawer, command palette and Markdown renderer l
 
 ## Board preferences and file attachments
 
-Board color mode, optional story-point visibility and the soft In progress WIP limit are stored under the active jam ID in SQLite settings. New jams default to plain paper cards, hidden estimates and a limit of six; estimates remain part of the domain and MCP contract. Asset Grid/List and collapsed-group preferences are application-wide.
+Board color mode, optional story-point visibility and the soft In progress WIP limit are stored under the active jam ID in SQLite settings. New jams default to epic-colored paper cards, hidden estimates and a limit of six; estimates remain part of the domain and MCP contract. Asset Grid/List and collapsed-group preferences are application-wide.
 
 Attaching a local file to a task calls one jam-core transaction: validate the active editable task and file, infer its kind/name, insert the asset reference and task link, touch the task version, and append one asset.linked activity event with created=true. No file is copied. A failed link rolls back the asset insertion. Registered-file preview authorization still happens in Rust.
+
+
+## Project work model (v0.2)
+
+A project retains the jams table, adding a template, optional milestone and transactional epic/story counters. Exactly three levels are enforced with foreign keys: Epic > Story > Task. Tasks cannot have a null story. Planning entities own interview/intent/acceptance fields; tasks own the playbook brief separately from editable Notes. Epic brains are agent members; every permission check is in jam-core, including activation, Ready overrides, Done and review. Humans retain control; workers cannot review their own submissions.
+
+Reports/reviews are immutable per task and review round. A worker submission moves In progress > Review; changes requested returns to Ready with the assignee and history retained. Questions use a validated polymorphic project/epic/story/task scope. Humans answer; each level shows only its own open questions. Task detail separately carries open story/epic questions as ancestorQuestions, preserving worker context without flooding task flags. Cross-process waits release all SQLite locks, then consume the existing activity/data-version feed at 250ms intervals until an answer, matching activity or a bounded timeout. wait_for_changes applies action/actor/self/epic filters, returns at most 100 ordered events and advances nextCursor through every inspected row, including non-matches. Its dedicated read snapshot ends before sleeping; the writer stays available. Presence refreshes add no activity.
+
+activity.epic_id indexes the epic journal; seq remains the project cursor and English event sentences are generated in core. Project interviews before epic creation keep epic_id null. Plan → Journal also displays those earlier project questions, answers and status lines as **Project prelude**, bounded by the preceding epic creation. This is labeled presentation context from the project feed: stored scope, scoped MCP journal reads and event sequence remain unchanged. Scoped agent status updates last_seen_at, records one event and becomes stale after 30 minutes. The separate online threshold stays 120 seconds.
+
+References are a React Flow canvas backed by frames, items, edges and target links. File items create role=reference assets in the same transaction and reference local paths. Adding/rendering a link only stores or reads its URL and never fetches it. A separate explicit human preview operation uses the OS curl client with a five-second deadline, HTTP(S)-only redirects and a 2 MiB cap; only title/og:image metadata is retained. Archival hides items/links without deleting records. A version-2 JSON snapshot retains this graph and planning history; imports validate polymorphic targets as well as ordinary foreign keys, allocate new IDs/keys and match member handles. Version-1 snapshots remain importable.
+
+## Forward migration and UI compatibility
+
+Schema version 3 is one rusqlite_migration forward migration after the two MVP migrations. It builds the new task table, creates an Imported tasks epic/story for each old project with tasks, copies every task with the same ID/key/title/Notes, maps todo > backlog and attaches its mandatory story. A single migration event records moved counts. Foreign-key enforcement is disabled only on the isolated migration connection outside the migration transaction, then checked and re-enabled; entity rows and relationships are preserved. Reopening the database does not repeat migration.
+
+The human planning surface adds Plan (epic Overview, ordered Stories, Journal and Questions), a Story drawer, editable task briefs with report/review rounds, and Inbox answers. Board epic filters and table hierarchy/readiness filters retain state in the URL. Table and Plan creation require a story; the older board quick-entry path still creates draft Unplanned work when no story is chosen. Ready always validates the brief and active story, with a recorded human/brain override available.
+
+## Human planning adapters and live state
+
+The native adapter adds list_plan_epics (including archives for the All filter), list_plan_stories, clear_brain and reorder_story. Their rules remain in jam-core; no MCP tool is added. An optional full brief in the version-checked native task patch saves Notes, fields and brief atomically, with one task.brief_updated event listing changed fields. A late save response preserves text typed while it was in flight. Dirty task edits retain the existing conflict comparison and Keep mine / Take theirs controls.
+
+One board-changed listener invalidates hierarchy, readiness, questions and journal queries in addition to task data. Question toasts open Inbox; agent.status updates presence/status views without a toast or sound. Journals group consecutive steps by actor and day, splitting at ten minutes, and freeze the visible history while a reader is scrolled down. New-step controls reveal pending entries. The existing shared thirty-second clock handles stale status text; the table continues to use memoized rows without per-row store subscriptions.
+
+Plan, Inbox and the Story drawer are lazy chunks. The mock implements the same planning operations, persists hierarchy with its snapshot, and extends the Rust-exported fixture and agent simulation seam. Production performance data uses 2000 tasks distributed over five epics and twenty stories. References has its own lazy chunk. Template selection and local skill setup are described below.
+
+## Reference canvas persistence and rendering
+
+Schema version 4 adds nullable ref_items.metadata and ref_frames.collapsed with backward-compatible defaults in version-2 snapshots. Geometry is relative to a parent frame; unframed positions are absolute. Item/frame drag and resize saves are debounced for 300 ms after the gesture, and leaving the screen flushes pending geometry. Viewports are keyed by the current human member in settings. Frames can bind/unbind an epic, and that binding derives reference links without duplicating ref_links. Archived frame origins remain available to release children visually and restore the region through session undo. Item/frame/edge archive restoration is human-only.
+
+Clipboard PNGs use generated names below the canonical data-directory references folder; a redirected references directory is refused. All other files retain their original paths. Image previews and registered audio/video/font files receive individual asset-protocol grants after core validation; no general filesystem scope is added. Audio peaks and duration are cached in item metadata, and a single audio controller stops the previous player. Page previews never download their og:image URL automatically.
+
+React Flow retains every node/edge record, handles interaction and uses onlyRenderVisibleElements. At readable zoom, custom paper nodes lazily load authorized media. Below 40% zoom, a cached browser-canvas overview batches cards, rough frames and edges into one raster while real nodes retain focus, selection, handles and screen-reader labels. Selecting a node/frame or enabling Connect restores its full controls. Only visible images acquire decoded thumbnails (maximum 512 px); user files are not copied. Camera motion transforms the cached overview instead of repainting hundreds of text layers each frame. Session history supports move, resize, caption and archive undo/redo.
+
+## Project templates and local agent setup
+
+Template-aware onboarding creates Game jam, Gamedev, Web app or Custom projects. Only Game jam uses a countdown; Gamedev and Web app may have a milestone. Used tags remain task data, separate from each template's suggestions. Human project changes run through one jam-core transaction and append one project.updated event. Project settings expose the existing immutable key prefix.
+
+Agents settings keeps the local MCP connection controls and adds a local playbook installer. The user selects a project and an agent-playbook checkout. The app checks harness.py, manifest.json and Python 3.12+, then launches only plan, install or verify with fixed argument positions and no shell. Each step has a 120-second process deadline; cancellation kills and waits for the Python child. Output streams through a typed skill-output event. The selected playbook path is stored in the local settings table.
+
+The app neither bundles nor downloads the playbook. A successful plan precedes a concrete installation confirmation, then install and verify run in order. The harness owns destination files and its private .harness-state/receipts in the selected checkout; the UI discloses both write locations. Source files and global agent configuration are not modified. Claude Code uses the harness CLI client identifier claude. Copyable commands use PowerShell single-quoted arguments; the actual runner uses separate argv values, never the displayed command string.
+
+## V0.2 presentation and release boundary
+
+Frames use cached unfilled rough outlines with paper title tabs. Readable link cards grow to fit content and persist their measured size through the existing geometry debounce. Sizing is disabled for overview placeholders: a camera move must never rewrite stored node geometry. Selecting an item or returning to readable zoom restores content fitting. Connection handles appear on hover, focus, selection or Connect mode.
+
+The desktop and sidecar share release version 0.2.0. NSIS remains an unsigned per-user Windows package; the sidecar is bundled beside the application. Preparing the package does not install it over an existing user's build. Hardware-dependent production performance checks remain local, separate from CI functional checks. End-to-end agent acceptance is recorded separately from successful unit/browser tests and does not follow merely from a packaged executable.
