@@ -95,6 +95,7 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
   );
   await page.keyboard.press("Escape");
   await page.goto("/board");
+  await page.waitForFunction(() => !!window.__jamMock);
   await page.evaluate(async () =>
     window.__jamMock.simulateAgent({
       action: "agent.status",
@@ -128,6 +129,7 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
   );
   await page.keyboard.press("Escape");
   await page.goto("/board");
+  await page.waitForFunction(() => !!window.__jamMock);
   await page.evaluate(async () =>
     window.__jamMock.simulateAgent({
       action: "agent.status",

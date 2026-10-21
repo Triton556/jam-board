@@ -17,6 +17,7 @@ async function writeBlock(page: Page, label: string, text: string) {
 }
 async function emptyPlan(page: Page) {
   await page.goto("/");
+  await page.waitForFunction(() => !!window.__jamMock);
   await page.evaluate(async () => {
     await window.__jamMock.createJam({
       name: "Lantern workshop",
