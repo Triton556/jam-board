@@ -11,7 +11,7 @@ import { api } from "../../lib/api";
 import { connectionPrompt } from "../../lib/brain-handoff";
 import { makeSnippets } from "../../lib/mcp-config";
 import { acceptProjectSelection } from "../../lib/project-selection";
-import { appQuery, boardQuery } from "../../lib/queries";
+import { appQuery } from "../../lib/queries";
 import { paperRustle } from "../../lib/sound";
 import type { ConfigSnippets, Theme } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
@@ -43,10 +43,15 @@ export function SettingsPage({
   const client = useQueryClient();
   const navigate = useNavigate();
   const app = useQuery(appQuery);
-  const board = useQuery({ ...boardQuery, enabled: !!app.data?.hasJam });
+  const projects = useQuery({
+    queryKey: ["projects", true],
+    queryFn: () => api.listProjects(true),
+    enabled: !!app.data?.hasJam,
+    staleTime: 0,
+  });
   const workingCount =
-    board.data?.columns.find((column) => column.status === "in_progress")
-      ?.count ?? 0;
+    projects.data?.find((project) => project.id === app.data?.jam?.id)
+      ?.inProgressCount ?? 0;
   const status = useQuery({
     queryKey: ["mcpStatus"],
     queryFn: () => api.mcpStatus(),
@@ -390,6 +395,7 @@ export function SettingsPage({
                   onClick={() => {
                     setTyped("");
                     setNotice("");
+                    void projects.refetch();
                     setConfirm("archive");
                   }}
                 >
@@ -596,9 +602,22 @@ export function SettingsPage({
                 </p>
                 {workingCount > 0 && (
                   <p className="notice" role="status">
-                    {workingCount} tasks are still in progress. Pause new work
-                    and let running tasks finish or release them before
-                    archiving. Switching projects is safe without archiving.
+                    {workingCount} tasks are still In progress, including
+                    archived cards. Pause new work and let them report before
+                    archiving the project. To release an archived task,
+                    unarchive it first. Switching projects is safe without
+                    archiving.
+                  </p>
+                )}
+                {projects.isPending && (
+                  <p role="status">Checking running work…</p>
+                )}
+                {projects.error && (
+                  <p role="alert">
+                    Could not check running work.{" "}
+                    <Button onClick={() => void projects.refetch()}>
+                      Retry
+                    </Button>
                   </p>
                 )}
                 <label>
@@ -618,7 +637,9 @@ export function SettingsPage({
                   busy ||
                   (confirm === "archive" &&
                     (!archiveConfirmed(app.data?.jam?.name ?? "", typed) ||
-                      workingCount > 0))
+                      workingCount > 0 ||
+                      projects.isPending ||
+                      !!projects.error))
                 }
                 onClick={() =>
                   void run(async () => {

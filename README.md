@@ -17,13 +17,14 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.1**. Multi-project sessions are implemented;
-> durable story/epic execution approval is not enforced in this alpha yet.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.1.md).
+> Development prerelease: **0.3.0-alpha.2**. Project-pinned sessions and human-authorized
+> story/epic work are implemented. Ready alone never grants execution permission.
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.2.md).
 
 ## Features
 
 - 📝 Epics → stories → tasks, complete briefs and a live five-column board.
+- ▶️ Start an agreed story or epic, then let its brain organize workers within that scope. Pause blocks new work without discarding reports.
 - 🤖 MCP over stdio and authenticated loopback HTTP: project-pinned sessions, hierarchy resources, planning/work/review prompts and `wait_for_changes`.
 - ✨ Live agent changes, with a colored highlight and a toast.
 - 🔎 A virtual table tested with 2,000 tasks, with sortable columns and shareable URL filters.
@@ -48,8 +49,9 @@ Plan shows the Snowball run. Board, Inbox and References show the bundled demo i
 1. Appoint a brain in your agent chat and choose the worker model.
 2. Answer its interview in Inbox. Confirm the goal, done-when and boundaries.
 3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
-4. Workers claim tasks and submit reports with real test evidence. A human or the brain accepts them or requests another round.
-5. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
+4. Start the agreed story or epic in Plan. Or ask the brain in chat: it creates a typed start request for your exact-scope confirmation in Inbox. This grants work permission; it never launches an agent session.
+5. Connected workers claim Ready tasks within that scope and submit reports with real test evidence. A human or the brain accepts them or requests another round.
+6. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
 
 **Where are features?** Open **Plan**, select an epic and choose **Stories** (or the story-count button in its overview). A story is the feature-sized outcome with acceptance criteria; its tasks are the implementation briefs. There is no additional Feature level.
 
@@ -61,9 +63,13 @@ Click the project name at the top to open **Your projects**. Create a new projec
 
 MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration for the selected project's prefix. Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
 
-**Settings → Data → Archive this project** keeps its data for **Your projects → Archived projects → Restore & open**. Finish or release In progress tasks before archiving. Archiving does not silently cancel workers or rewrite individual task archive flags. Data archived by older builds keeps its original per-task flags.
+**Start / Pause:** Ready describes a task brief, while execution permission belongs to its story or epic. Starting an epic includes its inheriting stories; a separately paused story stays paused. Pausing the epic blocks new work in all its stories, including separately started ones. Already-running tasks may still submit evidence. Closing, archiving, restoring or importing work never silently resumes a grant. [Full execution policy](docs/mcp.md#human-authorized-execution).
+
+**Settings → Data → Archive this project** keeps its data for **Your projects → Archived projects → Restore & open**. Finish or release all In progress tasks before archiving, including individually archived cards. Restore an archived card to release its existing claim; restoring visibility does not authorize new work. Archiving does not silently cancel workers or rewrite individual task archive flags. Data archived by older builds keeps its original per-task flags.
 
 ## Inbox
+
+Typed **Start requests** are separate from ordinary planning questions. Only an exact-scope approval grants work; answering a question—even with “start”—does not. Chat-to-approval currently requires that Inbox confirmation; there is no trusted direct chat authorization bridge.
 
 Agents ask through MCP; you answer in the app. Choose a recommended option, write your own answer, or combine both. A task's **Needs info** flag covers its own questions. Story and epic questions stay at their level, while workers still receive ancestor context.
 

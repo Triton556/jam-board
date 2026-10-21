@@ -470,12 +470,13 @@ impl Store {
             }
             let j = jam(c)?;
             if j.id != expected_project { return Err(Error::Conflict); }
-            let running:i64=c.query_row("SELECT count(*) FROM tasks WHERE jam_id=? AND status='in_progress' AND archived_at IS NULL",[&j.id],|r|r.get(0))?;
-            if running>0 { return Err(invalid("project",&format!("{running} tasks are still In progress. Pause new work, then let running tasks finish or release them before archiving."))); }
+            let running:i64=c.query_row("SELECT count(*) FROM tasks WHERE jam_id=? AND status='in_progress'",[&j.id],|r|r.get(0))?;
+            if running>0 { return Err(invalid("project",&format!("{running} tasks are still In progress, including archived tasks. Pause new work, then submit their reports or restore and release them before archiving."))); }
             if confirm_name != j.name {
                 return Err(invalid("confirmName", "Type the exact project name"));
             }
             // Project archival must not erase individual task archive state.
+            crate::execution::revoke_project(c,actor,&j.id)?;
             c.execute("UPDATE jams SET archived=1 WHERE id=?", [&j.id])?;
             event(
                 c,

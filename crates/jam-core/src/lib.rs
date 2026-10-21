@@ -3,6 +3,7 @@ mod canvas;
 mod changes;
 mod db;
 mod desktop;
+mod execution;
 mod human_planning;
 mod m5;
 mod migration_v3;
@@ -20,6 +21,7 @@ mod workflow;
 
 pub use changes::ACTIVITY_ACTIONS;
 pub use db::{ChangeFeed, Store, resolve_db_path};
+pub use execution::*;
 pub use m5::*;
 pub use model::*;
 pub use planning::activity_sentence;
@@ -32,6 +34,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("execution_required: {0}")]
+    ExecutionRequired(String),
     #[error("not_ready: {0}")]
     NotReady(String),
     #[error("wrong_status: {0}")]
@@ -46,7 +50,7 @@ pub enum Error {
     Validation { field: String, reason: String },
     #[error("archived: {0}")]
     Archived(String),
-    #[error("conflict: This task changed since you opened it. Review the latest changes.")]
+    #[error("conflict: This item changed since you opened it. Review the latest changes.")]
     Conflict,
     #[error("storage: {0}")]
     Storage(#[from] rusqlite::Error),

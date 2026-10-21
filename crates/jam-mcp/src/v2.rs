@@ -11,6 +11,17 @@ pub(crate) fn execute(
 ) -> Option<jam_core::Result<Value>> {
     Some((|| {
         Ok(match name {
+            "get_execution" => {
+                value(store.get_execution(&parse::<ExecutionScopeInput>(args)?.scope)?)?
+            }
+            "list_execution" => {
+                parse::<crate::server::Empty>(args)?;
+                value(store.list_execution()?)?
+            }
+            "list_execution_requests" => value(
+                store.list_execution_requests(parse::<ExecutionRequestListInput>(args)?.status)?,
+            )?,
+            "request_execution" => value(store.request_execution(&actor.id, parse(args)?)?)?,
             "get_project" => {
                 parse::<crate::server::Empty>(args)?;
                 value(store.get_project()?)?
@@ -117,6 +128,26 @@ struct IdInput {
 
 pub(crate) fn tools() -> Vec<Tool> {
     vec![
+        tool::<ExecutionScopeInput>(
+            "get_execution",
+            "Read the exact story/epic execution permission and revision. Ready is separate; only a human can start work.",
+            true,
+        ),
+        tool::<crate::server::Empty>(
+            "list_execution",
+            "Read execution states for this pinned project. A paused epic may have explicitly started stories.",
+            true,
+        ),
+        tool::<ExecutionRequestListInput>(
+            "list_execution_requests",
+            "Read typed execution requests and approval status in this project. No tool can approve or start work.",
+            true,
+        ),
+        tool::<RequestExecution>(
+            "request_execution",
+            "Appointed epic brain only: request human approval to start an exact story or epic. This does not start work or launch executors. The human confirms in the app Inbox; generic questions or chat text cannot authorize execution.",
+            false,
+        ),
         tool::<crate::server::Empty>(
             "get_project",
             "Read the active project's template, dates, suggested tags and hierarchy counts. Non-jam projects use milestoneAt rather than a countdown.",
@@ -395,8 +426,8 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
 }
 pub(crate) fn prompt(name: &str) -> Option<String> {
     Some(match name{
-    "plan_epic"=>"Follow requirements-interview.md and task-brief-and-acceptance.md from agent-playbook 1.1.0. Read get_project/get_board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Create a draft epic, become_brain if appointed, record the agreed participation/reviewer/workerModel, create stories with intent cards and mandatory acceptance, and tasks with complete briefs following brief-writing.md. Activate complete epics/stories, check_ready and mark_ready for actionable tasks, then set_status scoped to the epic. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
-    "work_on_next_task"=>"Follow brief-writing.md from agent-playbook 1.1.0. Call get_board, then list_tasks with status=[ready]. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call claim_task. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. Submit_report with summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
+    "plan_epic"=>"Follow requirements-interview.md and task-brief-and-acceptance.md from agent-playbook 1.1.0. Read get_project/get_board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Create a draft epic, become_brain if appointed, record the agreed participation/reviewer/workerModel, create stories with intent cards and mandatory acceptance, and tasks with complete briefs following brief-writing.md. Activate complete epics/stories, check_ready and mark_ready for actionable tasks, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Once the human starts a scope, coordinate workers within it without requesting approval for each worker. Never auto-launch OS sessions. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
+    "work_on_next_task"=>"Follow brief-writing.md from agent-playbook 1.1.0. Call get_session_context and get_board, then list_tasks with status=[ready]. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. Submit_report with summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
     "review_task"=>"Follow task-brief-and-acceptance.md from agent-playbook 1.1.0. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Call review_task with accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and use wait_for_changes (timeoutSeconds=60) for human corrections; save nextCursor and repeat. Use list_changes_since for recovery at turn start.".into(),
     _=>return None,
 })

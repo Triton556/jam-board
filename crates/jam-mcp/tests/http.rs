@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 40);
+    assert_eq!(actual.len(), 44);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -241,6 +241,201 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
             .unwrap()["projectId"],
         first.id
     );
+    client.cancel().await.unwrap();
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence() {
+    use jam_core::*;
+    let d = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open(d.path().join("execution.db")).unwrap());
+    let (project, human) = store
+        .create_jam("HTTP execution", None, None, None, "UTC", "Human")
+        .unwrap();
+    let pinned = store.for_project(&project.id).unwrap();
+    let epic = pinned
+        .create_epic(
+            &human.id,
+            NewEpic {
+                title: "Exact epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let story = pinned
+        .create_story(
+            &human.id,
+            NewStory {
+                epic_key: epic.key.clone(),
+                title: "Exact story".into(),
+                outcome_md: Some("Verified outcome".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "a".into(),
+                    criterion: "Correct".into(),
+                    mandatory: true,
+                    check: "Tests".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    pinned
+        .set_story_status(&human.id, &story.key, "active", None)
+        .unwrap();
+    let task = pinned
+        .create_task(
+            &human.id,
+            CreateTask {
+                story_key: Some(story.key.clone()),
+                title: "Ready is not permission".into(),
+                status: Some("ready".into()),
+                brief: TaskBrief {
+                    goal_md: "Goal".into(),
+                    where_md: "src/feature".into(),
+                    result_md: "Report".into(),
+                    changes: vec![Change {
+                        title: "Change".into(),
+                        required: "Required".into(),
+                        ..Default::default()
+                    }],
+                    tests: vec![BriefTest {
+                        setup: "Run checks".into(),
+                        expected: "Pass".into(),
+                    }],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        store.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Project", project.id.parse().unwrap());
+    headers.insert("X-Jam-Agent", "HTTP brain".parse().unwrap());
+    let transport = StreamableHttpClientTransport::with_client(
+        reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap(),
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-gate", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    let call = |name: &'static str, args: serde_json::Value| {
+        CallToolRequestParams::new(name).with_arguments(args.as_object().unwrap().clone())
+    };
+    client
+        .call_tool(call("get_project", serde_json::json!({})))
+        .await
+        .unwrap();
+    let brain = pinned
+        .list_members()
+        .unwrap()
+        .into_iter()
+        .find(|m| m.member.name == "HTTP brain")
+        .unwrap()
+        .member;
+    pinned
+        .set_brain(&human.id, &epic.key, &brain.handle)
+        .unwrap();
+    let denied = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(
+        denied.structured_content.unwrap()["code"],
+        "execution_required"
+    );
+    let request = client.call_tool(call("request_execution", serde_json::json!({"scope":{"type":"story","id":story.key},"reason":"Start this exact reviewed story"}))).await.unwrap();
+    assert_ne!(request.is_error, Some(true));
+    let request: ExecutionRequest =
+        serde_json::from_value(request.structured_content.unwrap()).unwrap();
+    assert_eq!(request.project_id, project.id);
+    assert_eq!(request.scope.id, story.audit.id);
+    assert!(
+        !client
+            .list_all_tools()
+            .await
+            .unwrap()
+            .iter()
+            .any(|t| matches!(
+                t.name.as_ref(),
+                "set_execution" | "resolve_execution_request"
+            ))
+    );
+    let (other, _) = store
+        .create_jam("Unrelated project", None, None, None, "UTC", "Other human")
+        .unwrap();
+    pinned
+        .resolve_execution_request(
+            &human.id,
+            ResolveExecutionRequest {
+                id: request.id,
+                decision: ExecutionDecision::Approve,
+                expected_revision: request.revision,
+            },
+        )
+        .unwrap();
+    assert_eq!(store.active_jam().unwrap().id, other.id);
+    let claim = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_ne!(claim.is_error, Some(true));
+    let scope = ExecutionScope {
+        kind: ExecutionScopeType::Story,
+        id: story.audit.id,
+    };
+    pinned
+        .set_execution(
+            &human.id,
+            SetExecution {
+                expected_revision: pinned.get_execution(&scope).unwrap().revision,
+                scope: scope.clone(),
+                action: ExecutionAction::Pause,
+            },
+        )
+        .unwrap();
+    let report = client.call_tool(call("submit_report", serde_json::json!({"key":task.task.key,"summaryMd":"Existing round evidence survives pause","changedFiles":["src/feature"],"tests":[{"name":"check","command":"check","expected":"Pass","actual":"Pass","result":"PASS"}]}))).await.unwrap();
+    assert_ne!(report.is_error, Some(true));
+    pinned
+        .review_task(
+            &human.id,
+            ReviewTask {
+                key: task.task.key.clone(),
+                verdict: "changes_requested".into(),
+                comments_md: "Another round".into(),
+                failed_tests: None,
+            },
+        )
+        .unwrap();
+    let denied = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(
+        denied.structured_content.unwrap()["code"],
+        "execution_required"
+    );
+    assert_eq!(store.get_project().unwrap().tasks, 0);
+    assert_eq!(pinned.get_task(&task.task.key).unwrap().reports.len(), 1);
     client.cancel().await.unwrap();
     server.stop().await;
 }

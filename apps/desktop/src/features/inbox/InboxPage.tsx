@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Question } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import {
@@ -22,7 +22,14 @@ import {
   storiesQuery,
 } from "../../lib/planning-queries";
 import { membersQuery, tasksQuery } from "../../lib/queries";
-export function QuestionCard({ question: q }: { question: Question }) {
+import { ExecutionRequests } from "../execution/ExecutionRequests";
+export function QuestionCard({
+  question: q,
+  onDecision,
+}: {
+  question: Question;
+  onDecision?(question: Question): void;
+}) {
   const members = useQuery(membersQuery),
     epics = useQuery(epicsQuery),
     stories = useQuery(storiesQuery),
@@ -40,11 +47,17 @@ export function QuestionCard({ question: q }: { question: Question }) {
         answerIndex: selected,
         answerText: text.trim() || null,
       }),
-    onSuccess: () => invalidatePlanning(client),
+    onSuccess: (question) => {
+      onDecision?.(question);
+      invalidatePlanning(client);
+    },
   });
   const withdraw = useMutation({
     mutationFn: () => api.withdrawQuestion(q.id),
-    onSuccess: () => invalidatePlanning(client),
+    onSuccess: (question) => {
+      onDecision?.(question);
+      invalidatePlanning(client);
+    },
   });
   const epic = epics.data?.find((e) => e.id === q.epicId),
     task = Object.values(tasks.data ?? {})
@@ -105,7 +118,12 @@ export function QuestionCard({ question: q }: { question: Question }) {
           <MoreHorizontal size={18} />
         </IconButton>
         {menu && pending && (
-          <Button onClick={() => withdraw.mutate()}>Withdraw</Button>
+          <Button
+            disabled={answer.isPending || withdraw.isPending}
+            onClick={() => withdraw.mutate()}
+          >
+            Withdraw
+          </Button>
         )}
       </div>
       <h3>{q.title}</h3>
@@ -143,7 +161,11 @@ export function QuestionCard({ question: q }: { question: Question }) {
           )}
           <Button
             variant="primary"
-            disabled={(selected === null && !text.trim()) || answer.isPending}
+            disabled={
+              (selected === null && !text.trim()) ||
+              answer.isPending ||
+              withdraw.isPending
+            }
             onClick={() => answer.mutate()}
           >
             Answer
@@ -164,12 +186,35 @@ export function QuestionCard({ question: q }: { question: Question }) {
     </article>
   );
 }
-export function QuestionList({
+type QuestionListProps = { epicId?: string; status?: string };
+export function QuestionList(props: QuestionListProps) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [decision, setDecision] = useState<Question | null>(null);
+  useEffect(() => {
+    if (decision) heading.current?.focus();
+  }, [decision]);
+  return (
+    <section aria-label="Questions">
+      <h2 ref={heading} tabIndex={-1}>
+        Questions
+      </h2>
+      {decision && (
+        <p role="status" className="execution-feedback">
+          {decision.status === "answered"
+            ? `Answer saved for “${decision.title}”. The connected brain can read it and update the plan; this does not start work.`
+            : `“${decision.title}” was withdrawn. No work was started.`}
+        </p>
+      )}
+      <QuestionListContent {...props} onDecision={setDecision} />
+    </section>
+  );
+}
+function QuestionListContent({
   epicId,
   status = "open",
-}: {
-  epicId?: string;
-  status?: string;
+  onDecision,
+}: QuestionListProps & {
+  onDecision(question: Question): void;
 }) {
   const questions = useQuery(questionsQuery),
     epics = useQuery(epicsQuery);
@@ -214,7 +259,11 @@ export function QuestionList({
                   {rows
                     .filter((q) => (q.roundLabel ?? "Questions") === round)
                     .map((q) => (
-                      <QuestionCard key={q.id} question={q} />
+                      <QuestionCard
+                        key={q.id}
+                        question={q}
+                        onDecision={onDecision}
+                      />
                     ))}
                 </section>
               ),
@@ -242,6 +291,7 @@ export function InboxPage() {
         />
       </PageHeading>
       <div className="inbox-scroll">
+        <ExecutionRequests status={status} />
         <QuestionList status={status} />
       </div>
     </main>

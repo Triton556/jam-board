@@ -266,10 +266,10 @@ impl Store {
             keys.push(task.task.key);
         }
         for index in [6, 8, 11] {
-            self.claim_task(&codex.id, &keys[index])?;
+            self.seed_in_progress_sample(&j.id, &codex.id, &keys[index])?;
         }
-        self.claim_task(&danil.id, &keys[12])?;
-        self.claim_task(&alex.id, &keys[13])?;
+        self.seed_in_progress_sample(&j.id, &danil.id, &keys[12])?;
+        self.seed_in_progress_sample(&j.id, &alex.id, &keys[13])?;
         for index in [6, 8] {
             self.submit_report(
                 &codex.id,
@@ -387,5 +387,20 @@ impl Store {
             Ok(())
         })?;
         self.active_jam()
+    }
+}
+
+impl Store {
+    /// Populate historical, synthetic sample cards, not live work or authority.
+    /// This private fixture writer is used only while creating a brand-new demo.
+    /// The ordinary claim API always enforces the gate; the demo has no grants.
+    fn seed_in_progress_sample(&self, project: &str, actor: &str, key: &str) -> Result<()> {
+        self.write(|c| {
+            let t=crate::service::task(c,key)?;
+            if t.jam_id!=project {return Err(invalid("demo","A sample must belong to the newly created demo"));}
+            c.execute("UPDATE tasks SET assignee_id=?,status='in_progress',position=(SELECT coalesce(max(position),0)+1024 FROM tasks WHERE jam_id=? AND status='in_progress') WHERE id=?",params![actor,project,t.id])?;
+            crate::service::touch(c,&t.id,actor)?;
+            crate::service::event(c,Some(project),actor,"task.claimed",Some(&t.id),serde_json::json!({"assigneeId":[t.assignee_id,actor],"status":[t.status,"in_progress"]}))
+        })
     }
 }

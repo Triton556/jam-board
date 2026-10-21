@@ -31,6 +31,9 @@ export function ProjectsPage() {
   const projects = useQuery({
     queryKey: ["projects", true],
     queryFn: () => api.listProjects(true),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 10000,
   });
   const pendingWrites = useIsMutating();
   const open = useMutation({
@@ -142,8 +145,8 @@ export function ProjectsPage() {
               </p>
               {project.inProgressCount > 0 && (
                 <p className="small">
-                  {project.inProgressCount} in progress · switching boards does
-                  not pause work
+                  {project.inProgressCount} In progress (including archived
+                  tasks) · switching boards does not pause work
                 </p>
               )}
               <Button

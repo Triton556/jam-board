@@ -41,6 +41,7 @@ import type { TaskDetail, UpdateInput } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
+import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
 import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
@@ -337,6 +338,10 @@ export function TaskEditor({
           <Button variant="ghost" onClick={() => archiveMutation.mutate()}>
             Unarchive
           </Button>
+          <p className="small">
+            Restoring this card only makes it visible. It does not start or
+            resume its story; existing work can report or be released.
+          </p>
         </div>
       )}
       {latest && (
@@ -356,6 +361,7 @@ export function TaskEditor({
           Save your notes before asking the brain to read them.
         </span>
       </div>
+      {!readonly && <TaskExecutionNotice task={task} />}
       <form
         id="task-form"
         onSubmit={handleSubmit((value) => submit(value))}

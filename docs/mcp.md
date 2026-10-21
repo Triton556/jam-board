@@ -75,7 +75,7 @@ The desktop can keep several projects and stores the explicitly selected project
 
 Use Settings → Agents to copy a configuration containing the current project's immutable ID. `get_session_context` is the source of truth for a connected agent. To work on another project, open another connection or reconnect with its ID. Changing the desktop selector, subsequent HTTP headers, or another agent's selection cannot retarget an existing connection. An unknown/archived project or missing selection fails initialization rather than silently choosing another project.
 
-All bound task, hierarchy, question, reference, asset and activity operations reject foreign-project addresses, including long-poll waits and resources. A session may continue on its exact project after archive/restore, but operations while archived fail. Archiving is refused while any unarchived task is In progress; finish or release running work first. Archive/restore preserves task statuses and individual archive flags. Historical exports made before project selection remain importable.
+All bound task, hierarchy, question, reference, asset and activity operations reject foreign-project addresses, including long-poll waits and resources. A session may continue on its exact project after archive/restore, but operations while archived fail. Archiving is refused while any task is In progress, including individually archived cards; submit their reports or restore visibility and release the claims first. Archive/restore preserves task statuses and individual archive flags. Historical exports made before project selection remain importable.
 
 Agent identity profiles (name, handle and color) remain shared for compatibility; membership, online heartbeat and handwritten status are project-specific. An agent in another project does not appear online on the selected board. HTTP identity is also fixed at initialization, not changeable by a later header. The local database and bearer token still have their existing trust model: project pinning prevents accidental redirection, not authentication against the database owner.
 
@@ -95,15 +95,19 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 - V2.2 refines needsInfo: a task flag and the list_tasks needsInfo filter cover only open questions scoped to that task. Story and epic questions stay at their own level. get_task adds ancestorQuestions (open story/epic questions); jam://task/{key} renders them under "Open questions above this task". Project questions remain Inbox items. This prevents an epic interview from flagging every card.
 - JSON exports use version 2 to retain hierarchy, briefs, reports, reviews, questions and references. Version-1 imports remain supported.
 
-## Tool contract (40 tools)
+## Tool contract (44 tools)
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means the active project. Reference items/questions use their returned IDs.
 
-Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, wrong_status, claim_conflict, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
+Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
 | get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false } |
+| get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
+| list_execution | {} | ExecutionState[] for the pinned project |
+| request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
+| list_execution_requests | status? (pending/approved/declined/superseded) | ExecutionRequest[] for the pinned project |
 | get_project | {} | { jam, template, templateLabel, milestoneAt, tagSuggestions, epics, stories, tasks, openQuestions } |
 | get_board | {} | { jam, columns, inProgress, myTasks, onlineAgents, tagSuggestions, openQuestionCount } |
 | list_epics | {} | Epic[] in position order, excluding archived |
@@ -144,12 +148,51 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
 | list_assets | kind?, query? | Asset[] with role=asset/reference |
 
+## Human-authorized execution
+
+**Ready is a planning state, not permission to start.** Drafting, questions, references, decomposition, human edits and brief reconciliation can happen while execution is paused. A human explicitly starts an exact **story or epic**, not each individual worker. A Start allows work within that scope; it does not launch a process, activate a draft story, mark tasks Ready, or modify task assignments.
+
+The native UI has `get_execution`, `list_execution`, `set_execution`, `list_execution_requests` and `resolve_execution_request` commands. Only the native human bridge exposes Start, Pause and approval. MCP has the four read/request tools above, **no Start, Pause or approval tool**. The human identity is resolved by the native backend, never accepted as an input flag.
+
+### A command in brain chat
+
+The appointed epic brain can call `request_execution` with an exact epic/story and a reason. This creates a separate typed Inbox request; it does not authorize work. The human reviews the project and scope, then chooses **Approve and start** in the app. A generic `ask_user` answer, free text such as “start”, a tool's `userApproved` field, or the brain's role cannot manufacture a grant. Unknown arguments are rejected. A trusted chat-to-human-approval bridge is not implemented in this alpha: chat requests still need that one Inbox confirmation.
+
+A pending request is idempotent for the same scope and revision. Start/Pause supersedes affected pending requests. A request records immutable project/scope IDs and the execution revision; a stale approval fails with `conflict`. Titles and keys in responses reflect the current canonical entities. Switching the human's selected project cannot redirect a captured request or connection.
+
+### Inheritance and pause matrix
+
+| Epic own state | Story own state | Story effective state |
+|---|---|---|
+| paused (default) | inherit (default) | paused |
+| running | inherit | running, from epic |
+| either | paused | paused |
+| either | running | running, explicitly started |
+
+- Starting an epic runs its inheriting stories; an explicitly paused story stays paused.
+- Pausing an epic clears child explicit running grants back to inherit and blocks the entire subtree at that moment. Explicit child pauses remain intact.
+- A later explicit Start on one story can run it while the epic remains paused. Epic state includes `runningStoryCount` so callers can distinguish this from a fully stopped subtree.
+- Starting a draft scope is allowed, but new task work still needs an **active story** and applicable task readiness/role checks. Closed or archived parents/scopes cannot start.
+- Closing or archiving an epic/story/project revokes its grants. Reopen/restore does not resurrect them. A story closed under a running epic becomes explicitly paused, so reopening it does not silently inherit the old grant.
+
+`ExecutionState` returns `projectId`, canonical `scope`, `scopeKey`, `scopeTitle`, `ownState`, `effectiveState`, `source` (scope/epic/none), opaque `revision`, `canStart`, nullable `blockedReason`, `inProgressCount`, `readyCount`, `runningStoryCount`, nullable `changedBy` and `changedAt`. In-progress counts include archived cards; Ready counts exclude archived cards. The revision includes the ancestor for stories and child grant revisions for epics. Treat it as an opaque token; native `set_execution` requires `expectedRevision`.
+
+`ExecutionRequest` returns `id`, `projectId`, canonical `scope`, `scopeKey`, `scopeTitle`, `requestedBy`, `reason`, `status`, `revision`, `createdAt`, nullable `resolvedBy` and `resolvedAt`. Native resolution requires `id`, `decision` (approve/decline), and `expectedRevision`. An approval verifies the request and current scope revision and starts the exact scope in one transaction. Decline does not start work.
+
+### Work already underway
+
+Pause blocks new claims, status transitions into In progress, direct creation in that status, new active assignees and subsequent work rounds. Neither a human nor a brain nor a Ready override bypasses this check (`execution_required`). A same-status reorder of existing work is not a new start. Task/story reparenting is not supported by the current update contracts.
+
+Existing holders may still submit reports and human/brain reviewers may accept or request changes while paused, including when the task or a planning parent was archived after the claim. Changes requested returns to Ready; reclaiming that next round needs a current grant. Restoring an individually archived task only restores visibility: status, holder, review round and paused execution remain unchanged. It therefore permits releasing an existing claim without starting the scope. A new assignment or claim remains gated. Closed parents still prevent new work.
+
+Project archive is refused while any In progress task remains, even hidden archived tasks. It does not silently reset work. Migration from older databases, JSON import, and demo creation grant no execution permission. Legacy/demo In progress cards retain their evidence/report path. JSON export/import preserves planning and work history, **not grants or pending approvals**.
+
 ### wait_for_changes
 
 Long-poll the active project's persisted activity feed on either stdio or HTTP. Required `cursor` is a nonnegative integer activity `seq`; only rows with `seq > cursor` are eligible. Matching events already present return immediately. Otherwise the call waits until a match or the deadline. Arguments combine with AND:
 
 - `epicKey?: string`: include events whose `epicId` equals that epic's ID. With this filter, `includeProject: true` additionally includes project-wide (`epicId: null`) **human** events. Project-wide agent events and events from other epics stay excluded. Default `includeProject` is false. Without `epicKey`, all scopes of the active project are eligible and `includeProject` has no effect.
-- `actions?: string[]`: match any listed action. Omitted or null means all actions; an empty array matches nothing. Unknown names return `validation` (field `actions`). Accepted names: `agent.status`, `asset.created`, `asset.linked`, `asset.unlinked`, `asset.updated`, `comment.added`, `epic.created`, `epic.status`, `epic.updated`, `jam.archived`, `jam.imported`, `jam.updated`, `member.joined`, `member.updated`, `project.updated`, `question.answered`, `question.asked`, `question.withdrawn`, `reference.added`, `reference.linked`, `reference.updated`, `report.submitted`, `review.recorded`, `story.created`, `story.status`, `story.updated`, `task.archived`, `task.brief_updated`, `task.claimed`, `task.created`, `task.moved`, `task.ready_override`, `task.released`, `task.updated`.
+- `actions?: string[]`: match any listed action. Omitted or null means all actions; an empty array matches nothing. Unknown names return `validation` (field `actions`). Accepted names: `agent.status`, `asset.created`, `asset.linked`, `asset.unlinked`, `asset.updated`, `comment.added`, `epic.created`, `epic.status`, `epic.updated`, `execution.started`, `execution.paused`, `execution.requested`, `execution.request_resolved`, `jam.archived`, `jam.imported`, `jam.updated`, `member.joined`, `member.updated`, `project.updated`, `question.answered`, `question.asked`, `question.withdrawn`, `reference.added`, `reference.linked`, `reference.updated`, `report.submitted`, `review.recorded`, `story.created`, `story.status`, `story.updated`, `task.archived`, `task.brief_updated`, `task.claimed`, `task.created`, `task.moved`, `task.ready_override`, `task.released`, `task.updated`.
 - `actorKind?: "human" | "agent"`: omitted or null means either kind; other values return `validation`.
 - `excludeSelf?: boolean`: defaults to true; skips events whose actor ID equals the authenticated caller's member ID. Pass false to include them.
 - `timeoutSeconds?: integer`: 1–60 inclusive, default 30. Zero, 61, fractions and negative values return `validation`. Missing/negative/non-integer `cursor` also returns `validation`.
@@ -189,7 +232,7 @@ Example `structuredContent` (seq 121–123 were inspected but did not match):
 
 At turn start, recover with `list_changes_since` from the last persisted cursor, handle the returned changes and advance to the last seq. Then loop:
 
-1. Call `wait_for_changes` with that cursor, `epicKey`, `includeProject: true`, `timeoutSeconds: 60` and actions for reports, answers and human edits (for example `["report.submitted","question.answered","task.brief_updated","task.updated","epic.updated","story.updated","project.updated","reference.added","reference.linked","reference.updated"]`). Omit `actorKind` to receive both worker reports and human edits. Action filters do not distinguish human edits from agent edits; `excludeSelf` skips only this brain's events.
+1. Call `wait_for_changes` with that cursor, `epicKey`, `includeProject: true`, `timeoutSeconds: 60` and actions for execution changes, reports, answers and human edits (for example `["execution.started","execution.paused","execution.request_resolved","report.submitted","question.answered","task.brief_updated","task.updated","epic.updated","story.updated","project.updated","reference.added","reference.linked","reference.updated"]`). Omit `actorKind` to receive both worker reports and human edits. Action filters do not distinguish human edits from agent edits; `excludeSelf` skips only this brain's events.
 2. Handle each returned event, fetching current task/question/epic detail as needed, and persist `nextCursor`.
 3. Repeat, including after `timedOut: true`. Do not add a client busy loop or repeatedly poll `list_changes_since` while idle.
 
@@ -204,7 +247,7 @@ get_project also returns top-level template, templateLabel (Game jam / Gamedev /
 
 Epic includes key/title/color/status, interview Markdown fields, participation (each_iteration/first_sketch/autonomous; default first_sketch), reviewer (none/final/stages; default none), nullable workerModel/brainMemberId, position and audit columns. Colors are m1..m6 assigned round-robin. update_epic preserves omitted fields; workerModel:null clears the model. A brain is an existing agent appointed by a human/current brain, or become_brain while unappointed. Appointment does not change the agent's model; the user chooses workerModel.
 
-Participation means: each meaningful iteration; first coherent sketch to correct direction, then autonomous refinement; or fully autonomous. Reviewer means none, one final pass, or agreed stages. These stored choices do not authorize launching another executor/reviewer: the brain still needs the user's explicit agreement on scope, stages and round limit, as in the playbook.
+Participation means: each meaningful iteration; first coherent sketch to correct direction, then autonomous refinement; or fully autonomous. Reviewer means none, one final pass, or agreed stages. These planning choices do not start work. The human starts a story or epic; within that authorized scope the brain can coordinate workers and review stages without a separate board approval per worker. The board never launches OS agent sessions itself. Any external runner must still honor the agreed scope, tool permissions and safety boundaries.
 
 Story includes key/epicId/title/status, the six intent-card Markdown fields and acceptance: [{ id, criterion, mandatory, check }]. Acceptance IDs must be unique and text/check nonempty. Planning statuses are draft/active/done/archived. Activation requires goalMd + doneWhenMd for epics; outcomeMd + a mandatory acceptance criterion for stories. These fields cannot be cleared while active. Done requires all active children done, or a human/brain overrideReason recorded in activity. Humans can restore archived planning entities through status commands.
 
@@ -221,7 +264,7 @@ TaskBrief is { goalMd, contextMd, whereMd, changes, tests, boundariesMd, resultM
 | result | Result (report format) is empty |
 | story_active | The story is still draft |
 
-Moving into Ready runs that check. An authorized nonempty override writes task.ready_override instead of task.moved, exactly one event. Claim rechecks readiness; a recorded override remains valid until a subsequent brief edit. A worker claiming Backlog gets not_ready; another non-Ready status gets wrong_status with the current status. Another holder takes precedence and returns claim_conflict. A brain may claim a complete brief from another status; humans may drag freely except for the Ready check. Only humans/brain can mark Done.
+Moving into Ready runs that check. An authorized nonempty override writes task.ready_override instead of task.moved, exactly one event. Claim rechecks readiness; a recorded override remains valid until a subsequent brief edit. A worker claiming Backlog gets not_ready; another non-Ready status gets wrong_status with the current status. Another holder takes precedence and returns claim_conflict. A brain may claim a complete brief from another status; human status changes retain their planning controls but cannot bypass the execution gate for entry into In progress. Only humans/brain can mark Done.
 
 Workers enter In progress through claim_task and Review through submit_report. move_task/release_task cannot substitute for those gates or move another holder's task. Workers may create Backlog/Ready tasks; direct creation in working/review/done statuses requires a human or the appointed epic brain. update_task does not accept status or assignee fields. A permitted return to work after a submitted report allocates one successor round, preserving prior evidence; repeated moves in that status do not advance the round.
 
@@ -256,7 +299,7 @@ resources/list exposes jam://board as Markdown. Resource templates are jam://epi
 Three prompts are available:
 
 - plan_epic: interview rounds with ask_user/wait_for_answer, playback summary/confirmation, epic/story/task planning, complete briefs, mark_ready and scoped status; wait_for_changes for reports, answers and human edits, with list_changes_since for turn-start recovery. Names requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md from agent-playbook 1.1.0.
-- work_on_next_task (optional tag): pick Ready work, prefer own changes-requested tasks, read the full brief/context, claim, work and submit_report with evidence. Names brief-writing.md.
+- work_on_next_task (optional tag): verify the pinned project and running story permission, pick Ready work, prefer own changes-requested tasks, read the full brief/context, claim, work and submit_report with evidence. Names brief-writing.md.
 - review_task: compare report evidence against brief tests, story acceptance and epic scope; accept or request changes, then publish status. Names task-brief-and-acceptance.md.
 
 The full playbook skill is not bundled in this stage. Prompts reference it by name without copying it.

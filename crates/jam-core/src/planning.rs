@@ -624,6 +624,7 @@ impl Store {
         let e=epic(c,key)?;if member(c,actor)?.kind!="human"{editable_audit(&e.audit)?;}require_privileged(c,actor,&e)?;planning_status(status)?;
         if status=="active"{let missing=[("goalMd",&e.goal_md),("doneWhenMd",&e.done_when_md)].into_iter().filter(|(_,v)|v.trim().is_empty()).map(|(k,_)|k).collect::<Vec<_>>();if !missing.is_empty(){return Err(invalid("epic",&format!("Missing {}",missing.join(", "))));}}
         let incomplete:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM stories WHERE epic_id=? AND archived_at IS NULL AND status!='done')",[&e.audit.id],|r|r.get(0))?;if status=="done"&&incomplete{override_reason(reason)?;}
+        if matches!(status,"done"|"archived") || matches!(e.status.as_str(),"done"|"archived") { crate::execution::revoke_scope(c,actor,&ExecutionScope{kind:ExecutionScopeType::Epic,id:e.audit.id.clone()})?; }
         c.execute("UPDATE epics SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,now(),e.audit.id])?;v2_event(c,actor,Some(&e.audit.id),"epic.status",None,json!({"key":key,"status":[e.status,status],"overrideReason":reason}))?;epic(c,key)
     })
     }
@@ -640,6 +641,7 @@ impl Store {
 if !s.acceptance.iter().any(|a|a.mandatory){missing.push("acceptance (mandatory)");}
 if !missing.is_empty(){return Err(invalid("story",&format!("Missing {}",missing.join(", "))));}}
         let incomplete:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM tasks WHERE story_id=? AND archived_at IS NULL AND status!='done')",[&s.audit.id],|r|r.get(0))?;if status=="done"&&incomplete{override_reason(reason)?;}
+        if matches!(status,"done"|"archived") || matches!(s.status.as_str(),"done"|"archived") { crate::execution::revoke_scope(c,actor,&ExecutionScope{kind:ExecutionScopeType::Story,id:s.audit.id.clone()})?; }
         c.execute("UPDATE stories SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,now(),s.audit.id])?;v2_event(c,actor,Some(&s.epic_id),"story.status",None,json!({"key":key,"status":[s.status,status],"overrideReason":reason}))?;story(c,key)
     })
     }
@@ -777,6 +779,27 @@ pub fn activity_sentence(action: &str, actor: &str, key: Option<&str>, payload: 
                     .collect::<Vec<_>>()
                     .join(", "))
                 .unwrap_or_default()
+        ),
+        "execution.started" => format!(
+            "{actor} started work on {}",
+            payload["scopeKey"].as_str().unwrap_or("")
+        ),
+        "execution.paused" => format!(
+            "{actor} paused new work on {}",
+            payload["scopeKey"].as_str().unwrap_or("")
+        ),
+        "execution.requested" => format!(
+            "{actor} requested permission to start {}",
+            payload["scopeKey"].as_str().unwrap_or("")
+        ),
+        "execution.request_resolved" => format!(
+            "{actor} {} the start request for {}",
+            if payload["decision"] == "approve" {
+                "approved"
+            } else {
+                "declined"
+            },
+            payload["scopeKey"].as_str().unwrap_or("")
         ),
         "task.created" => format!("{actor} created {key} · {title}"),
         "task.moved" => format!(

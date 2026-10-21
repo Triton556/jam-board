@@ -1,3 +1,4 @@
+mod support;
 use jam_core::*;
 fn setup() -> (tempfile::TempDir, Store, String) {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
@@ -83,6 +84,7 @@ fn assets_links_and_preview_are_scoped_and_each_mutation_has_one_event() {
 fn member_identity_is_immutable_and_statistics_include_work() {
     let (_d, s, actor) = setup();
     let a = s.identify_agent("Codex", "codex").unwrap();
+    support::start_epic(&s, &actor, "JB-E1");
     s.mark_ready(&actor, "JB-1", None).unwrap();
     s.claim_task(&a.id, "JB-1").unwrap();
     let updated = s
