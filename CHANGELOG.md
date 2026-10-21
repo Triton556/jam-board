@@ -49,6 +49,8 @@ All notable changes to Jam Board are documented here. The format follows
 
 ### Fixed
 
+- Windows release builds launch as GUI applications without an attached console.
+  The release workflow now rejects desktop executables built with the console subsystem.
 - Returning submitted work to In progress allocates a usable successor report
   round, preserving earlier reports and reviews. Repeated same-status moves do
   not allocate extra rounds; rejected transitions leave state and history intact.

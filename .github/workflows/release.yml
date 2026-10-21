@@ -29,6 +29,9 @@ jobs:
           releaseBody: Unsigned Windows installer. See README for SmartScreen and local data instructions.
           releaseDraft: true
           prerelease: false
+      - name: Verify Windows GUI executable
+        shell: pwsh
+        run: ./scripts/check-windows-gui.ps1 -Executable target/release/jam-board.exe
       - name: Add checksums to the draft
         shell: pwsh
         env:
