@@ -11,6 +11,7 @@ test("Plan journal includes a labeled project interview before epic creation", a
       yourName: "Operator",
       timezone: "UTC",
       template: "gamedev",
+      theme: null,
       startsAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + 172800000).toISOString(),
     });
@@ -21,6 +22,8 @@ test("Plan journal includes a labeled project interview before epic creation", a
       question: {
         scope: { type: "project", id: state.jam.id },
         title: "Which sketch comes first?",
+        bodyMd: null,
+        roundLabel: null,
         options: [{ label: "Snowball", description: "A small rolling toy" }],
         recommendedIndex: 0,
         allowFreeText: true,
@@ -28,7 +31,11 @@ test("Plan journal includes a labeled project interview before epic creation", a
     });
     const question = (await window.__jamMock.listQuestions())[0];
     if (!question) throw new Error("Missing interview");
-    await window.__jamMock.answerQuestion({ id: question.id, answerIndex: 0 });
+    await window.__jamMock.answerQuestion({
+      id: question.id,
+      answerIndex: 0,
+      answerText: null,
+    });
     const epic = await window.__jamMock.createEpic({
       title: "The confirmed sketch",
     });

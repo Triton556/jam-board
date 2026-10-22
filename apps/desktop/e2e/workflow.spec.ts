@@ -11,7 +11,9 @@ test("epic overview exposes stories and a safe scoped planning handoff", async (
   page,
 }) => {
   const hierarchy = page.getByRole("navigation", { name: "Epic hierarchy" });
-  await expect(hierarchy).toContainText("Stories live inside this epic");
+  await expect(hierarchy).toContainText("Epic JB-E1");
+  await expect(hierarchy).toContainText("3 stories · features & outcomes");
+  await expect(hierarchy).toContainText("17 tasks");
   await hierarchy
     .getByRole("button", { name: /stories? · features & outcomes/ })
     .click();
@@ -124,9 +126,10 @@ test("new projects keep existing boards and the picker restores their hierarchy"
   await page
     .getByRole("button", { name: `Open project ${original.jam?.name}` })
     .click();
-  await expect(
-    page.getByRole("navigation", { name: "Epic hierarchy" }),
-  ).toContainText("Stories live inside this epic");
+  const hierarchy = page.getByRole("navigation", { name: "Epic hierarchy" });
+  await expect(hierarchy).toContainText("Epic JB-E1");
+  await expect(hierarchy).toContainText("3 stories · features & outcomes");
+  await expect(hierarchy).toContainText("17 tasks");
   await expect(
     page.getByRole("link", { name: `Switch project · ${original.jam?.name}` }),
   ).toBeVisible();

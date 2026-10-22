@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { expectPoliteNotice, markdownReadView } from "./assertions";
 
 async function select(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label, exact: true }).click();
@@ -11,9 +12,7 @@ async function writeBlock(page: Page, label: string, text: string) {
   const input = page.getByRole("textbox", { name: label, exact: true });
   await input.fill(text);
   await input.press("Tab");
-  await expect(
-    page.getByRole("button", { name: `Edit ${label}`, exact: true }),
-  ).toContainText(text);
+  await expect(markdownReadView(page, label)).toHaveText(text);
 }
 async function emptyPlan(page: Page) {
   await page.goto("/");
@@ -198,9 +197,7 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
       title: "Which lantern color?",
     }),
   );
-  await expect(
-    page.getByRole("status", { name: "Notifications" }),
-  ).toContainText("Codex asked: Which lantern color?");
+  await expectPoliteNotice(page, "Codex asked: Which lantern color?");
   await page.getByRole("link", { name: "Board", exact: true }).click();
   await expect(page.locator('[data-key="JB-1"]')).toContainText("Needs info");
   await expect(page.locator('[data-key="JB-1"]')).toContainText(
