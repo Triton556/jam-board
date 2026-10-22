@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  CatchBoundary,
   createRootRoute,
   createRoute,
   createRouter,
@@ -88,11 +89,44 @@ const ReferencesPage = lazy(() =>
 import { Board } from "./features/board/Board";
 import { CommandCenter } from "./features/command/CommandCenter";
 
-const Welcome = lazy(() =>
+const WelcomeModule = lazy(() =>
   import("./features/onboarding/Welcome").then((module) => ({
     default: module.Welcome,
   })),
 );
+
+function Welcome() {
+  return (
+    <CatchBoundary
+      getResetKey={() => "welcome-module"}
+      errorComponent={() => (
+        <main className="loading">
+          <h1>Could not open project setup</h1>
+          <p role="alert">
+            Reload the app to retry loading this screen, or open Projects.
+            Unsaved fields on this screen will be lost on reload.
+          </p>
+          <div className="button-row">
+            <Button onClick={() => window.location.reload()}>Reload app</Button>
+            <Link to="/projects" className="button secondary">
+              Open Projects
+            </Link>
+          </div>
+        </main>
+      )}
+    >
+      <Suspense
+        fallback={
+          <main className="loading">
+            <p role="status">Loading project setup…</p>
+          </main>
+        }
+      >
+        <WelcomeModule />
+      </Suspense>
+    </CatchBoundary>
+  );
+}
 
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((m) => ({

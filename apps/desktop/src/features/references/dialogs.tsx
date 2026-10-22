@@ -1,40 +1,53 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { RefItem } from "../../bindings";
 import { Button, Dialog, Select, TagInput } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import type { ReferenceInput } from "../../lib/references-api";
+import { useProjectWrite } from "../../lib/use-project-write";
 export function AddReferenceDialog({
   kind,
   close,
   save,
+  onSaved,
 }: {
   kind: "link" | "note";
   close(): void;
   save(input: ReferenceInput): Promise<unknown>;
+  onSaved?(): void;
 }) {
   const [title, setTitle] = useState(""),
-    [text, setText] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [text, setText] = useState("");
+  const write = useProjectWrite(`add-reference:${kind}`),
+    form = useRef<HTMLFormElement>(null);
   return (
-    <Dialog title={kind === "link" ? "Add link" : "Add note"} onClose={close}>
+    <Dialog
+      title={kind === "link" ? "Add link" : "Add note"}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
+    >
       <form
+        ref={form}
         onSubmit={(e) => {
           e.preventDefault();
-          setBusy(true);
-          void save({
+          const input: ReferenceInput = {
             kind,
             title: title.trim() || undefined,
             ...(kind === "link" ? { url: text } : { text }),
-          })
-            .then(close)
-            .catch((e) => setError(String(e)))
-            .finally(() => setBusy(false));
+          };
+          write.run(
+            () => save(input),
+            () => {
+              onSaved?.();
+              close();
+            },
+          );
         }}
       >
         <label className="field">
           Title
           <input
+            disabled={!write.ready}
             autoFocus
             value={title}
             maxLength={140}
@@ -44,13 +57,18 @@ export function AddReferenceDialog({
         <label className="field">
           {kind === "link" ? "URL" : "Note"}
           <textarea
+            disabled={!write.ready}
             required
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
         </label>
-        {error && <p role="alert">{error}</p>}
-        <Button type="submit" variant="primary" disabled={busy}>
+        <ProjectWriteFeedback
+          write={write}
+          action={`Adding ${kind}`}
+          form={form}
+        />
+        <Button type="submit" variant="primary" disabled={!write.ready}>
           Add {kind}
         </Button>
       </form>
@@ -66,24 +84,31 @@ export function FrameDialog({
   epics: { id: string; title: string }[];
   close(): void;
   save(title: string, epicId: string | null): Promise<unknown>;
-  initial?: { title: string; epicId: string | null };
+  initial?: { id?: string; title: string; epicId: string | null };
 }) {
   const [title, setTitle] = useState(initial?.title ?? "Reference board"),
-    [epic, setEpic] = useState(initial?.epicId ?? ""),
-    [error, setError] = useState("");
+    [epic, setEpic] = useState(initial?.epicId ?? "");
+  const write = useProjectWrite(
+      `frame:${initial?.id ?? (initial ? "edit" : "new")}`,
+    ),
+    form = useRef<HTMLFormElement>(null);
   return (
-    <Dialog title={initial ? "Edit frame" : "New frame"} onClose={close}>
+    <Dialog
+      title={initial ? "Edit frame" : "New frame"}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
+    >
       <form
+        ref={form}
         onSubmit={(e) => {
           e.preventDefault();
-          void save(title, epic || null)
-            .then(close)
-            .catch((e) => setError(String(e)));
+          write.run(() => save(title, epic || null), close);
         }}
       >
         <label className="field">
           Title
           <input
+            disabled={!write.ready}
             required
             autoFocus
             value={title}
@@ -93,6 +118,7 @@ export function FrameDialog({
         <div className="field">
           <span>Epic</span>
           <Select
+            disabled={!write.ready}
             aria-label="Frame epic"
             value={epic}
             onChange={(e) => setEpic(e.target.value)}
@@ -105,8 +131,12 @@ export function FrameDialog({
             ))}
           </Select>
         </div>
-        {error && <p role="alert">{error}</p>}
-        <Button type="submit" variant="primary">
+        <ProjectWriteFeedback
+          write={write}
+          action={initial ? "Saving frame" : "Creating frame"}
+          form={form}
+        />
+        <Button type="submit" variant="primary" disabled={!write.ready}>
           {initial ? "Save frame" : "Create frame"}
         </Button>
       </form>
@@ -135,8 +165,9 @@ export function EditReferenceDialog({
   const [title, setTitle] = useState(item.title),
     [caption, setCaption] = useState(item.captionMd),
     [tags, setTags] = useState(item.tags),
-    [key, setKey] = useState(""),
-    [error, setError] = useState("");
+    [key, setKey] = useState("");
+  const write = useProjectWrite(`reference:${item.id}:${mode}`),
+    form = useRef<HTMLFormElement>(null);
   return (
     <Dialog
       title={
@@ -146,26 +177,31 @@ export function EditReferenceDialog({
             ? "Reference tags"
             : "Edit reference"
       }
-      onClose={close}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
     >
       <form
+        ref={form}
         onSubmit={(e) => {
           e.preventDefault();
-          void (
-            mode === "link"
-              ? link(key)
-              : save(mode === "tags" ? { tags } : { title, caption })
-          )
-            .then(close)
-            .catch((e) => setError(String(e)));
+          write.run(
+            () =>
+              mode === "link"
+                ? link(key)
+                : save(mode === "tags" ? { tags } : { title, caption }),
+            close,
+          );
         }}
       >
         {mode === "link" ? (
           <CustomSelect
+            disabled={!write.ready}
             searchable
             label="Link to work"
             value={key}
-            onChange={setKey}
+            onChange={(value) => {
+              if (write.ready) setKey(value);
+            }}
             options={targets.map((t) => ({
               value: t.key,
               label: `${t.key} · ${t.title}`,
@@ -173,12 +209,13 @@ export function EditReferenceDialog({
             }))}
           />
         ) : mode === "tags" ? (
-          <TagInput value={tags} onChange={setTags} />
+          <TagInput disabled={!write.ready} value={tags} onChange={setTags} />
         ) : (
           <>
             <label className="field">
               Title
               <input
+                disabled={!write.ready}
                 autoFocus
                 required
                 maxLength={140}
@@ -189,6 +226,7 @@ export function EditReferenceDialog({
             <label className="field">
               Caption
               <textarea
+                disabled={!write.ready}
                 aria-label="Reference caption"
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
@@ -197,11 +235,15 @@ export function EditReferenceDialog({
             </label>
           </>
         )}
-        {error && <p role="alert">{error}</p>}
+        <ProjectWriteFeedback
+          write={write}
+          action="Saving reference"
+          form={form}
+        />
         <Button
           type="submit"
           variant="primary"
-          disabled={mode === "link" && !key}
+          disabled={!write.ready || (mode === "link" && !key)}
         >
           Save
         </Button>

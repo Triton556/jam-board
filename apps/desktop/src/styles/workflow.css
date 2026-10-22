@@ -688,3 +688,27 @@
 .board-scroll:focus-visible {
   outline-offset: -3px;
 }
+
+/* A newer blur during an older project save is visibly unsaved, never queued. */
+.settings-draft-field {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.settings-row-control .settings-draft-field > input {
+  width: 100%;
+  min-width: 0;
+}
+.settings-draft-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.settings-draft-actions small {
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.settings-draft-actions .button {
+  white-space: normal;
+}
