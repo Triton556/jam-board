@@ -391,7 +391,7 @@ The optimistic-context design follows conditional-write principles in [RFC 9110 
 
 ### Native movement freshness (0.3.0-alpha.7)
 
-The native `move_task` and `mark_ready` inputs now require **expectedUpdatedAt**, just like a human task edit or Release confirmation. Capture the task version when a pointer/keyboard drag starts or the readiness decision opens, not when the request is finally sent. The human identity and project are still resolved by the native bridge; these inputs cannot choose an actor, grant execution or force an overwrite.
+The native `move_task` and `mark_ready` inputs now require **expectedUpdatedAt**, just like a human task edit or Release confirmation. Capture the task version when a pointer drag starts or the readiness decision opens, not when the request is finally sent. The human identity and project are still resolved by the native bridge; these inputs cannot choose an actor, grant execution or force an overwrite.
 
 A changed task returns `conflict` before any transition, review-round allocation, neighbor reordering, readiness override or activity is written. This also rejects a delayed decision after the same worker releases and reclaims the task. Keep override text, reread the authoritative task and reconcile intentionally; never replace the captured version on background refresh or automatically retry an old decision with a new version. A fresh explicit human manual Done remains distinct from reviewed acceptance, while a fresh move into In progress still needs a running scope.
 

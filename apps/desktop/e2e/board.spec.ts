@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectPoliteNotice } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -12,7 +13,27 @@ test("onboarding creates a jam and an empty board", async ({ page }) => {
   await page.getByLabel("Your name", { exact: true }).fill("Danil");
   await page.getByRole("button", { name: "Create jam", exact: true }).click();
   await expect(page).toHaveURL(/\/board/);
-  await expect(page.getByText("Nothing here yet")).toHaveCount(5);
+  await expect(page.getByTestId("task-card")).toHaveCount(0);
+  await expect(page.locator(".column-empty")).toHaveCount(5);
+  for (const [status, guidance] of Object.entries({
+    backlog: "Capture an idea here, then add context with your brain.",
+    ready:
+      "Refined tasks will wait here until their story or epic allows work.",
+    in_progress:
+      "Claimed work appears here. Starting a scope permits claims; it does not launch a worker.",
+    review: "Worker reports arrive here for acceptance or another round.",
+    done: "Accepted results and manually completed tasks collect here.",
+  })) {
+    await expect(
+      page.locator(`[data-column="${status}"] .column-empty`),
+    ).toHaveText(guidance);
+  }
+  await expect(
+    page.getByRole("link", {
+      name: "Switch project · A little snowy jam",
+      exact: true,
+    }),
+  ).toBeVisible();
 });
 test("demo loads all 22 cards and opens a task by URL", async ({ page }) => {
   await demo(page);
@@ -34,6 +55,7 @@ test("pointer drag moves Ready into In progress after its scope is started", asy
 }) => {
   await demo(page);
   await page.evaluate(() => window.__jamMock.startAllDemoScopes());
+  const before = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
   const card = page.getByRole("button", { name: /Open JB-2:/ });
   const target = page.locator('[data-column="in_progress"] .column-heading');
   const from = await card.boundingBox();
@@ -47,6 +69,18 @@ test("pointer drag moves Ready into In progress after its scope is started", asy
   await expect(
     page.locator('[data-column="in_progress"] [data-key="JB-2"]'),
   ).toBeVisible();
+  const moves = await page.evaluate(() =>
+    window.__jamMock.calls.filter((call) => call.command === "move_task"),
+  );
+  expect(moves).toHaveLength(1);
+  expect(moves[0]?.input).toMatchObject({
+    key: "JB-2",
+    status: "in_progress",
+    expectedUpdatedAt: before.updatedAt,
+  });
+  expect(
+    (await page.evaluate(() => window.__jamMock.getTask("JB-2"))).status,
+  ).toBe("in_progress");
 });
 test("inline create and N shortcut", async ({ page }) => {
   await demo(page);
@@ -79,9 +113,7 @@ test("agent creation highlights a card, shows a toast and expires", async ({
     "data-highlighted",
     "true",
   );
-  await expect(
-    page.getByRole("status", { name: "Notifications" }),
-  ).toContainText("Codex created JB-23 · Add jump buffer");
+  await expectPoliteNotice(page, "Codex created JB-23 · Add jump buffer");
   await page.getByRole("button", { name: "View", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Add jump buffer",
@@ -117,30 +149,60 @@ test("dark theme applies to paper and cards", async ({ page }) => {
   await expect(papers.first()).toHaveCSS("clip-path", "none");
   await expect(papers.first()).toHaveCSS("background-color", "rgb(46, 41, 37)");
 });
-test("keyboard drop works in Chromium and reduced motion retains agent feedback", async ({
+test("keyboard opens cards and edits status without dragging; reduced motion retains agent feedback", async ({
   page,
 }) => {
   await demo(page);
-  await page.evaluate(() => window.__jamMock.startAllDemoScopes());
-  await page.getByRole("button", { name: /Open JB-2:/ }).focus();
+  const before = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
+  const card = page.getByRole("button", { name: /Open JB-2:/ });
+  await card.focus();
   await page.keyboard.press("Space");
+  await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
+    before.title,
+  );
+  await expect(page.locator(".card-button.dragging")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(card).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Space");
-  await expect(
-    page.locator('[data-column="in_progress"] [data-key="JB-2"]'),
-  ).toBeAttached();
+  await expect(page.getByRole("textbox", { name: "Task title" })).toBeVisible();
+  expect(await page.evaluate(() => window.__jamMock.getTask("JB-2"))).toEqual(
+    before,
+  );
   expect(
-    await page.evaluate(
-      () =>
-        window.__jamMock.calls.find((call) => call.command === "move_task")
-          ?.input,
+    await page.evaluate(() =>
+      window.__jamMock.calls.filter((call) => call.command === "move_task"),
     ),
-  ).toEqual({
+  ).toHaveLength(0);
+  // The existing status control remains a keyboard path; it does not reorder a column.
+  const status = page.getByRole("combobox", { name: "Status", exact: true });
+  await status.focus();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Enter");
+  await expect(status).toContainText("Backlog");
+  await page.getByRole("button", { name: /^Save Ctrl/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(
+      async () =>
+        (await page.evaluate(() => window.__jamMock.getTask("JB-2"))).status,
+    )
+    .toBe("backlog");
+  const edits = await page.evaluate(() =>
+    window.__jamMock.calls.filter((call) => call.command === "update_task"),
+  );
+  expect(edits).toHaveLength(1);
+  expect(edits[0]?.input).toMatchObject({
     key: "JB-2",
-    status: "in_progress",
-    afterKey: "JB-14",
-    beforeKey: undefined,
+    status: "backlog",
+    expectedUpdatedAt: before.updatedAt,
   });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await card.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Task title" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.evaluate(() =>
     window.__jamMock.simulateAgent({
@@ -157,9 +219,7 @@ test("keyboard drop works in Chromium and reduced motion retains agent feedback"
     "data-highlighted",
     "true",
   );
-  await expect(
-    page.getByRole("status", { name: "Notifications" }),
-  ).toContainText("Quiet lantern animation");
+  await expectPoliteNotice(page, "Quiet lantern animation");
 });
 test("minimum window, expanded navigation and Team screen", async ({
   page,

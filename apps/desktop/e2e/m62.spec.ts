@@ -34,7 +34,7 @@ test("flat cards, assignee colors and opt-in estimates", async ({ page }) => {
     .not.toBe(paper);
   for (const [theme, percent] of [
     ["light", 14],
-    ["dark", 22],
+    ["dark", 16],
   ] as const) {
     await page.getByLabel("Theme", { exact: true }).selectOption(theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);

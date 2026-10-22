@@ -18,7 +18,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
 import { mockApi } from "../../lib/mock-bridge";
 import { tasksQuery, useMoveTask } from "../../lib/queries";
@@ -214,36 +214,142 @@ it("creates on Enter, keeps the editor, ignores blank titles and cancels on Esca
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });
-it("moves with Space, Right, Space and supplies destination neighbors", async () => {
+// Synthetic rectangles exercise real PointerSensor mechanics, not native layout.
+let restorePointerRects: (() => void) | undefined;
+afterEach(() => {
+  restorePointerRects?.();
+  restorePointerRects = undefined;
+});
+function pointerRects() {
+  const rects = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const column = this.matches("[data-column]")
+        ? this
+        : this.closest("[data-column]");
+      const index = [
+        "backlog",
+        "ready",
+        "in_progress",
+        "review",
+        "done",
+      ].indexOf(column?.getAttribute("data-column") ?? "");
+      if (index >= 0 && column) {
+        const card = this.matches(".card-button")
+          ? this
+          : this.closest(".card-button");
+        const offset = card
+          ? Array.from(column.querySelectorAll(".card-button")).indexOf(card)
+          : 0;
+        return new DOMRect(
+          index * 300,
+          card ? 100 + offset * 110 : 0,
+          280,
+          card ? 100 : 800,
+        );
+      }
+      // The measured overlay child fills its positioned wrapper, not the viewport.
+      if (this.matches(".drag-overlay") && this.parentElement) {
+        return this.parentElement.getBoundingClientRect();
+      }
+      if (this.style.position === "fixed") {
+        return new DOMRect(
+          Number.parseFloat(this.style.left),
+          Number.parseFloat(this.style.top),
+          Number.parseFloat(this.style.width),
+          Number.parseFloat(this.style.height),
+        );
+      }
+      return new DOMRect(0, 0, 1500, 900);
+    });
+  restorePointerRects = () => rects.mockRestore();
+}
+async function pickWithPointer(card: HTMLElement) {
+  const rect = card.getBoundingClientRect();
+  fireEvent.pointerDown(card, {
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+    clientX: rect.x + 20,
+    clientY: rect.y + 20,
+  });
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    isPrimary: true,
+    buttons: 1,
+    clientX: rect.x + 30,
+    clientY: rect.y + 20,
+  });
+  await waitFor(() => expect(card).toHaveClass("dragging"));
+}
+function dropPointerInDoing() {
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    isPrimary: true,
+    buttons: 1,
+    clientX: 620,
+    clientY: 130,
+  });
+  fireEvent.pointerUp(document, {
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+    clientX: 620,
+    clientY: 130,
+  });
+}
+it("pointer dragging supplies destination neighbors and the captured version", async () => {
   await mockApi.startAllDemoScopes();
-  const user = userEvent.setup();
+  pointerRects();
   const { Wrapper } = wrapper();
   const original = await api.listBoardTasks();
   render(<Board open={() => {}} />, { wrapper: Wrapper });
-  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
-  button.focus();
-  await user.keyboard("[Space]");
-  await user.keyboard("[ArrowRight]");
-  await user.keyboard("[Space]");
+  const button = await screen.findByRole("button", { name: /Open JB-2:/ });
+  await pickWithPointer(button);
+  dropPointerInDoing();
   await waitFor(() =>
     expect(mockApi.calls.some((c) => c.command === "move_task")).toBe(true),
   );
-  const call = mockApi.calls.find((c) => c.command === "move_task");
-  expect(call?.input).toEqual({
-    key: "JB-7",
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toEqual({
+    key: "JB-2",
     status: "in_progress",
-    expectedUpdatedAt: original.ready.find((task) => task.key === "JB-7")
+    expectedUpdatedAt: original.ready.find((task) => task.key === "JB-2")
       ?.updatedAt,
-    afterKey: original.in_progress.at(-1)?.key,
-    beforeKey: undefined,
+    beforeKey: original.in_progress[0]?.key,
+    afterKey: undefined,
   });
   await waitFor(() =>
     expect(
       within(
         screen.getByRole("region", { name: "In progress column" }),
-      ).getByText("JB-7"),
+      ).getByText("JB-2"),
     ).toBeVisible(),
   );
+});
+it("the former Space/arrow gesture activates a card but cannot drag or move it", async () => {
+  const open = vi.fn(),
+    { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const before = await api.listBoardTasks();
+  render(<Board open={open} />, { wrapper: Wrapper });
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  card.focus();
+  await user.keyboard("[Space][ArrowRight][Space][ArrowLeft]");
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(open).toHaveBeenLastCalledWith("JB-7");
+  expect(card).toHaveFocus();
+  expect(card).not.toHaveClass("dragging");
+  expect(card).not.toHaveAttribute("aria-roledescription");
+  expect(card).not.toHaveAttribute("aria-describedby");
+  expect(
+    screen.queryByText(/Space to pick|Space to drop|space bar to pick/i),
+  ).toBeNull();
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(0);
+  expect(await api.listBoardTasks()).toEqual(before);
 });
 describe("onboarding validation", () => {
   const valid = {
@@ -301,20 +407,23 @@ describe("onboarding validation", () => {
   });
 });
 
-it("Enter opens a card without starting a drag or mutating its status", async () => {
-  const open = vi.fn(),
-    { Wrapper } = wrapper(),
-    user = userEvent.setup();
-  render(<Board open={open} />, { wrapper: Wrapper });
-  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
-  card.focus();
-  await user.keyboard("{Enter}");
-  expect(open).toHaveBeenCalledExactlyOnceWith("JB-7");
-  expect(card).not.toHaveAttribute("aria-pressed", "true");
-  expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
-    false,
-  );
-});
+it.each(["Enter", "Space"])(
+  "%s opens a card without starting a drag or mutating its status",
+  async (key) => {
+    const open = vi.fn(),
+      { Wrapper } = wrapper(),
+      user = userEvent.setup();
+    render(<Board open={open} />, { wrapper: Wrapper });
+    const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+    card.focus();
+    await user.keyboard(`[${key}]`);
+    expect(open).toHaveBeenCalledExactlyOnceWith("JB-7");
+    expect(card).not.toHaveAttribute("aria-pressed", "true");
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      false,
+    );
+  },
+);
 it("activation without implicit focus retains an explicit drawer return target", async () => {
   let openingFocus: Element | null = null;
   const { Wrapper } = wrapper();
@@ -546,15 +655,14 @@ it("pending quick capture is single-submit, returns focus for the next draft and
   expect(trigger).toHaveFocus();
 });
 
-it("a keyboard drag keeps its starting version after a newer task arrives, refuses the stale drop and restores authoritative state", async () => {
+it("a pointer drag keeps its starting version after a newer task arrives and refuses the stale drop without losing authoritative state", async () => {
   await mockApi.startAllDemoScopes();
-  const user = userEvent.setup();
+  pointerRects();
   const { Wrapper, client } = wrapper();
   const captured = await mockApi.getTask("JB-7");
   render(<Board open={() => {}} />, { wrapper: Wrapper });
   const button = await screen.findByRole("button", { name: /Open JB-7:/ });
-  button.focus();
-  await user.keyboard("[Space]");
+  await pickWithPointer(button);
   const newer = await mockApi.updateTask({
     key: captured.key,
     expectedUpdatedAt: captured.updatedAt,
@@ -565,7 +673,7 @@ it("a keyboard drag keeps its starting version after a newer task arrives, refus
   });
   expect(newer.updatedAt).not.toBe(captured.updatedAt);
   const beforeHistory = (await mockApi.getTask(captured.key)).history.length;
-  await user.keyboard("[ArrowRight][Space]");
+  dropPointerInDoing();
   await waitFor(() =>
     expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
       true,
@@ -609,11 +717,12 @@ it("announces pending move without a speculative jump and exposes read-only reco
     reject = no;
   });
   const move = vi.spyOn(api, "moveTask").mockReturnValue(pending);
+  pointerRects();
   render(<Board open={() => {}} />, { wrapper: Wrapper });
   const button = await screen.findByRole("button", { name: /Open JB-7:/ });
   const before = client.getQueryData<BoardTasks>(["boardTasks"]);
-  button.focus();
-  await user.keyboard("[Space][ArrowRight][Space]");
+  await pickWithPointer(button);
+  dropPointerInDoing();
   await waitFor(() => expect(move).toHaveBeenCalledTimes(1));
   expect(
     await screen.findByText(/Saving move and refreshing the board/),

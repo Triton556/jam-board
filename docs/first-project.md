@@ -120,8 +120,11 @@ work; it does not create OS agent sessions or install an execution environment.
 
 ## 6. Follow evidence and review the result
 
-The Board shows task progress. A worker's task-specific status can animate its
-card; an online agent without a matching task status is labelled unconfirmed
+The Board shows task progress. **Enter** or **Space** opens a focused card;
+use its **Status** control and Save for keyboard status edits. Board dragging is
+pointer-only. The status control does not reorder tasks within a column.
+
+A worker's task-specific status can animate its card; an online agent without a matching task status is labelled unconfirmed
 rather than presented as proof of task activity.
 
 Open a submitted task's **Reports & review**. Read changed files, commands,

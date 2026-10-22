@@ -1,13 +1,8 @@
-import type {
-  Announcements,
-  DragEndEvent,
-  KeyboardCoordinateGetter,
-} from "@dnd-kit/core";
+import type { Announcements, DragEndEvent } from "@dnd-kit/core";
 import {
   closestCorners,
   DndContext,
   DragOverlay,
-  KeyboardSensor,
   PointerSensor,
   useDroppable,
   useSensor,
@@ -15,7 +10,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -175,15 +169,8 @@ function SortableCard({
   open(key: string): void;
 }) {
   const { settings } = useBoardSettings();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    isDragging,
-    isOver,
-    transform,
-    transition,
-  } = useSortable({ id: task.key, data: { status: task.status } });
+  const { listeners, setNodeRef, isDragging, isOver, transform, transition } =
+    useSortable({ id: task.key, data: { status: task.status } });
   return (
     <button
       type="button"
@@ -195,7 +182,6 @@ function SortableCard({
           : undefined,
         transition,
       }}
-      {...attributes}
       {...listeners}
       aria-label={`Open ${task.key}: ${task.title}${storyTitle ? ` · Story: ${storyTitle}` : ""}`}
       onClick={(event) => {
@@ -354,74 +340,8 @@ export function Board({
         ]),
       ) as typeof source)
     : source;
-  const boardRef = useRef(board);
-  boardRef.current = board;
-  const destination = useRef<{ status: Status; index: number } | null>(null);
-  // Horizontal keyboard movement explicitly selects the adjacent column. Vertical
-  // movement keeps dnd-kit's sortable coordinate behavior and announcements.
-  const coordinates: KeyboardCoordinateGetter = (event, args) => {
-    const slotCoordinates = (status: Status, index: number) => {
-      const items = boardRef.current[status];
-      const next = items[index];
-      const previous = items[index - 1];
-      const nextRect = next
-        ? args.context.droppableRects.get(next.key)
-        : undefined;
-      if (nextRect) return { x: nextRect.left, y: nextRect.top };
-      const previousRect = previous
-        ? args.context.droppableRects.get(previous.key)
-        : undefined;
-      if (previousRect)
-        return { x: previousRect.left, y: previousRect.bottom + 15 };
-      const columnRect = args.context.droppableRects.get(status);
-      return columnRect
-        ? { x: columnRect.left + 3, y: columnRect.top + 66 }
-        : undefined;
-    };
-    if (event.code === "ArrowRight" || event.code === "ArrowLeft") {
-      const current =
-        destination.current?.status ??
-        (args.context.active?.data.current?.status as Status);
-      const next =
-        statuses[
-          statuses.indexOf(current) + (event.code === "ArrowRight" ? 1 : -1)
-        ];
-      if (next) {
-        event.preventDefault();
-        destination.current = {
-          status: next,
-          index: boardRef.current[next].length,
-        };
-        return slotCoordinates(next, destination.current.index);
-      }
-    }
-    if (
-      destination.current &&
-      (event.code === "ArrowUp" || event.code === "ArrowDown")
-    ) {
-      event.preventDefault();
-      const dest = destination.current;
-      dest.index = Math.max(
-        0,
-        Math.min(
-          boardRef.current[dest.status].length,
-          dest.index + (event.code === "ArrowDown" ? 1 : -1),
-        ),
-      );
-      return slotCoordinates(dest.status, dest.index);
-    }
-    return sortableKeyboardCoordinates(event, args);
-  };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: coordinates,
-      keyboardCodes: {
-        start: ["Space"],
-        cancel: ["Escape"],
-        end: ["Space", "Enter"],
-      },
-    }),
   );
   const active = statuses
     .flatMap((s) => board[s])
@@ -435,13 +355,7 @@ export function Board({
       : null;
   }
   function finish(event: DragEndEvent) {
-    const keyboard = event.activatorEvent.type === "keydown";
-    const target =
-      keyboard && destination.current
-        ? destination.current
-        : event.over
-          ? locate(String(event.over.id))
-          : null;
+    const target = event.over ? locate(String(event.over.id)) : null;
     const intent = dragIntent.current;
     if (target && intent && intent.key === String(event.active.id)) {
       const key = intent.key;
@@ -463,7 +377,6 @@ export function Board({
     }
     setActiveKey(null);
     dragIntent.current = null;
-    destination.current = null;
   }
   const announcements: Announcements = {
     onDragStart: ({ active }) => {
@@ -473,14 +386,13 @@ export function Board({
         : undefined;
     },
     onDragOver: ({ active, over }) => {
-      const pos =
-        destination.current ?? (over ? locate(String(over.id)) : null);
+      const pos = over ? locate(String(over.id)) : null;
       return pos
         ? `${active.id}. Column ${labels[pos.status]}, position ${Math.max(0, pos.index) + 1}.`
         : undefined;
     },
     onDragEnd: ({ active, over }) =>
-      `Dropped ${active.id}${over ? ` in ${labels[destination.current?.status ?? locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
+      `Dropped ${active.id}${over ? ` in ${labels[locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
     onDragCancel: ({ active }) => `Cancelled dragging ${active.id}.`,
   };
   const backgroundError = tasks.error ?? members.error;
@@ -515,7 +427,7 @@ export function Board({
           announcements,
           screenReaderInstructions: {
             draggable:
-              "Press Enter to open a task. Press Space to pick it up. Use arrow keys to move, Space to drop, or Escape to cancel.",
+              "Board dragging uses a pointer. Open a task to change its status with the keyboard.",
           },
         }}
         onDragStart={({ active }) => {
@@ -527,13 +439,11 @@ export function Board({
             ? { key, updatedAt: captured.updatedAt }
             : null;
           setActiveKey(key);
-          destination.current = null;
         }}
         onDragEnd={finish}
         onDragCancel={() => {
           setActiveKey(null);
           dragIntent.current = null;
-          destination.current = null;
         }}
       >
         {backgroundError && (

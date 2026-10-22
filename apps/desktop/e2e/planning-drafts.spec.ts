@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { markdownReadView } from "./assertions";
 
 for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
   test(`queued ${field} saves retain their entity target across SPA navigation`, async ({
@@ -134,9 +135,9 @@ for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
         page.getByRole("textbox", { name: "Criterion 1", exact: true }),
       ).toHaveValue("Second submitted save");
     } else {
-      await expect(
-        page.getByRole("button", { name: `Edit ${label}`, exact: true }),
-      ).toContainText("Second submitted save");
+      await expect(markdownReadView(page, label)).toHaveText(
+        "Second submitted save",
+      );
     }
   });
 }
@@ -193,7 +194,7 @@ test("an earlier Markdown response preserves a newer draft and its subsequent sa
     )
     .toBe("New text typed while first save is pending");
   await page.reload();
-  await expect(edit).toContainText(
+  await expect(markdownReadView(page, "Goal and audience")).toHaveText(
     "New text typed while first save is pending",
   );
 });

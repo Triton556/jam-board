@@ -47,6 +47,9 @@ jobs:
         working-directory: apps/desktop
       - run: npm run typecheck
         working-directory: apps/desktop
+      - name: Typecheck browser scenarios
+        run: npm run typecheck:e2e
+        working-directory: apps/desktop
       - run: npm test
         working-directory: apps/desktop
       - name: Install Chromium

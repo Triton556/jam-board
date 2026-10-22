@@ -95,7 +95,7 @@ export function BoardOverflow({ children }: { children: ReactNode }) {
         className="board-scroll"
         aria-label="Board columns"
         aria-describedby={overflow ? hint : undefined}
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: Named scroll region needs a keyboard entry point; descendant drag/open keys are preserved.
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Named scroll region needs a keyboard entry point; descendant card/control keys are not handled here.
         tabIndex={0}
         onKeyDown={(event) => {
           if (

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectPoliteNotice } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -105,6 +106,7 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
   await page.getByRole("tab", { name: "Claude Code · HTTP" }).click();
+  const captured = await page.evaluate(() => window.__jamMock.appState());
   const token = await page.evaluate(() => window.__jamMock.revealMcpToken());
   await expect(page.locator(".code-block").first()).not.toContainText(token);
   await page
@@ -112,12 +114,15 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
     .first()
     .getByRole("button", { name: "Copy", exact: true })
     .click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    token,
+  const configuration = await page.evaluate(() =>
+    navigator.clipboard.readText(),
   );
-  await expect(
-    page.getByRole("status").filter({ hasText: "Copied with your token" }),
-  ).toBeVisible();
+  expect(configuration).toContain(token);
+  expect(configuration).toContain(captured.jam?.id ?? "missing project");
+  await expectPoliteNotice(
+    page,
+    `Configuration copied for ${captured.jam?.name} · ${captured.jam?.keyPrefix} (includes your token; keep it private)`,
+  );
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
   await expect(
     page.getByText("Existing HTTP connections will stop working."),

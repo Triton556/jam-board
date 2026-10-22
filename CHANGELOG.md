@@ -3,6 +3,32 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.27] - 2026-10-22
+
+### Changed
+
+- Removed keyboard dragging of Board task cards, as requested. Space and Enter
+  open cards normally; the existing Status control remains keyboard-operable.
+  Pointer dragging, task-status validation and MCP movement are retained.
+  Keyboard navigation, board scrolling and brief-list reordering are unchanged;
+  the Status control is not a replacement for within-column ordering.
+- Removed obsolete keyboard-pickup instructions and drag-only ARIA from Board
+  card buttons. Pointer gestures still capture the original task revision.
+
+### Verification
+
+- Added a strict all-E2E TypeScript config and CI gate. Two existing fixture files
+  now explicitly provide nullable API fields and reject missing layout elements;
+  no assertion, dependency or compiler strictness was weakened.
+- Migrated browser contracts to current contextual empty states, polite notice
+  summaries, project-specific clipboard receipts, readable Markdown content and
+  hierarchy counts. Exact saved content, captured validators, real clipboard
+  contents, highlighting and reduced-motion assertions are retained.
+- Replaced former keyboard-drag coverage with keyboard activation/status editing
+  and pointer-based stale-intent/refusal/recovery checks. No scenario was skipped
+  and no browser timeout increased. Full external browser results remain a
+  separate checkpoint in the version verification notes.
+
 ## [0.3.0-alpha.26] - 2026-10-22
 
 ### Fixed
