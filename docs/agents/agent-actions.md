@@ -178,3 +178,9 @@ permissions are unchanged. Local read receipts, autosave presentation, frame Fit
 reference menus, select placement and live tooltip text do not generate agent
 work, grants or activity. Presence still distinguishes heartbeat freshness from
 reported task activity; no inference of live session streaming is introduced.
+
+## Alpha36 visual-layout delta
+
+AG12 and all MCP contracts are unchanged. Reference control layout and measured
+camera clearance are human display behavior; they do not edit agent results,
+grant execution, create references or infer session activity.

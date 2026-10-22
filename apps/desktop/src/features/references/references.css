@@ -21,10 +21,20 @@
 .references-page .react-flow__edgelabel-renderer {
   will-change: transform;
 }
-.reference-toolbar,
-.reference-filters {
+.reference-control-stack {
   position: absolute;
   z-index: 6;
+  inset: 16px 16px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+.reference-toolbar,
+.reference-filters {
+  position: relative;
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -35,8 +45,7 @@
   box-shadow: var(--shadow-card);
 }
 .reference-toolbar {
-  top: 16px;
-  left: 16px;
+  z-index: 1;
 }
 .reference-toolbar .button {
   height: 32px;
@@ -49,10 +58,11 @@
   text-align: center;
 }
 .reference-filters {
-  right: 16px;
-  top: 70px;
+  align-self: flex-end;
+  min-width: 0;
+  margin: 0;
   gap: 6px;
-  max-width: 70%;
+  max-width: 100%;
   flex-wrap: wrap;
 }
 .reference-filters button {
@@ -630,17 +640,12 @@
   .reference-toolbar .button {
     padding: 0 6px;
   }
-  .reference-filters {
-    top: 68px;
-  }
 }
 
 .reference-read-notice {
-  position: absolute;
-  z-index: 8;
-  left: 16px;
-  right: 16px;
-  top: 128px;
+  position: relative;
+  align-self: stretch;
+  pointer-events: auto;
   margin: 0;
   max-height: min(32vh, 240px);
   overflow: auto;
@@ -648,11 +653,11 @@
   background: var(--card);
   box-shadow: var(--shadow-card);
 }
-p.reference-read-notice {
-  padding: 12px;
+.reference-read-notice:empty {
+  display: none;
 }
 .reference-toolbar {
-  max-width: calc(100% - 32px);
+  max-width: 100%;
   flex-wrap: wrap;
 }
 

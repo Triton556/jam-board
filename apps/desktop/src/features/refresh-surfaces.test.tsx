@@ -101,3 +101,42 @@ it("AS02 Assets background refresh stays quiet, changing filter invalidates expl
     );
   expect(screen.queryByText(/Checked assets/)).toBeNull();
 });
+
+it("VS01 reference feedback stays in one flow container without replacing controls or a local note", async () => {
+  const { client } = await mount(<ReferencesPage />);
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  const toolbar = screen.getByRole("toolbar", { name: "Canvas tools" });
+  const filters = screen.getByRole("group", { name: "Filter references" });
+  const stack = toolbar.parentElement;
+  expect(stack).toHaveClass("reference-control-stack");
+  expect(filters.parentElement).toBe(stack);
+  const notice = stack?.querySelector(".reference-read-notice");
+  expect(notice).toBeEmptyDOMElement();
+  const write = vi.spyOn(api, "addReference");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Note" }));
+  const title = screen.getByRole("textbox", { name: "Title" });
+  await user.type(title, "Retained local note");
+  vi.spyOn(api, "referenceCanvas").mockRejectedValueOnce(
+    new Error("Fictional long read diagnostic. ".repeat(40)),
+  );
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["references"] });
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Fictional long read diagnostic",
+  );
+  expect(notice).toContainElement(screen.getByRole("alert"));
+  expect(title).toHaveFocus();
+  expect(title).toHaveValue("Retained local note");
+  expect(screen.getByRole("toolbar", { name: "Canvas tools" })).toBe(toolbar);
+  expect(screen.getByRole("group", { name: "Filter references" })).toBe(
+    filters,
+  );
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(notice).toBeEmptyDOMElement();
+  expect(title).toHaveValue("Retained local note");
+  expect(write).not.toHaveBeenCalled();
+});

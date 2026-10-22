@@ -3,6 +3,19 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.36] — 2026-10-22
+
+### Reference controls with room for feedback
+
+- Canvas tools, filters and read feedback share a normal-flow overlay stack.
+  Wrapped receipts or errors move following controls instead of overlapping their
+  backgrounds at fixed vertical positions. Empty gaps still belong to the canvas.
+- Explicit Fit and new inline notes measure the same complete current control
+  area, including read notices, without resetting a saved camera on route entry.
+
+No data, execution, MCP or automatic-agent-launch behavior changes.
+[Verification and exact-version limits](docs/verification/0.3.0-alpha.36.md).
+
 ## [0.3.0-alpha.35] — 2026-10-22
 
 ### Visible outcomes and usable nested controls
