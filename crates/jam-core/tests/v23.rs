@@ -285,17 +285,14 @@ fn preview_cancels_a_stalled_transfer_after_five_seconds() {
         "No expected HTTP request: {diagnostic}"
     );
     assert!(
-        error
-            .as_deref()
-            .is_some_and(|message| message.contains("5 second")),
-        "{diagnostic}"
+        matches!(&result, Err(jam_core::Error::Validation { field, reason })
+            if field == "preview" && reason == "Page preview exceeded the 5 second deadline"),
+        "Expected curl's timeout outcome, not an arbitrary client failure: {diagnostic}"
     );
-    // Curl's transfer clock does not include process startup/reaping. Keep the
-    // existing acceptance bounds, and sample each interval once for diagnosis.
-    assert!(
-        (4.8..5.4).contains(&transfer_elapsed.as_secs_f64()),
-        "{diagnostic}"
-    );
+    // Exact argv coverage fixes max-time at 5 seconds. Here the real Store call
+    // must actually time out, send the request and disconnect without a peer
+    // response. Accept/EOF and whole-call clocks remain diagnostic only: neither
+    // samples curl's internal transfer start, especially on a scheduled runner.
     assert!(
         s.reference_canvas().unwrap().items[0]
             .link_preview

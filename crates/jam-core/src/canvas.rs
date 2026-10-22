@@ -24,48 +24,11 @@ impl Store {
         if !(url.starts_with("https://") || url.starts_with("http://")) {
             return Err(invalid("url", "Use an HTTP or HTTPS URL"));
         }
-        #[cfg(windows)]
-        let program = std::path::PathBuf::from(
-            std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into()),
-        )
-        .join("System32/curl.exe");
-        #[cfg(not(windows))]
-        let program = std::path::PathBuf::from("curl");
-        let mut command = std::process::Command::new(program);
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-        let output = command
-            .args([
-                "--disable",
-                "--silent",
-                "--show-error",
-                "--fail",
-                "--location",
-                "--max-redirs",
-                "3",
-                "--max-time",
-                "5",
-                "--max-filesize",
-                "2097152",
-                "--proto",
-                "=http,https",
-                "--proto-redir",
-                "=http,https",
-                "--header",
-                "Accept: text/html",
-                "--url",
-                &url,
-            ])
+        let output = preview_command(&url)
             .output()
             .map_err(|_| invalid("preview", "The OS curl HTTP client is unavailable"))?;
         if !output.status.success() {
-            return Err(invalid(
-                "preview",
-                "Page preview failed or exceeded the 5 second deadline / 2 MiB limit",
-            ));
+            return Err(preview_failure(output.status.code()));
         }
         let text = String::from_utf8_lossy(&output.stdout);
         self.store_link_preview(actor, id, Some(parse_preview(&text)))
@@ -411,4 +374,113 @@ fn parse_preview(html: &str) -> LinkPreview {
         }
     });
     LinkPreview { title, image }
+}
+
+// Keep this private command boundary identical for production and its exact-argv
+// contract test. OS scheduling around accept()/reaping is not curl's clock.
+fn preview_command(url: &str) -> std::process::Command {
+    #[cfg(windows)]
+    let program = std::path::PathBuf::from(
+        std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into()),
+    )
+    .join("System32/curl.exe");
+    #[cfg(not(windows))]
+    let program = std::path::PathBuf::from("curl");
+    let mut command = std::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    command.args([
+        "--disable",
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--location",
+        "--max-redirs",
+        "3",
+        "--max-time",
+        "5",
+        "--max-filesize",
+        "2097152",
+        "--proto",
+        "=http,https",
+        "--proto-redir",
+        "=http,https",
+        "--header",
+        "Accept: text/html",
+        "--url",
+        url,
+    ]);
+    command
+}
+
+fn preview_failure(code: Option<i32>) -> Error {
+    invalid(
+        "preview",
+        if code == Some(28) {
+            "Page preview exceeded the 5 second deadline"
+        } else {
+            "Page preview failed or exceeded the 5 second deadline / 2 MiB limit"
+        },
+    )
+}
+
+#[cfg(test)]
+mod preview_command_tests {
+    use super::*;
+
+    #[test]
+    fn command_has_exact_five_second_deadline_and_safety_arguments() {
+        let command = preview_command("https://example.test/preview");
+        let args = command
+            .get_args()
+            .map(|a| a.to_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            args,
+            [
+                "--disable",
+                "--silent",
+                "--show-error",
+                "--fail",
+                "--location",
+                "--max-redirs",
+                "3",
+                "--max-time",
+                "5",
+                "--max-filesize",
+                "2097152",
+                "--proto",
+                "=http,https",
+                "--proto-redir",
+                "=http,https",
+                "--header",
+                "Accept: text/html",
+                "--url",
+                "https://example.test/preview",
+            ]
+        );
+    }
+
+    #[test]
+    fn only_curl_exit_28_is_reported_as_confirmed_timeout() {
+        let timeout = "Page preview exceeded the 5 second deadline";
+        for code in [Some(28), Some(22), Some(56), None] {
+            let Error::Validation { field, reason } = preview_failure(code) else {
+                panic!("Preview failure must remain a field validation error");
+            };
+            assert_eq!(field, "preview");
+            if code == Some(28) {
+                assert_eq!(reason, timeout);
+            } else {
+                assert_ne!(reason, timeout);
+                assert_eq!(
+                    reason,
+                    "Page preview failed or exceeded the 5 second deadline / 2 MiB limit"
+                );
+            }
+        }
+    }
 }
