@@ -36,7 +36,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page
     .getByRole("textbox", { name: "Note", exact: true })
     .fill("# Warm light\nKeep the snowy silhouettes readable.");
-  await page.getByRole("button", { name: "Add note", exact: true }).click();
+  await page.getByRole("button", { name: "Save note", exact: true }).click();
   await expect(page.locator(".reference-card")).toHaveCount(4);
   await page.getByRole("button", { name: "Frame", exact: true }).click();
   await page

@@ -773,7 +773,7 @@ it("retains cached References canvas and note draft through repeated read failur
     ),
   );
   await user.click(screen.getByRole("button", { name: "Note" }));
-  const note = await screen.findByRole("dialog", { name: "Add note" });
+  const note = await screen.findByRole("form", { name: "New note draft" });
   const title = within(note).getByLabelText("Title"),
     body = within(note).getByLabelText("Note");
   fireEvent.change(title, {
@@ -795,7 +795,7 @@ it("retains cached References canvas and note draft through repeated read failur
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Synthetic background reference read failed",
     );
-    expect(screen.getByRole("dialog", { name: "Add note" })).toBe(note);
+    expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
     expect(
       screen.getByRole("region", { name: "References canvas" }),
     ).toBeInTheDocument();
@@ -806,14 +806,16 @@ it("retains cached References canvas and note draft through repeated read failur
   referenceReadError = false;
   act(() => emit("reference.added"));
   await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-  expect(screen.getByRole("dialog", { name: "Add note" })).toBe(note);
+  expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
   expect(title).toHaveValue("Unsaved title before background read");
   expect(body).toHaveValue("Unsaved note body must not disappear");
   expect(body).toHaveFocus();
   expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
   await user.keyboard("{Escape}");
+  expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
+  await user.click(screen.getByRole("button", { name: "Discard draft" }));
   await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Add note" })).toBeNull(),
+    expect(screen.queryByRole("form", { name: "New note draft" })).toBeNull(),
   );
   // Without a modal, retry is an ordinary read control, not a hidden mutation retry.
   referenceReadError = true;
