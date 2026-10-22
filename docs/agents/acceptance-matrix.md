@@ -240,3 +240,11 @@ empty overlay gaps do; keyboard activation and draft cancellation remain intact.
 `reference-controls.spec.ts` contains four prepared browser cases, NOT RUN locally.
 `control-layout.test.ts` and `refresh-surfaces.test.tsx` cover measurement and DOM
 ownership only. Actual native36 spacing/hit-through must be checked separately.
+
+## Alpha37 reference keyboard ownership
+
+H-R03 / RF04 / KB03: retain Enter → Escape → focused summary → Space reopening,
+then outside dismissal and exact dialog-opener return. The actual ReactFlow-hook
+DOM regression proves default-not-prevented and unchanged canvas Space handling,
+not browser-native disclosure activation. Hosted rerun is required. RF02 retains
+all original geometry/hit-test/state assertions after explicit lazy-route readiness.

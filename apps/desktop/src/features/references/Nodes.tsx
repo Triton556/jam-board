@@ -93,6 +93,12 @@ export function ReferenceActions({
       className="reference-menu nodrag nopan"
       onToggle={(event) => setOpen(event.currentTarget.open)}
       onKeyDownCapture={(event) => {
+        // ReactFlow's document Space handler does not recognize SUMMARY as
+        // interactive. Keep its native disclosure default, not canvas panning.
+        if (event.key === " " && event.target === summary.current) {
+          event.stopPropagation();
+          return;
+        }
         if (event.key !== "Escape" || !menu.current?.open) return;
         event.preventDefault();
         event.stopPropagation();

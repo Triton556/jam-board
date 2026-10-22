@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useKeyPress } from "@xyflow/react";
 import { useState } from "react";
 import { expect, it, vi } from "vitest";
 import type { RefItem } from "../../bindings";
@@ -143,4 +144,45 @@ it("RF04 repeated keyboard-style click events keep native summary semantics", as
   expect(summary.closest("details")).toHaveAttribute("open");
   fireEvent.click(summary, { detail: 0 });
   expect(summary.closest("details")).not.toHaveAttribute("open");
+});
+
+it("RF04 summary Space preserves native activation without enabling canvas panning", () => {
+  function WithCanvasSpace() {
+    const panning = useKeyPress("Space");
+    return (
+      <>
+        <Harness />
+        <output aria-label="Canvas pan key">{String(panning)}</output>
+      </>
+    );
+  }
+  render(<WithCanvasSpace />);
+  const summary = screen.getByLabelText("Actions for Agent findings");
+  summary.focus();
+  const space = new KeyboardEvent("keydown", {
+    key: " ",
+    code: "Space",
+    bubbles: true,
+    cancelable: true,
+  });
+  fireEvent(summary, space);
+  expect(space.defaultPrevented).toBe(false);
+  expect(summary).toHaveFocus();
+  expect(screen.getByLabelText("Canvas pan key")).toHaveTextContent("false");
+  fireEvent.keyUp(summary, { key: " ", code: "Space" });
+
+  // The canvas's own Space gesture remains intact outside the interactive control.
+  const canvasSpace = new KeyboardEvent("keydown", {
+    key: " ",
+    code: "Space",
+    bubbles: true,
+    cancelable: true,
+  });
+  fireEvent(document.body, canvasSpace);
+  expect(canvasSpace.defaultPrevented).toBe(true);
+  expect(screen.getByLabelText("Canvas pan key")).toHaveTextContent("true");
+  fireEvent.keyUp(document.body, { key: " ", code: "Space" });
+  expect(screen.getByLabelText("Canvas pan key")).toHaveTextContent("false");
+  // Actual native summary activation is covered by the unchanged hosted
+  // Enter → Escape → Space scenario; Happy DOM does not implement that default.
 });

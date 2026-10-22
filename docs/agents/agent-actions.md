@@ -184,3 +184,9 @@ reported task activity; no inference of live session streaming is introduced.
 AG12 and all MCP contracts are unchanged. Reference control layout and measured
 camera clearance are human display behavior; they do not edit agent results,
 grant execution, create references or infer session activity.
+
+## Alpha37 keyboard-only delta
+
+AG12 reference content/state and all agent tool contracts are unchanged. Human
+menu activation is repaired; no reference mutation, agent claim, Start or launch
+is implied by opening or dismissing that menu.
