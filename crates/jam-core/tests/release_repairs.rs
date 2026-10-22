@@ -1,6 +1,7 @@
 mod support;
 use jam_core::*;
 use serde_json::{Value, json};
+use support::FreshContext;
 
 fn setup() -> (tempfile::TempDir, Store, Member, Member, Member, Story) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -60,6 +61,7 @@ fn task(s: &Store, h: &Member, story: &Story) -> String {
 }
 fn report(key: &str) -> SubmitReport {
     SubmitReport {
+        expected_claim_generation: String::new(),
         key: key.into(),
         summary_md: "Revised work".into(),
         ..Default::default()
@@ -84,15 +86,16 @@ fn direct_return_to_work_preserves_evidence_and_can_report_again() {
     for patch in [false, true] {
         let (_d, s, h, brain, worker, story) = setup();
         let key = task(&s, &h, &story);
-        s.mark_ready(&h.id, &key, Some("Explicit investigation exception"))
+        s.mark_ready_fresh(&h.id, &key, Some("Explicit investigation exception"))
             .unwrap();
-        s.claim_task(&worker.id, &key).unwrap();
-        let first = s.submit_report(&worker.id, report(&key)).unwrap();
-        s.move_task(&h.id, &key, "review", None, None).unwrap();
+        s.claim_task_fresh(&worker.id, &key).unwrap();
+        let first = s.submit_report_fresh(&worker.id, report(&key)).unwrap();
+        s.move_task_fresh(&h.id, &key, "review", None, None)
+            .unwrap();
         assert_eq!(s.get_task(&key).unwrap().task.review_round, 0);
         let before = snapshot(&s, &key);
         assert!(
-            s.move_task(&h.id, &key, "in_progress", Some("JB-404"), None)
+            s.move_task_fresh(&h.id, &key, "in_progress", Some("JB-404"), None)
                 .is_err()
         );
         assert_eq!(
@@ -112,39 +115,56 @@ fn direct_return_to_work_preserves_evidence_and_can_report_again() {
             )
             .unwrap();
         } else {
-            s.move_task(&h.id, &key, "in_progress", None, None).unwrap();
+            s.move_task_fresh(&h.id, &key, "in_progress", None, None)
+                .unwrap();
         }
         // A no-op/repeated move must not allocate a second successor.
-        s.move_task(&h.id, &key, "in_progress", None, None).unwrap();
-        let second = s.submit_report(&worker.id, report(&key)).unwrap();
+        s.move_task_fresh(&h.id, &key, "in_progress", None, None)
+            .unwrap();
+        let second = s.submit_report_fresh(&worker.id, report(&key)).unwrap();
         assert_eq!(second.round, 1);
         let detail = s.get_task(&key).unwrap();
         assert_eq!(
             serde_json::to_value(&detail.reports[0]).unwrap(),
             serde_json::to_value(first).unwrap()
         );
-        s.review_task(
+        s.review_task_fresh(
             &brain.id,
             ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: key.clone(),
                 verdict: "changes_requested".into(),
                 ..Default::default()
             },
         )
         .unwrap();
-        s.claim_task(&worker.id, &key).unwrap();
-        assert_eq!(s.submit_report(&worker.id, report(&key)).unwrap().round, 2);
-        s.review_task(
+        s.claim_task_fresh(&worker.id, &key).unwrap();
+        assert_eq!(
+            s.submit_report_fresh(&worker.id, report(&key))
+                .unwrap()
+                .round,
+            2
+        );
+        s.review_task_fresh(
             &brain.id,
             ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: key.clone(),
                 verdict: "accept".into(),
                 ..Default::default()
             },
         )
         .unwrap();
-        s.move_task(&h.id, &key, "in_progress", None, None).unwrap();
-        assert_eq!(s.submit_report(&worker.id, report(&key)).unwrap().round, 3);
+        s.move_task_fresh(&h.id, &key, "in_progress", None, None)
+            .unwrap();
+        assert_eq!(
+            s.submit_report_fresh(&worker.id, report(&key))
+                .unwrap()
+                .round,
+            3
+        );
         assert_eq!(s.get_task(&key).unwrap().reviews.len(), 2);
     }
 }
@@ -166,14 +186,14 @@ fn workers_cannot_bypass_claim_through_public_status_operations() {
                 )
                 .unwrap();
             }
-            assert!(s.claim_task(&worker.id, &key).is_err());
+            assert!(s.claim_task_fresh(&worker.id, &key).is_err());
             let before = snapshot(&s, &key);
             let result = match operation {
                 "move" => s
-                    .move_task(&worker.id, &key, "in_progress", None, None)
+                    .move_task_fresh(&worker.id, &key, "in_progress", None, None)
                     .map(|_| ()),
                 _ => s
-                    .release_task(&worker.id, &key, Some("in_progress"))
+                    .release_task_fresh(&worker.id, &key, Some("in_progress"))
                     .map(|_| ()),
             };
             assert!(
@@ -181,7 +201,7 @@ fn workers_cannot_bypass_claim_through_public_status_operations() {
                 "{operation}, assigned={assigned} bypassed claim"
             );
             assert_eq!(snapshot(&s, &key), before);
-            assert!(s.submit_report(&worker.id, report(&key)).is_err());
+            assert!(s.submit_report_fresh(&worker.id, report(&key)).is_err());
             assert_eq!(snapshot(&s, &key), before);
         }
     }
@@ -206,25 +226,30 @@ fn worker_creation_ownership_and_privileged_planning_are_consistent() {
         assert_eq!(s.latest_seq().unwrap(), seq);
     }
     let key = task(&s, &h, &story);
-    s.move_task(&h.id, &key, "in_progress", None, None).unwrap();
-    s.move_task(&brain.id, &key, "backlog", None, None).unwrap();
+    s.move_task_fresh(&h.id, &key, "in_progress", None, None)
+        .unwrap();
+    s.move_task_fresh(&brain.id, &key, "backlog", None, None)
+        .unwrap();
     assert!(
-        s.mark_ready(&worker.id, &key, Some("Worker override"))
+        s.mark_ready_fresh(&worker.id, &key, Some("Worker override"))
             .is_err()
     );
-    s.mark_ready(&brain.id, &key, Some("Appointed brain investigation"))
+    s.mark_ready_fresh(&brain.id, &key, Some("Appointed brain investigation"))
         .unwrap();
     let before = snapshot(&s, &key);
     assert!(
-        s.move_task(&worker.id, &key, "in_progress", None, None)
+        s.move_task_fresh(&worker.id, &key, "in_progress", None, None)
             .is_err(),
         "Ready still needs claim"
     );
     assert_eq!(snapshot(&s, &key), before);
-    s.claim_task(&worker.id, &key).unwrap();
+    s.claim_task_fresh(&worker.id, &key).unwrap();
     let other = s.identify_agent("Other", "other").unwrap();
     let before = snapshot(&s, &key);
-    assert!(s.move_task(&other.id, &key, "review", None, None).is_err());
+    assert!(
+        s.move_task_fresh(&other.id, &key, "review", None, None)
+            .is_err()
+    );
     // MCP update_task cannot change either status or ownership; its schema rejects both.
     for field in [
         json!({"key":key,"status":"in_progress"}),
@@ -232,12 +257,12 @@ fn worker_creation_ownership_and_privileged_planning_are_consistent() {
     ] {
         assert!(serde_json::from_value::<UpdateTask>(field).is_err());
     }
-    assert!(s.submit_report(&other.id, report(&key)).is_err());
+    assert!(s.submit_report_fresh(&other.id, report(&key)).is_err());
     assert_eq!(snapshot(&s, &key), before);
-    s.move_task(&worker.id, &key, "in_progress", None, None)
+    s.move_task_fresh(&worker.id, &key, "in_progress", None, None)
         .unwrap();
-    s.submit_report(&worker.id, report(&key)).unwrap();
-    s.review_task(
+    s.submit_report_fresh(&worker.id, report(&key)).unwrap();
+    s.review_task_fresh(
         &brain.id,
         ReviewTask {
             key,

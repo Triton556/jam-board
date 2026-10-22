@@ -67,13 +67,19 @@ pub(crate) fn execute(
                 )?)?
             }
             "update_task_brief" => {
-                let a: BriefEditInput = parse(args)?;
-                value(store.update_task_brief(&actor.id, &a.key, a.patch)?)?
+                let a: AgentBriefEdit = parse(args)?;
+                let context = a.context();
+                value(store.update_task_brief(&actor.id, &a.key, a.patch, Some(&context))?)?
             }
             "check_ready" => value(store.check_ready(&parse::<crate::server::Key>(args)?.key)?)?,
             "mark_ready" => {
-                let a: ReadyInput = parse(args)?;
-                value(store.mark_ready(&actor.id, &a.key, a.override_reason.as_deref())?)?
+                let a: AgentReady = parse(args)?;
+                value(store.mark_ready(
+                    &actor.id,
+                    &a.key,
+                    a.override_reason.as_deref(),
+                    Some(&a.context()),
+                )?)?
             }
             "submit_report" => value(store.submit_report(&actor.id, parse(args)?)?)?,
             "review_task" => value(store.review_task(&actor.id, parse(args)?)?)?,
@@ -203,7 +209,7 @@ pub(crate) fn tools() -> Vec<Tool> {
             "Activate a story after defining its outcome and mandatory acceptance. Done requires completed tasks or an authorized overrideReason.",
             false,
         ),
-        tool::<BriefEditInput>(
+        tool::<AgentBriefEdit>(
             "update_task_brief",
             "Update supplied brief fields; changes and tests replace their whole arrays. Keep description in update_task for free-form notes.",
             false,
@@ -213,7 +219,7 @@ pub(crate) fn tools() -> Vec<Tool> {
             "Read the exact missing readiness codes and messages for a task. This does not change the task.",
             true,
         ),
-        tool::<ReadyInput>(
+        tool::<AgentReady>(
             "mark_ready",
             "Move a complete brief to Ready. A human or this epic's brain may pass a non-empty overrideReason, recorded in the journal.",
             false,
@@ -392,6 +398,22 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
         t.epic.title,
         t.task.status
     );
+    md.push_str(&format!(
+        "Claim generation (opaque): `{}`\nTask version (opaque): `{}`\n",
+        t.task.claim_generation, t.task.updated_at
+    ));
+    if let Some(revision) = &t.review_context_revision {
+        let report = t
+            .reports
+            .iter()
+            .find(|r| r.round == t.task.review_round)
+            .map(|r| r.id.as_str())
+            .unwrap_or("");
+        md.push_str(&format!(
+            "Current report ID: `{report}`\nReview context revision (opaque): `{revision}`\n"
+        ));
+    }
+    md.push_str("\nCapture these validators before deciding a mutation. Do not silently refresh them to replay stale work.\n\n");
     for (name, text) in [
         ("Goal", &t.brief.goal_md),
         ("Context", &t.brief.context_md),
@@ -426,9 +448,9 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
 }
 pub(crate) fn prompt(name: &str) -> Option<String> {
     Some(match name{
-    "plan_epic"=>"Follow requirements-interview.md and task-brief-and-acceptance.md from agent-playbook 1.1.0. Read get_project/get_board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Create a draft epic, become_brain if appointed, record the agreed participation/reviewer/workerModel, create stories with intent cards and mandatory acceptance, and tasks with complete briefs following brief-writing.md. Activate complete epics/stories, check_ready and mark_ready for actionable tasks, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Once the human starts a scope, coordinate workers within it without requesting approval for each worker. Never auto-launch OS sessions. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
-    "work_on_next_task"=>"Follow brief-writing.md from agent-playbook 1.1.0. Call get_session_context and get_board, then list_tasks with status=[ready]. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. Submit_report with summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
-    "review_task"=>"Follow task-brief-and-acceptance.md from agent-playbook 1.1.0. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Call review_task with accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and use wait_for_changes (timeoutSeconds=60) for human corrections; save nextCursor and repeat. Use list_changes_since for recovery at turn start.".into(),
+    "plan_epic"=>"Follow requirements-interview.md and task-brief-and-acceptance.md from agent-playbook 1.1.0. Read get_project/get_board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Create a draft epic, become_brain if appointed, record the agreed participation/reviewer/workerModel, create stories with intent cards and mandatory acceptance, and tasks with complete briefs following brief-writing.md. Activate complete epics/stories, check_ready and mark_ready for actionable tasks using expectedClaimGeneration and expectedUpdatedAt from get_task. Use those captured validators for every task edit/brief edit/status/archive intent; on conflict reread and reconcile instead of replaying, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Once the human starts a scope, coordinate workers within it without requesting approval for each worker. Never auto-launch OS sessions. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
+    "work_on_next_task"=>"Follow brief-writing.md from agent-playbook 1.1.0. Call get_session_context and get_board, then list_tasks with status=[ready]. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. Supply expectedClaimGeneration and expectedUpdatedAt from the task you inspected; retain the returned claimGeneration for this work attempt. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. submit_report with expectedClaimGeneration from that claim, summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. A stale_claim/conflict means the context changed: reread and reconcile, never fetch a new token merely to replay old evidence. Task edits, brief edits, moves, Ready and archive require both expectedClaimGeneration and expectedUpdatedAt from the context you decided against. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
+    "review_task"=>"Follow task-brief-and-acceptance.md from agent-playbook 1.1.0. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Retain the exact report ID and TaskDetail.reviewContextRevision while assessing it. Call review_task with expectedReportId and expectedReviewContextRevision from that inspected snapshot, never an auto-refreshed latest token; on conflict inspect the new context and reconsider. Use accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and use wait_for_changes (timeoutSeconds=60) for human corrections; save nextCursor and repeat. Use list_changes_since for recovery at turn start.".into(),
     _=>return None,
 })
 }
@@ -461,6 +483,8 @@ mod tests {
         task.task.key = "JB-9".into();
         task.task.title = "Lantern cue".into();
         task.task.status = "review".into();
+        task.task.claim_generation = "task-id:3".into();
+        task.task.updated_at = "task-version".into();
         task.task.description_md = "Keep notes here.".into();
         task.story.key = "JB-S1".into();
         task.story.title = "Safe bridge".into();
@@ -493,5 +517,39 @@ mod tests {
             task_markdown(&task),
             include_str!("../tests/fixtures/task-brief.md")
         );
+    }
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AgentBriefEdit {
+    key: String,
+    #[serde(flatten)]
+    patch: BriefPatch,
+    expected_claim_generation: String,
+    expected_updated_at: String,
+}
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AgentReady {
+    key: String,
+    override_reason: Option<String>,
+    expected_claim_generation: String,
+    expected_updated_at: String,
+}
+impl AgentBriefEdit {
+    fn context(&self) -> TaskWriteContext {
+        TaskWriteContext {
+            expected_claim_generation: self.expected_claim_generation.clone(),
+            expected_updated_at: self.expected_updated_at.clone(),
+        }
+    }
+}
+impl AgentReady {
+    fn context(&self) -> TaskWriteContext {
+        TaskWriteContext {
+            expected_claim_generation: self.expected_claim_generation.clone(),
+            expected_updated_at: self.expected_updated_at.clone(),
+        }
     }
 }

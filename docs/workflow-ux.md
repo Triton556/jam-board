@@ -148,6 +148,34 @@ Checks: cancel makes no change; pending submission is locked; failure is inside
 the dialog; success leaves a persistent receipt and logical focus; changed holder,
 project or task cannot silently retarget release; archived evidence remains intact.
 
+## 8. Make context readable, and keep decisions attached to what was read
+
+**Scenario:** a report is open while another person changes Story acceptance, or a
+new report round arrives. The existing report and criteria remain a captured
+snapshot. A changed-evidence notice blocks acceptance until an explicit reread.
+Request changes retains comments and test choices; removed tests require deliberate
+reconciliation instead of quietly losing the concern. This applies HAX correction
+and visible consequences together with conditional-write principles in
+[RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#name-if-match). It is our UI
+application of those principles, not a source-prescribed review ceremony.
+
+**Recognizable context:** cards show Story titles rather than requiring memory of
+keys. The Plan header visibly labels Brain, keeps the hierarchy action and moves
+repeated instructions out of the normal path. Goal and Done when precede optional
+References. Contextual column policies explain Draft, Ready and review; quick
+capture is a draft, not a shortcut to permission or fabricated completed work.
+When the board is filtered, an explicit matching Story keeps the new draft in view.
+These changes follow the recognition/empty-state/progressive-disclosure sources
+above and the observed native 1180px layout, not a new hierarchy or enterprise flow.
+
+**Contrast:** [WCAG 2.2 contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+uses a 4.5:1 minimum for ordinary-size text. Source-token checks use the
+[specified sRGB luminance calculation](https://www.w3.org/WAI/WCAG22/Understanding/relative-luminance.html)
+without rounding thresholds. Tertiary/error text and dark palette-tinted metadata
+were adjusted; the paper palette and activity animation remain. This verifies
+specific authored color pairs, not every rendered state, custom color or full WCAG
+conformance. Native visual and keyboard acceptance remain separate checks.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests

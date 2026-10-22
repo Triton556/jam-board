@@ -1,5 +1,6 @@
 mod support;
 use jam_core::*;
+use support::FreshContext;
 fn setup() -> (tempfile::TempDir, Store, String) {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
     std::fs::create_dir_all(&base).unwrap();
@@ -85,8 +86,8 @@ fn member_identity_is_immutable_and_statistics_include_work() {
     let (_d, s, actor) = setup();
     let a = s.identify_agent("Codex", "codex").unwrap();
     support::start_epic(&s, &actor, "JB-E1");
-    s.mark_ready(&actor, "JB-1", None).unwrap();
-    s.claim_task(&a.id, "JB-1").unwrap();
+    s.mark_ready_fresh(&actor, "JB-1", None).unwrap();
+    s.claim_task_fresh(&a.id, "JB-1").unwrap();
     let updated = s
         .edit_member(
             &actor,
@@ -203,7 +204,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
         .unwrap()
         .tasks
     {
-        s.release_task(&actor, &task.key, None).unwrap();
+        s.release_task_fresh(&actor, &task.key, None).unwrap();
     }
     let before = s.export_jam().unwrap();
     assert!(s.reset_jam(&actor, "cozy jam 48").is_err());

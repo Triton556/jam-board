@@ -340,3 +340,145 @@ it("an epic filter does not hide a project-wide Doing-limit warning", async () =
     within(column).getByText("7 / 6 Doing across board · 2 shown"),
   ).toHaveClass("over-wip");
 });
+
+it("quick capture is Backlog-only and cards show readable story context", async () => {
+  const { Wrapper } = wrapper();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  const detail = await mockApi.getTask("JB-7");
+  await waitFor(() =>
+    expect(card).toHaveAccessibleName(
+      expect.stringContaining(detail.story.title),
+    ),
+  );
+  expect(within(card).getByText(detail.story.title)).toHaveAttribute(
+    "title",
+    `${detail.story.key} · ${detail.story.title}`,
+  );
+  expect(screen.getAllByRole("button", { name: /^Add task to / })).toHaveLength(
+    1,
+  );
+  expect(document.querySelectorAll(".column-policy")).toHaveLength(5);
+  expect(
+    screen.getByText("Brief ready · scope permission still required"),
+  ).toBeVisible();
+});
+it("filtered quick capture requires a matching story and keeps its draft visible in that epic", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const story = (await mockApi.getTask("JB-7")).story;
+  const { epic } = await mockApi.getTask("JB-7");
+  render(<Board open={() => {}} epicKeys={[epic.key]} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "A scoped draft");
+  await user.keyboard("{Enter}");
+  expect(
+    mockApi.calls.filter((call) => call.command === "create_task"),
+  ).toHaveLength(0);
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  await user.click(
+    screen.getByRole("option", { name: `${story.key} · ${story.title}` }),
+  );
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect(
+    await screen.findByRole("button", { name: /Open .*A scoped draft/ }),
+  ).toBeVisible();
+  const saved = (await mockApi.listBoardTasks()).backlog.find(
+    (task) => task.title === "A scoped draft",
+  );
+  expect(saved?.storyKey).toBe(story.key);
+  expect(saved?.epicKey).toBe(epic.key);
+});
+it("changing an epic filter retains quick text but cannot reuse a story from another epic", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const { epic, story } = await mockApi.getTask("JB-7");
+  const other = (await mockApi.listEpics()).find((item) => item.id !== epic.id);
+  if (!other) throw new Error("Missing other epic");
+  const view = render(<Board open={() => {}} epicKeys={[epic.key]} />, {
+    wrapper: Wrapper,
+  });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Retain this thought");
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  await user.click(
+    screen.getByRole("option", { name: `${story.key} · ${story.title}` }),
+  );
+  view.rerender(<Board open={() => {}} epicKeys={[other.key]} />);
+  expect(input).toHaveValue("Retain this thought");
+  expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  expect(
+    screen.queryByRole("option", { name: `${story.key} · ${story.title}` }),
+  ).toBeNull();
+  expect(
+    mockApi.calls.filter((call) => call.command === "create_task"),
+  ).toHaveLength(0);
+});
+it("quick-create failure keeps the title and an inline error for retry", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Retain after error");
+  mockApi.failNext("create_task");
+  await user.keyboard("{Enter}");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Simulated failure",
+  );
+  expect(input).toHaveValue("Retain after error");
+  await user.keyboard("{Enter}");
+  expect(
+    await screen.findByRole("button", { name: /Open .*Retain after error/ }),
+  ).toBeVisible();
+});
+
+it("pending quick capture is single-submit, returns focus for the next draft and restores its trigger on close", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const trigger = await screen.findByRole("button", {
+    name: "Add task to Backlog",
+  });
+  await user.click(trigger);
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Only one draft");
+  let resolve: (() => void) | undefined;
+  const gate = new Promise<void>((done) => {
+    resolve = done;
+  });
+  const original = mockApi.createTask.bind(mockApi);
+  const spy = vi
+    .spyOn(mockApi, "createTask")
+    .mockImplementation(async (value) => {
+      await gate;
+      return original(value);
+    });
+  await user.dblClick(screen.getByRole("button", { name: "Add" }));
+  expect(spy).toHaveBeenCalledTimes(1);
+  expect(input).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Cancel new task" }),
+  ).toBeDisabled();
+  await user.keyboard("{Escape}");
+  expect(input).toBeInTheDocument();
+  await act(async () => resolve?.());
+  await waitFor(() => expect(input).toHaveFocus());
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveFocus();
+});

@@ -101,7 +101,7 @@ The app neither bundles nor downloads the playbook. A successful plan precedes a
 
 Frames use cached unfilled rough outlines with paper title tabs. Readable link cards grow to fit content and persist their measured size through the existing geometry debounce. Sizing is disabled for overview placeholders: a camera move must never rewrite stored node geometry. Selecting an item or returning to readable zoom restores content fitting. Connection handles appear on hover, focus, selection or Connect mode.
 
-The desktop and sidecar share release version 0.2.0. NSIS remains an unsigned per-user Windows package; the sidecar is bundled beside the application. Preparing the package does not install it over an existing user's build. Hardware-dependent production performance checks remain local, separate from CI functional checks. End-to-end agent acceptance is recorded separately from successful unit/browser tests and does not follow merely from a packaged executable.
+The desktop and sidecar share the version declared in the workspace, desktop manifest and Tauri config; `scripts/check-versions.mjs` checks those values and both lockfiles. NSIS remains an unsigned per-user Windows package; the sidecar is bundled beside the application. Preparing the package does not install it over an existing user's build. Hardware-dependent production performance checks remain local, separate from CI functional checks. End-to-end agent acceptance is recorded separately from successful unit/browser tests and does not follow merely from a packaged executable.
 
 ## Multiple projects and scoped connections
 
@@ -131,4 +131,34 @@ No execution operation spawns an OS agent process. A human authorizes a story/ep
 
 ### Human claim recovery
 
-The native `release_task` command resolves the human identity and captures the selected project before entering core. `ReleaseClaim` contains the task key and expected `updatedAt`; comparison and release run in the same write transaction. A changed task rejects with `conflict`. The UI only exposes this for In progress work, including unassigned historical rows, and always returns to Backlog. It preserves notes, rounds, reports and archive flags. Release is board-state recovery, not an operating-system cancellation signal. The MCP holder release API has no claim-generation token yet; a later reclaim by the same identity cannot distinguish an older payload from current work.
+The native `release_task` command resolves the human identity and captures the selected project before entering core. `ReleaseClaim` contains the task key and expected `updatedAt`; comparison and release run in the same write transaction. A changed task rejects with `conflict`. The UI only exposes this for In progress work, including unassigned historical rows, and always returns to Backlog. It preserves notes, rounds, reports and archive flags. Release is board-state recovery, not an operating-system cancellation signal. MCP holder release additionally requires its captured claim generation, so a delayed return cannot clear a later same-identity claim.
+
+
+## Work context and review freshness (schema 7)
+
+Task rows persist a nonnegative claim generation. An update trigger advances it
+when status, assignee or review round actually changes; overflow aborts rather
+than reusing a validator. The public opaque value binds generation to immutable
+task identity. Scope Pause/archive and visibility alone do not rotate it. Import
+allocates new identities and does not trust exported validators. Existing live
+claims survive migration but callers must reread their current context.
+
+Covered agent task writes compare caller-captured generation, with `updatedAt`
+CAS additionally required for overwrite/status/claim decisions. Exact required
+arguments and deliberate exclusions are in the [MCP contract](mcp.md#claim-generations-and-stale-decisions-breaking-mcp-change-in-030-alpha5).
+Checks, lifecycle transition and activity append share one immediate transaction.
+The successful claim's response is assembled inside that same transaction, avoiding
+a post-commit response race with a successor claim.
+
+Review binds the immutable current report ID and task/story/epic identities and
+versions, for humans and brains alike. `reviewContextRevision` is null outside
+Review or without a current-round report. The UI retains an inspected snapshot
+rather than replacing its authority on a query refetch. Explicit rereading updates
+visible evidence; comments survive, and obsolete failed-test choices must be
+reconciled. Unsaved task edits block review until saved or discarded. A changed
+context is never automatically inserted into a rejected decision and replayed.
+
+These controls fence accepted board writes, not operating-system processes or
+repository-file writes. They do not prevent an authorized identity from deliberately
+reading new context and issuing a new permitted request. Append-only contributions
+and informational presence are outside this bounded lifecycle mechanism.

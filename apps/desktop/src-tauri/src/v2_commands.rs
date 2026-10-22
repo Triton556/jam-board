@@ -197,7 +197,7 @@ pub async fn update_task_brief(
     app: tauri::AppHandle,
 ) -> Result<TaskDetail, ApiError> {
     execute(&state, app, true, move |s| {
-        s.update_task_brief(&s.current_member()?.id, &input.key, input.patch)
+        s.update_task_brief(&s.current_member()?.id, &input.key, input.patch, None)
     })
     .await
 }
@@ -224,6 +224,7 @@ pub async fn mark_ready(
             &s.current_member()?.id,
             &input.key,
             input.override_reason.as_deref(),
+            None,
         )
     })
     .await

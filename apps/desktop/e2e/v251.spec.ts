@@ -8,6 +8,8 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   const key = await page.evaluate(async () => {
+    // Explicit human fixture action: presence checks do not authorize work.
+    await window.__jamMock.startAllDemoScopes();
     const tasks = await window.__jamMock.listBoardTasks();
     const task = tasks.ready.find((t) => !t.assigneeId);
     if (!task) throw Error("No unassigned Ready fixture");
@@ -96,13 +98,16 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
   await page.keyboard.press("Escape");
   await page.goto("/board");
   await page.waitForFunction(() => !!window.__jamMock);
-  await page.evaluate(async () =>
-    window.__jamMock.simulateAgent({
-      action: "agent.status",
-      agent: "Worker",
-      text: "implementing snow tiles",
-      statusAt: new Date(Date.now() - 42 * 60000).toISOString(),
-    }),
+  await page.evaluate(
+    async (key) =>
+      window.__jamMock.simulateAgent({
+        action: "agent.status",
+        agent: "Worker",
+        scope: { type: "task", id: key },
+        text: "implementing snow tiles",
+        statusAt: new Date(Date.now() - 42 * 60000).toISOString(),
+      }),
+    key,
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
     "data-mode",
@@ -134,6 +139,39 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
     window.__jamMock.simulateAgent({
       action: "agent.status",
       agent: "Worker",
+      text: "planning next steps",
+    }),
+  );
+  await expect(card.getByTestId("working-line")).toHaveText(
+    "Worker · task activity unconfirmed",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await expect(card.locator(".working-ring")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+  await page.evaluate(async () =>
+    window.__jamMock.simulateAgent({
+      action: "agent.status",
+      agent: "Worker",
+      scope: { type: "task", id: "another-task" },
+      text: "checking another brief",
+    }),
+  );
+  await expect(card.getByTestId("working-line")).toHaveText(
+    "Worker · active elsewhere",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await page.evaluate(async () =>
+    window.__jamMock.simulateAgent({
+      action: "agent.status",
+      agent: "Worker",
       text: "",
     }),
   );
@@ -159,7 +197,20 @@ test("reduced motion stays readable and offscreen work animations pause", async 
   const key = await page.evaluate(async () => {
     await window.__jamMock.seedBulk(60);
     await window.__jamMock.seedWorkingPresence(50);
-    return (await window.__jamMock.listBoardTasks()).in_progress.at(-1)?.key;
+    const tasks = (await window.__jamMock.listBoardTasks()).in_progress;
+    const members = await window.__jamMock.listMembers();
+    // Each live worker reports one actual task, not every assigned card.
+    for (const task of tasks.slice(0, 50)) {
+      const member = members.find((member) => member.id === task.assigneeId);
+      if (!member) throw new Error("Missing working fixture member");
+      await window.__jamMock.simulateAgent({
+        action: "agent.status",
+        agent: member.handle,
+        scope: { type: "task", id: task.id },
+        text: "implementing snow tiles",
+      });
+    }
+    return tasks[49]?.key;
   });
   await page.reload();
   await expect(page.getByTestId("task-card")).toHaveCount(82);
@@ -178,7 +229,13 @@ test("reduced motion stays readable and offscreen work animations pause", async 
     "stroke-dashoffset",
     "0px",
   );
-  await expect(card.getByTestId("working-line")).toContainText("is working");
+  await expect(card.getByTestId("working-line")).toContainText(
+    "implementing snow tiles",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "active",
+  );
   await page.goto("/table?sort=key:asc");
   const firstPaintSlot = page.locator(
     '.table-working-layer path[data-mode="active"]',

@@ -461,7 +461,7 @@ impl Store {
                 c,
                 "epics",
                 &old.audit.id,
-                &json!({"updatedBy":actor,"updatedAt":now()}),
+                &json!({"updatedBy":actor,"updatedAt":crate::context::next_version(&old.audit.updated_at)?}),
             )?;
             v2_event(
                 c,
@@ -540,7 +540,7 @@ impl Store {
                 c,
                 "stories",
                 &old.audit.id,
-                &json!({"updatedBy":actor,"updatedAt":now()}),
+                &json!({"updatedBy":actor,"updatedAt":crate::context::next_version(&old.audit.updated_at)?}),
             )?;
             v2_event(
                 c,
@@ -571,7 +571,12 @@ impl Store {
             }
             c.execute(
                 "UPDATE epics SET brain_member_id=?,updated_by=?,updated_at=? WHERE id=?",
-                params![actor, actor, now(), e.audit.id],
+                params![
+                    actor,
+                    actor,
+                    crate::context::next_version(&e.audit.updated_at)?,
+                    e.audit.id
+                ],
             )?;
             v2_event(
                 c,
@@ -600,7 +605,12 @@ impl Store {
             crate::projects::join_member(c, &e.audit.jam_id, &id)?;
             c.execute(
                 "UPDATE epics SET brain_member_id=?,updated_by=?,updated_at=? WHERE id=?",
-                params![id, actor, now(), e.audit.id],
+                params![
+                    id,
+                    actor,
+                    crate::context::next_version(&e.audit.updated_at)?,
+                    e.audit.id
+                ],
             )?;
             v2_event(
                 c,
@@ -625,7 +635,7 @@ impl Store {
         if status=="active"{let missing=[("goalMd",&e.goal_md),("doneWhenMd",&e.done_when_md)].into_iter().filter(|(_,v)|v.trim().is_empty()).map(|(k,_)|k).collect::<Vec<_>>();if !missing.is_empty(){return Err(invalid("epic",&format!("Missing {}",missing.join(", "))));}}
         let incomplete:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM stories WHERE epic_id=? AND archived_at IS NULL AND status!='done')",[&e.audit.id],|r|r.get(0))?;if status=="done"&&incomplete{override_reason(reason)?;}
         if matches!(status,"done"|"archived") || matches!(e.status.as_str(),"done"|"archived") { crate::execution::revoke_scope(c,actor,&ExecutionScope{kind:ExecutionScopeType::Epic,id:e.audit.id.clone()})?; }
-        c.execute("UPDATE epics SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,now(),e.audit.id])?;v2_event(c,actor,Some(&e.audit.id),"epic.status",None,json!({"key":key,"status":[e.status,status],"overrideReason":reason}))?;epic(c,key)
+        c.execute("UPDATE epics SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,crate::context::next_version(&e.audit.updated_at)?,e.audit.id])?;v2_event(c,actor,Some(&e.audit.id),"epic.status",None,json!({"key":key,"status":[e.status,status],"overrideReason":reason}))?;epic(c,key)
     })
     }
     pub fn set_story_status(
@@ -642,7 +652,7 @@ if !s.acceptance.iter().any(|a|a.mandatory){missing.push("acceptance (mandatory)
 if !missing.is_empty(){return Err(invalid("story",&format!("Missing {}",missing.join(", "))));}}
         let incomplete:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM tasks WHERE story_id=? AND archived_at IS NULL AND status!='done')",[&s.audit.id],|r|r.get(0))?;if status=="done"&&incomplete{override_reason(reason)?;}
         if matches!(status,"done"|"archived") || matches!(s.status.as_str(),"done"|"archived") { crate::execution::revoke_scope(c,actor,&ExecutionScope{kind:ExecutionScopeType::Story,id:s.audit.id.clone()})?; }
-        c.execute("UPDATE stories SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,now(),s.audit.id])?;v2_event(c,actor,Some(&s.epic_id),"story.status",None,json!({"key":key,"status":[s.status,status],"overrideReason":reason}))?;story(c,key)
+        c.execute("UPDATE stories SET status=?,archived_at=?,updated_by=?,updated_at=? WHERE id=?",params![status,if status=="archived"{Some(now())}else{None},actor,crate::context::next_version(&s.audit.updated_at)?,s.audit.id])?;v2_event(c,actor,Some(&s.epic_id),"story.status",None,json!({"key":key,"status":[s.status,status],"overrideReason":reason}))?;story(c,key)
     })
     }
     pub fn get_story(&self, key: &str) -> Result<StoryTree> {

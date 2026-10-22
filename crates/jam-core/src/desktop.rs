@@ -175,6 +175,7 @@ impl Store {
             &input.key,
             Some("backlog"),
             Some(&input.expected_updated_at),
+            None,
         )
     }
     pub fn move_current_task(
@@ -184,7 +185,7 @@ impl Store {
         before: Option<&str>,
         after: Option<&str>,
     ) -> Result<TaskSummary> {
-        self.move_task(&self.current_member()?.id, key, status, before, after)
+        self.move_task(&self.current_member()?.id, key, status, before, after, None)
     }
 }
 

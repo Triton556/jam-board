@@ -144,11 +144,12 @@ impl Store {
             &self.current_member()?.id,
             &input.key,
             Some(&input.expected_updated_at),
+            None,
             input.patch,
         )
     }
     pub fn archive_current_task(&self, key: &str, reason: Option<&str>) -> Result<TaskSummary> {
-        self.archive_task(&self.current_member()?.id, key, reason)
+        self.archive_task(&self.current_member()?.id, key, reason, None)
     }
     pub fn unarchive_current_task(&self, key: &str) -> Result<TaskSummary> {
         self.unarchive_task(&self.current_member()?.id, key)

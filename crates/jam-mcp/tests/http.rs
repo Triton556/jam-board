@@ -338,7 +338,15 @@ async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence
     .serve(transport)
     .await
     .unwrap();
-    let call = |name: &'static str, args: serde_json::Value| {
+    // Legacy workflow checks explicitly observe the pinned project immediately.
+    let call = |name: &'static str, mut args: serde_json::Value| {
+        if ["claim_task", "submit_report"].contains(&name) {
+            let observed = pinned.get_task(args["key"].as_str().unwrap()).unwrap();
+            args["expectedClaimGeneration"] = serde_json::json!(observed.task.claim_generation);
+            if name == "claim_task" {
+                args["expectedUpdatedAt"] = serde_json::json!(observed.task.updated_at);
+            }
+        }
         CallToolRequestParams::new(name).with_arguments(args.as_object().unwrap().clone())
     };
     client
@@ -419,6 +427,19 @@ async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence
         .review_task(
             &human.id,
             ReviewTask {
+                expected_report_id: pinned
+                    .get_task(&task.task.key)
+                    .unwrap()
+                    .reports
+                    .last()
+                    .unwrap()
+                    .id
+                    .clone(),
+                expected_review_context_revision: pinned
+                    .get_task(&task.task.key)
+                    .unwrap()
+                    .review_context_revision
+                    .unwrap(),
                 key: task.task.key.clone(),
                 verdict: "changes_requested".into(),
                 comments_md: "Another round".into(),
@@ -436,6 +457,175 @@ async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence
     );
     assert_eq!(store.get_project().unwrap().tasks, 0);
     assert_eq!(pinned.get_task(&task.task.key).unwrap().reports.len(), 1);
+    client.cancel().await.unwrap();
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn http_rejects_old_generation_after_same_identity_reclaim_and_never_fills_missing_context() {
+    use jam_core::*;
+    use serde_json::json;
+    let d = tempfile::tempdir().unwrap();
+    let s = Arc::new(Store::open(d.path().join("http-context.db")).unwrap());
+    let (_, h) = s
+        .create_jam("HTTP context", None, None, None, "UTC", "Human")
+        .unwrap();
+    let e = s
+        .create_epic(
+            &h.id,
+            NewEpic {
+                title: "Epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let story = s
+        .create_story(
+            &h.id,
+            NewStory {
+                epic_key: e.key,
+                title: "Story".into(),
+                outcome_md: Some("Outcome".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "a".into(),
+                    criterion: "Correct".into(),
+                    mandatory: true,
+                    check: "Tests".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    s.set_story_status(&h.id, &story.key, "active", None)
+        .unwrap();
+    let scope = ExecutionScope {
+        kind: ExecutionScopeType::Story,
+        id: story.audit.id.clone(),
+    };
+    s.set_execution(
+        &h.id,
+        SetExecution {
+            expected_revision: s.get_execution(&scope).unwrap().revision,
+            scope: scope.clone(),
+            action: ExecutionAction::Start,
+        },
+    )
+    .unwrap();
+    let task = s
+        .create_task(
+            &h.id,
+            CreateTask {
+                title: "Task".into(),
+                story_key: Some(story.key),
+                status: Some("ready".into()),
+                brief: TaskBrief {
+                    goal_md: "Goal".into(),
+                    where_md: "src/feature".into(),
+                    changes: vec![Change {
+                        title: "Change".into(),
+                        required: "Correct".into(),
+                        ..Default::default()
+                    }],
+                    tests: vec![BriefTest {
+                        setup: "Run check".into(),
+                        expected: "Pass".into(),
+                    }],
+                    result_md: "Report".into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        s.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Agent", "HTTP context worker".parse().unwrap());
+    headers.insert("X-Jam-Project", task.task.jam_id.parse().unwrap());
+    let transport = StreamableHttpClientTransport::with_client(
+        reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap(),
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-context", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    let call = |name: &'static str, args: serde_json::Value| {
+        CallToolRequestParams::new(name).with_arguments(args.as_object().unwrap().clone())
+    };
+    let denied = client
+        .call_tool(call("claim_task", json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(denied.structured_content.unwrap()["code"], "validation");
+    let claimed=client.call_tool(call("claim_task",json!({"key":task.task.key,"expectedClaimGeneration":task.task.claim_generation,"expectedUpdatedAt":task.task.updated_at}))).await.unwrap();
+    assert_ne!(claimed.is_error, Some(true));
+    let claimed = claimed.structured_content.unwrap();
+    s.release_current_task(ReleaseClaim {
+        key: task.task.key.clone(),
+        expected_updated_at: claimed["updatedAt"].as_str().unwrap().into(),
+    })
+    .unwrap();
+    s.mark_ready(&h.id, &task.task.key, None, None).unwrap();
+    let observed = s.get_task(&task.task.key).unwrap();
+    let reclaimed=client.call_tool(call("claim_task",json!({"key":task.task.key,"expectedClaimGeneration":observed.task.claim_generation,"expectedUpdatedAt":observed.task.updated_at}))).await.unwrap();
+    assert_ne!(reclaimed.is_error, Some(true));
+    let reclaimed = reclaimed.structured_content.unwrap();
+    let before = serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap();
+    let seq = s.latest_seq().unwrap();
+    for (name, args) in [
+        (
+            "submit_report",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"],"summaryMd":"Delayed old report","changedFiles":[],"tests":[]}),
+        ),
+        (
+            "release_task",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"]}),
+        ),
+        (
+            "update_task_brief",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"],"expectedUpdatedAt":claimed["updatedAt"],"goalMd":"Delayed overwrite"}),
+        ),
+    ] {
+        let result = client.call_tool(call(name, args)).await.unwrap();
+        assert_eq!(
+            result.structured_content.unwrap()["code"],
+            "stale_claim",
+            "{name}"
+        );
+    }
+    assert_eq!(s.latest_seq().unwrap(), seq);
+    assert_eq!(
+        serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap(),
+        before
+    );
+    s.set_execution(
+        &h.id,
+        SetExecution {
+            expected_revision: s.get_execution(&scope).unwrap().revision,
+            scope,
+            action: ExecutionAction::Pause,
+        },
+    )
+    .unwrap();
+    let report=client.call_tool(call("submit_report",json!({"key":task.task.key,"expectedClaimGeneration":reclaimed["claimGeneration"],"summaryMd":"Current evidence after Pause","changedFiles":[],"tests":[]}))).await.unwrap();
+    assert_ne!(report.is_error, Some(true));
     client.cancel().await.unwrap();
     server.stop().await;
 }

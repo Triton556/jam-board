@@ -24,9 +24,14 @@ import { Plus, X } from "lucide-react";
 import { LayoutGroup } from "motion/react";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Button, EmptyState, IconButton } from "../../components/ui";
+import { Button, IconButton } from "../../components/ui";
 import { RoughLine } from "../../components/ui/RoughLine";
 import { api } from "../../lib/api";
+import {
+  epicsQuery,
+  invalidatePlanning,
+  storiesQuery,
+} from "../../lib/planning-queries";
 import {
   membersQuery,
   moveInput,
@@ -38,38 +43,75 @@ import {
 import type { ColorBy, Member, Status, TaskSummary } from "../../lib/types";
 import { emptyBoard, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { StoryPicker } from "../plan/PlanningControls";
 import { TaskCard } from "./TaskCard";
 
-function QuickCreate({ status }: { status: Status }) {
+function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
   const [title, setTitle] = useState("");
+  const [storyKey, setStoryKey] = useState("");
+  const stories = useQuery(storiesQuery),
+    epics = useQuery(epicsQuery);
+  const filtered = epicKeys.length > 0;
+  const allowedEpicIds = new Set(
+    (epics.data ?? [])
+      .filter((epic) => epicKeys.includes(epic.key))
+      .map((epic) => epic.id),
+  );
+  const selectedStory = stories.data?.find(
+    (story) =>
+      filtered && story.key === storyKey && allowedEpicIds.has(story.epicId),
+  );
+  const canAdd = !!title.trim() && (!filtered || !!selectedStory);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const opener = useRef(
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   useEffect(() => {
     ref.current?.focus();
+    return () => {
+      if (opener.current?.isConnected && opener.current !== document.body)
+        opener.current.focus();
+      else
+        document
+          .querySelector<HTMLElement>('[aria-label="Add task to Backlog"]')
+          ?.focus();
+    };
   }, []);
   const client = useQueryClient();
   const create = useMutation({
-    mutationFn: () => api.createTask({ title: title.trim(), status }),
+    mutationFn: () =>
+      api.createTask({
+        title: title.trim(),
+        status: "backlog",
+        storyKey: selectedStory?.key,
+      }),
     onSuccess: () => {
       setTitle("");
-      void client.invalidateQueries({ queryKey: ["boardTasks"] });
+      invalidatePlanning(client);
       ref.current?.focus();
     },
     onError: (error) => useUiStore.getState().error(error.message),
   });
+  useEffect(() => {
+    if (create.isSuccess && !create.isPending) ref.current?.focus();
+  }, [create.isSuccess, create.isPending]);
   function keydown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !create.isPending) {
       event.preventDefault();
       useUiStore.getState().setQuickColumn(null);
     }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (title.trim() && !create.isPending) create.mutate();
+      if (canAdd && !create.isPending) create.mutate();
     }
   }
   return (
     <div className="quick-create">
       <textarea
-        aria-label={`New task in ${labels[status]}`}
+        aria-label="New task in Backlog"
+        disabled={create.isPending}
         placeholder="What needs making?"
         maxLength={140}
         ref={ref}
@@ -77,16 +119,39 @@ function QuickCreate({ status }: { status: Status }) {
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={keydown}
       />
-      <div>
+      {filtered && (
+        <div className="quick-create-story">
+          <StoryPicker
+            label="Story for new draft"
+            value={selectedStory?.key ?? ""}
+            onChange={setStoryKey}
+            epicKeys={epicKeys}
+            disabled={create.isPending}
+          />
+          <p className="small muted">
+            Choose a story in the selected epics so your draft stays visible.
+            Need one? Create it in Plan.
+          </p>
+        </div>
+      )}
+      {!filtered && (
+        <p className="small muted">
+          Saved as a draft in Unplanned work. Add context and a story before
+          Ready.
+        </p>
+      )}
+      {create.error && <p role="alert">{create.error.message}</p>}
+      <div className="quick-create-actions">
         <span>Enter to add · Esc to close</span>
         <Button
-          disabled={!title.trim() || create.isPending}
+          disabled={!canAdd || create.isPending}
           onClick={() => create.mutate()}
         >
-          Add
+          {create.isPending ? "Adding…" : "Add"}
         </Button>
         <IconButton
           label="Cancel new task"
+          disabled={create.isPending}
           onClick={() => useUiStore.getState().setQuickColumn(null)}
         >
           <X size={16} />
@@ -98,10 +163,12 @@ function QuickCreate({ status }: { status: Status }) {
 function SortableCard({
   task,
   members,
+  storyTitle,
   open,
 }: {
   task: TaskSummary;
   members: Member[];
+  storyTitle?: string;
   open(key: string): void;
 }) {
   const { settings } = useBoardSettings();
@@ -127,7 +194,7 @@ function SortableCard({
       }}
       {...attributes}
       {...listeners}
-      aria-label={`Open ${task.key}: ${task.title}`}
+      aria-label={`Open ${task.key}: ${task.title}${storyTitle ? ` · Story: ${storyTitle}` : ""}`}
       onClick={(event) => {
         event.currentTarget.focus();
         open(task.key);
@@ -135,6 +202,7 @@ function SortableCard({
     >
       <TaskCard
         task={task}
+        storyTitle={storyTitle}
         members={members}
         colorBy={settings?.colorBy as ColorBy}
         estimatesEnabled={settings?.estimatesEnabled}
@@ -148,12 +216,16 @@ function Column({
   tasks,
   totalCount,
   members,
+  storyTitles,
+  epicKeys,
   open,
 }: {
   status: Status;
   tasks: TaskSummary[];
   totalCount: number;
   members: Member[];
+  storyTitles: Map<string, string>;
+  epicKeys: string[];
   open(key: string): void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -161,7 +233,9 @@ function Column({
     data: { status, column: true },
   });
   const { settings } = useBoardSettings();
-  const quick = useUiStore((s) => s.quickColumn === status);
+  const quick = useUiStore(
+    (s) => status === "backlog" && s.quickColumn === status,
+  );
   return (
     <section
       className={`board-column ${isOver ? "drop-over" : ""}`}
@@ -176,22 +250,33 @@ function Column({
         >
           {tasks.length}
         </span>
-        <IconButton
-          label={`Add task to ${labels[status]}`}
-          onClick={() => useUiStore.getState().setQuickColumn(status)}
-        >
-          <Plus size={17} />
-        </IconButton>
+        {status === "backlog" && (
+          <IconButton
+            label={`Add task to ${labels[status]}`}
+            onClick={() => useUiStore.getState().setQuickColumn(status)}
+          >
+            <Plus size={17} />
+          </IconButton>
+        )}
         <RoughLine color={`var(--st-${status})`} />
       </header>
-      {status === "in_progress" && (
-        <p
-          className={`column-policy ${totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
-        >
-          {totalCount} / {settings?.wipLimit ?? 6} Doing across board
-          {tasks.length !== totalCount && ` · ${tasks.length} shown`}
-        </p>
-      )}
+      <p
+        className={`column-policy ${status === "in_progress" && totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
+      >
+        {status === "in_progress" ? (
+          <>
+            {totalCount} / {settings?.wipLimit ?? 6} Doing across board
+            {tasks.length !== totalCount && ` · ${tasks.length} shown`}
+          </>
+        ) : (
+          {
+            backlog: "Draft ideas · refine before Ready",
+            ready: "Brief ready · scope permission still required",
+            review: "Reports awaiting independent review",
+            done: "Reviewed or manually completed",
+          }[status]
+        )}
+      </p>
       <div className="column-cards">
         <SortableContext
           items={tasks.map((t) => t.key)}
@@ -201,22 +286,41 @@ function Column({
             <SortableCard
               key={task.key}
               task={task}
+              storyTitle={storyTitles.get(task.storyKey ?? "")}
               members={members}
               open={open}
             />
           ))}
         </SortableContext>
-        {quick && <QuickCreate status={status} />}
-        {tasks.length === 0 && !quick && <EmptyState />}
+        {quick && <QuickCreate epicKeys={epicKeys} />}
+        {tasks.length === 0 && !quick && (
+          <p className="column-empty">
+            {epicKeys.length && totalCount
+              ? "No matching tasks. Other epics have work in this column."
+              : {
+                  backlog:
+                    "Capture an idea here, then add context with your brain.",
+                  ready:
+                    "Refined tasks will wait here until their story or epic allows work.",
+                  in_progress:
+                    "Claimed work appears here. Starting a scope permits claims; it does not launch a worker.",
+                  review:
+                    "Worker reports arrive here for acceptance or another round.",
+                  done: "Accepted results and manually completed tasks collect here.",
+                }[status]}
+          </p>
+        )}
         {isOver && <RoughLine frame />}
       </div>
-      <button
-        type="button"
-        className="column-add"
-        onClick={() => useUiStore.getState().setQuickColumn(status)}
-      >
-        <Plus size={15} /> Add task
-      </button>
+      {status === "backlog" && (
+        <button
+          type="button"
+          className="column-add"
+          onClick={() => useUiStore.getState().setQuickColumn(status)}
+        >
+          <Plus size={15} /> Add draft
+        </button>
+      )}
     </section>
   );
 }
@@ -230,6 +334,10 @@ export function Board({
   const { settings } = useBoardSettings();
   const tasks = useQuery(tasksQuery);
   const members = useQuery(membersQuery);
+  const stories = useQuery(storiesQuery);
+  const storyTitles = new Map(
+    (stories.data ?? []).map((story) => [story.key, story.title]),
+  );
   const move = useMoveTask();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const source = tasks.data ?? emptyBoard();
@@ -414,6 +522,8 @@ export function Board({
                 status={status}
                 tasks={board[status]}
                 totalCount={source[status].length}
+                storyTitles={storyTitles}
+                epicKeys={epicKeys}
                 members={members.data ?? []}
                 open={open}
               />
@@ -425,6 +535,7 @@ export function Board({
             <div className="drag-overlay">
               <TaskCard
                 task={active}
+                storyTitle={storyTitles.get(active.storyKey ?? "")}
                 members={members.data ?? []}
                 overlay
                 colorBy={settings?.colorBy as ColorBy}

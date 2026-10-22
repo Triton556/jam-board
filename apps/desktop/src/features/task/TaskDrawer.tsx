@@ -593,7 +593,11 @@ export function TaskEditor({
           )}
         </fieldset>
       </form>
-      <Rounds task={task} members={members.data ?? []} />
+      <Rounds
+        task={task}
+        members={members.data ?? []}
+        hasUnsavedEdits={isDirty}
+      />
       {(task.ancestorQuestions?.length ?? 0) > 0 && (
         <details className="task-section">
           <summary>Open questions above this task</summary>

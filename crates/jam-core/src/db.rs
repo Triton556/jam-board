@@ -69,6 +69,7 @@ impl Store {
             ),
             rusqlite_migration::M::up(include_str!("migration_v5.sql")),
             rusqlite_migration::M::up(include_str!("migration_v6.sql")),
+            rusqlite_migration::M::up(include_str!("migration_v7.sql")),
         ]);
         writer.pragma_update(None, "foreign_keys", "OFF")?;
         let migrated = migrations.to_latest(&mut writer);

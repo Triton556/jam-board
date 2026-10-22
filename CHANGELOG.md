@@ -3,6 +3,64 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.5] - 2026-10-21
+
+### Added
+
+- Persisted task claim generations prevent delayed report/release/status/edit
+  requests from changing a later claim, even when the same agent reclaims it.
+  Schema 7 preserves existing work and history without granting execution.
+- Exact report + task/story/epic review-context checks for human and brain review.
+  Reports & review freezes the snapshot being inspected; changed evidence requires
+  explicit rereading instead of silently accepting a newer report or criteria.
+- Review reconciliation keeps comments and selected failed tests. Obsolete test
+  choices remain visible until reconciled; refreshed evidence receives logical focus.
+- Source-token contrast regressions cover both themes, normal-size text, action
+  buttons and all six palette-tinted card backgrounds.
+
+### Changed
+
+- **Breaking MCP request schema:** covered agent task mutations now require caller-
+  captured claim and/or task versions; review requires exact report/context IDs.
+  Missing or stale validators fail closed. Refresh tool schemas after upgrading,
+  reread the task and reconcile drafts; never refill context and blindly retry.
+  Tool names/count and read APIs remain unchanged. See `docs/mcp.md` for the matrix.
+- Native human release keeps its confirmation CAS; native reports/reviews require
+  captured context. Validators are freshness checks, not credentials, time leases,
+  execution grants, process termination or external filesystem fencing.
+- Cards show readable Story titles with the key retained in their full context.
+  Epic Overview prioritizes Goal and Done when before optional References; Brain
+  has a visible label and repeated header instructions use less vertical space.
+- All board columns have aligned policy rows and contextual empty states. Quick
+  capture creates Backlog drafts only. With epic filters, it requires a matching
+  Story so a new draft cannot silently disappear into a different epic.
+- Improved faint/error text in both themes and dark tinted-card readability while
+  retaining the paper palette and task-scoped ring/pencil/handwritten animations.
+
+### Fixed
+
+- A successful claim returns its accepted generation inside the writer transaction,
+  rather than accidentally returning a successor claim from a later read.
+- Unsaved task edits cannot be skipped by accepting a report against older saved
+  criteria. Failed/racing reviews keep the captured context and human draft.
+- Quick capture retains failed titles, suppresses duplicate pending submissions
+  and restores keyboard focus for the next draft or back to its trigger.
+- Mock review context stays compact across 2,000-task persistence; targeted
+  synchronization avoids an all-task loop on each creation.
+- Browser scenarios now explicitly authorize synthetic worker fixtures and assert
+  visible compact Plan navigation and honest task-scoped presence. The four old
+  alpha3 CI expectations are replaced without disabling their interaction coverage.
+
+### Compatibility and verification
+
+- Old database/snapshot imports remain supported; imported validators are not
+  authority. Active migrated holders can reread and report while paused.
+- Append-only comments/questions/references, informational presence ordering and
+  general epic/story edit CAS are explicit limits, not claimed as fenced here.
+- Full automated checks and exact native alpha3 acceptance are recorded separately
+  in versioned verification notes. Alpha5 native rebuild and independent review
+  are pending at commit time; no Windows runtime or clean-distro claim is made.
+
 ## [0.3.0-alpha.4] - 2026-10-21
 
 ### Added

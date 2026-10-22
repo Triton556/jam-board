@@ -26,12 +26,14 @@ const icons = {
 export function TaskCard({
   task,
   members,
+  storyTitle,
   overlay = false,
   colorBy = "none",
   estimatesEnabled = false,
 }: {
   task: TaskSummary;
   members: Member[];
+  storyTitle?: string;
   overlay?: boolean;
   colorBy?: ColorBy;
   estimatesEnabled?: boolean;
@@ -93,7 +95,12 @@ export function TaskCard({
         </div>
         <div className="card-hierarchy">
           <i style={{ background: `var(--${task.epicColor ?? "m1"})` }} />
-          <span>{task.storyKey}</span>
+          <span
+            className="card-story-title"
+            title={[task.storyKey, storyTitle].filter(Boolean).join(" · ")}
+          >
+            {storyTitle ?? task.storyKey ?? "Unplanned work"}
+          </span>
         </div>
         <div className="card-title">{task.title}</div>
         {(task.changesRequested || task.needsInfo) && (

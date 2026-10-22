@@ -184,7 +184,7 @@ export type AnswerQuestion = {
 
 export type ApiError = ApiError_Serialize | ApiError_Deserialize;
 
-export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
+export type ApiErrorCode = "not_found" | "claim_conflict" | "stale_claim" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
 
 export type ApiError_Deserialize = {
 	code: ApiErrorCode,
@@ -954,6 +954,8 @@ export type Review = {
 
 export type ReviewTask = {
 	key: string,
+	expectedReportId: string,
+	expectedReviewContextRevision: string,
 	verdict: string,
 	commentsMd: string,
 	failedTests: string[] | null,
@@ -1074,6 +1076,7 @@ export type StoryTree = {
 
 export type SubmitReport = {
 	key: string,
+	expectedClaimGeneration: string,
 	summaryMd: string,
 	changedFiles: string[],
 	tests: ReportTest[],
@@ -1105,6 +1108,8 @@ export type TaskDetail_Deserialize = {
 	activity: ActivityEvent_Deserialize[],
 	history: ActivityEvent_Deserialize[],
 	brief: TaskBrief,
+	/**  Binds the current report to the task, story and epic versions reviewed. */
+	reviewContextRevision?: string | null,
 	ancestorQuestions?: Question[],
 	story: Story,
 	epic: Epic,
@@ -1119,6 +1124,8 @@ export type TaskDetail_Serialize = {
 	activity: ActivityEvent_Serialize[],
 	history: ActivityEvent_Serialize[],
 	brief: TaskBrief,
+	/**  Binds the current report to the task, story and epic versions reviewed. */
+	reviewContextRevision: string | null,
 	ancestorQuestions: Question[],
 	story: Story,
 	epic: Epic,
@@ -1223,6 +1230,8 @@ export type TaskSummary = {
 	changesRequested?: boolean,
 	needsInfo?: boolean,
 	reviewRound?: number,
+	/**  Opaque, task-bound lifecycle validator. Read again after a successful mutation. */
+	claimGeneration?: string,
 };
 
 /* Tauri Specta runtime */

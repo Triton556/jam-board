@@ -275,6 +275,7 @@ impl Store {
                 &codex.id,
                 SubmitReport {
                     key: keys[index].clone(),
+                    expected_claim_generation: self.get_task(&keys[index])?.task.claim_generation,
                     summary_md: if index == 6 {
                         "The pickup effect exists, but repeated input spawns a second burst."
                     } else {
@@ -303,7 +304,8 @@ impl Store {
                 },
             )?;
         }
-        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),verdict:"changes_requested".into(),comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
+        let observed = self.get_task(&keys[6])?;
+        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),expected_report_id:observed.reports.last().unwrap().id.clone(),expected_review_context_revision:observed.review_context_revision.unwrap(),verdict:"changes_requested".into(),comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
         self.ask_user(&claude.id,AskUser{scope:Scope{kind:"epic".into(),id:lantern.key.clone()},title:"Should the safe tile cue stay steady?".into(),body_md:Some("A steady outline works without motion. A pulse needs an equivalent reduced-motion cue.".into()),options:Some(vec![QuestionOption{label:"Steady outline".into(),description:"Readable without movement; the smaller change.".into()},QuestionOption{label:"Gentle pulse".into(),description:"Adds motion with a steady fallback.".into()}]),recommended_index:Some(0),allow_free_text:Some(true),round_label:Some("Round 2".into())})?;
         self.ask_user(
             &codex.id,

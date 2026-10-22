@@ -17,9 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.4**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.5**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.4.md).
+> Upgrading an MCP connection: refresh its tool schemas and reread task context;
+> alpha5 intentionally requires captured validators on task writes and reviews.
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.5.md).
 
 ## Features
 
@@ -28,7 +30,7 @@ Snowball dogfood recording in the real desktop app: a brain agent asks questions
 - 🤖 MCP over stdio and authenticated loopback HTTP: project-pinned sessions, hierarchy resources, planning/work/review prompts and `wait_for_changes`.
 - ✨ Live agent changes, with a colored highlight and a toast.
 - 🔎 A virtual table tested with 2,000 tasks, with sortable columns and shareable URL filters.
-- 🤝 Conflict-safe editing that preserves your draft when an agent changes the same task.
+- 🤝 Conflict-safe editing, claim-generation fencing and exact-report review that preserve drafts when the task or its acceptance context changes.
 - 🎨 A References canvas, local media, team presence and an epic journal.
 - 💾 Local SQLite storage. No cloud, accounts or telemetry. JSON export/import and non-destructive archives.
 - 🌙 Light and dark paper themes, self-hosted fonts and optional paper-rustle sounds.

@@ -41,6 +41,7 @@ fn domain_errors_keep_the_public_command_contract() {
         ),
         (Error::Archived("JB-1".into()), "archived"),
         (Error::Conflict, "conflict"),
+        (Error::StaleClaim, "stale_claim"),
         (Error::Io(std::io::Error::other("Unavailable")), "internal"),
     ] {
         let result = serde_json::to_value(ApiError::from(error)).unwrap();

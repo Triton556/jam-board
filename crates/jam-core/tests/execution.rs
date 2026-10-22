@@ -1,4 +1,6 @@
+mod support;
 use jam_core::*;
+use support::FreshContext;
 
 struct Fixture {
     _dir: tempfile::TempDir,
@@ -115,6 +117,7 @@ fn input(story: &Story) -> CreateTask {
 }
 fn report(key: &str) -> SubmitReport {
     SubmitReport {
+        expected_claim_generation: String::new(),
         key: key.into(),
         summary_md: "Implemented with evidence".into(),
         changed_files: vec!["src/feature".into()],
@@ -193,14 +196,14 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
     assert!(t.task.ready);
     for actor in [&f.human, &f.brain, &f.worker] {
         assert!(matches!(
-            s.claim_task(&actor.id, &t.task.key),
+            s.claim_task_fresh(&actor.id, &t.task.key),
             Err(Error::ExecutionRequired(_))
         ));
     }
     let before = s.latest_seq().unwrap();
     for actor in [&f.human, &f.brain] {
         assert!(matches!(
-            s.move_task_with_override(
+            s.move_task_with_override_fresh(
                 &actor.id,
                 &t.task.key,
                 "in_progress",
@@ -229,7 +232,7 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
         Err(Error::ExecutionRequired(_))
     ));
     assert!(matches!(
-        s.release_task(&f.human.id, &t.task.key, Some("in_progress")),
+        s.release_task_fresh(&f.human.id, &t.task.key, Some("in_progress")),
         Err(Error::ExecutionRequired(_))
     ));
     assert_eq!(s.latest_seq().unwrap(), before);
@@ -245,7 +248,7 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
         Err(Error::Forbidden(_))
     ));
     change(s, &f.human, story(&f.story), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &t.task.key).unwrap();
+    s.claim_task_fresh(&f.worker.id, &t.task.key).unwrap();
     change(s, &f.human, story(&f.story), ExecutionAction::Pause);
     assert!(matches!(
         s.assign_task(&f.human.id, &t.task.key, Some(&f.brain.id)),
@@ -263,12 +266,15 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
         }),
         Err(Error::ExecutionRequired(_))
     ));
-    s.move_task(&f.worker.id, &t.task.key, "in_progress", None, None)
+    s.move_task_fresh(&f.worker.id, &t.task.key, "in_progress", None, None)
         .unwrap();
-    s.submit_report(&f.worker.id, report(&t.task.key)).unwrap();
-    s.review_task(
+    s.submit_report_fresh(&f.worker.id, report(&t.task.key))
+        .unwrap();
+    s.review_task_fresh(
         &f.brain.id,
         ReviewTask {
+            expected_report_id: String::new(),
+            expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
             verdict: "changes_requested".into(),
             comments_md: "One more check".into(),
@@ -277,12 +283,13 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
     )
     .unwrap();
     assert!(matches!(
-        s.claim_task(&f.worker.id, &t.task.key),
+        s.claim_task_fresh(&f.worker.id, &t.task.key),
         Err(Error::ExecutionRequired(_))
     ));
     change(s, &f.human, story(&f.story), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &t.task.key).unwrap();
-    s.submit_report(&f.worker.id, report(&t.task.key)).unwrap();
+    s.claim_task_fresh(&f.worker.id, &t.task.key).unwrap();
+    s.submit_report_fresh(&f.worker.id, report(&t.task.key))
+        .unwrap();
     assert_eq!(s.get_task(&t.task.key).unwrap().reports.len(), 2);
 }
 #[test]
@@ -401,17 +408,20 @@ fn close_reopen_and_archive_restore_never_resurrect_authority_or_drop_reports() 
     let scope = story(&f.story);
     let t = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(s, &f.human, e.clone(), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &t.task.key).unwrap();
+    s.claim_task_fresh(&f.worker.id, &t.task.key).unwrap();
     s.set_story_status(&f.human.id, &f.story.key, "archived", None)
         .unwrap();
-    s.submit_report(&f.worker.id, report(&t.task.key)).unwrap();
+    s.submit_report_fresh(&f.worker.id, report(&t.task.key))
+        .unwrap();
     s.set_story_status(&f.human.id, &f.story.key, "active", None)
         .unwrap();
     assert!(running(s, &e));
     assert!(!running(s, &scope));
-    s.review_task(
+    s.review_task_fresh(
         &f.brain.id,
         ReviewTask {
+            expected_report_id: String::new(),
+            expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
             verdict: "accept".into(),
             comments_md: "Accepted".into(),
@@ -458,18 +468,19 @@ fn migration_adds_no_grant_but_existing_worker_may_submit_evidence() {
     let s = f.store;
     let t = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(&s, &f.human, story(&f.story), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &t.task.key).unwrap();
+    s.claim_task_fresh(&f.worker.id, &t.task.key).unwrap();
     let path = s.path.clone();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
     c.execute_batch(
-        "DROP TABLE execution_requests;DROP TABLE execution_states;PRAGMA user_version=5;",
+        "DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests;DROP TABLE execution_states;PRAGMA user_version=5;",
     )
     .unwrap();
     drop(c);
     let s = Store::open(&path).unwrap();
     assert!(!running(&s, &story(&f.story)));
-    s.submit_report(&f.worker.id, report(&t.task.key)).unwrap();
+    s.submit_report_fresh(&f.worker.id, report(&t.task.key))
+        .unwrap();
     assert_eq!(s.get_task(&t.task.key).unwrap().reports.len(), 1);
 }
 
@@ -544,22 +555,23 @@ fn pause_and_claim_serialize_and_visibility_restore_does_not_resume_work() {
     let sync = barrier.clone();
     let claim = std::thread::spawn(move || {
         sync.wait();
-        copy.claim_task(&worker, &key)
+        copy.claim_task_fresh(&worker, &key)
     });
     barrier.wait();
     change(&s, &f.human, scope.clone(), ExecutionAction::Pause);
     let result = claim.join().unwrap();
     assert!(result.is_ok() || matches!(result, Err(Error::ExecutionRequired(_))));
     assert!(matches!(
-        s.claim_task(&f.worker.id, &second.task.key),
+        s.claim_task_fresh(&f.worker.id, &second.task.key),
         Err(Error::ExecutionRequired(_))
     ));
     if s.get_task(&t.task.key).unwrap().task.status != "in_progress" {
         change(&s, &f.human, scope.clone(), ExecutionAction::Start);
-        s.claim_task(&f.worker.id, &t.task.key).unwrap();
+        s.claim_task_fresh(&f.worker.id, &t.task.key).unwrap();
         change(&s, &f.human, scope.clone(), ExecutionAction::Pause);
     }
-    s.archive_task(&f.human.id, &t.task.key, None).unwrap();
+    s.archive_task_fresh(&f.human.id, &t.task.key, None)
+        .unwrap();
     let before = s.get_task(&t.task.key).unwrap().task;
     let restored = s.unarchive_task(&f.human.id, &t.task.key).unwrap();
     assert_eq!(restored.status, before.status);
@@ -571,16 +583,18 @@ fn pause_and_claim_serialize_and_visibility_restore_does_not_resume_work() {
         Err(Error::ExecutionRequired(_))
     ));
     // Restoring visibility permits cancellation without authorizing any new work.
-    let released = s.release_task(&f.worker.id, &t.task.key, None).unwrap();
+    let released = s
+        .release_task_fresh(&f.worker.id, &t.task.key, None)
+        .unwrap();
     assert_eq!(released.status, "backlog");
     assert!(released.assignee_id.is_none());
     assert!(!running(&s, &scope));
     assert!(matches!(
-        s.claim_task(&f.worker.id, &t.task.key),
+        s.claim_task_fresh(&f.worker.id, &t.task.key),
         Err(Error::ExecutionRequired(_))
     ));
     assert!(matches!(
-        s.move_task(&f.human.id, &t.task.key, "in_progress", None, None),
+        s.move_task_fresh(&f.human.id, &t.task.key, "in_progress", None, None),
         Err(Error::ExecutionRequired(_))
     ));
 }
@@ -602,14 +616,14 @@ fn demo_and_draft_starts_do_not_implicitly_authorize_claims() {
     let mut create = input(&draft);
     create.status = Some("backlog".into());
     let task = s.create_task(&f.human.id, create).unwrap();
-    s.mark_ready(
+    s.mark_ready_fresh(
         &f.human.id,
         &task.task.key,
         Some("Brief approved, intent still in draft"),
     )
     .unwrap();
     assert!(matches!(
-        s.claim_task(&f.worker.id, &task.task.key),
+        s.claim_task_fresh(&f.worker.id, &task.task.key),
         Err(Error::NotReady(_))
     ));
     s.seed_demo().unwrap();
@@ -640,9 +654,10 @@ fn archived_in_progress_still_blocks_project_archive_until_evidence_arrives() {
     let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
     let scope = story(&f.story);
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &task.task.key).unwrap();
+    s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Pause);
-    s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+    s.archive_task_fresh(&f.human.id, &task.task.key, None)
+        .unwrap();
     let project = s.active_jam().unwrap();
     assert_eq!(s.list_projects(false).unwrap()[0].in_progress_count, 1);
     assert_eq!(s.get_execution(&scope).unwrap().in_progress_count, 1);
@@ -656,7 +671,7 @@ fn archived_in_progress_still_blocks_project_archive_until_evidence_arrives() {
         "in_progress"
     );
     assert_eq!(s.active_jam().unwrap().id, project.id);
-    s.submit_report(&f.worker.id, report(&task.task.key))
+    s.submit_report_fresh(&f.worker.id, report(&task.task.key))
         .unwrap();
     assert_eq!(s.list_projects(false).unwrap()[0].in_progress_count, 0);
     assert_eq!(s.get_execution(&scope).unwrap().in_progress_count, 0);
@@ -857,15 +872,18 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
     let scope = story(&f.story);
     let t = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    s.claim_task(&f.brain.id, &t.task.key).unwrap();
-    s.submit_report(&f.brain.id, report(&t.task.key)).unwrap();
+    s.claim_task_fresh(&f.brain.id, &t.task.key).unwrap();
+    s.submit_report_fresh(&f.brain.id, report(&t.task.key))
+        .unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Pause);
     let before = serde_json::to_value(s.get_task(&t.task.key).unwrap()).unwrap();
     let seq = s.latest_seq().unwrap();
     assert!(matches!(
-        s.review_task(
+        s.review_task_fresh(
             &f.brain.id,
             ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
                 verdict: "accept".into(),
                 comments_md: "Self approval".into(),
@@ -875,11 +893,11 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
         Err(Error::Forbidden(_))
     ));
     assert!(matches!(
-        s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+        s.move_task_fresh(&f.brain.id, &t.task.key, "done", None, None),
         Err(Error::Forbidden(_))
     ));
     assert!(matches!(
-        s.move_task_with_override(
+        s.move_task_with_override_fresh(
             &f.brain.id,
             &t.task.key,
             "done",
@@ -890,7 +908,7 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
         Err(Error::Forbidden(_))
     ));
     assert!(matches!(
-        s.release_task(&f.brain.id, &t.task.key, Some("done")),
+        s.release_task_fresh(&f.brain.id, &t.task.key, Some("done")),
         Err(Error::Forbidden(_))
     ));
     let mut direct = input(&f.story);
@@ -908,9 +926,11 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
     for assignee in [None, Some(f.worker.id.as_str())] {
         s.assign_task(&f.human.id, &t.task.key, assignee).unwrap();
         assert!(matches!(
-            s.review_task(
+            s.review_task_fresh(
                 &f.brain.id,
                 ReviewTask {
+                    expected_report_id: String::new(),
+                    expected_review_context_revision: String::new(),
                     key: t.task.key.clone(),
                     verdict: "accept".into(),
                     comments_md: "Changed holder".into(),
@@ -920,20 +940,21 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
             Err(Error::Forbidden(_))
         ));
         assert!(matches!(
-            s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+            s.move_task_fresh(&f.brain.id, &t.task.key, "done", None, None),
             Err(Error::Forbidden(_))
         ));
     }
     s.assign_task(&f.human.id, &t.task.key, Some(&f.brain.id))
         .unwrap();
     // Even relinquishing the claim cannot convert an author's evidence to approval.
-    s.release_task(&f.brain.id, &t.task.key, None).unwrap();
+    s.release_task_fresh(&f.brain.id, &t.task.key, None)
+        .unwrap();
     assert!(matches!(
-        s.move_task(&f.brain.id, &t.task.key, "done", None, None),
+        s.move_task_fresh(&f.brain.id, &t.task.key, "done", None, None),
         Err(Error::Forbidden(_))
     ));
     assert!(s.get_task(&t.task.key).unwrap().reviews.is_empty());
-    s.move_task(&f.human.id, &t.task.key, "done", None, None)
+    s.move_task_fresh(&f.human.id, &t.task.key, "done", None, None)
         .unwrap();
     assert_eq!(s.get_task(&t.task.key).unwrap().task.status, "done");
     assert!(
@@ -942,9 +963,9 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
     );
     let own = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    s.claim_task(&f.human.id, &own.task.key).unwrap();
+    s.claim_task_fresh(&f.human.id, &own.task.key).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Pause);
-    s.release_task(&f.human.id, &own.task.key, Some("done"))
+    s.release_task_fresh(&f.human.id, &own.task.key, Some("done"))
         .unwrap();
     assert_eq!(s.get_task(&own.task.key).unwrap().task.status, "done");
     // Human's version-checked patch uses the same explicit manual policy.
@@ -970,11 +991,12 @@ fn existing_claim_release_survives_pause_and_archived_task_or_parent_without_new
             let scope = story(&f.story);
             let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
             change(s, &f.human, scope.clone(), ExecutionAction::Start);
-            s.claim_task(&f.worker.id, &task.task.key).unwrap();
+            s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
             change(s, &f.human, scope.clone(), ExecutionAction::Pause);
             match archived {
                 "task" => {
-                    s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+                    s.archive_task_fresh(&f.human.id, &task.task.key, None)
+                        .unwrap();
                 }
                 "story" => {
                     s.set_story_status(&f.human.id, &f.story.key, "archived", None)
@@ -990,7 +1012,8 @@ fn existing_claim_release_survives_pause_and_archived_task_or_parent_without_new
             let grant = s.get_execution(&scope).unwrap();
             let seq = s.latest_seq().unwrap();
             assert!(
-                s.release_task(&f.brain.id, &task.task.key, None).is_err(),
+                s.release_task_fresh(&f.brain.id, &task.task.key, None)
+                    .is_err(),
                 "nonholder brain cannot cancel somebody else's claim"
             );
             assert_eq!(s.latest_seq().unwrap(), seq);
@@ -999,7 +1022,7 @@ fn existing_claim_release_survives_pause_and_archived_task_or_parent_without_new
             } else {
                 &f.worker.id
             };
-            let released = s.release_task(actor, &task.task.key, None).unwrap();
+            let released = s.release_task_fresh(actor, &task.task.key, None).unwrap();
             assert_eq!(released.status, "backlog");
             assert!(released.assignee_id.is_none());
             assert_eq!(released.archived_at, before.task.archived_at);
@@ -1014,7 +1037,7 @@ fn existing_claim_release_survives_pause_and_archived_task_or_parent_without_new
             let events = s.list_changes_since(seq, None).unwrap();
             assert_eq!(events.len(), 1);
             assert_eq!(events[0].action, "task.released");
-            assert!(s.claim_task(&f.worker.id, &task.task.key).is_err());
+            assert!(s.claim_task_fresh(&f.worker.id, &task.task.key).is_err());
             let project = s.active_jam().unwrap();
             s.reset_jam(&f.human.id, &project.name).unwrap();
         }
@@ -1029,11 +1052,12 @@ fn archived_claim_recovery_to_ready_preserves_readiness_validation() {
         let scope = story(&f.story);
         let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
         change(s, &f.human, scope.clone(), ExecutionAction::Start);
-        s.claim_task(&f.worker.id, &task.task.key).unwrap();
+        s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
         change(s, &f.human, scope.clone(), ExecutionAction::Pause);
         match archived {
             "task" => {
-                s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+                s.archive_task_fresh(&f.human.id, &task.task.key, None)
+                    .unwrap();
             }
             "story" => {
                 s.set_story_status(&f.human.id, &f.story.key, "archived", None)
@@ -1046,7 +1070,7 @@ fn archived_claim_recovery_to_ready_preserves_readiness_validation() {
             _ => unreachable!(),
         }
         let old = s.get_task(&task.task.key).unwrap().task;
-        let result = s.release_task(&f.worker.id, &task.task.key, Some("ready"));
+        let result = s.release_task_fresh(&f.worker.id, &task.task.key, Some("ready"));
         if archived == "story" {
             assert!(matches!(result, Err(Error::NotReady(_))));
             let current = s.get_task(&task.task.key).unwrap().task;
@@ -1070,7 +1094,7 @@ fn native_release_confirmation_cannot_clear_reassigned_reclaimed_or_reported_wor
         let scope = story(&f.story);
         let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
         change(s, &f.human, scope.clone(), ExecutionAction::Start);
-        let claimed = s.claim_task(&f.worker.id, &task.task.key).unwrap();
+        let claimed = s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
         let confirmed = ReleaseClaim {
             key: task.task.key.clone(),
             expected_updated_at: claimed.task.updated_at,
@@ -1081,12 +1105,12 @@ fn native_release_confirmation_cannot_clear_reassigned_reclaimed_or_reported_wor
                     .unwrap();
             }
             "reclaimed" => {
-                s.release_task(&f.worker.id, &task.task.key, Some("ready"))
+                s.release_task_fresh(&f.worker.id, &task.task.key, Some("ready"))
                     .unwrap();
-                s.claim_task(&f.worker.id, &task.task.key).unwrap();
+                s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
             }
             "reported" => {
-                s.submit_report(&f.worker.id, report(&task.task.key))
+                s.submit_report_fresh(&f.worker.id, report(&task.task.key))
                     .unwrap();
             }
             _ => unreachable!(),
@@ -1115,7 +1139,7 @@ fn native_release_confirmation_cannot_clear_reassigned_reclaimed_or_reported_wor
         assert_eq!(released.updated_by, f.human.id);
         assert!(!running(s, &scope));
         assert!(
-            s.submit_report(&f.worker.id, report(&task.task.key))
+            s.submit_report_fresh(&f.worker.id, report(&task.task.key))
                 .is_err(),
             "late report cannot attach to a released claim"
         );
@@ -1138,12 +1162,14 @@ fn native_release_is_project_pinned_and_preserves_archived_work_evidence() {
     let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
     let scope = story(&f.story);
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    s.claim_task(&f.worker.id, &task.task.key).unwrap();
-    s.submit_report(&f.worker.id, report(&task.task.key))
+    s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
+    s.submit_report_fresh(&f.worker.id, report(&task.task.key))
         .unwrap();
-    s.review_task(
+    s.review_task_fresh(
         &f.brain.id,
         ReviewTask {
+            expected_report_id: String::new(),
+            expected_review_context_revision: String::new(),
             key: task.task.key.clone(),
             verdict: "changes_requested".into(),
             comments_md: "Another round".into(),
@@ -1151,7 +1177,10 @@ fn native_release_is_project_pinned_and_preserves_archived_work_evidence() {
         },
     )
     .unwrap();
-    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
+    let current = s
+        .claim_task_fresh(&f.worker.id, &task.task.key)
+        .unwrap()
+        .task;
     s.set_epic_status(&f.human.id, &f.epic.key, "archived", None)
         .unwrap();
     let revision = s.get_execution(&scope).unwrap().revision;
@@ -1194,7 +1223,7 @@ fn native_release_is_project_pinned_and_preserves_archived_work_evidence() {
     assert!(!running(&captured, &scope));
     assert!(
         captured
-            .submit_report(&f.worker.id, report(&task.task.key))
+            .submit_report_fresh(&f.worker.id, report(&task.task.key))
             .is_err()
     );
 }
@@ -1207,12 +1236,13 @@ fn only_native_human_can_cancel_unassigned_in_progress_after_archival() {
         let scope = story(&f.story);
         let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
         change(s, &f.human, scope.clone(), ExecutionAction::Start);
-        s.move_task(&f.human.id, &task.task.key, "in_progress", None, None)
+        s.move_task_fresh(&f.human.id, &task.task.key, "in_progress", None, None)
             .unwrap();
         change(s, &f.human, scope.clone(), ExecutionAction::Pause);
         match archived {
             "task" => {
-                s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+                s.archive_task_fresh(&f.human.id, &task.task.key, None)
+                    .unwrap();
             }
             "story" => {
                 s.set_story_status(&f.human.id, &f.story.key, "archived", None)
@@ -1226,7 +1256,10 @@ fn only_native_human_can_cancel_unassigned_in_progress_after_archival() {
         }
         let current = s.get_task(&task.task.key).unwrap().task;
         assert!(current.assignee_id.is_none());
-        assert!(s.release_task(&f.brain.id, &task.task.key, None).is_err());
+        assert!(
+            s.release_task_fresh(&f.brain.id, &task.task.key, None)
+                .is_err()
+        );
         let confirmed = ReleaseClaim {
             key: current.key.clone(),
             expected_updated_at: current.updated_at.clone(),
@@ -1256,16 +1289,21 @@ fn concurrent_native_release_and_report_serialize_without_losing_evidence() {
     let scope = story(&f.story);
     let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
+    let current = s
+        .claim_task_fresh(&f.worker.id, &task.task.key)
+        .unwrap()
+        .task;
     change(s, &f.human, scope.clone(), ExecutionAction::Pause);
     let worker_store = Store::open(&s.path).unwrap().selected_snapshot().unwrap();
     let barrier = Arc::new(Barrier::new(2));
     let sync = barrier.clone();
     let worker = f.worker.id.clone();
     let key = task.task.key.clone();
+    let mut payload = report(&key);
+    payload.expected_claim_generation = current.claim_generation.clone();
     let reported = std::thread::spawn(move || {
         sync.wait();
-        worker_store.submit_report(&worker, report(&key))
+        worker_store.submit_report(&worker, payload)
     });
     barrier.wait();
     let released = s.release_current_task(ReleaseClaim {
@@ -1275,7 +1313,7 @@ fn concurrent_native_release_and_report_serialize_without_losing_evidence() {
     let reported = reported.join().unwrap();
     let detail = s.get_task(&task.task.key).unwrap();
     match (released, reported) {
-        (Ok(_), Err(Error::Forbidden(_))) => {
+        (Ok(_), Err(Error::StaleClaim)) => {
             assert_eq!(detail.task.status, "backlog");
             assert!(detail.reports.is_empty());
             assert!(detail.task.assignee_id.is_none());
@@ -1294,14 +1332,18 @@ fn concurrent_native_release_and_report_serialize_without_losing_evidence() {
 }
 
 #[test]
-fn report_contract_has_no_claim_token_so_callers_must_reread_after_reclaim() {
+fn old_report_payload_is_fenced_after_same_identity_reclaims() {
     let f = fixture();
     let s = &f.store;
     let scope = story(&f.story);
     let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
     change(s, &f.human, scope.clone(), ExecutionAction::Start);
-    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
-    let payload = report(&task.task.key);
+    let current = s
+        .claim_task_fresh(&f.worker.id, &task.task.key)
+        .unwrap()
+        .task;
+    let mut payload = report(&task.task.key);
+    payload.expected_claim_generation = current.claim_generation.clone();
     s.release_current_task(ReleaseClaim {
         key: current.key,
         expected_updated_at: current.updated_at,
@@ -1309,15 +1351,20 @@ fn report_contract_has_no_claim_token_so_callers_must_reread_after_reclaim() {
     .unwrap();
     assert!(matches!(
         s.submit_report(&f.worker.id, payload.clone()),
-        Err(Error::Forbidden(_))
+        Err(Error::StaleClaim)
     ));
-    s.mark_ready(&f.human.id, &task.task.key, None).unwrap();
-    s.claim_task(&f.worker.id, &task.task.key).unwrap();
-    // Current API authenticates the holder and status/round, not an individual
-    // claim epoch. After this same identity legitimately reclaims, it cannot
-    // distinguish an old payload from new evidence. This documents the boundary,
-    // not a freshness guarantee: callers must reread their current claim/context.
-    let accepted = s.submit_report(&f.worker.id, payload).unwrap();
-    assert_eq!(accepted.round, 0);
-    assert_eq!(s.get_task(&task.task.key).unwrap().task.status, "review");
+    s.mark_ready_fresh(&f.human.id, &task.task.key, None)
+        .unwrap();
+    s.claim_task_fresh(&f.worker.id, &task.task.key).unwrap();
+    // Alpha4 accepted this delayed payload. Alpha5 requires the claim generation
+    // captured before work; a same-identity reclaim is a distinct lifecycle.
+    let before = serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap();
+    assert!(matches!(
+        s.submit_report(&f.worker.id, payload),
+        Err(Error::StaleClaim)
+    ));
+    assert_eq!(
+        serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap(),
+        before
+    );
 }

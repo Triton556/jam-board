@@ -1,6 +1,7 @@
 mod support;
 use jam_core::*;
 use std::{sync::Arc, thread, time::Duration};
+use support::FreshContext;
 
 fn fixture() -> (tempfile::TempDir, Store, Jam, Member) {
     let dir = tempfile::tempdir().unwrap();
@@ -53,7 +54,7 @@ fn selection_survives_restart_and_scoped_stores_never_retarget() {
         Err(Error::Forbidden(_))
     ));
     assert!(matches!(
-        pinned.update_task(
+        pinned.update_task_fresh(
             &h.id,
             UpdateTask {
                 key: second.task.key.clone(),
@@ -89,7 +90,8 @@ fn project_archive_restore_preserves_individual_task_state_and_boundaries() {
     let (_dir, s, a, h) = fixture();
     let active = task(&s, &h, "Keep active");
     let archived = task(&s, &h, "Keep archived");
-    s.archive_task(&h.id, &archived.task.key, None).unwrap();
+    s.archive_task_fresh(&h.id, &archived.task.key, None)
+        .unwrap();
     let before = s.export_jam().unwrap();
     let pinned = s.for_project(&a.id).unwrap();
     let (b, _) = s
@@ -325,7 +327,7 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
     let agent = s.identify_agent("Legacy worker", "codex").unwrap();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
-    c.execute_batch("DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
+    c.execute_batch("DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
     c.execute(
         "UPDATE tasks SET idempotency_key='legacy-token' WHERE id=?",
         [&legacy.task.id],
@@ -388,14 +390,14 @@ fn archival_guard_does_not_strand_running_work_or_target_a_new_selection() {
     s.set_story_status(&h.id, &t.task.story_key, "active", None)
         .unwrap();
     support::start_story(&s, &h.id, &t.task.story_key);
-    s.move_task(&h.id, &t.task.key, "in_progress", None, None)
+    s.move_task_fresh(&h.id, &t.task.key, "in_progress", None, None)
         .unwrap();
     let before = s.activity_count().unwrap();
     let error = s.reset_jam(&h.id, &a.name).unwrap_err().to_string();
     assert!(error.contains("In progress"));
     assert_eq!(s.activity_count().unwrap(), before);
     assert_eq!(s.active_jam().unwrap().id, a.id);
-    s.move_task(&h.id, &t.task.key, "review", None, None)
+    s.move_task_fresh(&h.id, &t.task.key, "review", None, None)
         .unwrap();
     assert!(!s.reset_jam(&h.id, &a.name).unwrap().has_jam);
     s.restore_project(&a.id).unwrap();

@@ -25,7 +25,11 @@ impl Store {
             require_privileged(c, actor, &e)?;
             c.execute(
                 "UPDATE epics SET brain_member_id=NULL,updated_by=?,updated_at=? WHERE id=?",
-                params![actor, now(), e.audit.id],
+                params![
+                    actor,
+                    crate::context::next_version(&e.audit.updated_at)?,
+                    e.audit.id
+                ],
             )?;
             v2_event(
                 c,
@@ -67,7 +71,11 @@ impl Store {
             }
             c.execute(
                 "UPDATE stories SET updated_by=?,updated_at=? WHERE id=?",
-                params![actor, now(), s.audit.id],
+                params![
+                    actor,
+                    crate::context::next_version(&s.audit.updated_at)?,
+                    s.audit.id
+                ],
             )?;
             v2_event(
                 c,
