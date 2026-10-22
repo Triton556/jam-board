@@ -718,3 +718,9 @@
   display: grid;
   gap: 6px;
 }
+
+/* Code loading has no write to cancel: the ordinary drawer can always close. */
+.drawer-load-state {
+  padding: 24px;
+  line-height: 1.6;
+}

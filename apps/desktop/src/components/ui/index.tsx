@@ -189,12 +189,14 @@ export function Drawer({
   title,
   leading,
   actions,
+  closeLabel = "Close task",
 }: {
   children: ReactNode;
   onClose(): void;
   title: string;
   leading?: ReactNode;
   actions?: ReactNode;
+  closeLabel?: string;
 }) {
   const ref = useModal(onClose);
   const id = useId();
@@ -222,7 +224,7 @@ export function Drawer({
           {leading}
           <div className="drawer-heading-actions">
             {actions}
-            <IconButton label="Close task" onClick={onClose}>
+            <IconButton label={closeLabel} onClick={onClose}>
               <X />
             </IconButton>
           </div>

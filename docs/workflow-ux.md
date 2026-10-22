@@ -450,3 +450,28 @@ This is source/DOM evidence, not native accessibility certification.
 Documentation uses the same worker-permission and pinned-project vocabulary as
 the UI and protocol. Historical screenshots and optional skill installation are
 not substitutes for exact-current-build or live-protocol verification.
+
+## 20. Keep navigation and dismissal available while code loads
+
+A native Table transition showed a transient blank frame, with no measured
+stall duration. Independent controlled imports then reproduced a distinct DOM
+failure: router-level suspension hid the whole shell for Table/Projects/Settings;
+rejection replaced it with diagnostics only. Task loading had no visible drawer
+or Escape dismissal, and rejection also replaced the whole app.
+
+[React's Suspense guidance](https://react.dev/reference/react/Suspense) makes the
+boundary's placement the unit of replacement. Local page boundaries now retain
+surrounding navigation, show a named loading status and offer Back to Board.
+[React lazy caches its loading result](https://react.dev/reference/react/lazy), so
+resetting an error boundary is not advertised as a fresh import attempt. An explicit
+Reload app action warns about unsaved drafts; nothing reloads automatically.
+Recovery components have stable identity during the shell's clock updates.
+
+Pending/error task and story modules use the existing modal drawer interaction:
+focus inside, Tab containment, Escape/Close and return to a surviving opener, as
+outlined by the [WAI dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+Dismissing a loading view is not cancellation of a submitted transaction. The
+existing loaded editors and their save/draft rules remain in place. Late module
+settlement does not restore a dismissed URL intent. Direct Story links are tested
+separately because Plan eagerly imports its field metadata from StoryDrawer.
+No dependency extraction or broader route rewrite is needed for this repair.
