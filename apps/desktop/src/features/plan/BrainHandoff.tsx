@@ -1,9 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { Copy, MessageSquareText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button, Dialog } from "../../components/ui";
-import { brainHandoff, type HandoffScope } from "../../lib/brain-handoff";
+import { Button, Dialog, SegmentedControl } from "../../components/ui";
+import {
+  brainHandoff,
+  type HandoffMode,
+  type HandoffProject,
+  type HandoffScope,
+} from "../../lib/brain-handoff";
 import { appQuery } from "../../lib/queries";
+import { usePlanningDraft } from "./planning-draft";
+
+type Snapshot = {
+  scope: HandoffScope;
+  project: HandoffProject;
+  title: string;
+  projectLabel: string;
+};
+const emptyRequest: { request: string; mode: HandoffMode } = {
+  request: "",
+  mode: "setup",
+};
 
 export function BrainHandoff({
   scope,
@@ -15,12 +32,7 @@ export function BrainHandoff({
   disabled?: boolean;
 }) {
   const app = useQuery(appQuery);
-  const [snapshot, setSnapshot] = useState<{
-    prompt: string;
-    title: string;
-    projectId: string;
-    projectLabel: string;
-  } | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const active = useRef(snapshot);
   active.current = snapshot;
   const copyLock = useRef(false);
@@ -32,17 +44,22 @@ export function BrainHandoff({
     [],
   );
   const [notice, setNotice] = useState("");
-  const close = () => setSnapshot(null);
-  const copy = async () => {
-    if (!snapshot || copyLock.current) return;
+  const close = () => {
+    active.current = null;
+    setSnapshot(null);
+  };
+  const copy = async (prompt: string) => {
+    if (!snapshot || active.current !== snapshot || copyLock.current) return;
     const captured = snapshot;
     copyLock.current = true;
     setPending(true);
     try {
-      await navigator.clipboard.writeText(captured.prompt);
+      // Clipboard invocation is immediate. A later close cannot cancel it,
+      // but its completion must not announce into a different preview.
+      await navigator.clipboard.writeText(prompt);
       if (active.current === captured)
         setNotice(
-          `Copied for ${captured.projectLabel}. Paste it into your connected brain's chat.`,
+          `Copied for ${captured.projectLabel}. Paste it into your connected brain's chat. Nothing was sent or saved to the board.`,
         );
     } catch {
       if (active.current === captured)
@@ -62,11 +79,15 @@ export function BrainHandoff({
           setNotice("");
           setPending(copyLock.current);
           setSnapshot({
-            prompt: brainHandoff(scope, project),
+            scope: { ...scope },
+            project: {
+              id: project.id,
+              name: project.name,
+              keyPrefix: project.keyPrefix,
+            },
             title: scope.key
               ? `Plan ${scope.key} with your brain`
               : "Plan with your brain",
-            projectId: project.id,
             projectLabel: `${project.name} · ${project.keyPrefix}`,
           });
         }}
@@ -75,52 +96,142 @@ export function BrainHandoff({
         {label}
       </Button>
       {snapshot && (
-        <Dialog
-          title={snapshot.title}
-          onClose={close}
-          className="brain-handoff"
-        >
-          <p>
-            Give the brain your rough idea, references or corrections. It can
-            ask questions in Inbox and update the plan for your review.
-          </p>
-          <p className="handoff-boundary">
-            This prepares a message, not an agent launch. Planning and Ready do
-            not authorize execution; start a story or epic separately.
-          </p>
-          <p className="small">
-            Prepared for {snapshot.projectLabel}. This message stays bound to
-            that project.
-          </p>
-          {app.data?.jam?.id !== snapshot.projectId && (
-            <p role="status">
-              The selected project changed. This preview still targets{" "}
-              {snapshot.projectLabel}; close and reopen it to prepare a
-              different target.
-            </p>
-          )}
-          <label className="field">
-            Planning prompt
-            <textarea
-              aria-label="Planning prompt"
-              value={snapshot.prompt}
-              readOnly
-            />
-          </label>
-          {notice && <p role="status">{notice}</p>}
-          <div className="dialog-actions">
-            <Button onClick={close}>Close</Button>
-            <Button
-              variant="primary"
-              disabled={pending}
-              onClick={() => void copy()}
-            >
-              <Copy size={16} /> {pending ? "Copying…" : "Copy planning prompt"}
-            </Button>
-          </div>
-        </Dialog>
+        <HandoffDialog
+          snapshot={snapshot}
+          selectedProjectId={app.data?.jam?.id}
+          pending={pending}
+          notice={notice}
+          clearNotice={() => setNotice("")}
+          close={close}
+          copy={copy}
+        />
       )}
     </>
+  );
+}
+
+function HandoffDialog({
+  snapshot,
+  selectedProjectId,
+  pending,
+  notice,
+  clearNotice,
+  close,
+  copy,
+}: {
+  snapshot: Snapshot;
+  selectedProjectId?: string;
+  pending: boolean;
+  notice: string;
+  clearNotice(): void;
+  close(): void;
+  copy(prompt: string): Promise<void>;
+}) {
+  const { scope, project } = snapshot;
+  const draft = usePlanningDraft(
+    emptyRequest,
+    `handoff:${project.id}:${scope.type}:${scope.id ?? project.id}`,
+  );
+  const prompt = brainHandoff(scope, project, draft.value);
+  const words = prompt.trim().split(/\s+/u).length;
+  const bytes = new TextEncoder().encode(prompt).length;
+  const edit = (value: typeof emptyRequest) => {
+    if (pending) return;
+    draft.change(value, false);
+    clearNotice();
+  };
+  return (
+    <Dialog title={snapshot.title} onClose={close} className="brain-handoff">
+      <div className="handoff-content">
+        <p className="handoff-boundary">
+          Prepares a message, not an agent launch. Ready means the brief is
+          prepared; Start grants scope permission, but does not wake a chat. A
+          worker claim records pickup.
+        </p>
+        <div>
+          <p>
+            Prepared for <strong>{snapshot.projectLabel}</strong>
+            {scope.key ? ` · ${scope.key}` : ""}.
+          </p>
+          <details className="handoff-identity">
+            <summary>Exact target IDs</summary>
+            <p>
+              Project: <code>{project.id}</code>
+            </p>
+            {scope.id && (
+              <p>
+                {scope.type}: <code>{scope.id}</code>
+              </p>
+            )}
+          </details>
+        </div>
+        {selectedProjectId !== project.id && (
+          <p role="status">
+            The selected project changed. This preview still targets{" "}
+            {snapshot.projectLabel}; close and reopen it to prepare a different
+            target.
+          </p>
+        )}
+        <div>
+          <SegmentedControl<HandoffMode>
+            label="Conversation context"
+            value={draft.value.mode}
+            onChange={(mode) => edit({ ...draft.value, mode })}
+            disabled={pending}
+            options={[
+              { value: "setup", label: "First / new chat" },
+              { value: "continue", label: "Continue in this chat" },
+            ]}
+          />
+          <p className="small muted">
+            {draft.value.mode === "setup"
+              ? "Includes setup and recovery rules. Use after reconnecting or losing context."
+              : "Short reminder for a conversation that already knows the workflow; it still must read the latest board."}{" "}
+            Your choice is remembered for this scope, not detected from a
+            connection.
+          </p>
+        </div>
+        <label className="field">
+          What should change? (optional)
+          <textarea
+            aria-label="What should change?"
+            value={draft.value.request}
+            disabled={pending}
+            rows={3}
+            onChange={(event) =>
+              edit({ ...draft.value, request: event.target.value })
+            }
+          />
+          <span className="small muted">
+            Local draft, not saved to the board. Kept when you close or switch
+            projects in this app session; not after restart.
+          </span>
+        </label>
+        <p className="small">
+          Use Inbox for project decisions you want tracked here. Conversation or
+          client permission questions may remain in chat.
+        </p>
+        <label className="field">
+          Planning prompt
+          <textarea aria-label="Planning prompt" value={prompt} readOnly />
+          <span className="small muted">
+            {words} words · {bytes} UTF-8 bytes. Text size, not a token or cost
+            estimate.
+          </span>
+        </label>
+        {notice && <p role="status">{notice}</p>}
+        <div className="dialog-actions">
+          <Button onClick={close}>Close</Button>
+          <Button
+            variant="primary"
+            disabled={pending}
+            onClick={() => void copy(prompt)}
+          >
+            <Copy size={16} /> {pending ? "Copying…" : "Copy planning prompt"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 
@@ -144,8 +255,8 @@ export function WorkflowGuide() {
         <li>
           <strong>Refine</strong>
           <span>
-            Ask the brain to review the scope, read its sources and ask
-            questions in Inbox.
+            Ask the brain to review the scope, read its sources and ask project
+            decisions in Inbox; conversation may stay in chat.
           </span>
         </li>
         <li>

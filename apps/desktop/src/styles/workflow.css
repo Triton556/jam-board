@@ -806,3 +806,28 @@
 .agent-plan-feedback > button {
   justify-self: start;
 }
+
+.handoff-content {
+  display: grid;
+  gap: 16px;
+}
+.handoff-content > p,
+.handoff-content > div > p {
+  margin: 0;
+}
+.handoff-content .field {
+  margin: 0;
+}
+.brain-handoff textarea[aria-label="What should change?"] {
+  min-height: 88px;
+  max-height: 180px;
+  font-family: inherit;
+}
+.handoff-identity {
+  margin-top: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.handoff-identity summary {
+  cursor: pointer;
+}

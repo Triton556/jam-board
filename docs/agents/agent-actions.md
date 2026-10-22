@@ -7,7 +7,7 @@
 | ID | Actor / entry → depth and actions | Result / authority boundary | Failure/recovery and human counterpart |
 |---|---|---|---|
 | AG01 | New client → initialize exact project → get_session_context → scoped baseline | Connection stays pinned; current desktop project is not retargeting | Wrong/archived project fails closed. Verify immutable ID before reads; H-G04/S01 |
-| AG02 | Human Prepare planning prompt → copy → client full setup → inspect scope/sources → refine | Copy is deterministic guidance, not execution or proof of connection | Same scope normally gives same prompt. Current prompt retrieves notes, not embeds chat history. Explicit Continue refinement is proposed, not auto-detected; H-P07 |
+| AG02 | Human Prepare planning prompt → copy → client full setup → inspect scope/sources → refine | Copy is deterministic guidance, not execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
 | AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04 |
 | AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06 |
 | AG05 | Agent prepares brief → check_ready → mark_ready | Backlog → Ready when valid/authorized override; no work launch | Missing codes lead to brief repair; capture claim generation + updatedAt from inspected task; H-D02/D07 |
@@ -130,3 +130,7 @@ schema, execution permission, result-card contract or persisted kind changes.
 An inline note is local until Save; uncertain response is not rollback and must
 not be blindly replayed. Image Retry is read-only. Existing agent-published results
 remain available in the same canvas.
+
+## Alpha31 Refine candidate delta
+
+AG02.setup/continue/request are implemented as explicit choices; see [Refine modes](refinement-modes.md). AG11.handover remains recipe-only, not a third UI mode. New prompts ask for an understandable user-language outcome in an EMPTY human Description and preserve existing human text; no model guarantee or new readiness condition. Exact entity IDs now come from DTOs. Native/browser acceptance remains separate.

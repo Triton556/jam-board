@@ -83,3 +83,7 @@ content hides the empty art; the full-width visible grip and selected resize
 controls do not capture frame interiors. Existing persisted note/agent-result
 editing is unchanged. Image source selection accounts for painted device pixels;
 read-only image retry does not change references. See [alpha30 verification](../verification/0.3.0-alpha.30.md).
+
+## Alpha31 candidate: H-P07
+
+Refine opens a captured target, explicit setup/continuation radio group, local What should change? request and selectable preview. Close/mode/project-return retain request per immutable target within this app session; copy failure retains it; pending Copy prevents overlapping input, and old completion cannot announce into another preview. No board write/launch. [Details and evidence](refinement-modes.md).

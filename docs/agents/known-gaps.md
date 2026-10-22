@@ -12,7 +12,7 @@
 | Notification bell/history | Proposed | NT01 including retention, identity, accessible View and stale destination |
 | Hidden dialog spacing | Source mismatch identified; broader visual inspection pending | VS01 and H-D11 nested flow |
 | Zoom/DPI polish | Separate implementation lane; no fix claimed here | VS02/VS03 native checks |
-| Short routine refinement / brain handover | Documented proposal; current full prompt unchanged | AG02/AG11, no loss of binding/validator/bootstrap rules |
+| Short routine refinement / brain handover | Alpha31 candidate implements explicit setup/continuation; read-only handover remains recipe-only | AG02/AG11; [mode contract](refinement-modes.md), browser/native and real generated-summary evidence pending |
 | Session message/tool streaming | Future, out of current implementation scope | Supported client transport, consent, scope identity, filtering/retention; never hidden reasoning |
 
 ## Concrete source findings

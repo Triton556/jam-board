@@ -108,3 +108,7 @@ reference dialog form spacing and draft confirmation focus. VS03: image dimensio
 at fractional zoom × DPR and stale/failure paths. DOM/pure cases are recorded in
 alpha30 verification; native geometry, both themes, 800×600/200% scaling and
 500-card gesture/clarity checks remain unrun at this source checkpoint.
+
+## Alpha31 candidate additions
+
+AC02: both Refine modes, keyboard choice, scoped local request across Close/project return, copy failure/pending/scope changes, exact entity IDs, no board mutations. See `features/brain-handoff.test.tsx` and `e2e/refinement-modes.spec.ts` (browser/native not yet run). AC12: a newly agent-created task has a concise human-readable user-language description, existing human wishes preserved, technical detail secondary. This end-to-end/model behavior is NOT established by prompt-string tests.
