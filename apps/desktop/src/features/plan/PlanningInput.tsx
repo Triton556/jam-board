@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type Query, useMutation, useQueryClient } from "@tanstack/react-query";
 import { type InputHTMLAttributes, useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui";
 import { invalidatePlanning } from "../../lib/planning-queries";
@@ -53,6 +53,12 @@ function ScopedPlanningInput({
       unsubscribe();
     };
   }, [client]);
+  type RetainedDraft = {
+    source: string;
+    baseline: string;
+    draft: string;
+    dirty: boolean;
+  };
   type Attempt = typeof draft.snapshot & {
     save: typeof save;
     generation: number;
@@ -60,6 +66,10 @@ function ScopedPlanningInput({
     id: number;
     dispatched: boolean;
     acknowledge: typeof draft.saved;
+    bindingCurrent(): boolean;
+    stopBinding(): void;
+    retainedQuery: Query | undefined;
+    baseline: string | undefined;
   };
   const current = (submitted: Attempt) =>
     live.current &&
@@ -77,12 +87,36 @@ function ScopedPlanningInput({
       return submitted.save(submitted.draft);
     },
     onSuccess: (_, submitted) => {
-      if (!current(submitted)) return;
+      if (!current(submitted)) {
+        // A confirmed departed-field write still owns its captured cache baseline,
+        // not the current UI. Preserve newer text/dirty state and never announce,
+        // invalidate another surface, or acknowledge across project selection ABA.
+        const key = ["planning-draft", identity];
+        if (
+          submitted.bindingCurrent() &&
+          submitted.retainedQuery &&
+          client.getQueryCache().find({ queryKey: key, exact: true }) ===
+            submitted.retainedQuery
+        ) {
+          client.setQueryData<RetainedDraft>(key, (cached) => {
+            if (
+              !cached ||
+              cached.baseline !== submitted.baseline ||
+              (cached.source !== submitted.source &&
+                cached.source !== submitted.draft)
+            )
+              return cached;
+            return { ...cached, baseline: submitted.draft };
+          });
+        }
+        return;
+      }
       submitted.acknowledge(submitted);
       invalidatePlanning(client);
       if (submitted.id === latestAttempt.current)
         setFeedback({ kind: "saved" });
     },
+    onSettled: (_result, _error, submitted) => submitted.stopBinding(),
     onError: (error, submitted) => {
       if (current(submitted) && submitted.id === latestAttempt.current)
         setFeedback({
@@ -92,12 +126,32 @@ function ScopedPlanningInput({
     },
   });
   const submit = () => {
+    const project = client.getQueryData<AppState>(["app"])?.jam?.id;
+    let bindingValid = !!project;
+    // Outlives the field only until this attempt settles, so project ABA while
+    // it is unmounted cannot authorize a late retained-cache acknowledgement.
+    const stopBinding = client.getQueryCache().subscribe((event) => {
+      if (
+        event.query.queryKey[0] === "app" &&
+        client.getQueryData<AppState>(["app"])?.jam?.id !== project
+      )
+        bindingValid = false;
+    });
+    const key = ["planning-draft", identity];
     setFeedback({ kind: "pending" });
     mutation.mutate({
       ...draft.snapshot,
       save,
       generation: generation.current,
-      project: client.getQueryData<AppState>(["app"])?.jam?.id,
+      project,
+      bindingCurrent: () =>
+        bindingValid &&
+        client.getQueryData<AppState>(["app"])?.jam?.id === project,
+      stopBinding,
+      retainedQuery: client
+        .getQueryCache()
+        .find({ queryKey: key, exact: true }),
+      baseline: client.getQueryData<RetainedDraft>(key)?.baseline,
       id: ++latestAttempt.current,
       dispatched: false,
       acknowledge: draft.saved,
