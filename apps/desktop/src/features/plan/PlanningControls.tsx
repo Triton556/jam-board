@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { Button, Dialog } from "../../components/ui";
+import { Button } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { MarkdownField } from "../../components/ui/MarkdownField";
 import { api } from "../../lib/api";
@@ -174,68 +174,5 @@ export function StoryPicker({
           })),
       ]}
     />
-  );
-}
-export function NewTaskDialog({
-  storyKey,
-  close,
-  created,
-}: {
-  storyKey?: string;
-  close(): void;
-  created(key: string): void;
-}) {
-  const [title, setTitle] = useState(""),
-    [story, setStory] = useState(storyKey ?? "");
-  const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: () =>
-      api.createTask({
-        title: title.trim(),
-        status: "backlog",
-        storyKey: story,
-      }),
-    onSuccess: (task) => {
-      invalidatePlanning(client);
-      close();
-      created(task.key);
-    },
-  });
-  return (
-    <Dialog title="New task" onClose={close}>
-      <form
-        className="planning-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (title.trim() && story) save.mutate();
-        }}
-      >
-        <label>
-          Title
-          <input
-            aria-label="New planned task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={140}
-          />
-        </label>
-        <label htmlFor="new-story-picker">Story</label>
-        <StoryPicker label="Task story" value={story} onChange={setStory} />
-        <p className="muted">
-          Start in Backlog, then write its brief and check readiness.
-        </p>
-        {save.error && <p role="alert">{save.error.message}</p>}
-        <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={!title.trim() || !story || save.isPending}
-          >
-            Create task
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   );
 }

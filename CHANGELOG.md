@@ -3,6 +3,34 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.12] - 2026-10-21
+
+### Fixed
+
+- Epic, Story and planned Task creation now keeps a visibly pending dialog open
+  until its submitted write settles. Escape, backdrop, Cancel, repeated Enter and
+  repeated clicks cannot dismiss or duplicate the in-flight operation. Processing
+  text receives focus; a known failure restores editable fields and retains the
+  title/parent for an intentional retry or ordinary dismissal.
+- Creation captures submitted values and the original project context. Forced
+  unmount or a project transition, including A→B→A, cannot trigger stale success
+  navigation. Renaming the same project does not invalidate its identity. Missing
+  project context fails closed and an explicit read retry preserves the draft.
+- Shared creation code stays with the lazy planning routes, rather than loading
+  through the board's shared Story picker. Existing bundle budgets are unchanged.
+
+### Verification and limitations
+
+- The three delayed-dismissal regressions were reproduced before the fix and are
+  retained as local evidence. Happy DOM checks exercise actual planning forms,
+  deferred success/failure, duplicate-submit guards, pending focus, dismissal,
+  project changes and unmount. Native/browser interaction for this batch is not
+  yet verified; see [verification notes](docs/verification/0.3.0-alpha.12.md).
+- This is a UI transaction-state repair, not a cancellation or idempotency protocol.
+  A submitted write may already be committed; closing the application cannot undo
+  it. There is no timer that turns a still-pending write into a retryable failure.
+  Database schema 7 and existing MCP/native request contracts are unchanged.
+
 ## [0.3.0-alpha.11] - 2026-10-21
 
 ### Fixed
