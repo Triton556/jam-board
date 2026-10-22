@@ -289,9 +289,11 @@ it("AG02 continuation is smaller without dropping identity, stale intent or plan
   expect(short).not.toContain("Page list_tasks");
   expect(setup).toContain("Never replace an unprocessed saved checkpoint");
   expect(setup).toContain("does not wake a chat");
+  expect(setup).toContain("later, separately requested execution phase");
+  expect(setup).toContain("This refinement request remains planning-only");
 });
 
-it("H-P04 remembers an explicitly chosen mode and local request across modes and Close without a board write", async () => {
+it("H-P07 remembers an explicitly chosen mode and local request across modes and Close without a board write", async () => {
   const user = userEvent.setup();
   const client = new QueryClient();
   client.setQueryData(["app"], await mockApi.appState());
@@ -338,7 +340,7 @@ it("H-P04 remembers an explicitly chosen mode and local request across modes and
   );
 });
 
-it("H-P04 local request survives project return but never leaks to another project with the same key", async () => {
+it("H-P07 local request survives project return but never leaks to another project with the same key", async () => {
   const user = userEvent.setup();
   const client = new QueryClient();
   const original = await mockApi.appState();
@@ -382,7 +384,7 @@ it("H-P04 local request survives project return but never leaks to another proje
   ).not.toHaveValue(expect.stringContaining("Only in project B"));
 });
 
-it("H-P04 mode and request changes never rebind an open captured entity after a scope/project rerender", async () => {
+it("H-P07 mode and request changes never rebind an open captured entity after a scope/project rerender", async () => {
   const user = userEvent.setup();
   const client = new QueryClient();
   const original = await mockApi.appState();
@@ -425,7 +427,7 @@ it("H-P04 mode and request changes never rebind an open captured entity after a 
   expect(text).not.toContain("other-story");
 });
 
-it("H-P04 copy single-flight locks accepted input and mode, then retains them on known clipboard failure", async () => {
+it("H-P07 copy single-flight locks accepted input and mode, then retains them on known clipboard failure", async () => {
   const user = userEvent.setup();
   let reject!: (reason: Error) => void;
   const write = vi
