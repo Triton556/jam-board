@@ -40,10 +40,25 @@ export function CustomSelect({
     if (!open) return;
     const update = () => {
       if (!button.current || !root.current || !popup.current) return;
+      const anchor = button.current.getBoundingClientRect();
+      const clip = selectClip(root.current);
+      if (
+        (anchor.width > 0 || anchor.height > 0) &&
+        (anchor.bottom <= clip.top ||
+          anchor.top >= clip.bottom ||
+          anchor.right <= clip.left ||
+          anchor.left >= clip.right)
+      ) {
+        // A scrolled-away trigger must not leave an orphaned popup. Do not
+        // refocus/scroll it back against the person's navigation intent.
+        setOpen(false);
+        setQuery("");
+        return;
+      }
       const next = selectPlacement(
-        button.current.getBoundingClientRect(),
+        anchor,
         root.current.getBoundingClientRect(),
-        selectClip(root.current),
+        clip,
         Math.min(300, popup.current.scrollHeight + 4),
       );
       setPlacement((old) =>

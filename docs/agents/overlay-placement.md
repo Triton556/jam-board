@@ -10,7 +10,8 @@ CustomSelect keeps its existing in-tree DOM/modal scope (no body portal or new
 focus layer). Its popup measures the trigger, intersects viewport and scroll/
 overflow ancestor bounds, chooses above when below cannot fit and above has more
 room, and bounds width/height with scrolling. Nested scrolling, window/visual
-viewport resize and element resize recompute placement. No selection is made by
+viewport resize and element resize recompute placement. Scrolling the trigger wholly outside the visible clip closes
+the popup without selecting or scrolling focus back. No selection is made by
 positioning; active and selected options remain separate. Search, empty results,
 Escape-to-trigger then parent Escape, Tab and disabled controls retain their
 contracts. Geometry is in CSS pixels; it does not multiply device pixel ratio.
