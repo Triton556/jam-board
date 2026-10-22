@@ -375,3 +375,31 @@ color arithmetic is not a rendered accessibility certification. Development mock
 readiness also follows [Rust's Unicode White_Space definition](https://doc.rust-lang.org/std/primitive.char.html#method.is_whitespace)
 rather than JavaScript trim, so previews cannot silently disagree on a brief's
 completeness. This changes neither production validation nor permission to execute.
+
+## 17. Preserve capture and settings drafts through slow saves
+
+Independent tests reproduced old asset/reference saves closing newer dialogs,
+frame/reference-link duplicate requests, failed asset reads masquerading as an
+empty list, and project-field remounts erasing newer typing. Alpha14 applies the
+captured-project, single-flight and visible-status policy from section 15 to these
+individual dialog writes. A changed context invalidates late UI effects, not a
+write already sent. Known failures retain input and an explicit retry; no timeout
+turns an uncertain result into permission to submit again. Ordinary Escape resumes
+once the operation settles. This remains a deliberate temporary exception to the
+[WAI modal dismissal pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+
+Settings are deliberately different: a user can type a newer value while an older
+field save is pending. Only the submitted edit revision is acknowledged. If the
+newer draft also blurs, it stays visibly **Unsaved** with a **Save …** action rather
+than silently queueing an outdated request. This includes editing back to the old
+baseline while a different submitted value is still pending. A background read
+failure does not remove the draft's DOM. The policy improves local intent clarity;
+it does not add backend optimistic concurrency to project/reference metadata.
+
+The alpha13 Welcome split exposed two independent slow/failing-module cases.
+Loading is now visible inside a local Suspense boundary. The [React lazy contract](https://react.dev/reference/react/lazy)
+caches both the loader promise and its result, including rejection. Therefore the
+error screen offers a real user-initiated app reload, or navigation to Projects,
+not a retry button that merely remounts the same rejected lazy component. Reload
+explicitly warns about unsaved fields; there is no automatic reload or form write.
+Dialog tests and controlled module failures are not native layout/network acceptance.

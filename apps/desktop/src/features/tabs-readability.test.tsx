@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { mockApi } from "../lib/mock-bridge";
@@ -117,6 +123,7 @@ it("asset source switching keeps unsaved fields and never opens a file picker on
   const user = userEvent.setup();
   wrap(<AssetDialog close={() => {}} />);
   const file = screen.getByRole("tab", { name: "File" });
+  await waitFor(() => expect(file).toBeEnabled());
   file.focus();
   await user.keyboard("{ArrowRight}");
   expect(

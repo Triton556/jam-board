@@ -3,6 +3,37 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.14] - 2026-10-21
+
+### Fixed
+
+- Asset and reference dialogs capture a single submitted operation and project,
+  keep pending edits/dismissal locked with visible status, and retain known-failure
+  drafts for an explicit retry. Late completion cannot close a remounted form or
+  act on a changed project/target. This covers asset editing/linking, adding a note
+  or link, reference captions/tags/links, and frame creation/editing. The existing
+  reference picker also blocks duplicate links and preserves its search on failure.
+- Asset-link source reads distinguish loading, failure, an empty list and no matches.
+  Retry retains search/selection rather than presenting a failed read as no assets.
+- Project name, start/end, timezone and milestone fields no longer remount after
+  an older save and erase newer typing. Newer edits blurred during a pending save
+  remain visibly **Unsaved**, with an explicit Save action after settlement; they
+  are never silently queued/replayed. Failed background reads preserve the editor.
+  Template-save confirmation also has pending/error/focus recovery.
+- The on-demand Welcome screen now shows loading feedback even inside the router's
+  own suspense boundary. A rejected chunk offers explicit **Reload app** or
+  **Open Projects**, rather than an unusable retry of React.lazy's cached rejection.
+  These close two independent alpha13 review findings while retaining the split.
+
+### Compatibility and verification
+
+- No database migration, MCP/native contract, dependency, authorization, task
+  readiness or worker-launch change. These are UI intent fences, not transactional
+  cancellation, server idempotency or new cross-client compare-and-swap protection.
+- [Exact validation and limitations](docs/verification/0.3.0-alpha.14.md).
+  The separate session-cursor proposal and later generic-asset/Markdown clarity
+  work are deliberately not included in this correctness batch.
+
 ## [0.3.0-alpha.13] - 2026-10-21
 
 ### Fixed

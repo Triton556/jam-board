@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { WorkloadBar } from "../components/ui/m5";
 import { makeSnippets } from "../lib/mcp-config";
 import { mockApi } from "../lib/mock-bridge";
@@ -11,6 +11,10 @@ import { AssetDialog } from "./assets/AssetsPage";
 import { assetKind, assetSchema } from "./assets/model";
 import { archiveConfirmed } from "./settings/SettingsPage";
 
+vi.mock("@tanstack/react-router", async (original) => ({
+  ...(await original<typeof import("@tanstack/react-router")>()),
+  useBlocker: () => ({}),
+}));
 beforeEach(async () => {
   await mockApi.resetDemo();
   mockApi.calls.length = 0;

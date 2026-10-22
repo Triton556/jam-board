@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AudioLines,
   ChevronDown,
@@ -27,10 +27,12 @@ import {
   Tabs,
 } from "../../components/ui";
 import { FileDropZone, PageHeading } from "../../components/ui/m5";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { api } from "../../lib/api";
 import { useBoardSettings } from "../../lib/queries";
 import type { Asset, AssetWithTasks } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { useTableVirtualizer } from "../table/use-table-virtualizer";
 import { AssetLinkDialog } from "./AssetLinkDialog";
 import { assetKind, assetKinds, assetName, assetSchema } from "./model";
@@ -69,26 +71,47 @@ export function AssetDialog({
     },
   });
   const mode = form.watch("mode");
-  const save = useMutation({
-    mutationFn: async (v: z.infer<typeof assetSchema>) =>
-      asset
-        ? api.updateAsset({
+  const write = useProjectWrite(`asset:${asset?.id ?? "new"}`);
+  const formElement = useRef<HTMLFormElement>(null);
+  const submit = () => {
+    if (write.isLocked()) return;
+    form.clearErrors();
+    const parsed = assetSchema.safeParse(form.getValues());
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0] as keyof z.infer<typeof assetSchema>;
+        form.setError(field, { message: issue.message });
+      }
+      const field = parsed.error.issues[0]?.path[0] as keyof z.infer<
+        typeof assetSchema
+      >;
+      if (field) form.setFocus(field);
+      return;
+    }
+    const v = parsed.data;
+    write.run(
+      async () => {
+        if (asset)
+          await api.updateAsset({
             id: asset.id,
             name: v.name,
             notes: v.notes,
             kind: v.kind,
-          })
-        : api.createAsset({
+          });
+        else
+          await api.createAsset({
             name: v.name,
             location: v.location,
             kind: v.kind,
             notes: v.notes || null,
-          }),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["assets"] });
-      close();
-    },
-  });
+          });
+      },
+      () => {
+        void client.invalidateQueries({ queryKey: ["assets"] });
+        close();
+      },
+    );
+  };
   const choose = async () => {
     const path = await api.pickFile(false);
     if (path) {
@@ -98,16 +121,25 @@ export function AssetDialog({
     }
   };
   return (
-    <Dialog title={asset ? "Edit asset" : "Add asset"} onClose={close}>
+    <Dialog
+      title={asset ? "Edit asset" : "Add asset"}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
+    >
       <form
         className="m5-form"
-        onSubmit={form.handleSubmit((v) => save.mutate(v))}
+        ref={formElement}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
         noValidate
       >
         {!asset && (
           <Tabs
             id={locationTabs}
             label="Asset source"
+            disabled={!write.ready}
             value={mode}
             onChange={(v) => form.setValue("mode", v as "File" | "URL")}
             items={["File", "URL"]}
@@ -123,21 +155,28 @@ export function AssetDialog({
             <input
               aria-label="Asset location"
               {...form.register("location")}
-              disabled={!!asset || mode === "File"}
+              disabled={!write.ready || !!asset || mode === "File"}
             />
           </label>
           {!asset && mode === "File" && (
-            <Button onClick={() => void choose()}>Choose file</Button>
+            <Button disabled={!write.ready} onClick={() => void choose()}>
+              Choose file
+            </Button>
           )}
         </TabPanels>
         <label>
           Name
-          <input {...form.register("name")} />
+          <input
+            data-write-focus
+            disabled={!write.ready}
+            {...form.register("name")}
+          />
         </label>
         <label htmlFor="asset-kind">
           Kind
           <Select
             id="asset-kind"
+            disabled={!write.ready}
             aria-label="Kind"
             value={form.watch("kind")}
             onChange={(e) =>
@@ -157,17 +196,23 @@ export function AssetDialog({
         </label>
         <label>
           Notes
-          <textarea {...form.register("notes")} />
+          <textarea disabled={!write.ready} {...form.register("notes")} />
         </label>
         {Object.entries(form.formState.errors).map(([key, e]) => (
           <p role="alert" className="field-error" key={key}>
             {e.message}
           </p>
         ))}
-        {save.error && <p role="alert">{save.error.message}</p>}
+        <ProjectWriteFeedback
+          write={write}
+          action="Saving asset"
+          form={formElement}
+        />
         <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={save.isPending}>
+          <Button disabled={write.pending} onClick={() => write.dismiss(close)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={!write.ready}>
             Save asset
           </Button>
         </div>
