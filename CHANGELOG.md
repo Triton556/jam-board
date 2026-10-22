@@ -3,6 +3,36 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.8] - 2026-10-21
+
+### Fixed
+
+- Human task-edit conflict comparisons now freeze the exact base, local draft and
+  saved version being inspected. New background edits block resolution until an
+  intentional reread; the client never silently rebases or replays an old decision.
+- Conflict save failures remain inside the active modal with the draft intact.
+  Pending decisions cannot be double-submitted or dismissed; hidden editor
+  shortcuts cannot bypass the open comparison. Failed initial comparison reads
+  have a read-only retry instead of discarding edits or repeating a stale write.
+- Readable field names and structured change/test entries replace raw property
+  names and JSON. Responsive three-version panels distinguish the starting value,
+  inspected saved value and local edit without a cramped four-column grid.
+- Explicit “Save my edits against latest” and “Discard my edits and use latest”
+  labels state the consequences. Whole Changes/test lists are honestly described
+  as replacement, not entry-by-entry merging; unrelated unedited fields survive.
+- Rereading restores focus to the comparison, and save/discard leaves a stable
+  receipt. Closing keeps local edits without a mutation.
+
+### Verification and compatibility
+
+- Existing atomic task-update CAS and field/brief-property merge semantics are
+  unchanged. No schema, MCP contract, role, execution grant or process change.
+- Exact alpha7 passed independent native-intent safety and interaction audits;
+  source and synthetic pointer/keyboard probes are distinct from native geometry.
+- Browser assertions use the clearer actions and now exercise a second background
+  change during comparison; they are not claimed executed until supported CI or
+  browser acceptance runs. See versioned verification notes for current evidence.
+
 ## [0.3.0-alpha.7] - 2026-10-21
 
 ### Fixed

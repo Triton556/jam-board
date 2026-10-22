@@ -246,7 +246,7 @@ it("dirty close offers Keep editing and Discard and protects task navigation", a
     expect(router.state.location.search).toEqual({ task: "JB-8" }),
   );
 });
-it.each(["Take theirs", "Keep mine"])(
+it.each(["Discard my edits and use latest", "Save my edits against latest"])(
   "conflict comparison supports %s without dropping another field",
   async (action) => {
     harness();
@@ -269,7 +269,10 @@ it.each(["Take theirs", "Keep mine"])(
     });
     expect(dialog).toHaveTextContent("Agent title");
     fireEvent.click(within(dialog).getByRole("button", { name: action }));
-    const expected = action === "Take theirs" ? "Agent title" : "Human title";
+    const expected =
+      action === "Discard my edits and use latest"
+        ? "Agent title"
+        : "Human title";
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /^Save/ })).toBeDisabled(),
     );

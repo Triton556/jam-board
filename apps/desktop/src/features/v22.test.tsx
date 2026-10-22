@@ -37,7 +37,7 @@ beforeEach(async () => {
   mockApi.calls.length = 0;
   useUiStore.setState({ toasts: [], highlights: {}, readyRequest: null });
 });
-it("Keep mine merges only edited brief fields onto the latest version", async () => {
+it("Save my edits against latest merges only edited brief fields onto the latest version", async () => {
   const base = taskValues(await mockApi.getTask("JB-2"));
   const mine = structuredClone(base),
     theirs = structuredClone(base);

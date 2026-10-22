@@ -505,3 +505,79 @@
 .ready-snapshot .readonly-brief {
   margin-top: 12px;
 }
+
+/* Compare human edits without raw object dumps or a cramped four-column grid. */
+.task-conflict-dialog {
+  width: 860px;
+}
+.task-comparison {
+  display: grid;
+  gap: 18px;
+  margin-block: 18px;
+}
+.task-comparison-field {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  overflow: hidden;
+}
+.task-comparison-field > h4 {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--paper-2);
+  font-size: 13px;
+}
+.task-comparison-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.task-comparison-columns > div {
+  padding: 12px;
+  min-width: 0;
+}
+.task-comparison-columns > div + div {
+  border-left: 1px solid var(--line-soft);
+}
+.task-comparison-columns h5 {
+  color: var(--ink-2);
+  font-size: 11px;
+  margin: 0 0 10px;
+}
+.comparison-text,
+.comparison-entries dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0;
+}
+.comparison-entries {
+  padding-left: 20px;
+  margin: 0;
+}
+.comparison-entries li + li {
+  margin-top: 14px;
+}
+.comparison-entries dl {
+  margin: 0;
+}
+.comparison-entries dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-block: 8px 3px;
+}
+.task-conflict-dialog .dialog-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .task-comparison-columns {
+    grid-template-columns: 1fr;
+  }
+  .task-comparison-columns > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .task-conflict-dialog .dialog-actions .button {
+    white-space: normal;
+  }
+}
