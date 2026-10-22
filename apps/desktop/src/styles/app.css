@@ -419,7 +419,7 @@ p {
   color: var(--ink-2);
 }
 .countdown.ending {
-  color: var(--coral);
+  color: var(--coral-ink);
 }
 .topbar .button {
   height: 32px;
@@ -1060,6 +1060,7 @@ input[aria-invalid="true"] {
   accent-color: var(--coral);
 }
 .table-scroll {
+  scroll-padding-top: 84px;
   isolation: isolate;
   will-change: scroll-position;
   overflow-anchor: none;

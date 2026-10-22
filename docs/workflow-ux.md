@@ -339,3 +339,39 @@ No client timeout claims a pending write failed. If the app is forcibly closed o
 a response is lost, an already submitted creation may remain in the plan. Reopen
 and inspect before repeating an uncertain action. This batch adds no rollback,
 server idempotency key, background process controller or permission grant.
+
+
+## 16. Visible navigation and reliable table entry
+
+A source-blind screenshot review found the project-name/chevron ambiguous and the
+last board column clipped without an obvious horizontal cue. This is heuristic AI
+review, not a human usability study. **Switch project**, directional overflow cues
+and explicit **Planning status / Worker permission** labels reduce recall without
+adding another hierarchy or compressing readable cards. The [NN/G recognition
+heuristic](https://www.nngroup.com/articles/ten-usability-heuristics/) supports these
+small affordances. The [MDN overflow accessibility guidance](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow#accessibility)
+recommends a focusable, named scroll region. Board keys apply only to that region,
+not card drag controls; bounded controls follow resize and never imply hidden
+columns when there is no overflow. Scrolling is deliberately nonanimated.
+
+Independent table probes found no Tab entry after virtual scrolling or removal of
+the focused row. The fix considers the actual viewport, not merely mounted
+overscan. It preserves task identity during data reorder, chooses a visible fallback
+when necessary, and never moves focus out of a filter/input. Between virtual-window
+commits, only mounted rows' tab stops change; row-window and performance budgets
+are unchanged. Keyboard destinations explicitly account for the sticky header.
+Synthetic DOM geometry tests validate these choices, not native frame rate.
+
+A separately reproduced inline-create race erased a newer draft after an older
+write completed. The table now uses the same captured-intent/pending-feedback
+principles as section 15, without pretending dismissal cancels a transaction.
+Its status/error editor sits above the virtual table so feedback is not constrained
+by a fixed-height row. Read failures expose Retry while retaining filters/drafts.
+
+Normal-size success/recommendation and ending-countdown text use semantic ink
+colors meeting the [WCAG contrast-minimum calculation](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+on their declared theme backgrounds; decorative colors remain unchanged. Automated
+color arithmetic is not a rendered accessibility certification. Development mock
+readiness also follows [Rust's Unicode White_Space definition](https://doc.rust-lang.org/std/primitive.char.html#method.is_whitespace)
+rather than JavaScript trim, so previews cannot silently disagree on a brief's
+completeness. This changes neither production validation nor permission to execute.

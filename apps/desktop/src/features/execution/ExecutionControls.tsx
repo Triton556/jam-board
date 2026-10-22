@@ -99,6 +99,7 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
         state && (
           <>
             <div className="execution-heading">
+              <span className="small muted">Worker permission</span>
               <Stamp
                 className={
                   state.effectiveState === "running"
@@ -176,6 +177,11 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
                     : "Pause new work"}
                 </Button>
               )}
+              {state.effectiveState === "paused" && state.canStart && (
+                <span className="small muted">
+                  Start permits Ready claims; it does not launch an agent.
+                </span>
+              )}
               {pendingWrites > 0 && (
                 <span className="small" role="status">
                   Saving changes…
@@ -185,6 +191,7 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
             <details className="execution-help">
               <summary>How starting works</summary>
               <p className="small muted">
+                Planning status describes this scope, not worker permission.
                 Ready is a brief state, not permission to execute. Start allows
                 connected workers to take Ready work; it never launches a
                 session. Pause blocks new claims, not running work or its

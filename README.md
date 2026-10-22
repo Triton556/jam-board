@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.12**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.13**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.12.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.13.md).
 
 ## Features
 
@@ -63,7 +63,7 @@ New here? Follow [one project from rough idea to reviewed work](docs/first-proje
 
 ## Separate projects
 
-Click the project name at the top to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
+Use **Switch project** in the left navigation to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
 
 MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration pinned to the selected project's immutable ID (with its name and prefix shown for orientation). Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
 

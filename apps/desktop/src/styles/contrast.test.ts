@@ -87,3 +87,23 @@ it.each(["light", "dark"] as const)(
     ).toBeGreaterThanOrEqual(4.5);
   },
 );
+
+it.each(["light", "dark"] as const)(
+  "%s semantic report success and ending countdown text meet 4.5:1 on their actual base surfaces",
+  (theme) => {
+    const colors = theme === "light" ? light : dark;
+    for (const background of ["paper", "paper-2", "card", "card-hover"])
+      expect(
+        contrast(color(colors, "success-ink"), color(colors, background)),
+        `${theme} success-ink on ${background}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(color(colors, "coral-ink"), color(colors, "paper")),
+    ).toBeGreaterThanOrEqual(4.5);
+    const reports = readFileSync("src/styles/v22.css", "utf8");
+    expect(reports).toMatch(
+      /\.test-pass,\s*\.recommendation\s*\{\s*color: var\(--success-ink\)/,
+    );
+    expect(app).toMatch(/\.countdown\.ending\s*\{\s*color: var\(--coral-ink\)/);
+  },
+);

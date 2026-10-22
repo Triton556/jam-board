@@ -107,8 +107,8 @@
   gap: 3px;
 }
 .project-switcher small {
-  font-size: 9px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   color: var(--ink-2);
 }
 .project-switcher-title {
@@ -652,4 +652,39 @@
   > summary::before {
   transform: rotate(45deg);
   margin-bottom: 3px;
+}
+
+/* Feedback cannot expand the virtual table's fixed-height header. */
+.table-inline-create {
+  padding: 12px;
+  border: var(--stroke) solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--card);
+}
+.table-inline-create .inline-task-form {
+  flex-wrap: wrap;
+}
+.table-inline-create .inline-task-form input {
+  min-width: 180px;
+}
+.table-inline-create p {
+  margin: 8px 0 0;
+}
+
+.board-overflow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 26px 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.board-overflow-controls .button {
+  min-height: 30px;
+  padding: 4px 9px;
+}
+.board-scroll:focus-visible {
+  outline-offset: -3px;
 }

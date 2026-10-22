@@ -87,7 +87,12 @@ const ReferencesPage = lazy(() =>
 
 import { Board } from "./features/board/Board";
 import { CommandCenter } from "./features/command/CommandCenter";
-import { Welcome } from "./features/onboarding/Welcome";
+
+const Welcome = lazy(() =>
+  import("./features/onboarding/Welcome").then((module) => ({
+    default: module.Welcome,
+  })),
+);
 
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((m) => ({
@@ -408,10 +413,11 @@ function Shell() {
           <Link
             to="/projects"
             className="project-switcher"
-            aria-label={`Projects · ${app.data.jam?.name}`}
+            aria-label={`Switch project · ${app.data.jam?.name}`}
+            title={app.data.jam?.name}
           >
             <span className="project-switcher-label">
-              <small>PROJECT</small>
+              <small>Switch project</small>
               <strong className="project-switcher-title">
                 {app.data.jam?.name}
               </strong>

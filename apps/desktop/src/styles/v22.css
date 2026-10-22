@@ -412,7 +412,7 @@
 }
 .test-pass,
 .recommendation {
-  color: var(--leaf);
+  color: var(--success-ink);
 }
 .test-fail,
 .changes-requested {

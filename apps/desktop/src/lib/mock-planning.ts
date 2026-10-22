@@ -37,24 +37,31 @@ export const emptyBrief = (): Required<TaskBrief> => ({
   resultMd: "",
   userQuotesMd: "",
 });
+// Rust char::is_whitespace / str::trim, not ECMAScript trim (NEL/BOM differ).
+export const hasRustText = (value: string) => /\P{White_Space}/u.test(value);
+
 export function mockReadiness(
   t: Pick<TaskDetail, "brief" | "story">,
 ): Readiness {
   const b = { ...emptyBrief(), ...t.brief };
   const missing = [
-    ["goal", "Goal is empty", !b.goalMd.trim()],
-    ["where", "Where is empty", !b.whereMd.trim()],
+    ["goal", "Goal is empty", !hasRustText(b.goalMd)],
+    ["where", "Where is empty", !hasRustText(b.whereMd)],
     [
       "change",
       "At least one change with a Required text",
-      !(b.changes ?? []).some((c) => c.title.trim() && c.required.trim()),
+      !(b.changes ?? []).some(
+        (c) => hasRustText(c.title) && hasRustText(c.required),
+      ),
     ],
     [
       "test",
       "At least one test with setup and expected result",
-      !(b.tests ?? []).some((c) => c.setup.trim() && c.expected.trim()),
+      !(b.tests ?? []).some(
+        (c) => hasRustText(c.setup) && hasRustText(c.expected),
+      ),
     ],
-    ["result", "Result (report format) is empty", !b.resultMd.trim()],
+    ["result", "Result (report format) is empty", !hasRustText(b.resultMd)],
     ["story_active", "The story is still draft", t.story.status !== "active"],
   ]
     .filter((c) => c[2])
@@ -62,13 +69,21 @@ export function mockReadiness(
   return { ready: missing.length === 0, missing };
 }
 export function validateBrief(b: TaskBrief) {
-  if ((b.changes ?? []).some((c) => !c.title.trim() || !c.required.trim()))
+  if (
+    (b.changes ?? []).some(
+      (c) => !hasRustText(c.title) || !hasRustText(c.required),
+    )
+  )
     throw new JamError(
       "validation",
       "Each change needs title and required text",
       "changes",
     );
-  if ((b.tests ?? []).some((t) => !t.setup.trim() || !t.expected.trim()))
+  if (
+    (b.tests ?? []).some(
+      (t) => !hasRustText(t.setup) || !hasRustText(t.expected),
+    )
+  )
     throw new JamError(
       "validation",
       "Each test needs setup and expected result",

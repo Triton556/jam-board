@@ -104,7 +104,7 @@ test("new projects keep existing boards and the picker restores their hierarchy"
   page,
 }) => {
   const original = await page.evaluate(() => window.__jamMock.appState());
-  await page.getByRole("link", { name: /^Projects ·/ }).click();
+  await page.getByRole("link", { name: /^Switch project ·/ }).click();
   await page.getByRole("button", { name: "New project", exact: true }).click();
   await page.getByRole("button", { name: "Custom", exact: true }).click();
   await page
@@ -115,10 +115,12 @@ test("new projects keep existing boards and the picker restores their hierarchy"
     .getByRole("button", { name: "Create project", exact: true })
     .click();
   await expect(
-    page.getByRole("link", { name: "Projects · Fictional second project" }),
+    page.getByRole("link", {
+      name: "Switch project · Fictional second project",
+    }),
   ).toBeVisible();
   await expect(page.getByTestId("task-card")).toHaveCount(0);
-  await page.getByRole("link", { name: /^Projects ·/ }).click();
+  await page.getByRole("link", { name: /^Switch project ·/ }).click();
   await page
     .getByRole("button", { name: `Open project ${original.jam?.name}` })
     .click();
@@ -126,7 +128,7 @@ test("new projects keep existing boards and the picker restores their hierarchy"
     page.getByRole("navigation", { name: "Epic hierarchy" }),
   ).toContainText("Stories live inside this epic");
   await expect(
-    page.getByRole("link", { name: `Projects · ${original.jam?.name}` }),
+    page.getByRole("link", { name: `Switch project · ${original.jam?.name}` }),
   ).toBeVisible();
   const projects = await page.evaluate(() => window.__jamMock.listProjects());
   expect(projects).toHaveLength(2);

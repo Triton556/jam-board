@@ -44,6 +44,7 @@ import type { ColorBy, Member, Status, TaskSummary } from "../../lib/types";
 import { emptyBoard, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { StoryPicker } from "../plan/PlanningControls";
+import { BoardOverflow } from "./BoardOverflow";
 import { TaskCard } from "./TaskCard";
 
 function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
@@ -526,7 +527,7 @@ export function Board({
           destination.current = null;
         }}
       >
-        <div className="board-scroll">
+        <BoardOverflow>
           <div className="board-columns">
             {statuses.map((status) => (
               <Column
@@ -541,7 +542,7 @@ export function Board({
               />
             ))}
           </div>
-        </div>
+        </BoardOverflow>
         <DragOverlay dropAnimation={null}>
           {active && (
             <div className="drag-overlay">
