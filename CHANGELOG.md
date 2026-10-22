@@ -3,6 +3,49 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.13] - 2026-10-21
+
+### Fixed
+
+- Virtual table windows retain a visible keyboard entry after scrolling, row removal,
+  filtering and sorting. Mounted overscan rows outside the usable viewport do not
+  count as visible. Genuine row focus is preserved by task identity when possible;
+  search/filter controls keep their own focus. Arrows, Home/End and Enter continue
+  working without rendering the whole table. Read failures offer an explicit Retry.
+- The table's inline New task editor captures submitted values, prevents duplicate
+  writes and visibly holds its pending form. Known errors preserve the complete
+  draft for explicit retry; old project/unmounted completions cannot erase a newer
+  draft, announce success or scroll another table. Its feedback sits above the
+  fixed-height virtual header rather than overflowing the row. This is separate
+  from the Plan creation dialogs repaired in alpha12.
+- Mock readiness now matches Rust's Unicode whitespace rules, including NEL versus
+  BOM and NUL-containing text. Authoritative readiness and execution policy are
+  unchanged; this closes a development/test bridge inconsistency.
+- Success/recommendation text and ending countdowns use theme-specific ink colors
+  instead of lower-contrast decorative colors. Decorative rings/palette stay intact.
+
+### Improved
+
+- The project header explicitly says **Switch project**, retaining the full name in
+  accessible text and its title. **Planning status** and **Worker permission** are
+  named separately, with a concise reminder that Start permits claims, not launch.
+- Overflowing boards show directional cues and bounded Left/Right controls. A named
+  keyboard-focusable region supports Left/Right/Home/End only when the region itself
+  is focused; task-card opening and drag keys are unchanged. Controls track resize
+  and disappear when all columns fit. Scrolling is immediate, including reduced motion.
+- Welcome loads only when onboarding is needed. The unchanged initial JavaScript
+  budget caught a small overrun; a real empty-app-to-demo/router test verifies the
+  lazy boundary rather than raising the limit.
+
+### Verification and limitations
+
+- See [exact-version verification](docs/verification/0.3.0-alpha.13.md). Virtual
+  geometry is explicitly synthetic in DOM tests; this batch is not a new native,
+  browser frame-time or accessibility-conformance claim. No database migration,
+  dependency, execution grant, MCP or native request contract change.
+- Pending UI locks do not cancel or make submitted writes idempotent. An uncertain
+  write must be inspected before repeating it; no automatic timeout/retry is added.
+
 ## [0.3.0-alpha.12] - 2026-10-21
 
 ### Fixed

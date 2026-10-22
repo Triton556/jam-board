@@ -21,6 +21,7 @@
   --coral: #f07e5f;
   --coral-ink: #aa452b;
   --leaf: #3e9a62;
+  --success-ink: #287344;
   --danger: #b83c32;
   --danger-ink: #ab3e31;
   --st-backlog: var(--lilac);
@@ -68,6 +69,7 @@
   --coral: #f48c6e;
   --coral-ink: #f48c6e;
   --danger-ink: #f28d80;
+  --success-ink: #82c99a;
   --shadow-card:
     0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 24px -12px rgba(0, 0, 0, 0.7);
 }

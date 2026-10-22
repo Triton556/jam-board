@@ -5,7 +5,7 @@ examples, not instructions to provision a real server or launch an agent process
 
 ## 1. Make a separate board
 
-Open the project name in the left navigation, then **New project**. Choose **Custom**
+Use **Switch project** in the left navigation, then **New project**. Choose **Custom**
 for a general project, give it a name and create it. Use **Your projects** to return
 to another board; a project switch does not move tasks or stop workers.
 
@@ -81,8 +81,8 @@ not individual rows. You can close the comparison and keep working on the draft.
 ## 5. Ready is not Start
 
 Mark a sufficiently specified task **Ready**. This means its brief is usable, not
-that workers may execute it. The Story's **Plan status** also describes planning;
-it is distinct from the **New work allowed / Paused** permission display.
+that workers may execute it. The Story's **Planning status** also describes planning;
+it is distinct from **Worker permission**, shown as **New work allowed / Paused**.
 
 When you want implementation to begin, **Start the story or epic** in Plan and
 confirm the exact scope. Or ask in brain chat; the brain creates a typed Start

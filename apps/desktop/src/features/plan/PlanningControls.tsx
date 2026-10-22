@@ -44,7 +44,7 @@ export function PlanningStatus({
   });
   return (
     <div className="planning-status">
-      <span className="planning-status-label small muted">Plan status</span>
+      <span className="planning-status-label small muted">Planning status</span>
       <CustomSelect
         label={`${level} plan status`}
         value={value}
