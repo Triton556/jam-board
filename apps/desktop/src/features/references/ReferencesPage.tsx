@@ -49,6 +49,7 @@ import {
 } from "./dialogs";
 import { ReferenceEdge } from "./Edge";
 import { EdgeLabelDialog } from "./EdgeLabelDialog";
+import { referenceFitViewport } from "./frame-layout";
 import { stopReferenceAudio } from "./Media";
 import {
   CanvasHistory,
@@ -240,17 +241,48 @@ function Canvas() {
   );
   const announce = useCallback((text: string) => setNotice(text), []);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fitCanvas = useCallback(
+    (duration: number) => {
+      const bounds = container.current?.getBoundingClientRect();
+      if (!bounds) return Promise.resolve(false);
+      const toolsBottom = Math.max(
+        0,
+        ...Array.from(
+          container.current?.querySelectorAll<HTMLElement>(
+            ".reference-toolbar, .reference-filters",
+          ) ?? [],
+        ).map((element) => element.getBoundingClientRect().bottom - bounds.top),
+      );
+      const viewport = referenceFitViewport(
+        flow
+          .getNodes()
+          .filter((node) => !node.hidden)
+          .map((node) => ({
+            ...flow.getNodesBounds([node.id]),
+            frame:
+              node.type === "frame"
+                ? { collapsed: !!node.data.frame.collapsed }
+                : undefined,
+          })),
+        { width: bounds.width, height: bounds.height, toolsBottom },
+      );
+      return viewport
+        ? flow.setViewport(viewport, { duration })
+        : Promise.resolve(false);
+    },
+    [flow],
+  );
   useEffect(() => {
     if (import.meta.env.VITE_MOCK_BRIDGE !== "1") return;
     window.__jamCanvas = {
       setViewport: (v) => flow.setViewport(v, { duration: 0 }),
       getViewport: () => flow.getViewport(),
-      fit: () => flow.fitView({ duration: 0, padding: 0.3 }),
+      fit: () => fitCanvas(0),
     };
     return () => {
       delete window.__jamCanvas;
     };
-  }, [flow]);
+  }, [flow, fitCanvas]);
   const center = useCallback(() => {
     const rect = container.current?.getBoundingClientRect();
     return flow.screenToFlowPosition({
@@ -663,7 +695,7 @@ function Canvas() {
         return;
       if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 });
+        void fitCanvas(reduced ? 0 : 220);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         void undo(e.shiftKey);
@@ -671,7 +703,7 @@ function Canvas() {
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [flow, reduced, undo]);
+  }, [fitCanvas, reduced, undo]);
   const addInput = useCallback(
     async (input: ReferenceInput) => {
       const point = center(),
@@ -820,7 +852,7 @@ function Canvas() {
           }
           if (key === "f") {
             e.preventDefault();
-            void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 });
+            void fitCanvas(reduced ? 0 : 220);
             return;
           }
           const focused = (e.target as HTMLElement).closest<HTMLElement>(
@@ -1177,9 +1209,7 @@ function Canvas() {
           </Button>
           <IconButton
             label="Fit view · F"
-            onClick={() =>
-              void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 })
-            }
+            onClick={() => void fitCanvas(reduced ? 0 : 220)}
           >
             <Focus size={18} />
           </IconButton>

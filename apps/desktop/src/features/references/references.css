@@ -361,7 +361,7 @@
   transform-origin: left bottom;
   position: absolute;
   left: 0;
-  top: -46px;
+  bottom: calc(100% + 4px);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -383,6 +383,32 @@
 }
 .reference-frame-tab:active {
   cursor: grabbing;
+}
+.reference-frame-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.reference-frame-grip {
+  flex-shrink: 0;
+}
+.reference-frame-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.reference-frame-tab.compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.reference-frame-tab.compact .reference-frame-heading {
+  min-height: 32px;
+}
+.reference-frame-tab.compact .reference-frame-actions {
+  align-self: flex-end;
 }
 .reference-frame-title {
   flex: 1;
@@ -430,6 +456,8 @@
 }
 .reference-frame.collapsed .reference-frame-tab {
   top: 0;
+  bottom: auto;
+  transform-origin: left top;
 }
 .reference-frame .react-flow__resize-control {
   pointer-events: auto;
@@ -670,13 +698,6 @@ p.reference-read-notice {
 .reference-note-draft p {
   margin: 0;
   overflow-wrap: anywhere;
-}
-
-.reference-frame-overview .reference-frame-tab button {
-  display: none;
-}
-.reference-frame-tab:focus-within button {
-  display: grid;
 }
 
 .reference-read-notice > p:not(:empty) {

@@ -25,6 +25,7 @@ import type { RefFrame, RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
+import { frameHeaderLayout } from "./frame-layout";
 import { LocalMedia } from "./Media";
 import { palette, referenceKind } from "./model";
 import { useCanvas } from "./runtime";
@@ -52,6 +53,97 @@ const icons = {
   link: Link,
   note: StickyNote,
 };
+
+/** Native disclosure semantics, with explicit nested dismissal and dialog opener ownership. */
+export function ReferenceActions({
+  item,
+  links,
+}: {
+  item: RefItem;
+  links: TargetChip[];
+}) {
+  const runtime = useCanvas();
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDetailsElement>(null);
+  const summary = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as globalThis.Node)) {
+        if (menu.current) menu.current.open = false;
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => document.removeEventListener("pointerdown", dismiss, true);
+  }, [open]);
+  const close = () => {
+    if (menu.current) menu.current.open = false;
+    setOpen(false);
+  };
+  const activate = (action: () => void) => {
+    close();
+    // Dialogs capture this visible opener, not the button about to become hidden.
+    summary.current?.focus();
+    action();
+  };
+  return (
+    <details
+      ref={menu}
+      className="reference-menu nodrag nopan"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onKeyDownCapture={(event) => {
+        if (event.key !== "Escape" || !menu.current?.open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        summary.current?.focus();
+      }}
+    >
+      <summary ref={summary} aria-label={`Actions for ${item.title}`}>
+        <MoreHorizontal size={18} />
+      </summary>
+      <fieldset
+        className="reference-action-list"
+        aria-label="Reference actions"
+      >
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.edit(item.id, "caption"))}
+        >
+          Edit caption
+        </button>
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.edit(item.id, "tags"))}
+        >
+          Tags
+        </button>
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.edit(item.id, "link"))}
+        >
+          Link to…
+        </button>
+        {links.map((l) => (
+          <button
+            type="button"
+            key={l.key}
+            onClick={() => activate(() => runtime.open(l.key))}
+          >
+            Open {l.key}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.archive("item", item.id))}
+        >
+          Archive
+        </button>
+      </fieldset>
+    </details>
+  );
+}
 export const ReferenceNode = memo(function ReferenceNode({
   data,
   selected,
@@ -110,43 +202,7 @@ export const ReferenceNode = memo(function ReferenceNode({
       <header className="reference-card-header">
         <Icon size={15} />
         <strong>{item.title}</strong>
-        <details className="reference-menu nodrag nopan">
-          <summary aria-label={`Actions for ${item.title}`}>
-            <MoreHorizontal size={18} />
-          </summary>
-          <fieldset
-            className="reference-action-list"
-            aria-label="Reference actions"
-          >
-            <button
-              type="button"
-              onClick={() => runtime.edit(item.id, "caption")}
-            >
-              Edit caption
-            </button>
-            <button type="button" onClick={() => runtime.edit(item.id, "tags")}>
-              Tags
-            </button>
-            <button type="button" onClick={() => runtime.edit(item.id, "link")}>
-              Link to…
-            </button>
-            {links.map((l) => (
-              <button
-                type="button"
-                key={l.key}
-                onClick={() => runtime.open(l.key)}
-              >
-                Open {l.key}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => runtime.archive("item", item.id)}
-            >
-              Archive
-            </button>
-          </fieldset>
-        </details>
+        <ReferenceActions item={item} links={links} />
       </header>
       <div className="reference-content">
         {item.kind === "asset" ? (
@@ -283,12 +339,13 @@ function NoteContent({ item }: { item: RefItem }) {
 export const ReferenceFrame = memo(function ReferenceFrame({
   data,
   selected,
+  width,
 }: NodeProps<FrameNode>) {
   const { frame } = data,
     c = useCanvas();
   const zoom = useStore((s) => s.transform[2]);
   const overview = zoom < 0.4;
-  const headerScale = Math.max(1, 0.75 / zoom);
+  const header = frameHeaderLayout(width ?? frame.w ?? 800, zoom);
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -298,6 +355,7 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             ? palette(frame.color)
             : "var(--line)",
           opacity: data.dim ? 0.15 : 1,
+          minHeight: frame.collapsed ? header.height * header.scale : undefined,
         } as React.CSSProperties
       }
     >
@@ -324,49 +382,53 @@ export const ReferenceFrame = memo(function ReferenceFrame({
         </svg>
       )}
       <div
-        className="reference-frame-tab"
+        className={`reference-frame-tab ${header.compact ? "compact" : ""}`}
         style={{
-          transform: `scale(${headerScale})`,
-          width: `${100 / headerScale}%`,
+          transform: `scale(${header.scale})`,
+          width: `${header.cssWidth}px`,
         }}
         title="Drag this header to move the frame; select it to resize"
       >
-        <GripHorizontal
-          className="reference-frame-grip"
-          size={20}
-          aria-hidden="true"
-        />
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
-          onClick={() => c.collapse(frame)}
-        >
-          {frame.collapsed ? (
-            <ChevronRight size={16} />
-          ) : (
-            <ChevronDown size={16} />
-          )}
-        </button>
-        <span className="reference-frame-title" title={frame.title}>
-          {frame.title}
-        </span>
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`Edit frame ${frame.title}`}
-          onClick={() => c.editFrame(frame)}
-        >
-          <MoreHorizontal size={15} />
-        </button>
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`Archive frame ${frame.title}`}
-          onClick={() => c.archive("frame", frame.id)}
-        >
-          <Archive size={15} />
-        </button>
+        <div className="reference-frame-heading">
+          <GripHorizontal
+            className="reference-frame-grip"
+            size={20}
+            aria-hidden="true"
+          />
+          <span className="reference-frame-title" title={frame.title}>
+            {frame.title}
+          </span>
+        </div>
+        <div className="reference-frame-actions">
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+            onClick={() => c.collapse(frame)}
+          >
+            {frame.collapsed ? (
+              <ChevronRight size={16} />
+            ) : (
+              <ChevronDown size={16} />
+            )}
+          </button>
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`Edit frame ${frame.title}`}
+            onClick={() => c.editFrame(frame)}
+          >
+            <MoreHorizontal size={15} />
+          </button>
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`Archive frame ${frame.title}`}
+            onClick={() => c.archive("frame", frame.id)}
+          >
+            <Archive size={15} />
+          </button>
+        </div>
       </div>
     </div>
   );
