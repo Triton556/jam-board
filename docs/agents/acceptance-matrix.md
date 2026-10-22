@@ -111,4 +111,4 @@ alpha30 verification; native geometry, both themes, 800×600/200% scaling and
 
 ## Alpha31 candidate additions
 
-AC02: both Refine modes, keyboard choice, scoped local request across Close/project return, copy failure/pending/scope changes, exact entity IDs, no board mutations. See `features/brain-handoff.test.tsx` and `e2e/refinement-modes.spec.ts` (browser/native not yet run). AC12: a newly agent-created task has a concise human-readable user-language description, existing human wishes preserved, technical detail secondary. This end-to-end/model behavior is NOT established by prompt-string tests.
+AC02: both Refine modes, keyboard choice, scoped local request across Close/project return, copy failure/pending/scope changes, exact entity IDs, no board mutations. See `features/brain-handoff.test.tsx` and `e2e/refinement-modes.spec.ts` (browser/native not yet run). AC13: a newly agent-created task has a concise human-readable user-language description, existing human wishes preserved, technical detail secondary. This end-to-end/model behavior is NOT established by prompt-string tests.
