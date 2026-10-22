@@ -29,11 +29,13 @@ import {
 import { QueryError } from "../../components/ui/AsyncState";
 import { FileDropZone, PageHeading } from "../../components/ui/m5";
 import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { useBoardSettings } from "../../lib/queries";
 import type { Asset, AssetWithTasks } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
 import { useProjectWrite } from "../../lib/use-project-write";
 import { useTableVirtualizer } from "../table/use-table-virtualizer";
 import { AssetLinkDialog } from "./AssetLinkDialog";
@@ -363,6 +365,11 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const [sort, setSort] = useState("createdAt:desc");
   const [edit, setEdit] = useState<Asset | true | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const read = useExplicitRead(
+    JSON.stringify(["assets", kind, text, linked, sort]),
+  );
+  const refresh = () =>
+    void read.run(() => assets.refetch({ cancelRefetch: false }));
   useEffect(
     () =>
       api.onFileDrop((paths) => {
@@ -423,11 +430,11 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
             ]}
           />
           <Button
-            disabled={assets.isFetching}
-            aria-busy={assets.isFetching}
-            onClick={() => void assets.refetch()}
+            disabled={read.pending || assets.isFetching}
+            aria-busy={read.pending || assets.isFetching}
+            onClick={refresh}
           >
-            Refresh assets
+            {read.pending ? "Checking assets…" : "Refresh assets"}
           </Button>
           <Button variant="primary" onClick={() => setEdit(true)}>
             Add asset
@@ -466,15 +473,24 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           onChange={(e) => setText(e.target.value)}
         />
       </div>
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="assets"
+      />
       {assets.error && (
-        <QueryError error={assets.error} retry={() => void assets.refetch()} />
+        <QueryError
+          error={assets.error}
+          retry={refresh}
+          busy={read.pending || assets.isFetching}
+        />
       )}
       {assets.error && assets.data && (
         <p className="small muted">
           Showing the last loaded asset list; retry to check for changes.
         </p>
       )}
-      {assets.isFetching && assets.data && (
+      {assets.isFetching && assets.data && !read.pending && (
         <p className="small muted" role="status">
           Refreshing assets… showing the last loaded list.
         </p>

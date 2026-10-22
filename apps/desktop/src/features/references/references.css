@@ -678,3 +678,8 @@ p.reference-read-notice {
 .reference-frame-tab:focus-within button {
   display: grid;
 }
+
+.reference-read-notice > p:not(:empty) {
+  margin: 0;
+  padding: 12px;
+}
