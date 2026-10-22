@@ -152,3 +152,16 @@ it("P02/AS03: a queued save invalidated before dispatch is not sent or described
   expect(screen.getByRole("status")).toHaveTextContent("Unsaved changes");
   expect(input).toHaveValue("Queued");
 });
+
+it("P02: missing project at dispatch refuses save and keeps the draft with not-sent feedback", async () => {
+  const save = vi.fn().mockResolvedValue(undefined);
+  const { client } = mount(save);
+  act(() => client.removeQueries({ queryKey: ["app"] }));
+  const { input } = await edit("Local draft without project");
+  await waitFor(() =>
+    expect(screen.getByRole("alert")).toHaveTextContent("Save was not sent."),
+  );
+  expect(save).not.toHaveBeenCalled();
+  expect(input).toHaveValue("Local draft without project");
+  expect(screen.queryByText("Epic title saved.")).toBeNull();
+});

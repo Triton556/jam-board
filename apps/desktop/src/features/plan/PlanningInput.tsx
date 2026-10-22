@@ -69,7 +69,7 @@ function ScopedPlanningInput({
     scope: { id: identity },
     retry: false,
     mutationFn: (submitted: Attempt) => {
-      if (!current(submitted))
+      if (!submitted.project || !current(submitted))
         throw new Error(
           "The project or field changed before this save was sent.",
         );

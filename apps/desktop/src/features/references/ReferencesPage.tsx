@@ -1079,11 +1079,7 @@ function Canvas() {
               retry={explicitRefresh}
             />
           )}
-          <ReadReceipt
-            checkedAt={read.checkedAt}
-            phase={read.phase}
-            resource="references"
-          />
+
           {query.isFetching && query.data && !query.error && !read.pending && (
             <p role="status">
               Refreshing references… showing the last loaded canvas.
@@ -1228,6 +1224,11 @@ function Canvas() {
           >
             {read.pending ? "Checking references…" : "Refresh references"}
           </Button>
+          <ReadReceipt
+            checkedAt={read.checkedAt}
+            phase={read.phase}
+            resource="references"
+          />
         </div>
         <fieldset className="reference-filters" aria-label="Filter references">
           <button
