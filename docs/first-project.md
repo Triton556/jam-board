@@ -61,6 +61,12 @@ agent. The connected client still needs its own permitted access to those files
 and your knowledge base. If it cannot read a source, it should say so and ask for
 accessible material rather than invent what the attachment contains.
 
+**If a save returns an error:** this is not always proof that nothing was written;
+a notification can fail after persistence. Inspect fresh data in the intended
+project for the submitted item before intentionally retrying. The pending
+button lock prevents simultaneous sends, not duplicate creation after an uncertain
+result. The app does not automatically replay the mutation.
+
 Choose **Refine with brain**, inspect the prepared project/scope and copy the
 planning prompt into the connected brain's chat. For example, add:
 
