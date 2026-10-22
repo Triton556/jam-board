@@ -52,10 +52,10 @@ Legend: `D0` base route; `D1` revealed editor/menu/modal; `D2+` nested layers. E
 | I01 | `/inbox` → question card | Choices/custom answer; collapse/open; navigate scope → drawer/page | Open/resolved list, empty/read failure/retry, failed write retains answer, removal receipt and stable heading focus | `inbox/InboxPage.tsx` |
 | I02 | Inbox → execution request → Approve | Approve start dialog → captured consequences | Stale/superseded/declined/approved, pending and failed approval; no double grant; approval receipt not claim of worker launched | `execution/ExecutionRequests.tsx` |
 | A01 | `/assets` → add/edit asset dialog | File/URL tabs; Choose file → native picker; Kind dropdown; link targets | Required field/invalid URL, empty/search/filter, read retry, pending/error/project-changed; tabs keyboard and source-specific fields | `assets/AssetsPage.tsx:127+`; `AssetLinkDialog.tsx` |
-| R01 | `/references` → Add menu | Add link/note dialog; Add file native picker; New frame dialog → Epic dropdown | Existing add-note modal is baseline, not desired future behavior; empty-only-frame case; failed create/repeated click; project check states | `references/ReferencesPage.tsx:1040+,1177+`; `dialogs.tsx` |
+| R01 | `/references` → Add menu | Note placement → canvas click/Enter → body on paper; optional Add title; link/frame dialog and native file picker remain separate | New blank is local; idle/blur autosave; pending/newer typing; uncertain create retains text without automatic replay; project/lifetime ownership | `references/ReferencesPage.tsx`; `DraftNote.tsx`; `StickyEditor.tsx`; `use-sticky-note.ts` (alpha38 candidate) |
 | R02 | References → frame selection | Resize handles; title tab collapse; edit frame dialog → Epic dropdown; archive → Undo notice | Grab region and low zoom; frame vs child move; collapsed children; archive/undo geometry; selected focus indicator | `references/Nodes.tsx:281+`; `ReferencesPage.tsx:297+,416+`; `references.css:342+` |
 | R03 | References → reference Actions details | Edit caption / Tags / Link to dialog → searchable target dropdown (D3); Open target; Archive | Label clipping and popup bounds; return to originating card; dead/archived linked entity; failed mutation visibility | `references/Nodes.tsx:110+`; `references/dialogs.tsx:172+` |
-| R04 | References → existing note | Double-click/Enter body editor → Save note / Escape | Text keyboard does not pan/delete node; save pending/failure/duplicate; explicit cancel; title currently not inline | `references/Nodes.tsx:226–279` |
+| R04 | References → existing note | Double-click/Enter or Edit note → same direct body/optional-heading editor → finish | No-heading survives reopen; explicit Note heading retained; content-equality conflict preserves draft; cleared existing paper remains a record; no uncertain-write replay | `references/Nodes.tsx`; `StickyEditor.tsx`; `use-sticky-note.ts` (alpha38 candidate) |
 | R05 | References → image / audio / video / link | Image lightbox; audio seek/play; external link / Fetch/Remove preview | Missing local file, unsupported preview, long title/lightbox fit; page leave stops audio; fetch error cannot look like success | `references/Media.tsx`; `Nodes.tsx`; `ReferencesPage.tsx:1280+` |
 | R06 | References → Connect mode → edge | Edge label dialog; right-click archive; selection delete; Undo/Redo | Mode hint, no edge selected, fail after save, repeated Submit, edge label long/empty; geometry history origin project | `references/ReferencesPage.tsx`; `references/Edge.tsx`; `model.ts` |
 | R07 | References → filter / minimap / zoom / fit | Overview representation below 0.4; selected item expansion | All-filtered differs from empty, low-zoom controls still discoverable, fit includes frames; keyboard focus remains visible | `ReferencesPage.tsx`; `OverviewScene.tsx`; `Nodes.tsx` |
@@ -163,3 +163,17 @@ H-R03: focused item Actions retains native Enter/Space activation; Escape closes
 only its menu and returns focus. Summary Space is isolated from the canvas pan
 shortcut, while empty-canvas Space remains available. The alpha35 hosted failure
 and the unchanged real-key scenario are recorded in alpha37 verification.
+
+## Alpha38 candidate: H-R01 / H-R03 / H-R04 / H-R07
+
+Direct paper supersedes the historical alpha30 Title/Note/Save form. The empty
+new paper is local until nonblank heading or body triggers autosave; a deliberate
+clear of an existing note is a valid saved state, not deletion. Explicit heading
+`Note` and a deliberately empty heading are distinct stored values. Existing
+media captions and agent result cards retain their previous editing surfaces.
+
+A returned error is not proof that a write did not happen. Creation uncertainty
+keeps text for inspection/read-only recovery and does not create again. Known-ID
+updates compare both inspected content fields atomically; this cannot detect a
+remote change-away-and-back history and does not make unguarded agent writes
+revision-aware. Hosted/native rendered-paper acceptance is recorded separately.

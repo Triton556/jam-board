@@ -8,7 +8,7 @@
 |---|---|---|
 | Human-first Task/Story | Corrected alpha29 DOM closure and bounded native read-only evidence; native text entry blocked | HF01–HF06 functional + open-state visual evidence; preserve reports, readiness and drafts |
 | Reference frame grip/empty state | Alpha30 source/DOM; alpha32 source visual treatment; native pending | RF01, RF02 |
-| Create notes inline | Alpha30 local-draft implementation and behavior tests; persisted-note editing unchanged | RF03 including create ambiguity and duplicate guard |
+| Direct note paper | Alpha30–36 canvas form was explicitly rejected by the user; alpha38 replaces it with direct placement/writing | RF03 including reopen/no-heading, autosave ambiguity, retained drafts and actual rendered appearance |
 | Notification bell/history | Alpha31 implemented from existing scoped activity; corrected paging/navigation races | NT01 including retention, identity, accessible View and stale destination |
 | Hidden dialog spacing | Reference form rhythm corrected in30; select collision repair in31; broader visual inspection pending | VS01 and H-D11 nested flow |
 | Zoom/DPI polish | Alpha30 image-resolution logic implemented; entire-board/text sharpness unverified | VS02/VS03 native checks |
@@ -22,7 +22,7 @@
 |---|---|---|---|
 | F01 | Alpha30 source/DOM correction; native pending | `features/references/ReferencesPage.tsx:1177`: `!data?.items.length` gates empty illustration; frames ignored. | Empty canvas → add only frame → illustration gone; archive last frame → illustration returns only if no active content; verify archived records/filter state separately. |
 | F02 | Alpha30 grip correction; alpha32 source visual revision; native pending | `ReferencesPage.tsx:442` dragHandle `.reference-frame-tab`; `Nodes.tsx:281+` tab controls are nodrag; `references.css:342–405` frame/outline pointer-events none, tab auto, overview tab opacity 0. | Drag obvious title/grip at 100%, 75%, 40%, 39% zoom; border vs interior behavior understandable; collapse/edit/archive never start drag; interior still allows node selection/pan. Resize remains reachable. |
-| F03 | Alpha30 inline local draft implemented; native editing pending | `ReferencesPage.tsx:1066,1213+`, `references/dialogs.tsx:8+` create note in AddReferenceDialog. `Nodes.tsx:226–279` inline body editing only, double-click/Enter. | Add note → immediate positioned editable card; title and body writable inline; one activation does not require guessing double-click; keyboard start/save/cancel; failed create/save retains text; no duplicate after repeated Add/Save. |
+| F03 | Alpha30–36 canvas form rejected by user; alpha38 direct-paper candidate, visual gate pending | `references/DraftNote.tsx`, `StickyEditor.tsx`, `use-sticky-note.ts`; historical form is replaced, not visually accepted. | Place → direct body/optional heading → autosave → finish/reopen; no new blank records; retained newer typing/conflict/uncertain-create recovery; active editor survives overview/removal until explicit recovery/discard. |
 | F04 | Alpha31 persisted agent-history implementation; native pending | `lib/ui-store.ts:10–20,112–173`: no durable history; last three toasts; five-second expiry; `lib/project-selection.ts` clears toasts. `app.tsx:734+` current View opens Inbox or Board task. | Bell → empty/recent/read states → View exact item; eligible persisted agent updates remain available independently of toast expiry; file receipts are not this history; new event while panel open; long list; current project vs old project explicit. Do not merely preserve old task-key URLs across project switches. |
 | F05 | Alpha30 source spacing correction; revealed-state visual acceptance pending | `references/dialogs.tsx` plain forms; field wrappers nested inside form. `styles/v22.css:508` spacing applies only `.dialog > .field`; `styles/m5.css:57` `.m5-form` has grid gap 16px, absent here. `styles/app.css:1637` label gap separates label/input, not adjacent fields. | New frame, edit frame, add link, edit caption/tags/link: consistent heading→body→field→feedback→footer gaps, especially error and pending variants. Compare Asset/Member dialogs, not only screenshots of closed page. |
 | F06 | Corrected alpha29 behavior; native hierarchy read-only observed | `task/TaskDrawer.tsx:675+` renders full BriefEditor then Notes, Rounds, assets, Comments. `task/BriefEditor.tsx:215+` exposes Goal/Context/Where/Changes/Tests/Boundaries/Result/User quotes. | Default task view exposes human description, comments, planning/regenerate entry; technical structure separately disclosed. Existing agent fields survive human edits exactly; readiness errors offer clear route into required detail. |
@@ -36,7 +36,7 @@
 ## Decisions before the next feature
 
 - Bell decision: existing project activity is durable; read markers are session-only. Seven actionable agent event kinds, bounded pages and explicit newer reads are documented. No unscoped old task-key navigation or guaranteed toast-delivery history.
-- Inline-note decision: Add creates a local draft only; explicit Save requires nonblank body. An uncertain dispatched create retains copyable text and permits read-only reconciliation, never automatic creation replay or a rollback claim.
+- Note decision (alpha38 candidate): Add selects placement; untouched blank paper is local, heading or body triggers autosave. No separate Save form. Existing cleared paper remains saved. Uncertain creation retains copyable text and permits read-only reconciliation, never automatic replay or a rollback claim.
 - Frame interaction: visible grip/selection area should not steal child-node manipulation or interior canvas pan. Low zoom must not leave only invisible controls.
 - Form spacing: adopt one reusable form rhythm, not isolated pixel patches; test field errors and nested dropdowns as well as default states.
 - Human-first: technical plan is still editable and operationally authoritative; do not let hidden invalid fields silently disable Save without explanation.
@@ -147,7 +147,26 @@ extreme control content consuming the viewport remain separate limits.
 The first published35 run passed 86/89 browser cases, not the entire suite. Two
 frame tests ran before the lazy canvas existed; a third exposed real summary
 Space suppression by ReactFlow. Alpha37 fixes the readiness contract and isolates
-the summary key without removing the failing Space assertion. Hosted rerun and
-changed-control native confirmation remain pending. The user's separate rejection
+the summary key without removing the failing Space assertion. The exact alpha37
+hosted run passed those three cases but was not green: Linux 92/93 then exposed
+caption-dialog return focus, and Windows failed the unchanged preview timing
+observer. Alpha38 corrects these bounded causes; its hosted result is still
+pending. Changed-control native confirmation remains separate. The user's rejection
 of the inline creation form is not resolved by this keyboard repair: direct
-placement/writing with optional title is the next scoped design.
+placement/writing with optional title is the separate alpha38 candidate, not yet
+rendered acceptance.
+
+## Alpha38 remaining evidence
+
+The old inline form is not accepted simply because it is on the canvas. Direct
+paper must be inspected after actual placement, typing, optional heading and
+reopening; local native transport is currently unavailable. Hosted screenshot
+scenarios are prepared, not executed evidence. Content-equality checking protects
+against a different current heading/body, not historical ABA or unguarded future
+agent writes. Uncertain creation cannot be reliably deduplicated without a server
+idempotency key; the UI must retain text and never automatically create again.
+
+Actual-router review also caught a pristine saved-note blocker after project
+context loss. Alpha38 allows a genuinely clean departure, while a dispatched
+unresolved operation remains protected even if the user types back to baseline.
+DOM/source checks cover this distinction; no native interruption claim is made.

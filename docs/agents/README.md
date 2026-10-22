@@ -59,9 +59,11 @@ scoped fix nor an aggregate test count is a whole-application usability pass.
 
 The final local alpha35 source checkpoint passed 749 DOM and 26 Node checks, both
 TypeScript configurations, lint/build, and 161 Rust tests (three existing opt-in
-volume cases unrun). The 89 prepared browser scenarios remain NOT RUN; exact35
-native follow-up is now recorded separately and hosted acceptance remains pending. See verification for the
-failed initial checkpoint and its real autosave correction, not only totals.
+volume cases unrun). The later exact35 hosted run passed Windows and **86/89** Linux browser scenarios;
+it was not green overall. Alpha37 addresses the three diagnosed failures, with
+its hosted rerun still pending. Exact35 native follow-up is recorded separately.
+See verification for the failed initial checkpoint and its real autosave
+correction, not only totals.
 
 ## Alpha36 reference overlay spacing
 
@@ -74,4 +76,21 @@ automatic acceptance of changed source.
 Local36 gates passed 752 DOM / 26 Node checks, both TypeScript configurations,
 lint/build and version/map checks. Rust source equivalence to35, formatting and
 locked metadata were checked without claiming a new full Rust test run. The 93
-prepared browser cases and exact36 native rendering are still separate gates.
+prepared browser cases remain unrun on that source. Exact36 native checks later
+observed separated controls in Light/Dark at 1180px, plus bounded blank-gap pan
+and filter behavior. Minimum-window checks were stopped by unavailable native
+tool transport; this is not a whole-canvas or Windows GUI pass.
+
+## Alpha38 direct paper candidate
+
+The user rejected the alpha30–36 canvas form as still feeling modal. The new
+[direct-note contract](direct-sticky-notes.md) supersedes that creation/editing
+path: placement, immediate writing, optional persisted heading and guarded
+autosave. Existing media/result cards are not silently rewritten. Read the
+[alpha38 verification record](../verification/0.3.0-alpha.38.md) for current gates;
+a source implementation or a prepared screenshot test is not visual acceptance.
+
+Alpha38 local integration passes 792 DOM / 26 Node / 178 Rust checks, both
+frontend typechecks, actual binding export and isolated stdio smoke. Its 96
+hosted-browser scenarios and requested actual-paper screenshots are still pending;
+see the [exact verification boundary](../verification/0.3.0-alpha.38.md).
