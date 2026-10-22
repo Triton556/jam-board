@@ -28,6 +28,7 @@ import type { CanvasGeometry, RefFrame, RefItem } from "../../bindings";
 import { Button, Dialog, EmptyState, IconButton } from "../../components/ui";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { api } from "../../lib/api";
+import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { epicsQuery } from "../../lib/planning-queries";
 import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
@@ -83,6 +84,7 @@ export const referencesQuery = {
   staleTime: Infinity,
 };
 function Canvas() {
+  const batch = useFileDropBatch("references");
   const query = useQuery(referencesQuery),
     epics = useQuery(epicsQuery),
     stories = useQuery({
@@ -667,19 +669,20 @@ function Canvas() {
     async (paths: string[], point = center()) => {
       if (!paths.length) return;
       const frame = parentAt(point, latest.current?.frames ?? []);
-      for (const [i, path] of paths.entries())
-        await api.addReference({
-          kind: "asset",
-          filePath: path,
-          frameId: frame?.id,
-          x: point.x - (frame?.x ?? 0) + (i % 3) * 290,
-          y: point.y - (frame?.y ?? 0) + Math.floor(i / 3) * 250,
-        });
-      announce(`Added ${paths.length} references`);
-      await client.invalidateQueries({ queryKey: ["assets"] });
-      await refresh();
+      await batch.run(
+        paths,
+        (path, i) =>
+          api.addReference({
+            kind: "asset",
+            filePath: path,
+            frameId: frame?.id,
+            x: point.x - (frame?.x ?? 0) + (i % 3) * 290,
+            y: point.y - (frame?.y ?? 0) + Math.floor(i / 3) * 250,
+          }),
+        [["assets"], ["references"]],
+      );
     },
-    [center, announce, client, refresh],
+    [center, batch.run],
   );
   useEffect(
     () =>
@@ -1019,6 +1022,7 @@ function Canvas() {
             />
           )}
         </ReactFlow>
+        <FileDropProgress progress={batch.progress} />
         <div
           className="reference-toolbar"
           role="toolbar"

@@ -825,6 +825,8 @@ p {
   flex-direction: column;
   gap: 10px;
   max-width: 490px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
 }
 .app-shell.expanded ~ .toast-stack {
   left: 240px;
@@ -842,8 +844,51 @@ p {
   font-size: 12px;
   animation: toast-in 200ms var(--ease);
 }
-.toast > span:not(.tooltip-wrap) {
+.toast-content {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-details {
+  margin-top: 6px;
+}
+.toast-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.toast-details[open] {
+  max-height: min(40vh, 260px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.toast-details ol {
+  padding-left: 20px;
+}
+.toast-details li + li {
+  margin-top: 8px;
+}
+.toast-details code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.toast:has(.toast-details) {
+  align-items: flex-start;
+  max-width: min(490px, calc(100vw - 110px));
+}
+.file-drop-progress {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--paper-2);
+  line-height: 1.6;
+}
+.references-page > .file-drop-progress {
+  position: absolute;
+  z-index: 8;
+  top: 60px;
+  left: 16px;
+  right: 16px;
 }
 .toast .button {
   height: 28px;

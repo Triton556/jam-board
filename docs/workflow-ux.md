@@ -475,3 +475,28 @@ existing loaded editors and their save/draft rules remain in place. Late module
 settlement does not restore a dismissed URL intent. Direct Story links are tested
 separately because Plan eagerly imports its field metadata from StoryDrawer.
 No dependency extraction or broader route rewrite is needed for this repair.
+
+## 21. A file batch is an intent, not a transaction
+
+An actual-App test with modeled native transport reproduced an Assets drop that
+started in one project and sent its remaining files to a newly selected project.
+References had the same sequential continuation issue. Listener cleanup alone did
+not stop the in-flight loop. Each batch now captures its origin and page lifetime,
+fences every new dispatch, and does not revive after an A → B → A return. This is
+UI continuation fencing, not a new atomic importer or a backend permission change.
+
+[Visibility of system status](https://www.nngroup.com/articles/visibility-system-status/)
+supports showing both processing and the actual outcome. Native command handling
+can reject while polling/emitting events after a store write. Consequently a generic
+error means **unconfirmed**, not “not added.” Receipts distinguish confirmed,
+unconfirmed and not-attempted files, name the captured project, and tell the user
+to inspect it before re-dropping only what is still needed. No mutation retry button,
+automatic replay, rollback promise or process-exit delivery guarantee is added.
+Problematic receipts stay only among the latest three in-memory notices; details
+are optional, bounded, selectable and excluded from the concise live announcement.
+
+The same status principle separates loading/read failure from genuine empty data
+and from filters with no matches. Omitting zero-item groups in the All view brings
+real non-game assets forward without changing drop targets, import classification,
+kind filters or saved collapse preferences. Unit/DOM tests do not establish native
+screen-reader behavior or the rendered height of a large receipt.
