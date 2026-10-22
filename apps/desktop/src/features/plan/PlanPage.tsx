@@ -255,6 +255,14 @@ export function PlanPage({
             retry={() => void epics.refetch()}
           />
         )}
+        {selected.error && selected.data && (
+          <QueryRefreshNotice
+            error={selected.error}
+            resource={`epic ${selected.data.epic.key}`}
+            busy={selected.isFetching}
+            retry={() => void selected.refetch()}
+          />
+        )}
         <WorkflowGuide />
         {!epics.data?.length ? (
           <EmptyState image={duo} size={180} text="No epics yet">
@@ -274,7 +282,7 @@ export function PlanPage({
           </EmptyState>
         ) : selected.isPending ? (
           <PaperSkeleton label="Loading epic" />
-        ) : selected.error ? (
+        ) : selected.error && !selected.data ? (
           <QueryError
             error={selected.error}
             retry={() => void selected.refetch()}

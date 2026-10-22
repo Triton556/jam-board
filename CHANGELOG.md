@@ -3,6 +3,19 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.23] - 2026-10-21
+
+### Fixed
+
+- Cached selected-Epic and Story detail read failures retain the exact Markdown
+  editor, local draft and focus instead of replacing them with an error screen.
+  The last-loaded-view warning offers a read retry; first loads with no data still
+  show a distinct error/retry state.
+- Background recovery and late reads from a former entity do not replace the
+  current editor or trigger a save. Ordinary user blur still invokes the existing
+  Markdown autosave contract; it was not silently disabled or relabelled read-only.
+  The tested data-first TaskDrawer path remains unchanged.
+
 ## [0.3.0-alpha.22] - 2026-10-21
 
 ### Fixed

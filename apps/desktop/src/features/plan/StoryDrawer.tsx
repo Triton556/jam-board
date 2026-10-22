@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Drawer, Stamp } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
@@ -58,9 +62,17 @@ export function StoryDrawer({
   });
   return (
     <Drawer title={storyKey} onClose={close}>
+      {query.error && story && (
+        <QueryRefreshNotice
+          error={query.error}
+          resource={`story ${story.key}`}
+          busy={query.isFetching}
+          retry={() => void query.refetch()}
+        />
+      )}
       {query.isPending ? (
         <PaperSkeleton label="Loading story" />
-      ) : query.error ? (
+      ) : query.error && !query.data ? (
         <QueryError error={query.error} retry={() => void query.refetch()} />
       ) : (
         story && (

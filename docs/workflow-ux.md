@@ -542,3 +542,16 @@ negative control and is unchanged. This applies the same
 [visibility and recovery principle](https://www.nngroup.com/articles/visibility-system-status/)
 to reads: state what failed without silently removing the user's local draft.
 No backend, execution permission, cache lifetime or draft-store architecture changes.
+
+
+## 24. Preserve an editor through a failed detail read
+
+The same independent audit reproduced unsaved Markdown loss in selected-Epic and
+Story detail subtrees, but found TaskDrawer's data-first path safe. Only those two
+proven branches now retain cached content and use the existing read warning. Initial
+no-data errors stay distinct; late reads from a previous entity remain query-scoped.
+Background error/recovery preserves the exact input and focus without a write.
+Ordinary explicit user blur still saves Markdown, as before. We do not conflate
+clicking away from an autosaving field with a write-free background refetch. This
+continues the visibility/recovery rationale in section 23, without a new draft store,
+backend revision mechanism or permission change.
