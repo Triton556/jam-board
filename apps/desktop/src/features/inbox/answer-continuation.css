@@ -1,0 +1,44 @@
+.answer-continuation {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 16px;
+  overflow-wrap: anywhere;
+}
+.answer-continuation > p,
+.answer-continuation-preview > p {
+  margin: 0;
+}
+.answer-continuation-preview {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.answer-continuation-preview > .field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+.answer-continuation-preview textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 12rem;
+  resize: vertical;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.answer-continuation > .button,
+.answer-continuation-preview > .button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
