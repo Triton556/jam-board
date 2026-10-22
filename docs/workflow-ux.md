@@ -251,11 +251,36 @@ The setup now names the target, checks its exact ID before board reads, explains
 reconnection/duplicate-entry consequences, and separates mandatory MCP from optional
 skill installation. Source acquisition is a disclosed, user-triggered action; copying
 instructions is not treated as successful setup. Clipboard receipts name the captured
-project even if selection changes during an asynchronous token read. The displayed
-and copied configurations both prefer the immutable project ID.
+project. Since alpha10, a project change during the asynchronous token read cancels
+the old copy instead of applying it to a later selection. The displayed and copied
+configurations both prefer the immutable project ID.
 
 This applies [NN/G recognition rather than recall](https://www.nngroup.com/articles/ten-usability-heuristics/)
 and [Microsoft HAX capability/consequence guidance](https://www.microsoft.com/en-us/haxtoolkit/library/)
 to the observed scenario; those sources are design rationale, not external product
 validation. The [upstream compatibility audit](agent-playbook-compatibility.md) avoids
 implying that optional older call examples are a current integration guarantee.
+
+## 13. Readable evidence, correct tabs and ordered clipboard intent
+
+Native alpha7 showed complete report evidence inside a roughly 180px nested scroll
+area. Fields existed, but the clipped test row and transient scrollbar obscured
+how much remained. Request changes now uses one vertical modal scroll surface and
+focus shortcuts between the full captured report and retained comments. This is a
+reading affordance, not a new acceptance step or a claim that evidence was reviewed.
+
+The shared tab control previously exposed tab roles without keyboard behavior or
+panel relationships. The [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)
+informs named/associated panels and roving focus. Manual activation avoids changing
+a note editor, asset source or transport while arrows merely explore choices.
+The [modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+informs focus movement within structured evidence and back to its meaningful heading.
+Ordinary filters remain radio groups; this is not a blanket conversion to tabs.
+
+An independent alpha9 audit reproduced a slow HTTP token read overwriting a newer
+stdio copy. A pending copy now visibly locks setup actions, with a synchronous
+handler lock too. Project-cache changes and unmount invalidate its generation before
+clipboard invocation and success receipt. This also handles A→B→A without waiting
+for a React render. Once a clipboard write has already been invoked, the platform
+has no cancellation primitive: the guard prevents stale invocation/receipt, not an
+undo of a previously accepted write. No token is logged or added to product data.

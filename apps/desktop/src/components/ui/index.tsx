@@ -7,9 +7,9 @@ export {
   Kbd,
   SegmentedControl,
   Select,
-  Tabs,
   TagInput,
 } from "./controls";
+export { TabPanels, Tabs } from "./Tabs";
 
 import { Bot, X } from "lucide-react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";

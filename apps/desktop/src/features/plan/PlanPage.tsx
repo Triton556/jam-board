@@ -231,7 +231,8 @@ export function PlanPage({
                     )}
                   />
                   <p className="small muted">
-                    {progress.done} / {progress.total} tasks done
+                    {progress.done} / {progress.total}{" "}
+                    {progress.total === 1 ? "task" : "tasks"} done
                   </p>
                   <div className="epic-card-meta">
                     {brain && (
@@ -347,6 +348,10 @@ function EpicDetail({
   createStory: boolean;
 }) {
   const e = tree.epic;
+  const taskCount = tree.stories.reduce(
+    (total, row) => total + row.tasks.length,
+    0,
+  );
   const members = useQuery(membersQuery),
     epics = useQuery(epicsQuery);
   const client = useQueryClient();
@@ -465,8 +470,7 @@ function EpicDetail({
           </Button>
           <span aria-hidden="true">→</span>
           <span>
-            {tree.stories.reduce((total, row) => total + row.tasks.length, 0)}{" "}
-            tasks
+            {taskCount} {taskCount === 1 ? "task" : "tasks"}
           </span>
         </nav>
         <ExecutionControls

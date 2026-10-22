@@ -12,7 +12,7 @@ import {
   Package,
   Type,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import {
@@ -23,6 +23,7 @@ import {
   SegmentedControl,
   Select,
   Stamp,
+  TabPanels,
   Tabs,
 } from "../../components/ui";
 import { FileDropZone, PageHeading } from "../../components/ui/m5";
@@ -55,6 +56,7 @@ export function AssetDialog({
   asset?: Asset;
   close(): void;
 }) {
+  const locationTabs = useId();
   const client = useQueryClient();
   const form = useForm<z.infer<typeof assetSchema>>({
     resolver: zodResolver(assetSchema),
@@ -104,22 +106,30 @@ export function AssetDialog({
       >
         {!asset && (
           <Tabs
+            id={locationTabs}
+            label="Asset source"
             value={mode}
             onChange={(v) => form.setValue("mode", v as "File" | "URL")}
             items={["File", "URL"]}
           />
         )}
-        <label>
-          {mode === "URL" ? "URL" : "File path"}
-          <input
-            aria-label="Asset location"
-            {...form.register("location")}
-            disabled={!!asset || mode === "File"}
-          />
-        </label>
-        {!asset && mode === "File" && (
-          <Button onClick={() => void choose()}>Choose file</Button>
-        )}
+        <TabPanels
+          id={locationTabs}
+          value={mode}
+          items={asset ? [] : ["File", "URL"]}
+        >
+          <label>
+            {mode === "URL" ? "URL" : "File path"}
+            <input
+              aria-label="Asset location"
+              {...form.register("location")}
+              disabled={!!asset || mode === "File"}
+            />
+          </label>
+          {!asset && mode === "File" && (
+            <Button onClick={() => void choose()}>Choose file</Button>
+          )}
+        </TabPanels>
         <label>
           Name
           <input {...form.register("name")} />

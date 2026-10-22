@@ -67,6 +67,22 @@ test("agent setup distinguishes connection, skill and planning without starting 
   await expect(configuration.locator("pre")).toContainText(
     current.jam?.id ?? "missing project",
   );
+  const stdioTab = configuration.getByRole("tab", {
+    name: "Codex · stdio",
+    exact: true,
+  });
+  await stdioTab.focus();
+  await page.keyboard.press("ArrowRight");
+  const httpTab = configuration.getByRole("tab", {
+    name: "Codex · HTTP",
+    exact: true,
+  });
+  await expect(httpTab).toBeFocused();
+  await expect(stdioTab).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(
+    configuration.getByRole("tabpanel", { name: "Codex · HTTP", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Prepare planning prompt" }).click();
   const dialog = page.getByRole("dialog", { name: "Plan with your brain" });
   await expect(dialog).toContainText("not an agent launch");

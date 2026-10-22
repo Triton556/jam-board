@@ -3,6 +3,37 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.10] - 2026-10-21
+
+### Fixed
+
+- Configuration copying is single-flight through both controls and its handler.
+  Pending token/clipboard work visibly locks copy and transport selection. Later
+  accepted copies cannot be overwritten by an earlier overlapping HTTP operation.
+- Project changes (including a rapid return to the original project) and unmount
+  invalidate delayed clipboard intent before a token is written or success is
+  announced. A cancelled read never pretends to have copied the new project.
+- True tabs now have named tablists, unique tab/panel relationships, one roving
+  keyboard entry point and manual activation: arrows/Home/End explore; Enter/Space
+  selects. Vertical arrows retain scrolling. Notes and asset-source draft fields
+  survive explicit tab switches; ordinary segmented filters remain radios.
+- Request changes shows captured evidence at full natural height inside the modal's
+  single vertical scroll surface, not a clipped 180px inner viewport. Go to comments
+  and Back to captured report move focus without discarding draft/test selections.
+- Help disclosures use monochrome CSS ink chevrons instead of platform-dependent
+  emoji-style markers, retaining native details/summary keyboard behavior. Epic
+  hierarchy and progress labels use singular “task” when the count is one.
+
+### Verification and compatibility
+
+- The alpha9 overlapping-copy defect was independently reproduced before this fix.
+  Source and DOM tests distinguish refused overlapping actions from later accepted
+  copies, and verify project/unmount cancellation with fictional tokens only.
+- No database, MCP mutation-schema, permission, execution or worker-process change.
+- Native alpha7 completed the fictional non-game planning/edit/Ready/Start/report/
+  review journey. Current native readability and keyboard checks remain a separate
+  acceptance step; see versioned verification notes for precise evidence/limits.
+
 ## [0.3.0-alpha.9] - 2026-10-21
 
 ### Changed

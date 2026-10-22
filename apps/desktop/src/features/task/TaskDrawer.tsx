@@ -10,7 +10,7 @@ import {
   Package,
   Type,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Markdown } from "../../components/Markdown";
 import {
@@ -25,6 +25,7 @@ import {
   SegmentedControl,
   Select,
   Stamp,
+  TabPanels,
   Tabs,
   TagInput,
 } from "../../components/ui";
@@ -113,6 +114,7 @@ export function TaskEditor({
   const [archive, setArchive] = useState(false);
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState("Write");
+  const notesTabs = useId();
   const [comment, setComment] = useState("");
   const [markPending, setMarkPending] = useState(false);
   const markLock = useRef(false);
@@ -677,17 +679,25 @@ export function TaskEditor({
           )}
           <div className="section-heading">
             <h2>Notes</h2>
-            <Tabs value={tab} onChange={setTab} items={["Write", "Preview"]} />
-          </div>
-          {tab === "Write" ? (
-            <textarea
-              aria-label="Notes"
-              className="description-input"
-              {...register("descriptionMd")}
+            <Tabs
+              id={notesTabs}
+              label="Notes editor mode"
+              value={tab}
+              onChange={setTab}
+              items={["Write", "Preview"]}
             />
-          ) : (
-            <Markdown>{watch("descriptionMd") || "*No notes yet.*"}</Markdown>
-          )}
+          </div>
+          <TabPanels id={notesTabs} value={tab} items={["Write", "Preview"]}>
+            {tab === "Write" ? (
+              <textarea
+                aria-label="Notes"
+                className="description-input"
+                {...register("descriptionMd")}
+              />
+            ) : (
+              <Markdown>{watch("descriptionMd") || "*No notes yet.*"}</Markdown>
+            )}
+          </TabPanels>
         </fieldset>
       </form>
       {saveNotice && (
