@@ -152,10 +152,12 @@ it("VS01 reference feedback stays in one flow container without replacing contro
   // Leaving the paper deliberately flushes its autosave. The failed read and
   // retry must not replace the editor or duplicate that pending first create.
   await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
-  expect(write.mock.calls[0][0]).toMatchObject({
+  const first = write.mock.calls[0];
+  if (!first) throw Error("The deliberate blur did not capture a note create");
+  expect(first[0]).toMatchObject({
     kind: "note",
     text: "Retained local note",
   });
-  expect(write.mock.calls[0][0].title).toBeUndefined();
-  expect(write.mock.calls[0][1]).toBe(true);
+  expect(first[0].title).toBeUndefined();
+  expect(first[1]).toBe(true);
 });
