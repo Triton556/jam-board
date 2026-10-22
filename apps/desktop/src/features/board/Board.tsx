@@ -502,6 +502,12 @@ export function Board({
     );
   return (
     <LayoutGroup>
+      {move.isPending && (
+        <p role="status" className="small muted">
+          Saving move and refreshing the board… Positions show the last read or
+          event, not a speculative move.
+        </p>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}

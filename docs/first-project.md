@@ -204,3 +204,17 @@ different things. An unconfirmed request may already have saved the image. Open 
 captured project and use **Refresh references** before deciding whether to paste it
 again. No paste is automatically replayed; receipts use the same session-only bound
 as file-drop notices.
+
+## If a Board move does not return confirmation
+
+Dragging still uses the same readiness and scope-permission checks. While a move
+is saving, cards keep their last read/event positions rather than jumping to an
+unconfirmed destination. The board reads the result after the request settles.
+A generic error says **Move result unconfirmed**: native persistence may have
+succeeded before notification failed. The notice retains its explanation until
+it is dismissed or displaced by the existing three-notice session limit.
+If refreshing fails, **Try again** retries only the read. Inspect the task before
+another intentional move; there is no automatic replay or rollback. Leaving the
+Board or switching projects invalidates that view's completion callbacks, not an
+already-dispatched native request. Reopen the intended project and inspect fresh
+state if you left while the move was settling.

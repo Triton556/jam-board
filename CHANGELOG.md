@@ -3,6 +3,27 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.26] - 2026-10-22
+
+### Fixed
+
+- Board move callbacks belong to the captured project selection generation and
+  mounted view. A late result cannot restore an old project's snapshot into the
+  current board, revive after A→B→A, refill removed cache, or open a stale Ready
+  dialog. Inputs are captured before deferred dispatch; mutations are never replayed.
+- Moves keep last-read/event positions while saving instead of writing speculative
+  whole-board positions. Completion reconciles by read only; simultaneous moves
+  cannot roll back one another's data. Pending feedback explains this deliberate
+  tradeoff without changing drag gestures, readiness or execution checks.
+- Generic native errors are described as unconfirmed results, not proof of failed
+  persistence. A bounded persistent notice explains read recovery; failed reads
+  retain observed data and the existing Try again action retries only that read.
+
+### Verification
+
+- [Verification and limits](docs/verification/0.3.0-alpha.26.md). Earlier native
+  evidence belongs to its exact package; no native failure injection is implied.
+
 ## [0.3.0-alpha.25] - 2026-10-22
 
 ### Fixed
