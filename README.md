@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.6**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.7**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.6.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.7.md).
 
 ## Features
 
@@ -204,7 +204,27 @@ Playwright starts mock-backed Vite servers. Local tests use installed Chrome; CI
 
 Set `JAM_BROWSER_PATH` to an already installed Chromium executable when it is not in Playwright's default Chrome location. This selects an executable only; it does not change browser or operating-system permissions. UI design decisions and their source rationale are recorded in [Workflow and usability](docs/workflow-ux.md).
 
-Release builds prepare the sidecar automatically. The NSIS installer is written beneath `target/release/bundle/nsis/`. `node scripts/m6-install-check.mjs` runs the explicit per-user installation check, refuses pre-existing default data, and removes only the fresh data it created after verifying uninstall retention. Development data and raw traces belong in `.dev-data`.
+Release builds prepare the sidecar automatically. After `cargo build -p jam-mcp-cli`,
+`node scripts/stdio-smoke.mjs` runs the current real-MCP smoke in its own fresh
+`.dev-data/stdio-smoke-*` directory. It checks exact binary/schema versions,
+complete planning, paused-scope rejection and stale writes without retrying old
+payloads. It does not grant execution or launch an agent. Helper tests run with
+`node --test scripts/smoke-contracts.test.mjs scripts/smoke-stdio.test.mjs`.
+
+The NSIS installer is written beneath `target/release/bundle/nsis/`. On a **disposable
+Windows QA account**, `node scripts/m6-install-check.mjs --fresh-disposable-install`
+explicitly installs/uninstalls a per-user fixture. It refuses existing default data,
+installation paths and shortcuts, verifies the exact parent-owned native target,
+and simulates human Start/review only inside that fresh test project. It removes
+only its fresh data after checking uninstall retention; artifacts stay in a unique
+`.dev-data/install-check-*` directory. This is not permission to run against an
+existing user's installation. The Windows lifecycle remains separately verified.
+
+Historical capture scripts preserve old evidence; their milestone names are not
+current executable examples or package-version guarantees. They fail before side
+effects on current contracts. Reproduction requires reviewing their original
+source/binary/payloads and disposable data, not bypassing the guard. Development
+data and raw traces belong in `.dev-data`.
 
 ## Tech stack
 

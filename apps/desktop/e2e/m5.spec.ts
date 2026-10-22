@@ -136,7 +136,11 @@ test("Archiving a project requires idle workers and its exact name, and keeps a 
   await page.evaluate(async () => {
     const tasks = await window.__jamMock.listBoardTasks();
     for (const task of tasks.in_progress)
-      await window.__jamMock.moveTask({ key: task.key, status: "backlog" });
+      await window.__jamMock.moveTask({
+        key: task.key,
+        status: "backlog",
+        expectedUpdatedAt: task.updatedAt,
+      });
   });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Data", exact: true }).click();

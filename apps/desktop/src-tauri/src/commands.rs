@@ -108,6 +108,7 @@ async fn execute_with_store<T: Send + 'static>(
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MoveInput {
     pub key: String,
+    pub expected_updated_at: String,
     pub status: String,
     pub before_key: Option<String>,
     pub after_key: Option<String>,
@@ -239,14 +240,13 @@ pub async fn move_task(
     app: tauri::AppHandle,
 ) -> Result<TaskSummary, ApiError> {
     execute(&state, app, true, move |s| {
-        s.move_task_with_override(
-            &s.current_member()?.id,
+        s.move_current_task(
             &input.key,
             &input.status,
+            &input.expected_updated_at,
             input.before_key.as_deref(),
             input.after_key.as_deref(),
             input.override_reason.as_deref(),
-            None,
         )
     })
     .await

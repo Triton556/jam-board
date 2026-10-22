@@ -719,9 +719,37 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         override_reason: Option<&str>,
         context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
+        self.move_task_checked(
+            actor,
+            key,
+            target,
+            before,
+            after,
+            override_reason,
+            context,
+            None,
+        )
+    }
+    #[allow(clippy::too_many_arguments)] // One transaction serves agent context and native-human version preconditions.
+    pub(crate) fn move_task_checked(
+        &self,
+        actor: &str,
+        key: &str,
+        target: &str,
+        before: Option<&str>,
+        after: Option<&str>,
+        override_reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
+        expected_updated_at: Option<&str>,
+    ) -> Result<TaskSummary> {
         status(target)?;
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            // Compare the human's drag/modal snapshot before allocating a round,
+            // touching any neighbor position, recording an override or appending history.
+            if expected_updated_at.is_some_and(|expected| expected != old.updated_at) {
+                return Err(Error::Conflict);
+            }
             crate::context::check_write(c, actor, &old, context)?;
             let overridden=crate::workflow::transition(c,actor,&old,target,override_reason)?;
             let mut rows = c

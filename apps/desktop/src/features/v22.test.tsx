@@ -95,7 +95,13 @@ it("readiness override requires a trimmed reason of ten characters", async () =>
     title: "Explore",
     status: "backlog",
   });
-  useUiStore.setState({ readyRequest: { key: task.key, status: "ready" } });
+  useUiStore.setState({
+    readyRequest: {
+      key: task.key,
+      status: "ready",
+      expectedUpdatedAt: task.updatedAt,
+    },
+  });
   wrap(<ReadinessDialog />);
   const user = userEvent.setup();
   await user.click(

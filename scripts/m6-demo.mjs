@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Record the actual release WebView. captureFrame returns a CDP content JPEG without a cursor overlay.
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";

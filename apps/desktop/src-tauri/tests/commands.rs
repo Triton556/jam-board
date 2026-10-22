@@ -83,3 +83,50 @@ fn release_claim_input_requires_a_version_and_cannot_choose_actor_or_destination
         );
     }
 }
+
+#[test]
+fn native_move_and_ready_require_captured_task_version_without_authority_flags() {
+    use jam_core::ReadyInput;
+    let move_input =
+        serde_json::json!({"key":"JB-1","status":"ready","expectedUpdatedAt":"captured-version"});
+    let ready_input = serde_json::json!({"key":"JB-1","expectedUpdatedAt":"captured-version","overrideReason":"Explicit human reason"});
+    assert_eq!(
+        serde_json::from_value::<MoveInput>(move_input.clone())
+            .unwrap()
+            .expected_updated_at,
+        "captured-version"
+    );
+    assert_eq!(
+        serde_json::from_value::<ReadyInput>(ready_input.clone())
+            .unwrap()
+            .expected_updated_at,
+        "captured-version"
+    );
+    for field in [
+        "actor",
+        "humanId",
+        "projectId",
+        "force",
+        "ignoreVersion",
+        "expectedClaimGeneration",
+    ] {
+        let mut forged = move_input.clone();
+        forged[field] = serde_json::json!("forged");
+        assert!(
+            serde_json::from_value::<MoveInput>(forged).is_err(),
+            "MoveInput.{field}"
+        );
+        let mut forged = ready_input.clone();
+        forged[field] = serde_json::json!("forged");
+        assert!(
+            serde_json::from_value::<ReadyInput>(forged).is_err(),
+            "ReadyInput.{field}"
+        );
+    }
+    let mut missing = move_input;
+    missing.as_object_mut().unwrap().remove("expectedUpdatedAt");
+    assert!(serde_json::from_value::<MoveInput>(missing).is_err());
+    let mut missing = ready_input;
+    missing.as_object_mut().unwrap().remove("expectedUpdatedAt");
+    assert!(serde_json::from_value::<ReadyInput>(missing).is_err());
+}

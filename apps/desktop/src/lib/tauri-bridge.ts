@@ -193,8 +193,13 @@ export const tauriApi: JamApi = {
   updateTaskBrief: (key, patch) =>
     unwrap(commands.updateTaskBrief({ key, ...patch })),
   checkReady: (key) => unwrap(commands.checkReady(key)),
-  markReady: (key, overrideReason) =>
-    unwrap(commands.markReady({ key, overrideReason: overrideReason ?? null })),
+  markReady: (input) =>
+    unwrap(
+      commands.markReady({
+        ...input,
+        overrideReason: input.overrideReason ?? null,
+      }),
+    ),
   listQuestions: (status, scope) =>
     unwrap(
       commands.listQuestions({ status: status ?? null, scope: scope ?? null }),

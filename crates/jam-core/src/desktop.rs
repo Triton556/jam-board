@@ -178,14 +178,43 @@ impl Store {
             None,
         )
     }
+    /// Apply only the native human intent captured at drag start or dialog open.
+    /// A fresh timestamp must never be substituted for a stale request on the server.
     pub fn move_current_task(
         &self,
         key: &str,
         status: &str,
+        expected_updated_at: &str,
         before: Option<&str>,
         after: Option<&str>,
+        override_reason: Option<&str>,
     ) -> Result<TaskSummary> {
-        self.move_task(&self.current_member()?.id, key, status, before, after, None)
+        if expected_updated_at.is_empty() {
+            return Err(invalid(
+                "expectedUpdatedAt",
+                "A captured task version is required",
+            ));
+        }
+        self.move_task_checked(
+            &self.current_member()?.id,
+            key,
+            status,
+            before,
+            after,
+            override_reason,
+            None,
+            Some(expected_updated_at),
+        )
+    }
+    pub fn mark_current_task_ready(&self, input: ReadyInput) -> Result<TaskSummary> {
+        self.move_current_task(
+            &input.key,
+            "ready",
+            &input.expected_updated_at,
+            None,
+            None,
+            input.override_reason.as_deref(),
+        )
     }
 }
 

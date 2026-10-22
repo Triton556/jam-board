@@ -1,6 +1,7 @@
 // Per-user NSIS round-trip. Never changes script execution policy or existing user data.
 import { spawn, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { assertWindowsInstallEnvironment } from "./installed-smoke-preflight.mjs";
 import {
 	readdir,
 	stat,
@@ -16,16 +17,30 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 const root = fileURLToPath(new URL("../", import.meta.url));
-const temporary = path.join(root, ".dev-data/install-temp");
+// Fail before any directories, installer, diagnostics or native commands.
+assertWindowsInstallEnvironment();
+const version = JSON.parse(
+	await readFile(path.join(root, "apps/desktop/package.json"), "utf8"),
+).version;
+const runId = randomUUID();
+const outputDir = path.join(root, ".dev-data", `install-check-${runId}`);
+await mkdir(path.join(root, ".dev-data"), { recursive: true });
+if (
+	(await realpath(path.join(root, ".dev-data"))).toLowerCase() !==
+	path.join(root, ".dev-data").toLowerCase()
+)
+	throw new Error("Refusing redirected local QA directory");
+await mkdir(outputDir, { recursive: false });
+const temporary = path.join(outputDir, "temp");
 await mkdir(temporary, { recursive: true });
 const toolEnv = { ...process.env, TEMP: temporary, TMP: temporary };
 const started = Date.now();
 const installDir = path.join(process.env.LOCALAPPDATA, "Jam Board");
 const dataDir = path.join(process.env.APPDATA, "dev.triton556.jamboard");
 const database = path.join(dataDir, "jam.db");
-const output = path.join(root, "docs/media/m6/install-check.json");
+const output = path.join(outputDir, "install-check.json");
 const exists = async (p) =>
-	stat(p).then(
+	lstat(p).then(
 		() => true,
 		(error) => {
 			if (error.code === "ENOENT") return false;
@@ -72,7 +87,10 @@ const shortcuts = async () => {
 	const found = [];
 	const walk = async (dir, depth = 0) => {
 		for (const e of await readdir(dir, { withFileTypes: true }).catch(
-			() => [],
+			(error) => {
+				if (error.code === "ENOENT") return [];
+				throw error;
+			},
 		)) {
 			const p = path.join(dir, e.name);
 			if (e.isDirectory() && depth < 3) await walk(p, depth + 1);
@@ -85,6 +103,9 @@ const shortcuts = async () => {
 const result = {
 	startedAt: new Date(started).toISOString(),
 	perUser: true,
+	version,
+	fixture:
+		"Fresh disposable QA only; native human Start/review are simulated test setup, not real user approval.",
 	executionPolicyChanged: false,
 	steps: {},
 };
@@ -158,16 +179,42 @@ try {
 	};
 	delete env.JAM_BOARD_DATA_DIR;
 	delete env.JAM_BOARD_DB;
+	delete env.JAM_BOARD_PROJECT;
 	app = spawn(executable, [], { env, windowsHide: false, stdio: "ignore" });
+	await new Promise((resolve, reject) => {
+		app.once("spawn", resolve);
+		app.once("error", reject);
+	});
 	if (!Number.isInteger(app.pid))
 		throw new Error("Installed application did not start");
+	const receiptPath = path.join(outputDir, "fixture-receipt.json");
+	await writeFile(
+		receiptPath,
+		JSON.stringify(
+			{
+				schemaVersion: 1,
+				runId,
+				version,
+				parentPid: process.pid,
+				startedAt: started,
+				fixtureDataAbsentBeforeRun: !dataExisted,
+				dataDir,
+				sidecar,
+				sidecarSha256: await sha(sidecar),
+				outputDir,
+			},
+			null,
+			2,
+		) + "\n",
+		{ flag: "wx", mode: 0o600 },
+	);
 	await run(
 		process.execPath,
-		[path.join(root, "scripts/m6-installed-check.mjs"), sidecar],
+		[path.join(root, "scripts/m6-installed-check.mjs"), sidecar, receiptPath],
 		{ env },
 	);
 	result.steps.live = JSON.parse(
-		await readFile(path.join(root, ".dev-data/m6-installed-live.json"), "utf8"),
+		await readFile(path.join(outputDir, "installed-live.json"), "utf8"),
 	);
 	ps(`(Get-Process -Id ${app.pid}).CloseMainWindow()`);
 	for (let i = 0; i < 100 && app.exitCode === null; i++) await delay(100);
@@ -178,12 +225,12 @@ try {
 	const dataInfo = await lstat(dataDir);
 	result.steps.close = { ok: true };
 	// Preserve the generated test token only in ignored local data for the final secret audit.
-	await mkdir(path.join(root, ".dev-data/m6-installed-audit"), {
+	await mkdir(path.join(outputDir, "audit"), {
 		recursive: true,
 	});
 	await copyFile(
 		path.join(dataDir, "mcp-token"),
-		path.join(root, ".dev-data/m6-installed-audit/mcp-token"),
+		path.join(outputDir, "audit/mcp-token"),
 	);
 	await run(path.join(installDir, "uninstall.exe"), ["/S"]);
 	for (
@@ -214,10 +261,15 @@ try {
 	// A fixed, non-reparse target created during this exact run is the only recursive cleanup allowed here.
 	const expected = path.resolve(process.env.APPDATA, "dev.triton556.jamboard");
 	const actual = await realpath(dataDir);
+	const currentDataInfo = await lstat(dataDir);
 	const owned =
 		!dataExisted &&
 		dataInfo.birthtimeMs >= started &&
 		!dataInfo.isSymbolicLink() &&
+		!currentDataInfo.isSymbolicLink() &&
+		currentDataInfo.birthtimeMs === dataInfo.birthtimeMs &&
+		currentDataInfo.ino === dataInfo.ino &&
+		currentDataInfo.dev === dataInfo.dev &&
 		actual.toLowerCase() === expected.toLowerCase();
 	if (!owned)
 		throw new Error(

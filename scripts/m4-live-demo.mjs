@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Prepare reproducible states in the actual Tauri WebView2. Native window
 // screenshots are captured separately through the Windows capture API.
 import { spawn } from "node:child_process";

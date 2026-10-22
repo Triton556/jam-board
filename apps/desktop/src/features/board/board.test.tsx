@@ -150,7 +150,11 @@ it("rolls back the optimistic move when move_task fails", async () => {
       <button
         type="button"
         onClick={() =>
-          move.mutate({ key: source?.key ?? "", status: "review" })
+          move.mutate({
+            key: source?.key ?? "",
+            status: "review",
+            expectedUpdatedAt: source?.updatedAt ?? "missing",
+          })
         }
       >
         Move
@@ -216,6 +220,8 @@ it("moves with Space, Right, Space and supplies destination neighbors", async ()
   expect(call?.input).toEqual({
     key: "JB-7",
     status: "in_progress",
+    expectedUpdatedAt: original.ready.find((task) => task.key === "JB-7")
+      ?.updatedAt,
     afterKey: original.in_progress.at(-1)?.key,
     beforeKey: undefined,
   });
@@ -481,4 +487,59 @@ it("pending quick capture is single-submit, returns focus for the next draft and
   await waitFor(() => expect(input).toHaveFocus());
   await user.keyboard("{Escape}");
   expect(trigger).toHaveFocus();
+});
+
+it("a keyboard drag keeps its starting version after a newer task arrives, refuses the stale drop and restores authoritative state", async () => {
+  await mockApi.startAllDemoScopes();
+  const user = userEvent.setup();
+  const { Wrapper, client } = wrapper();
+  const captured = await mockApi.getTask("JB-7");
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
+  button.focus();
+  await user.keyboard("[Space]");
+  const newer = await mockApi.updateTask({
+    key: captured.key,
+    expectedUpdatedAt: captured.updatedAt,
+    descriptionMd: "A newer brief must be inspected before moving.",
+  });
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["boardTasks"] });
+  });
+  expect(newer.updatedAt).not.toBe(captured.updatedAt);
+  const beforeHistory = (await mockApi.getTask(captured.key)).history.length;
+  await user.keyboard("[ArrowRight][Space]");
+  await waitFor(() =>
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      true,
+    ),
+  );
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toMatchObject({
+    key: captured.key,
+    status: "in_progress",
+    expectedUpdatedAt: captured.updatedAt,
+  });
+  await waitFor(() =>
+    expect(useUiStore.getState().toasts.at(-1)?.text).toContain(
+      "Inspect the task before moving it again",
+    ),
+  );
+  const saved = await mockApi.getTask(captured.key);
+  expect(saved.status).toBe("ready");
+  expect(saved.updatedAt).toBe(newer.updatedAt);
+  expect(saved.history).toHaveLength(beforeHistory);
+  await waitFor(() =>
+    expect(
+      client
+        .getQueryData<BoardTasks>(["boardTasks"])
+        ?.ready.find((task) => task.key === captured.key)?.updatedAt,
+    ).toBe(newer.updatedAt),
+  );
+  expect(
+    within(screen.getByRole("region", { name: "Ready column" })).getByText(
+      captured.key,
+    ),
+  ).toBeVisible();
 });

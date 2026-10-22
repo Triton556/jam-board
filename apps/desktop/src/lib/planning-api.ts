@@ -34,6 +34,11 @@ export type EpicInput = Pick<NewEpic, "title"> &
   Partial<Omit<NewEpic, "title">>;
 export type StoryInput = Pick<NewStory, "title" | "epicKey"> &
   Partial<Omit<NewStory, "title" | "epicKey">>;
+export type ReadyTaskInput = {
+  key: string;
+  expectedUpdatedAt: string;
+  overrideReason?: string;
+};
 export interface PlanningApi {
   listEpics(): Promise<Epic[]>;
   listStories(): Promise<Story[]>;
@@ -60,7 +65,7 @@ export interface PlanningApi {
     patch: BriefPatch_Serialize,
   ): Promise<TaskDetail>;
   checkReady(key: string): Promise<Readiness>;
-  markReady(key: string, overrideReason?: string): Promise<TaskSummary>;
+  markReady(input: ReadyTaskInput): Promise<TaskSummary>;
   listQuestions(status?: string, scope?: Scope): Promise<Question[]>;
   answerQuestion(input: AnswerQuestion): Promise<Question>;
   withdrawQuestion(id: string): Promise<Question>;

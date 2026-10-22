@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Native WebView2 + independent MCP processes. Screenshots contain no desktop cursor overlay.
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';

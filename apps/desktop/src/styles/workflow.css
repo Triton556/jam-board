@@ -490,3 +490,18 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+.readiness-dialog {
+  width: 640px;
+}
+.ready-snapshot {
+  margin: 16px 0;
+}
+.ready-snapshot summary {
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.ready-snapshot .readonly-brief {
+  margin-top: 12px;
+}

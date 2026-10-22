@@ -790,3 +790,298 @@ fn planning_edit_and_review_race_records_only_the_context_actually_observed() {
         }
     }
 }
+
+#[test]
+fn native_move_and_ready_reject_old_intents_after_same_or_different_holder_reclaims() {
+    for different_holder in [false, true] {
+        let f = fixture();
+        let s = &f.store;
+        let observed = s.get_task(&f.key).unwrap().task;
+        claim(&f, &f.worker.id);
+        reset_and_claim(
+            &f,
+            if different_holder {
+                &f.other.id
+            } else {
+                &f.worker.id
+            },
+        );
+        pause(&f);
+        let before = snapshot(s, &f.key);
+        let board = serde_json::to_value(s.list_board_tasks().unwrap()).unwrap();
+        for target in ["backlog", "ready", "in_progress", "done"] {
+            assert!(
+                matches!(
+                    s.move_current_task(
+                        &f.key,
+                        target,
+                        &observed.updated_at,
+                        None,
+                        None,
+                        Some("Older drag or Ready exception")
+                    ),
+                    Err(Error::Conflict)
+                ),
+                "{target}, different holder={different_holder}"
+            );
+        }
+        assert!(matches!(
+            s.mark_current_task_ready(ReadyInput {
+                key: f.key.clone(),
+                expected_updated_at: observed.updated_at,
+                override_reason: Some("Older Ready decision".into())
+            }),
+            Err(Error::Conflict)
+        ));
+        assert_eq!(snapshot(s, &f.key), before);
+        assert_eq!(
+            serde_json::to_value(s.list_board_tasks().unwrap()).unwrap(),
+            board
+        );
+    }
+}
+
+#[test]
+fn old_incomplete_readiness_modal_cannot_replace_later_complete_claimed_work() {
+    let f = fixture();
+    let s = &f.store;
+    let ready = s.get_task(&f.key).unwrap().task;
+    s.move_current_task(&f.key, "backlog", &ready.updated_at, None, None, None)
+        .unwrap();
+    s.update_task_brief(
+        &f.human.id,
+        &f.key,
+        BriefPatch {
+            goal_md: Some(String::new()),
+            ..Default::default()
+        },
+        None,
+    )
+    .unwrap();
+    let opened = s.get_task(&f.key).unwrap().task;
+    assert!(!s.check_ready(&f.key).unwrap().ready);
+    s.update_task_brief(
+        &f.human.id,
+        &f.key,
+        BriefPatch {
+            goal_md: Some("Human clarified this after the modal opened".into()),
+            ..Default::default()
+        },
+        None,
+    )
+    .unwrap();
+    s.mark_current_task_ready(ReadyInput {
+        key: f.key.clone(),
+        expected_updated_at: s.get_task(&f.key).unwrap().task.updated_at,
+        override_reason: None,
+    })
+    .unwrap();
+    claim(&f, &f.worker.id);
+    pause(&f);
+    let before = snapshot(s, &f.key);
+    assert!(matches!(
+        s.move_current_task(
+            &f.key,
+            "ready",
+            &opened.updated_at,
+            None,
+            None,
+            Some("Old modal override reason")
+        ),
+        Err(Error::Conflict)
+    ));
+    assert_eq!(snapshot(s, &f.key), before);
+    assert_eq!(s.get_task(&f.key).unwrap().task.status, "in_progress");
+}
+
+#[test]
+fn native_stale_version_precedes_round_allocation_and_neighbor_reordering() {
+    let f = fixture();
+    let s = &f.store;
+    let claimed = claim(&f, &f.worker.id);
+    s.submit_report(&f.worker.id, report(&f.key, &claimed.task.claim_generation))
+        .unwrap();
+    let observed = s.get_task(&f.key).unwrap().task;
+    let a = s
+        .create_task(&f.human.id, task_input(&f.story))
+        .unwrap()
+        .task;
+    let b = s
+        .create_task(&f.human.id, task_input(&f.story))
+        .unwrap()
+        .task;
+    let db = rusqlite::Connection::open(&s.path).unwrap();
+    db.execute("UPDATE tasks SET position=1024 WHERE id=?", [&a.id])
+        .unwrap();
+    db.execute("UPDATE tasks SET position=1024.0000001 WHERE id=?", [&b.id])
+        .unwrap();
+    s.add_comment(
+        &f.human.id,
+        &f.key,
+        "The review context changed after pickup",
+    )
+    .unwrap();
+    let before = snapshot(s, &f.key);
+    let board = serde_json::to_value(s.list_board_tasks().unwrap()).unwrap();
+    assert!(matches!(
+        s.move_current_task(
+            &f.key,
+            "ready",
+            &observed.updated_at,
+            Some(&b.key),
+            Some(&a.key),
+            Some("Old override")
+        ),
+        Err(Error::Conflict)
+    ));
+    assert_eq!(snapshot(s, &f.key), before);
+    assert_eq!(
+        serde_json::to_value(s.list_board_tasks().unwrap()).unwrap(),
+        board
+    );
+    assert_eq!(
+        s.get_task(&f.key).unwrap().task.review_round,
+        observed.review_round
+    );
+}
+
+#[test]
+fn fresh_native_intents_keep_human_policy_but_not_execution_or_identity_bypasses() {
+    let f = fixture();
+    let s = &f.store;
+    pause(&f);
+    let t = s.get_task(&f.key).unwrap().task;
+    let before = snapshot(s, &f.key);
+    assert!(matches!(
+        s.move_current_task(&f.key, "in_progress", &t.updated_at, None, None, None),
+        Err(Error::ExecutionRequired(_))
+    ));
+    assert!(
+        matches!(s.move_current_task(&f.key,"backlog","",None,None,None),Err(Error::Validation{field,..})if field=="expectedUpdatedAt")
+    );
+    assert!(
+        matches!(s.mark_current_task_ready(ReadyInput{key:f.key.clone(),expected_updated_at:String::new(),override_reason:None}),Err(Error::Validation{field,..})if field=="expectedUpdatedAt")
+    );
+    assert_eq!(snapshot(s, &f.key), before);
+    // Fresh manual Done is explicitly human policy, not a reviewed acceptance.
+    let done = s
+        .move_current_task(&f.key, "done", &t.updated_at, None, None, None)
+        .unwrap();
+    assert_eq!(done.status, "done");
+    assert!(s.get_task(&f.key).unwrap().reviews.is_empty());
+    let project = s.active_jam().unwrap();
+    let captured = s.for_project(&project.id).unwrap();
+    captured
+        .set_setting(
+            &format!("project.{}.current_member_id", project.id),
+            &f.worker.id,
+        )
+        .unwrap();
+    let before = snapshot(&captured, &f.key);
+    assert!(
+        captured
+            .move_current_task(&f.key, "backlog", &done.updated_at, None, None, None)
+            .is_err()
+    );
+    assert!(
+        captured
+            .mark_current_task_ready(ReadyInput {
+                key: f.key.clone(),
+                expected_updated_at: done.updated_at,
+                override_reason: None
+            })
+            .is_err()
+    );
+    assert_eq!(snapshot(&captured, &f.key), before);
+}
+
+#[test]
+fn versioned_native_intent_and_human_identity_stay_pinned_across_project_switch() {
+    let f = fixture();
+    let s = &f.store;
+    let captured = s.selected_snapshot().unwrap();
+    let observed = captured.get_task(&f.key).unwrap().task;
+    s.create_jam("Second project", None, None, None, "UTC", "Second human")
+        .unwrap();
+    let second = s
+        .create_current_task(CreateTask {
+            title: "Unrelated task".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    let before = serde_json::to_value(s.get_task(&second.task.key).unwrap()).unwrap();
+    let moved = captured
+        .move_current_task(&f.key, "backlog", &observed.updated_at, None, None, None)
+        .unwrap();
+    assert_eq!(moved.jam_id, observed.jam_id);
+    assert_eq!(moved.updated_by, f.human.id);
+    assert_eq!(
+        serde_json::to_value(s.get_task(&second.task.key).unwrap()).unwrap(),
+        before
+    );
+    assert!(matches!(
+        captured.move_current_task(
+            &second.task.key,
+            "ready",
+            &second.task.updated_at,
+            None,
+            None,
+            None
+        ),
+        Err(Error::Forbidden(_))
+    ));
+}
+
+#[test]
+fn native_ready_or_drag_and_worker_claim_races_have_only_serializable_outcomes() {
+    use std::sync::{Arc, Barrier};
+    for ready in [false, true] {
+        for _ in 0..12 {
+            let f = fixture();
+            let observed = f.store.get_task(&f.key).unwrap().task;
+            let worker_context = context(&f.store, &f.key);
+            let barrier = Arc::new(Barrier::new(2));
+            let s = Store::open(&f.store.path)
+                .unwrap()
+                .selected_snapshot()
+                .unwrap();
+            let key = f.key.clone();
+            let b = barrier.clone();
+            let human = std::thread::spawn(move || {
+                b.wait();
+                if ready {
+                    s.mark_current_task_ready(ReadyInput {
+                        key,
+                        expected_updated_at: observed.updated_at,
+                        override_reason: None,
+                    })
+                } else {
+                    s.move_current_task(&key, "backlog", &observed.updated_at, None, None, None)
+                }
+            });
+            let s = Store::open(&f.store.path)
+                .unwrap()
+                .selected_snapshot()
+                .unwrap();
+            let key = f.key.clone();
+            let actor = f.worker.id.clone();
+            let worker = std::thread::spawn(move || {
+                barrier.wait();
+                s.claim_task(&actor, &key, Some(&worker_context))
+            });
+            match (human.join().unwrap(), worker.join().unwrap()) {
+                (Ok(_), Err(Error::StaleClaim | Error::Conflict)) => {
+                    let t = f.store.get_task(&f.key).unwrap().task;
+                    assert_eq!(t.status, if ready { "ready" } else { "backlog" });
+                    assert!(t.assignee_id.is_none());
+                }
+                (Err(Error::Conflict), Ok(_)) => {
+                    let t = f.store.get_task(&f.key).unwrap().task;
+                    assert_eq!(t.status, "in_progress");
+                    assert_eq!(t.assignee_id.as_deref(), Some(f.worker.id.as_str()));
+                }
+                result => panic!("Stale human intent raced accepted work: {result:?}"),
+            }
+        }
+    }
+}

@@ -31,7 +31,14 @@ fn desktop_identity_is_a_human_and_actor_cannot_be_supplied() {
         .member;
     s.set_current_member(&mira.id).unwrap();
     let moved = s
-        .move_current_task(&task.task.key, "review", None, None)
+        .move_current_task(
+            &task.task.key,
+            "review",
+            &task.task.updated_at,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(moved.updated_by, mira.id);
     assert_eq!(s.list_activity(None, Some(1)).unwrap()[0].actor.id, mira.id);

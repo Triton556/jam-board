@@ -14,9 +14,11 @@ function keyed<T>(rows: T[]) {
 export function ReadOnlyBrief({
   task,
   members,
+  includeHistory = true,
 }: {
   task: TaskDetail;
   members: Member[];
+  includeHistory?: boolean;
 }) {
   const b = task.brief;
   const report = task.reports.at(-1),
@@ -135,7 +137,7 @@ export function ReadOnlyBrief({
           </p>
         </details>
       </section>
-      {report && (
+      {includeHistory && report && (
         <section
           className="task-section readonly-report"
           aria-label="Latest report"
@@ -168,7 +170,7 @@ export function ReadOnlyBrief({
           <Markdown>{report.notVerifiedMd || "None reported"}</Markdown>
         </section>
       )}
-      {review && (
+      {includeHistory && review && (
         <section
           className="task-section readonly-review"
           aria-label="Latest review"

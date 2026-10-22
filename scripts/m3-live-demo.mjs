@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Runs against the actual Tauri WebView2 and a separate stdio MCP process.
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
