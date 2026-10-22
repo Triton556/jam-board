@@ -147,3 +147,10 @@ member data every30seconds and on visible return; publication checks project/ABA
 lifetime, cache lifecycle and newer observation count before writing the shared
 cache. Review status stays quiet; generic status is not an invented reviewer role.
 See [presence](../live-card-presence.md).
+
+## Alpha32 agent-state non-change
+
+H-B01 empty-column wording and H-R02 frame styling do not alter AG05–AG07 Ready,
+Start or claim semantics. Agent-created reference cards/results, parent/frame
+coordinates, permissions and persisted data are unchanged. The overview no longer
+paints a duplicate frame/title; its cards/edges remain rasterized as before.

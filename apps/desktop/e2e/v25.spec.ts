@@ -175,7 +175,7 @@ test("planning and Inbox polish preserve shared controls and readable placement"
   expect(Math.abs(positions.left - positions.right)).toBeLessThanOrEqual(12);
 });
 
-test("canvas links fit content, frames are rough, handles stay quiet until needed", async ({
+test("canvas links fit content, frames have one rounded boundary, handles stay quiet until needed", async ({
   page,
 }) => {
   await page.goto("/");
@@ -229,12 +229,15 @@ test("canvas links fit content, frames are rough, handles stay quiet until neede
     "font-size",
     "16px",
   );
-  expect(
-    await frame
-      .locator(".reference-frame-outline path")
-      .first()
-      .getAttribute("d"),
-  ).toContain("C");
+  const boundary = frame.locator(".reference-frame-outline rect");
+  await expect(boundary).toHaveCount(1);
+  await expect(boundary).toBeVisible();
+  await expect(boundary).toHaveAttribute("rx", "12");
+  await expect(boundary).toHaveAttribute("vector-effect", "non-scaling-stroke");
+  await expect(frame.locator(".reference-frame-outline")).toHaveCSS(
+    "pointer-events",
+    "none",
+  );
   await page.mouse.move(80, 70);
   await expect(card.locator(".react-flow__handle").first()).toHaveCSS(
     "opacity",
