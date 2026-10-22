@@ -97,7 +97,13 @@ export function DraftNote({
     >
       <header>
         <strong>New note</strong>
-        <small>Local draft · not saved yet</small>
+        <small>
+          {uncertain
+            ? "Creation unconfirmed · text retained"
+            : write.pending
+              ? "Creating note…"
+              : "Local draft · not saved yet"}
+        </small>
       </header>
       <label className="field">
         Title

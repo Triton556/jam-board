@@ -137,6 +137,10 @@ it("RF03 commit then lost response retains text and read reconciliation never re
   await fill();
   fireEvent.submit(screen.getByRole("form"));
   await screen.findByText(/Creation is unconfirmed/);
+  expect(
+    screen.getByText("Creation unconfirmed · text retained"),
+  ).toBeVisible();
+  expect(screen.queryByText("Local draft · not saved yet")).toBeNull();
   expect(screen.getByRole("textbox", { name: "Note" })).toHaveValue(
     "Amber lantern on snow",
   );
