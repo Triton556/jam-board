@@ -1157,6 +1157,32 @@ export class MockBridge implements JamApi {
     await this.call("move_task", input);
     return this.move(input, this.human());
   }
+  releaseTask: JamApi["releaseTask"] = async (input) => {
+    await this.call("release_task", input);
+    const actor = this.human(),
+      task = this.find(input.key);
+    if (task.updatedAt !== input.expectedUpdatedAt)
+      throw new JamError(
+        "conflict",
+        "This task changed. Review the latest claim before returning it.",
+      );
+    if (!task.assigneeId && task.status !== "in_progress")
+      throw new JamError(
+        "wrong_status",
+        "There is no current claim or In progress work to return",
+      );
+    const oldStatus = task.status,
+      oldHolder = task.assigneeId;
+    task.assigneeId = null;
+    task.status = "backlog";
+    this.touch(task, actor);
+    this.planning.sync();
+    this.event("task.released", actor, task, {
+      status: [oldStatus, "backlog"],
+      assigneeId: [oldHolder, null],
+    });
+    return clone(task);
+  };
   async listMembers() {
     await this.call("list_members");
     return clone(

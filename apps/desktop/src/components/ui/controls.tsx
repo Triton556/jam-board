@@ -17,6 +17,43 @@ import type { Member } from "../../lib/types";
 import { CustomSelect } from "./CustomSelect";
 import { Button, Chip, IconButton } from "./index";
 
+/** Visible native tab stops, including disclosure summaries but not their hidden contents. */
+export function modalTabStops(root: HTMLElement) {
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),summary,[tabindex="0"]',
+    ),
+  ).filter((node) => {
+    if (node.matches("[tabindex]") && node.tabIndex < 0) return false;
+    if (node.matches('input[type="hidden"]')) return false;
+    for (
+      let parent: HTMLElement | null = node;
+      parent && root.contains(parent);
+      parent = parent.parentElement
+    ) {
+      if (
+        parent.hidden ||
+        parent.hasAttribute("inert") ||
+        parent.getAttribute("aria-hidden") === "true"
+      )
+        return false;
+      const style = getComputedStyle(parent);
+      if (
+        style.display === "none" ||
+        ["hidden", "collapse"].includes(style.visibility)
+      )
+        return false;
+      if (parent.matches("details:not([open])")) {
+        const summary = Array.from(parent.children).find(
+          (child) => child.tagName === "SUMMARY",
+        );
+        if (!summary?.contains(node)) return false;
+      }
+    }
+    return true;
+  });
+}
+
 const layers: symbol[] = [];
 export function useModal(onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -42,11 +79,7 @@ export function useModal(onClose: () => void) {
         close.current();
       }
       if (event.key !== "Tab") return;
-      const nodes = Array.from(
-        ref.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
-        ) ?? [],
-      ).filter((n) => !n.hidden && n.getAttribute("aria-hidden") !== "true");
+      const nodes = ref.current ? modalTabStops(ref.current) : [];
       const first = nodes[0],
         last = nodes.at(-1);
       if (!first) {
@@ -56,14 +89,16 @@ export function useModal(onClose: () => void) {
       if (
         event.shiftKey &&
         (document.activeElement === first ||
-          document.activeElement === ref.current)
+          document.activeElement === ref.current ||
+          !ref.current?.contains(document.activeElement))
       ) {
         event.preventDefault();
         last?.focus();
       } else if (
         !event.shiftKey &&
         (document.activeElement === last ||
-          document.activeElement === ref.current)
+          document.activeElement === ref.current ||
+          !ref.current?.contains(document.activeElement))
       ) {
         event.preventDefault();
         first.focus();
@@ -73,7 +108,15 @@ export function useModal(onClose: () => void) {
     return () => {
       layers.splice(layers.indexOf(token), 1);
       document.removeEventListener("keydown", key, true);
-      previous?.focus();
+      if (previous?.isConnected && previous !== document.body) previous.focus();
+      else
+        Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[role="dialog"][aria-modal="true"]',
+          ),
+        )
+          .at(-1)
+          ?.focus();
     };
   }, []);
   return ref;

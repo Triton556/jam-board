@@ -350,3 +350,44 @@
   display: grid;
   gap: 5px;
 }
+.claim-recovery {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.claim-recovery-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.claim-recovery-hint {
+  flex: 1 1 250px;
+  line-height: 1.6;
+}
+.claim-recovery p {
+  margin-block: 6px 0;
+}
+.claim-worker-status {
+  padding: 12px 16px;
+  background: var(--paper-2);
+  border-radius: 8px;
+}
+.claim-worker-status p {
+  margin-block: 6px;
+  overflow-wrap: anywhere;
+}
+.claim-worker-status .button {
+  display: flex;
+  margin-top: 8px;
+}
+.round > summary {
+  cursor: pointer;
+  font: 600 18px var(--font-display);
+  padding: 6px 0;
+}
+.round:not([open]) {
+  margin-bottom: 12px;
+}
+.round > .button-row {
+  flex-wrap: wrap;
+}

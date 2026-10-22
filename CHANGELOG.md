@@ -3,6 +3,37 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.4] - 2026-10-21
+
+### Added
+
+- Human-facing Release claim / Return to Backlog recovery for In progress tasks,
+  including archived work. Confirmation names the project, task and current holder;
+  clearing board tracking does not stop an external worker or change scope permission.
+- Atomic native release checks the exact task revision and captured project. A
+  reassignment, report or other task change while confirmation is open rejects the
+  stale action instead of clearing newer work. Unassigned In progress rows can be
+  returned to Backlog without inventing an assignee or report.
+
+### Changed
+
+- Reports & review shows the latest round first, with previous evidence in closed
+  disclosures. Accept result and Request changes stay beside the current evidence.
+- Modal keyboard navigation skips hidden/inert controls and closed disclosure
+  content, while retaining the visible summary as a tab stop.
+- Recovery feedback remains visible and focused after success. Pending operations
+  cannot be duplicated or dismissed; failed confirmations retain their context.
+
+### Verification and compatibility
+
+- Independent exact-alpha3 review closed the review-bypass and archived-release
+  findings and verified keyboard, feedback and startup probes. Its actual native
+  Linux build now passes first cold launch and scoped Start/Pause/report checks.
+- No new database migration or MCP tool. Native release adds versioned human
+  confirmation; this does not yet give agent calls a per-claim generation token.
+  An old payload from the same agent after a later reclaim remains a known gap.
+- Full checks and limits are recorded in the versioned verification notes.
+
 ## [0.3.0-alpha.3] - 2026-10-21
 
 ### Fixed

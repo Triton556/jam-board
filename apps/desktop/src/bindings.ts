@@ -86,6 +86,7 @@ export const commands = {
 	setTheme: (theme: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_theme", { theme })),
 	listTasks: (input: TaskQuery) => typedError<TaskListPage, ApiError_Serialize>(__TAURI_INVOKE("list_tasks", { input })),
 	updateTask: (input: TaskEditInput_Deserialize) => typedError<TaskDetail_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_task", { input })),
+	releaseTask: (input: ReleaseClaim) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("release_task", { input })),
 	archiveTask: (key: string, reason: string | null) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("archive_task", { key, reason })),
 	unarchiveTask: (key: string) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("unarchive_task", { key })),
 	addComment: (input: CommentInput) => typedError<Comment, ApiError_Serialize>(__TAURI_INVOKE("add_comment", { input })),
@@ -901,6 +902,12 @@ export type ReferencePatch_Serialize = {
 	caption?: string | null,
 	tags?: string[] | null,
 	title?: string | null,
+};
+
+/**  Human confirmation of a captured claim; neither actor nor destination is caller-controlled. */
+export type ReleaseClaim = {
+	key: string,
+	expectedUpdatedAt: string,
 };
 
 export type Report = {

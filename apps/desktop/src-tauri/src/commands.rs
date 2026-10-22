@@ -298,6 +298,18 @@ pub async fn update_task(
 }
 #[tauri::command]
 #[specta::specta]
+pub async fn release_task(
+    input: ReleaseClaim,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<TaskSummary, ApiError> {
+    execute(&state, app, true, move |store| {
+        store.release_current_task(input)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
 pub async fn archive_task(
     key: String,
     reason: Option<String>,

@@ -20,6 +20,7 @@ async function unwrap<T>(
   return result.data;
 }
 export const tauriApi: JamApi = {
+  releaseTask: (input) => unwrap(commands.releaseTask(input)),
   getExecution: (scope) => unwrap(commands.getExecution(scope)),
   listExecution: () => unwrap(commands.listExecution()),
   setExecution: (input) => unwrap(commands.setExecution(input)),

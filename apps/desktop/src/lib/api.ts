@@ -109,6 +109,7 @@ export interface JamApi
   getTask(key: string): Promise<TaskDetail>;
   createTask(input: CreateInput): Promise<TaskDetail>;
   moveTask(input: MoveInput): Promise<TaskSummary>;
+  releaseTask(input: import("../bindings").ReleaseClaim): Promise<TaskSummary>;
   listMembers(): Promise<MemberWithStats[]>;
   listActivity(input?: Partial<ActivityQuery>): Promise<ActivityEvent[]>;
   setTheme(theme: Theme): Promise<void>;

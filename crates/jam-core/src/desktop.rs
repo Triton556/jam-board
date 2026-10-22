@@ -168,6 +168,15 @@ impl Store {
         }
         self.create_task(&self.current_member()?.id, input)
     }
+    /// Return the captured claim to Backlog without authorizing or stopping work.
+    pub fn release_current_task(&self, input: ReleaseClaim) -> Result<TaskSummary> {
+        self.release_task_checked(
+            &self.current_member()?.id,
+            &input.key,
+            Some("backlog"),
+            Some(&input.expected_updated_at),
+        )
+    }
     pub fn move_current_task(
         &self,
         key: &str,

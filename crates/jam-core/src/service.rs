@@ -851,11 +851,33 @@ NULL AND key<>? ORDER BY position, key",
         key: &str,
         target: Option<&str>,
     ) -> Result<TaskSummary> {
+        self.release_task_checked(actor, key, target, None)
+    }
+    pub(crate) fn release_task_checked(
+        &self,
+        actor: &str,
+        key: &str,
+        target: Option<&str>,
+        expected_updated_at: Option<&str>,
+    ) -> Result<TaskSummary> {
         let target = target.unwrap_or("backlog");
         status(target)?;
         self.write(|c| {
             let old = task(c, key)?;
-            if old.assignee_id.as_deref() != Some(actor) && member(c, actor)?.kind != "human" {
+            // A confirmation is about this exact claim/version, not whichever
+            // worker happens to hold the card when a queued command is executed.
+            if let Some(expected) = expected_updated_at {
+                if old.updated_at != expected {
+                    return Err(Error::Conflict);
+                }
+                if old.assignee_id.is_none() && old.status != "in_progress" {
+                    return Err(Error::WrongStatus(
+                        "This task has no claim or active work to return to Backlog".into(),
+                    ));
+                }
+            }
+            let human = member(c, actor)?.kind == "human";
+            if old.assignee_id.as_deref() != Some(actor) && !human {
                 return Err(invalid(
                     "actor",
                     "only the holder or a human can release this task",
@@ -864,8 +886,9 @@ NULL AND key<>? ORDER BY position, key",
             // Giving back an existing claim is cancellation/recovery, not new work.
             // Permit it even if a task or planning parent was archived after claim.
             // Keep archive flags intact; readiness validation still applies to Ready.
-            let recovering_claim =
-                old.assignee_id.is_some() && ["backlog", "ready"].contains(&target);
+            let recovering_claim = (old.assignee_id.is_some()
+                || (human && old.status == "in_progress"))
+                && ["backlog", "ready"].contains(&target);
             if !recovering_claim {
                 editable(c, key, actor)?;
             }
