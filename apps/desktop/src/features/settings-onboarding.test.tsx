@@ -120,7 +120,7 @@ it("stdio copy uses the displayed project and does not fetch an unnecessary toke
     ),
   ).toBe(false);
 });
-it("an HTTP copy keeps its captured target across a late UI project change", async () => {
+it("an HTTP copy keeps its captured target label across a project rename", async () => {
   const user = userEvent.setup();
   let resolve!: (value: string) => void;
   vi.spyOn(mockApi, "revealMcpToken").mockImplementation(
@@ -145,15 +145,15 @@ it("an HTTP copy keeps its captured target across a late UI project change", asy
       ...original,
       jam: {
         ...original.jam,
-        id: "other-id",
-        keyPrefix: "OTHER",
-        name: "Other project",
+        id: original.jam?.id,
+        keyPrefix: original.jam?.keyPrefix,
+        name: "Renamed project",
       },
     });
     client.setQueryData(["mcpStatus"], {
       ...oldStatus,
-      projectId: "other-id",
-      projectKeyPrefix: "OTHER",
+      projectId: original.jam?.id,
+      projectKeyPrefix: original.jam?.keyPrefix,
     });
     resolve("local-test-token");
   });

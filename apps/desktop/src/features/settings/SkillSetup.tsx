@@ -8,7 +8,7 @@ import { skillCommands } from "../../lib/skill-setup";
 export const playbookRepository = "https://github.com/Triton556/agent-playbook";
 export const playbookCloneCommand =
   "git clone -c core.longpaths=true https://github.com/Triton556/agent-playbook.git";
-export function SkillSetup() {
+export function SkillSetup({ disabled = false }: { disabled?: boolean }) {
   const [input, setInput] = useState<SkillInput>({
     playbook: "",
     target: "",
@@ -16,10 +16,11 @@ export function SkillSetup() {
     profile: "jam-board",
   });
   const [check, setCheck] = useState<SkillCheck | null>(null),
-    [busy, setBusy] = useState(false),
+    [working, setBusy] = useState(false),
     [confirm, setConfirm] = useState(false),
     [log, setLog] = useState(""),
     [notice, setNotice] = useState("");
+  const busy = working || disabled;
   const mounted = useRef(true);
   const cancelled = useRef(false);
   useEffect(() => {
@@ -254,6 +255,7 @@ export function SkillSetup() {
         ))}
         <Button
           variant="ghost"
+          disabled={busy}
           onClick={() => void api.openUrl("https://www.python.org/downloads/")}
         >
           Python installation information ↗
@@ -265,6 +267,7 @@ export function SkillSetup() {
       >
         <CodeBlock
           code={commands}
+          disabled={busy}
           onCopy={() => void navigator.clipboard.writeText(commands)}
         />
         <p className="muted small">
@@ -280,7 +283,7 @@ export function SkillSetup() {
           >
             Run install
           </Button>
-          {busy && (
+          {working && (
             <Button
               onClick={() => {
                 cancelled.current = true;
@@ -316,6 +319,7 @@ export function SkillSetup() {
                 and prepare a planning prompt. This does not start work.
               </p>
               <Button
+                disabled={busy}
                 onClick={() =>
                   void navigator.clipboard.writeText(
                     `Start a new agent session in ${input.target}. Refresh its tool schemas. In Jam Board Settings > Agents, copy the intended project's read-only connection check. Confirm the exact project before writing, appoint a Brain for each epic in Plan, and use Prepare planning prompt. Installing the skill did not connect MCP or authorize execution.`,

@@ -1,10 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { Copy, Eye, FolderOpen, RefreshCw, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { version } from "../../../package.json";
 import wave from "../../assets/chibi/danil-wave-256.webp";
-import { Button, Dialog, IconButton, Select, Tabs } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  IconButton,
+  Select,
+  TabPanels,
+  Tabs,
+} from "../../components/ui";
 import { CodeBlock, PageHeading, Switch } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
 import { api } from "../../lib/api";
@@ -70,12 +77,40 @@ export function SettingsPage({
   const [shown, setShown] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const configuration = useRef<HTMLElement>(null);
+  const configurationTabs = useId();
   const [confirm, setConfirm] = useState<"token" | "demo" | "archive" | null>(
     null,
   );
   const [typed, setTyped] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const runLock = useRef(false);
+  const mounted = useRef(true);
+  const copyGeneration = useRef(0);
+  const currentProject = useRef(app.data?.jam?.id);
+  currentProject.current = app.data?.jam?.id;
+  const [copyPending, setCopyPending] = useState(false);
+  useEffect(
+    () =>
+      client.getQueryCache().subscribe((event) => {
+        if (event.query.queryKey[0] !== "app") return;
+        const next = client.getQueryData<
+          Awaited<ReturnType<typeof api.appState>>
+        >(["app"])?.jam?.id;
+        if (next !== currentProject.current) {
+          currentProject.current = next;
+          copyGeneration.current += 1;
+        }
+      }),
+    [client],
+  );
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      copyGeneration.current += 1;
+    };
+  }, []);
   useBlocker({ shouldBlockFn: () => busy, enableBeforeUnload: busy });
   useEffect(
     () => () => {
@@ -87,23 +122,47 @@ export function SettingsPage({
     setSection(initialSection === "MCP" ? "Agents" : initialSection);
   }, [initialSection]);
   const run = async (action: () => Promise<unknown>, message?: string) => {
+    if (runLock.current) return;
+    runLock.current = true;
     setBusy(true);
     setNotice("");
     try {
       await action();
-      if (message) setNotice(message);
+      if (message && mounted.current) setNotice(message);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      if (mounted.current)
+        setNotice(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
+      runLock.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ["mcpStatus"] });
   };
-  const copy = async (text: string, message = "Copied") => {
-    await navigator.clipboard.writeText(text);
-    setNotice(message);
+  const copy = async (
+    source: string | (() => Promise<string>),
+    message = "Copied",
+  ) => {
+    const generation = ++copyGeneration.current;
+    const projectId = currentProject.current;
+    const valid = () =>
+      mounted.current &&
+      generation === copyGeneration.current &&
+      projectId ===
+        client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])
+          ?.jam?.id;
+    setCopyPending(true);
+    try {
+      const text = typeof source === "string" ? source : await source();
+      if (!valid()) return;
+      await navigator.clipboard.writeText(text);
+      if (valid()) setNotice(message);
+    } catch (error) {
+      if (valid()) throw error;
+    } finally {
+      if (mounted.current) setCopyPending(false);
+    }
   };
   const show = async () => {
     const token = await api.revealMcpToken();
@@ -147,6 +206,7 @@ export function SettingsPage({
             (s) => (
               <Button
                 key={s}
+                disabled={busy}
                 aria-current={section === s ? "page" : undefined}
                 onClick={() => {
                   setSection(s);
@@ -263,19 +323,20 @@ export function SettingsPage({
                     {shown ?? `••••${data?.tokenTail ?? "••••"}`}
                   </p>
                   <div className="button-row">
-                    <Button onClick={() => void run(show)}>
+                    <Button disabled={busy} onClick={() => void run(show)}>
                       <Eye size={15} />
                       {shown ? "Shown for 30s" : "Show"}
                     </Button>
                     <IconButton
                       label="Copy token"
+                      disabled={busy}
                       onClick={() =>
-                        void run(async () => copy(await api.revealMcpToken()))
+                        void run(() => copy(() => api.revealMcpToken()))
                       }
                     >
                       <Copy size={16} />
                     </IconButton>
-                    <Button onClick={() => setConfirm("token")}>
+                    <Button disabled={busy} onClick={() => setConfirm("token")}>
                       <RefreshCw size={15} />
                       Regenerate
                     </Button>
@@ -285,6 +346,7 @@ export function SettingsPage({
                   <code className="path-value">{data?.sidecarPath}</code>
                   <IconButton
                     label="Copy sidecar path"
+                    disabled={busy}
                     onClick={() =>
                       void run(() => copy(data?.sidecarPath ?? ""))
                     }
@@ -349,56 +411,75 @@ export function SettingsPage({
                       : "Run this command in your terminal."
                   }
                 >
-                  <Tabs value={tab} onChange={setTab} items={tabs} />
-                  {!connectionReady && (status.isPending || app.isPending) && (
-                    <p role="status">
-                      Reading the selected project's connection settings…
-                    </p>
-                  )}
-                  {!connectionReady && !status.isPending && !app.isPending && (
-                    <>
-                      <p role="alert">
-                        Connection settings are unavailable or do not match the
-                        selected project. Reread them before copying a
-                        configuration.
-                      </p>
-                      <Button
+                  <Tabs
+                    id={configurationTabs}
+                    label="Agent client and transport"
+                    disabled={busy}
+                    value={tab}
+                    onChange={setTab}
+                    items={tabs}
+                  />
+                  <TabPanels id={configurationTabs} value={tab} items={tabs}>
+                    {!connectionReady &&
+                      (status.isPending || app.isPending) && (
+                        <p role="status">
+                          Reading the selected project's connection settings…
+                        </p>
+                      )}
+                    {!connectionReady &&
+                      !status.isPending &&
+                      !app.isPending && (
+                        <>
+                          <p role="alert">
+                            Connection settings are unavailable or do not match
+                            the selected project. Reread them before copying a
+                            configuration.
+                          </p>
+                          <Button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(async () => {
+                                await Promise.all([
+                                  status.refetch(),
+                                  app.refetch(),
+                                ]);
+                              })
+                            }
+                          >
+                            Retry connection settings
+                          </Button>
+                        </>
+                      )}
+                    {masked && connectionReady && (
+                      <CodeBlock
+                        code={masked[snippetKey]}
                         disabled={busy}
-                        onClick={() =>
+                        pending={copyPending}
+                        onCopy={() =>
                           void run(async () => {
-                            await Promise.all([
-                              status.refetch(),
-                              app.refetch(),
-                            ]);
+                            // Capture displayed settings before any asynchronous token read.
+                            const captured = data;
+                            const target = `${project?.name} · ${project?.keyPrefix}`;
+                            const http = tab.includes("HTTP");
+                            await copy(
+                              async () => {
+                                const token = http
+                                  ? await api.revealMcpToken()
+                                  : "";
+                                return makeSnippets(captured, token)[
+                                  snippetKey
+                                ];
+                              },
+                              `Configuration copied for ${target}${http ? " (includes your token; keep it private)" : ""}`,
+                            );
                           })
                         }
-                      >
-                        Retry connection settings
-                      </Button>
-                    </>
-                  )}
-                  {masked && connectionReady && (
-                    <CodeBlock
-                      code={masked[snippetKey]}
-                      onCopy={() =>
-                        void run(async () => {
-                          // Capture displayed settings before any asynchronous token read.
-                          const captured = data;
-                          const target = `${project?.name} · ${project?.keyPrefix}`;
-                          const http = tab.includes("HTTP");
-                          const token = http ? await api.revealMcpToken() : "";
-                          const snippets = makeSnippets(captured, token);
-                          await copy(
-                            snippets[snippetKey],
-                            `Configuration copied for ${target}${http ? " (includes your token; keep it private)" : ""}`,
-                          );
-                        })
-                      }
-                    />
-                  )}
+                      />
+                    )}
+                  </TabPanels>
                 </SettingsRow>
               </SettingsSection>
-              <SkillSetup />
+              <SkillSetup disabled={busy} />
               <SettingsSection
                 title="Recent agent calls"
                 description="Last 20 calls · kept in memory while this window is open"

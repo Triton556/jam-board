@@ -35,6 +35,7 @@ export function ReviewDialog({
   const [comments, setComments] = useState(""),
     [failed, setFailed] = useState<string[]>([]);
   const capturedHeading = useRef<HTMLHeadingElement>(null);
+  const commentsField = useRef<HTMLTextAreaElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: every explicitly reread snapshot needs focus, including a second reread while refreshed remains true.
   useEffect(() => {
     if (refreshed) capturedHeading.current?.focus();
@@ -71,6 +72,17 @@ export function ReviewDialog({
           test choices before submitting.
         </p>
       )}
+      <div className="review-reading-navigation">
+        <span className="small">
+          Full report below · scroll this dialog to read the evidence.
+        </span>
+        <Button
+          disabled={pending}
+          onClick={() => commentsField.current?.focus()}
+        >
+          Go to comments
+        </Button>
+      </div>
       <div className="review-captured-report">
         <h3 ref={capturedHeading} tabIndex={-1}>
           Captured report
@@ -78,9 +90,16 @@ export function ReviewDialog({
         <ReportEvidence report={report} expandFiles={refreshed} />
       </div>
       {context && <ReviewContext task={context} expanded={refreshed} />}
+      <Button
+        disabled={pending}
+        onClick={() => capturedHeading.current?.focus()}
+      >
+        Back to captured report
+      </Button>
       <label className="field">
         Comments
         <textarea
+          ref={commentsField}
           aria-label="Review comments"
           disabled={pending}
           value={comments}

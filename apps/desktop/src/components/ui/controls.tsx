@@ -277,31 +277,6 @@ export function SegmentedControl<T extends string>({
     </div>
   );
 }
-export function Tabs({
-  value,
-  onChange,
-  items,
-}: {
-  value: string;
-  onChange(v: string): void;
-  items: string[];
-}) {
-  return (
-    <div className="tabs" role="tablist">
-      {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          role="tab"
-          aria-selected={value === item}
-          onClick={() => onChange(item)}
-        >
-          {item}
-        </button>
-      ))}
-    </div>
-  );
-}
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd>{children}</kbd>;
 }

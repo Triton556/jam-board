@@ -465,8 +465,9 @@
 }
 .review-captured-report {
   margin-block: 12px;
-  max-height: 180px;
-  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
 }
 
 /* Evidence must remain readable inside both the task drawer and review dialog. */
@@ -607,4 +608,46 @@
   border: 1px solid var(--line-soft);
   border-radius: var(--r-input);
   background: var(--paper-2);
+}
+
+/* One vertical review scroll surface; navigation keeps long reports workable. */
+.review-reading-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 12px;
+}
+.tab-panel {
+  min-width: 0;
+  width: 100%;
+  flex-basis: 100%;
+}
+.tab-panel > label {
+  margin-bottom: 10px;
+}
+/* Draw disclosure ink in CSS rather than relying on platform emoji markers. */
+:is(.workflow-guide, .execution-help, .connection-help) > summary {
+  list-style: none;
+}
+:is(.workflow-guide, .execution-help, .connection-help)
+  > summary::-webkit-details-marker {
+  display: none;
+}
+:is(.workflow-guide, .execution-help, .connection-help) > summary::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 10px;
+  margin-bottom: 1px;
+}
+:is(.workflow-guide, .execution-help, .connection-help)[open]
+  > summary::before {
+  transform: rotate(45deg);
+  margin-bottom: 3px;
 }
