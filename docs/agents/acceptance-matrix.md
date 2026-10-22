@@ -196,3 +196,20 @@ Longer live text must stay inside the viewport. Four new DOM probes and existing
 activity tests pass (23 total); position tests use synthetic coordinates. Native
 alpha34 established the old stale-open-title defect; exact alpha35 native closure
 is pending, not inherited from those observations.
+
+## Alpha35 explicit-read and compact-modal acceptance
+
+AS02: type an answer, fail a background questions read, then explicitly refresh.
+The exact input node/draft/focus must survive the background failure; pending
+refresh coalesces repeated input, reports its actual read result and checked-at
+time, and performs no answer/claim/Start mutation. The hosted browser case is
+prepared/typechecked, NOT RUN; DOM regressions and read-scope fences are recorded
+in the [feedback inventory](deltas/feedback35-inventory.md).
+
+RF04 / KB03 / VS01: open Link reference's searchable select in the short modal;
+actual options must be visible and hit-testable, with selected versus active state
+unchanged until intentional choice. Test two Escapes, outside dismissal, newer
+modal focus, scroll-out/resize, native support and throwing/unsupported fallback.
+Seven new DOM cases plus seven existing placement cases pass; four browser cases
+are prepared/typechecked, NOT RUN. Native34's clipped screenshot is red baseline,
+not native35 closure. Preserve the separately passing native34 Task Status case.

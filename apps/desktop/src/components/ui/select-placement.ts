@@ -30,15 +30,19 @@ export function selectPlacement(
   };
 }
 
-export function selectClip(element: HTMLElement): Rect {
+export function selectViewport(): Rect {
   const viewport = window.visualViewport;
-  const clip = {
+  return {
     left: viewport?.offsetLeft ?? 0,
     top: viewport?.offsetTop ?? 0,
     right: (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth),
     bottom:
       (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight),
   };
+}
+
+export function selectClip(element: HTMLElement): Rect {
+  const clip = selectViewport();
   for (
     let parent = element.parentElement;
     parent;

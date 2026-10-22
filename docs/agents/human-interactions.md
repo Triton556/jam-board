@@ -132,3 +132,14 @@ The Board activity label keeps its current description while a tooltip is alread
 open, including heartbeat refresh and expiry. The existing card remains the focus
 and activation target; no new tab stop, action, claim or permission is introduced.
 See [native finding and bounded correction](../live-card-presence.md#alpha35-live-card-tooltip-content).
+
+## Alpha35 read feedback and compact select correction
+
+H-I01/P06/P05/T01, H-A01/R01 and H-G03: explicit reads expose Checking, a true
+checked-at receipt or an error; background failures preserve existing editable
+content. H-P02 autosave keeps newer drafts separate from acknowledged submitted
+text and refuses an absent/switched project before dispatch. See the scoped
+[feedback inventory](deltas/feedback35-inventory.md), not a whole-app pass claim.
+H-R03/H-D01: compact searchable selects can use a native top layer while retaining
+modal DOM ownership; unsupported engines have an in-flow fallback. First Escape
+closes the select, then its parent. See [placement contract](overlay-placement.md).
