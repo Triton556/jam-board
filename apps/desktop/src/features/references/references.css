@@ -610,6 +610,7 @@ p.reference-read-notice {
   flex-shrink: 0;
 }
 .reference-note-draft {
+  z-index: 2100;
   user-select: text;
   position: absolute;
   width: 340px;

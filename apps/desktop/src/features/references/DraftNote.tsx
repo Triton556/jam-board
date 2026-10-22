@@ -11,6 +11,7 @@ export function DraftNote({
   projectId,
   x,
   y,
+  maxHeight = 480,
   close,
   saved,
   refresh,
@@ -18,6 +19,7 @@ export function DraftNote({
   projectId: string;
   x: number;
   y: number;
+  maxHeight?: number;
   close(): void;
   saved(item: RefItem): void;
   refresh(): Promise<unknown>;
@@ -31,6 +33,17 @@ export function DraftNote({
   const sent = useRef(false);
   const form = useRef<HTMLFormElement>(null);
   const titleInput = useRef<HTMLInputElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (discard)
+      form.current
+        ?.querySelector<HTMLButtonElement>("[data-keep-editing]")
+        ?.focus();
+    else if (returnFocus.current) {
+      returnFocus.current.focus();
+      returnFocus.current = null;
+    }
+  }, [discard]);
   useEffect(() => {
     titleInput.current?.focus();
   }, []);
@@ -41,17 +54,20 @@ export function DraftNote({
       write.isLocked() ||
       (dirty &&
         !window.confirm(
-          "Leave this unsaved note? Copy any text you need first. An already submitted note may still have been created.",
+          "Leave this local note draft? Copy any text you need first. An already submitted note may still have been created.",
         )),
     enableBeforeUnload: dirty,
   });
   const cancel = () => {
     if (write.isLocked()) return;
-    if (dirty || uncertain) setDiscard(true);
-    else close();
+    if (dirty || uncertain) {
+      if (!discard)
+        returnFocus.current = document.activeElement as HTMLElement | null;
+      setDiscard(true);
+    } else close();
   };
   const save = () => {
-    if (!text.trim() || sent.current) return;
+    if (discard || !text.trim() || sent.current) return;
     write.run(async () => {
       // Set before dispatch: a transport rejection cannot prove non-commit.
       sent.current = true;
@@ -74,7 +90,7 @@ export function DraftNote({
       ref={form}
       aria-label="New note draft"
       className="reference-note-draft m5-form nodrag nopan nowheel"
-      style={{ transform: `translate(${x}px, ${y}px)` }}
+      style={{ transform: `translate(${x}px, ${y}px)`, maxHeight }}
       onSubmit={(event) => {
         event.preventDefault();
         save();
@@ -156,8 +172,18 @@ export function DraftNote({
             submitted.
           </p>
           <div className="button-row">
-            <Button onClick={() => setDiscard(false)}>Keep editing</Button>
-            <Button variant="danger" onClick={close}>
+            <Button
+              data-keep-editing
+              disabled={write.pending}
+              onClick={() => setDiscard(false)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              variant="danger"
+              disabled={write.pending}
+              onClick={() => write.dismiss(close)}
+            >
               Discard draft
             </Button>
           </div>

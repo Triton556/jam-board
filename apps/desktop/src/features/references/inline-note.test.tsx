@@ -159,13 +159,19 @@ it("RF03 commit then lost response retains text and read reconciliation never re
   ).toHaveLength(1);
 });
 it("RF03 dirty Escape requires explicit discard and Keep editing preserves both fields", async () => {
+  const create = vi.spyOn(mockApi, "addReference");
   const { close } = await mountDraft();
   await fill();
   fireEvent.keyDown(screen.getByRole("textbox", { name: "Note" }), {
     key: "Escape",
   });
   expect(close).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Keep editing" })).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole("form"), { key: "s", ctrlKey: true });
+  fireEvent.submit(screen.getByRole("form"));
+  expect(create).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+  expect(screen.getByRole("textbox", { name: "Note" })).toHaveFocus();
   expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue(
     "Lighting notes",
   );
