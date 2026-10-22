@@ -105,3 +105,14 @@ The historical alpha38 pending statement above is superseded for the repaired
 alpha39 runtime by [its terminal record](../verification/0.3.0-alpha.39.md):
 Linux96/96 and Windows green; six actual synthetic paper PNGs inspected.
 This does not convert native-unrun cases into passes. Alpha40 has separate gates.
+
+## Alpha40 verified runtime checkpoint
+
+The [46-family readability ledger](readability-motion.md) records the source audit
+and its limits. Exact public runtime `e7c37260` completed Linux **103/103 browser**
+and Windows **178 Rust /805 DOM plus debug desktop build** successfully. Twelve
+actual synthetic screenshots were inspected, covering paper creation/heading/reopen,
+restrained pickup/reduced motion and narrow Light/Dark guidance. See the
+[terminal evidence](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
+This supersedes the browser-pending checkpoint statements for the tested runtime,
+not the separate unrun native, real-agent or exhaustive visual cases.

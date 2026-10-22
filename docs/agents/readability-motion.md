@@ -113,7 +113,10 @@ real states, using exact `sticky-note-*.png` / `readability-*.png` allowlists an
 Execution/inspection results belong in the version record, not inferred here.
 
 At freeze, 805 DOM tests and 26 Node tests pass; 103 browser scenarios are listed
-but not yet run. These aggregate counts do not mean every family was exercised.
+but not yet run. The later exact public runtime `e7c37260` completed 103/103
+hosted browser cases and both CI jobs successfully; all 12 synthetic PNGs were
+inspected. See the [terminal result](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
+These aggregate counts do not mean every family was exercised visually.
 
 Native GUI transport remains unavailable. Browser800px tests are not native
 minimum-width1100px evidence. Native/Windows text entry, full nested visual

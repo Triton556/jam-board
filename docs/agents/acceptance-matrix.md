@@ -299,3 +299,9 @@ VS01/VS02/H-P08: short authority bullets wrap at800browserpx in both themes,
 requires an actual pointer pickup, computed transform and cancellation with zero
 move calls. Reduced-motion transform is identity; existing real move/CAS tests
 remain. Static PNGs alone cannot prove animation or permission behavior.
+
+Alpha40 terminal evidence: exact public runtime `e7c37260` passed all 103 hosted
+browser scenarios, including the requirements immediately above. All 12 synthetic
+paper/pickup/guidance PNGs were inspected. This is bounded Chromium behavior and
+rendering evidence, not all-family native or accessibility certification; see
+[the exact record](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
