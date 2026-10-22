@@ -59,6 +59,7 @@ export type CreateInput = {
 };
 export type MoveInput = {
   key: string;
+  expectedUpdatedAt: string;
   status: Status;
   beforeKey?: string;
   afterKey?: string;

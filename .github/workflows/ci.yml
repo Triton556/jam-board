@@ -34,10 +34,12 @@ jobs:
       - run: npm ci
         working-directory: apps/desktop
       - name: Check release version consistency
-        run: node scripts/check-versions.mjs && node --test scripts/check-versions.test.mjs
+        run: node scripts/check-versions.mjs && node --test scripts/check-versions.test.mjs scripts/smoke-contracts.test.mjs scripts/smoke-stdio.test.mjs
       - name: Prepare sidecar for Tauri resource validation
         run: npm run prepare:sidecar
         working-directory: apps/desktop
+      - name: Isolated current MCP contract smoke
+        run: node scripts/stdio-smoke.mjs
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace

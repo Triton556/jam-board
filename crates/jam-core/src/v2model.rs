@@ -334,7 +334,7 @@ macro_rules! input {
     };
 }
 input!(PlanningStatusInput{key:String,status:String,override_reason:Option<String>});
-input!(ReadyInput{key:String,override_reason:Option<String>});
+input!(ReadyInput{key:String,expected_updated_at:String,override_reason:Option<String>});
 input!(BrainInput {
     epic_key: String,
     member_handle: String

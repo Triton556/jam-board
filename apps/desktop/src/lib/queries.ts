@@ -47,10 +47,12 @@ export function moveInput(
   board: BoardTasks,
   key: string,
   status: Status,
+  expectedUpdatedAt: string,
 ): MoveInput {
   const index = board[status].findIndex((t) => t.key === key);
   return {
     key,
+    expectedUpdatedAt,
     status,
     afterKey: board[status][index - 1]?.key,
     beforeKey: board[status][index + 1]?.key,
@@ -63,7 +65,12 @@ export function useMoveTask() {
     onMutate: async (input) => {
       await client.cancelQueries({ queryKey: ["boardTasks"] });
       const snapshot = client.getQueryData<BoardTasks>(["boardTasks"]);
-      if (snapshot) {
+      const captured =
+        snapshot &&
+        Object.values(snapshot)
+          .flat()
+          .find((task) => task.key === input.key);
+      if (snapshot && captured?.updatedAt === input.expectedUpdatedAt) {
         const dest = snapshot[input.status].filter((t) => t.key !== input.key);
         const index = input.beforeKey
           ? dest.findIndex((t) => t.key === input.beforeKey)
@@ -78,11 +85,16 @@ export function useMoveTask() {
       return { snapshot };
     },
     onError: (error, input, context) => {
-      if (context?.snapshot)
+      const stale = "code" in error && error.code === "conflict";
+      // Never roll a newer event back to a stale optimistic snapshot. The
+      // settled refetch restores authoritative state after a refused intent.
+      if (context?.snapshot && !stale)
         client.setQueryData(["boardTasks"], context.snapshot);
       useUiStore
         .getState()
-        .error(`Couldn't move ${input.key} — ${error.message}`);
+        .error(
+          `Couldn't move ${input.key} — ${error.message}${stale ? " The board is being refreshed. Inspect the task before moving it again." : ""}`,
+        );
       if ("code" in error && error.code === "not_ready")
         useUiStore.setState({ readyRequest: input });
     },

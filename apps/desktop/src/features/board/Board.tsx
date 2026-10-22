@@ -341,6 +341,7 @@ export function Board({
   );
   const move = useMoveTask();
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const dragIntent = useRef<{ key: string; updatedAt: string } | null>(null);
   const source = tasks.data ?? emptyBoard();
   const board = epicKeys.length
     ? (Object.fromEntries(
@@ -438,8 +439,9 @@ export function Board({
         : event.over
           ? locate(String(event.over.id))
           : null;
-    if (target) {
-      const key = String(event.active.id);
+    const intent = dragIntent.current;
+    if (target && intent && intent.key === String(event.active.id)) {
+      const key = intent.key;
       const items = board[target.status].filter((t) => t.key !== key);
       const index =
         target.index < 0 ? items.length : Math.min(target.index, items.length);
@@ -454,9 +456,10 @@ export function Board({
           ? full.findIndex((t) => t.key === after.key) + 1
           : full.length;
       const next = relocate(source, key, target.status, fullIndex);
-      move.mutate(moveInput(next, key, target.status));
+      move.mutate(moveInput(next, key, target.status, intent.updatedAt));
     }
     setActiveKey(null);
+    dragIntent.current = null;
     destination.current = null;
   }
   const announcements: Announcements = {
@@ -506,12 +509,20 @@ export function Board({
           },
         }}
         onDragStart={({ active }) => {
-          setActiveKey(String(active.id));
+          const key = String(active.id);
+          const captured = Object.values(source)
+            .flat()
+            .find((task) => task.key === key);
+          dragIntent.current = captured
+            ? { key, updatedAt: captured.updatedAt }
+            : null;
+          setActiveKey(key);
           destination.current = null;
         }}
         onDragEnd={finish}
         onDragCancel={() => {
           setActiveKey(null);
+          dragIntent.current = null;
           destination.current = null;
         }}
       >

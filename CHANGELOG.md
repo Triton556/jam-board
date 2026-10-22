@@ -3,6 +3,47 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.7] - 2026-10-21
+
+### Fixed
+
+- Native human Move and Mark ready now require the task revision captured when
+  the action began. The atomic writer rejects stale drag/drop and readiness
+  decisions before changing status, round, ordering, override comments or history.
+- Pointer and keyboard drag share a captured starting revision. Background updates
+  cannot refill it; a refused drop refreshes authoritative board state instead of
+  rolling a newer event back to an old optimistic snapshot.
+- Readiness keeps its saved brief/status snapshot and override reason. A changed
+  task blocks confirmation until an explicit reread; the latest saved brief and
+  status are then inspectable without closing the decision or losing the reason.
+- Mark ready saves dirty draft fields first, prevents duplicate checks, and leaves
+  stable focus and honest feedback. A failed combined Ready/edit save retains
+  unsaved fields rather than overriding a different saved brief.
+- Supported smoke scripts use current captured task/review context. The installed
+  fixture requires an explicit fresh-disposable run and exact parent/path/binary
+  checks; historical capture scripts refuse current contracts before side effects.
+
+### Added
+
+- A current isolated real-stdio smoke checks binary/schema identity, complete
+  planning, paused execution, missing validators and stale-write rejection without
+  replay. It never fabricates a human Start or launches a worker session.
+- Script preflight/client regressions and the isolated smoke are included in CI.
+
+### Compatibility and verification
+
+- **Native invocation change:** Move/Mark ready require `expectedUpdatedAt`.
+  Generated bindings, UI, mocks and supported examples are synchronized. MCP
+  requirements from alpha5 remain unchanged; SQLite remains schema 7.
+- Fresh human manual Done remains an explicit non-reviewed completion. Existing
+  grants, holders, reports and imports are preserved; no process is stopped.
+- Alpha6's complete evidence/recovery fixes passed independent DOM review. Native
+  alpha5 testing found an AX-associated Linux WebKit freeze at report/Settings
+  table traversal; screenshot-only controls remained responsive. Its exact cause
+  and native accessibility remain unresolved, not claimed fixed by this version.
+- See versioned verification notes for exact local checks and unverified native,
+  browser and Windows-installed paths. No public release or tag is implied.
+
 ## [0.3.0-alpha.6] - 2026-10-21
 
 ### Fixed

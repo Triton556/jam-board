@@ -18,6 +18,7 @@ beforeEach(async () => {
   vi.restoreAllMocks();
   mockApi.setLatency(0);
   await mockApi.resetDemo();
+  mockApi.calls.length = 0;
   useUiStore.setState({ toasts: [], readyRequest: null });
 });
 async function mount() {
@@ -44,7 +45,11 @@ async function mount() {
           type="button"
           onClick={() =>
             useUiStore.setState({
-              readyRequest: { key: task.key, status: "ready" },
+              readyRequest: {
+                key: task.key,
+                status: "ready",
+                expectedUpdatedAt: task.updatedAt,
+              },
             })
           }
         >
@@ -54,7 +59,7 @@ async function mount() {
       <ReadinessDialog />
     </QueryClientProvider>,
   );
-  return { task, user: userEvent.setup() };
+  return { task, client, user: userEvent.setup() };
 }
 async function open(user: ReturnType<typeof userEvent.setup>, key: string) {
   await user.click(screen.getByRole("button", { name: "Mark ready" }));
@@ -183,4 +188,127 @@ it("a failed readiness read is retryable and cannot be overridden without seeing
   );
   expect(screen.getByRole("button", { name: "Mark ready" })).toHaveFocus();
   expect((await mockApi.getTask(task.key)).status).toBe("backlog");
+});
+
+it("a readiness decision retains its reason but never replaces its captured version after a background edit", async () => {
+  const { task, user, client } = await mount();
+  const dialog = await open(user, task.key);
+  const changed = await mockApi.updateTask({
+    key: task.key,
+    expectedUpdatedAt: task.updatedAt,
+    descriptionMd: "New acceptance: preserve the local files.",
+  });
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["task", task.key] });
+  });
+  expect(
+    await within(dialog).findByText(/This task changed after the action began/),
+  ).toBeVisible();
+  const confirm = within(dialog).getByRole("button", {
+    name: "Mark ready anyway",
+  });
+  expect(confirm).toBeDisabled();
+  expect(within(dialog).getByRole("textbox")).toHaveValue(
+    "Explore first; a bounded planning exception.",
+  );
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(0);
+  await user.click(
+    within(dialog).getByRole("button", { name: "Read latest task" }),
+  );
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("heading", {
+        name: `${task.key} · ${task.title}`,
+      }),
+    ).toHaveFocus(),
+  );
+  expect(
+    within(dialog).getByText("New acceptance: preserve the local files."),
+  ).toBeVisible();
+  expect(confirm).toBeEnabled();
+  await user.click(confirm);
+  await waitFor(() => expect(useUiStore.getState().readyRequest).toBeNull());
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toMatchObject({
+    expectedUpdatedAt: changed.updatedAt,
+    overrideReason: "Explore first; a bounded planning exception.",
+  });
+});
+it("a conflict returned before live refetch locks readiness until an intentional reread, without replaying the override", async () => {
+  const { task, user } = await mount();
+  const dialog = await open(user, task.key);
+  const newer = await mockApi.updateTask({
+    key: task.key,
+    expectedUpdatedAt: task.updatedAt,
+    descriptionMd: "An unseen concurrent edit.",
+  });
+  const history = (await mockApi.getTask(task.key)).history.length;
+  await user.click(
+    within(dialog).getByRole("button", { name: "Mark ready anyway" }),
+  );
+  await within(dialog).findByText(/This task changed after the action began/);
+  expect(
+    within(dialog).getByRole("button", { name: "Mark ready anyway" }),
+  ).toBeDisabled();
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(1);
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toMatchObject({ expectedUpdatedAt: task.updatedAt });
+  expect(await mockApi.getTask(task.key)).toMatchObject({
+    status: "backlog",
+    updatedAt: newer.updatedAt,
+  });
+  expect((await mockApi.getTask(task.key)).history).toHaveLength(history);
+  await user.click(
+    within(dialog).getByRole("button", { name: "Read latest task" }),
+  );
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("button", { name: "Mark ready anyway" }),
+    ).toBeEnabled(),
+  );
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(1);
+});
+it("a task changed during its readiness read is not presented as a coherent snapshot", async () => {
+  const { task, user } = await mount();
+  const check = mockApi.checkReady.bind(mockApi);
+  vi.spyOn(mockApi, "checkReady").mockImplementationOnce(async (key) => {
+    const readiness = await check(key);
+    await mockApi.updateTask({
+      key,
+      expectedUpdatedAt: task.updatedAt,
+      descriptionMd: "Changed midway through the read.",
+    });
+    return readiness;
+  });
+  await user.click(screen.getByRole("button", { name: "Mark ready" }));
+  const dialog = screen.getByRole("dialog", {
+    name: `Not ready · ${task.key}`,
+  });
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "changed while its brief was being read",
+  );
+  expect(
+    within(dialog).getByRole("button", { name: "Mark ready anyway…" }),
+  ).toBeDisabled();
+  await user.click(within(dialog).getByRole("button", { name: "Check again" }));
+  await within(dialog).findByText(/This task changed after the action began/);
+  expect(
+    within(dialog).getByRole("button", { name: "Mark ready anyway…" }),
+  ).toBeDisabled();
+  await user.click(
+    within(dialog).getByRole("button", { name: "Read latest task" }),
+  );
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("button", { name: "Mark ready anyway…" }),
+    ).toBeEnabled(),
+  );
 });

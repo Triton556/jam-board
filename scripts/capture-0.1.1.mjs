@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Captures the actual WebView2 desktop surface without the Computer Use cursor overlay.
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";

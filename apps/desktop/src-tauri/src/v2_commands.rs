@@ -219,15 +219,7 @@ pub async fn mark_ready(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<TaskSummary, ApiError> {
-    execute(&state, app, true, move |s| {
-        s.mark_ready(
-            &s.current_member()?.id,
-            &input.key,
-            input.override_reason.as_deref(),
-            None,
-        )
-    })
-    .await
+    execute(&state, app, true, move |s| s.mark_current_task_ready(input)).await
 }
 
 #[tauri::command]

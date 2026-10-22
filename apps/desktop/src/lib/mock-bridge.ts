@@ -361,8 +361,7 @@ export class MockBridge implements JamApi {
     call: (c, i) => this.call(c, i),
     checkpoint: () => this.checkpoint(),
     emit: (...args) => this.event(...args),
-    move: (key, overrideReason) =>
-      this.moveTask({ key, status: "ready", overrideReason }),
+    move: (input) => this.moveTask({ ...input, status: "ready" }),
   });
   listEpics = () => this.planning.listEpics();
   listStories = async () => {
@@ -1160,6 +1159,18 @@ export class MockBridge implements JamApi {
   }
   async moveTask(input: MoveInput) {
     await this.call("move_task", input);
+    if (!input.expectedUpdatedAt?.trim())
+      throw new JamError(
+        "validation",
+        "A captured task version is required",
+        "expectedUpdatedAt",
+      );
+    if (this.find(input.key).updatedAt !== input.expectedUpdatedAt)
+      throw new JamError(
+        "conflict",
+        "This task changed after the move was prepared. Read the latest task before deciding again.",
+        "expectedUpdatedAt",
+      );
     return this.move(input, this.human());
   }
   releaseTask: JamApi["releaseTask"] = async (input) => {
@@ -1946,7 +1957,11 @@ export class MockBridge implements JamApi {
       );
     if (input.action === "task.moved")
       return this.move(
-        { key: task.key, status: input.status ?? "review" },
+        {
+          key: task.key,
+          expectedUpdatedAt: task.updatedAt,
+          status: input.status ?? "review",
+        },
         actor,
       );
     if (input.action === "task.claimed") {

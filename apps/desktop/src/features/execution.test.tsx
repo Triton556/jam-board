@@ -64,7 +64,11 @@ it("Ready alone cannot start work through claim, move, edit or direct working cr
     mockApi.simulateAgent({ action: "task.claimed", key: task.key }),
   ).rejects.toMatchObject({ code: "execution_required" });
   await expect(
-    mockApi.moveTask({ key: task.key, status: "in_progress" }),
+    mockApi.moveTask({
+      key: task.key,
+      status: "in_progress",
+      expectedUpdatedAt: (await mockApi.getTask(task.key)).updatedAt,
+    }),
   ).rejects.toMatchObject({ code: "execution_required" });
   await expect(
     mockApi.updateTask({
@@ -116,7 +120,11 @@ it("pause preserves assignments and permits in-flight evidence, but blocks resta
   await mockApi.simulateAgent({ action: "report.submitted", key: task.key });
   expect((await mockApi.getTask(task.key)).status).toBe("review");
   await expect(
-    mockApi.moveTask({ key: task.key, status: "in_progress" }),
+    mockApi.moveTask({
+      key: task.key,
+      status: "in_progress",
+      expectedUpdatedAt: (await mockApi.getTask(task.key)).updatedAt,
+    }),
   ).rejects.toMatchObject({ code: "execution_required" });
   expect((await mockApi.getTask(task.key)).reports.length).toBeGreaterThan(0);
 });
@@ -612,7 +620,11 @@ it("even the appointed brain cannot bypass independent review through direct Don
       patch: { status: "done" },
     }),
   ).rejects.toMatchObject({ code: "forbidden" });
-  await mockApi.moveTask({ key: task.key, status: "done" });
+  await mockApi.moveTask({
+    key: task.key,
+    status: "done",
+    expectedUpdatedAt: (await mockApi.getTask(task.key)).updatedAt,
+  });
   expect(await mockApi.getTask(task.key)).toMatchObject({
     status: "done",
     reviews: task.reviews,

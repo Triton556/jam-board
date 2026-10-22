@@ -38,7 +38,7 @@ import { invalidatePlanning } from "../../lib/planning-queries";
 import { appQuery, membersQuery, useBoardSettings } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
 import type { TaskDetail, UpdateInput } from "../../lib/types";
-import { labels, statuses } from "../../lib/types";
+import { JamError, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
 import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
@@ -46,7 +46,7 @@ import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
-import { ReadinessStrip } from "./Readiness";
+import { announceReady, ReadinessStrip } from "./Readiness";
 import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
 import type { TaskFields } from "./task-form";
@@ -112,6 +112,9 @@ export function TaskEditor({
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState("Write");
   const [comment, setComment] = useState("");
+  const [markPending, setMarkPending] = useState(false);
+  const markLock = useRef(false);
+  const [saveNotice, setSaveNotice] = useState("");
   const changes = useUiStore((s) => s.taskChanges[task.key]);
   const form = useForm<TaskFields>({
     resolver: zodResolver(taskSchema),
@@ -169,7 +172,10 @@ export function TaskEditor({
   };
   const save = useMutation({
     mutationFn: (input: UpdateInput) => api.updateTask(input),
-    onMutate: () => structuredClone(getValues()),
+    onMutate: () => {
+      setSaveNotice("");
+      return structuredClone(getValues());
+    },
     onSuccess: (value, _input, submitted) => {
       const current = getValues();
       client.setQueryData(["task", task.key], value);
@@ -184,19 +190,84 @@ export function TaskEditor({
       }
       invalidate();
     },
-    onError: async (error) => {
+    onError: async (error, input) => {
       if ("code" in error && error.code === "not_ready") {
         form.setValue("status", base.status as TaskFields["status"], {
           shouldDirty: true,
         });
-        useUiStore.setState({
-          readyRequest: { key: task.key, status: "ready" },
-        });
+        const remaining = taskPatch(taskValues(base), getValues());
+        if (Object.keys(remaining).some((field) => field !== "status"))
+          setSaveNotice(
+            "The brief is not ready. Your edits remain unsaved. Save them without changing status, then choose Mark ready to review the saved brief.",
+          );
+        else
+          useUiStore.setState({
+            readyRequest: {
+              key: task.key,
+              status: "ready",
+              expectedUpdatedAt: input.expectedUpdatedAt,
+            },
+          });
       } else if ("code" in error && error.code === "conflict") {
         const fresh = await api.getTask(task.key);
         setLatest(fresh);
         setReview(true);
       } else useUiStore.getState().error(error.message);
+    },
+  });
+  // Track the whole save/check/Ready operation so project switching waits for it.
+  const markOperation = useMutation({
+    mutationFn: async (capturedTask: TaskDetail) => {
+      let captured = capturedTask;
+      let checking = false;
+      try {
+        if (isDirty) {
+          const parsed = taskSchema.safeParse(getValues());
+          if (!parsed.success) return;
+          const patch = taskPatch(taskValues(base), {
+            ...parsed.data,
+            status: base.status as TaskFields["status"],
+          });
+          if (Object.keys(patch).length)
+            captured = await save.mutateAsync({
+              key: captured.key,
+              expectedUpdatedAt: base.updatedAt,
+              ...patch,
+            });
+        }
+        checking = true;
+        const check = await api.checkReady(captured.key);
+        if (check.ready) {
+          await api.markReady({
+            key: captured.key,
+            expectedUpdatedAt: captured.updatedAt,
+          });
+          invalidate();
+          announceReady(captured.key);
+        } else
+          useUiStore.setState({
+            readyRequest: {
+              key: captured.key,
+              status: "ready",
+              expectedUpdatedAt: captured.updatedAt,
+            },
+          });
+      } catch (error) {
+        if (checking && error instanceof JamError && error.code === "conflict")
+          useUiStore.setState({
+            readyRequest: {
+              key: captured.key,
+              status: "ready",
+              expectedUpdatedAt: captured.updatedAt,
+            },
+          });
+        else if (checking) useUiStore.getState().error(String(error));
+        // Save failures already preserve the editor and show their own recovery.
+      }
+    },
+    onSettled: () => {
+      markLock.current = false;
+      setMarkPending(false);
     },
   });
   const submit = (values: TaskFields, version = base.updatedAt) => {
@@ -211,7 +282,7 @@ export function TaskEditor({
   };
   const submitRef = useRef(() => {});
   submitRef.current = () => {
-    if (isDirty && !task.archivedAt && !save.isPending)
+    if (isDirty && !task.archivedAt && !save.isPending && !markLock.current)
       void handleSubmit((values) => submit(values))();
   };
   useEffect(() => {
@@ -369,7 +440,7 @@ export function TaskEditor({
         onSubmit={handleSubmit((value) => submit(value))}
         className="task-form"
       >
-        <fieldset disabled={readonly || save.isPending}>
+        <fieldset disabled={readonly || save.isPending || markPending}>
           <div className="task-breadcrumb">
             <Button
               variant="ghost"
@@ -421,26 +492,12 @@ export function TaskEditor({
             <ReadinessStrip
               readiness={readiness.data}
               status={task.status}
+              pending={markPending}
               onMark={() => {
-                void (async () => {
-                  if (isDirty) {
-                    const parsed = taskSchema.safeParse(getValues());
-                    if (!parsed.success) return;
-                    await save.mutateAsync({
-                      key: task.key,
-                      expectedUpdatedAt: base.updatedAt,
-                      ...taskPatch(taskValues(base), parsed.data),
-                    });
-                  }
-                  const check = await api.checkReady(task.key);
-                  if (check.ready) {
-                    await api.markReady(task.key);
-                    invalidate();
-                  } else
-                    useUiStore.setState({
-                      readyRequest: { key: task.key, status: "ready" },
-                    });
-                })().catch((e) => useUiStore.getState().error(String(e)));
+                if (markLock.current) return;
+                markLock.current = true;
+                setMarkPending(true);
+                markOperation.mutate(task);
               }}
             />
           )}
@@ -593,6 +650,11 @@ export function TaskEditor({
           )}
         </fieldset>
       </form>
+      {saveNotice && (
+        <p role="alert" className="notice">
+          {saveNotice}
+        </p>
+      )}
       <Rounds
         task={task}
         members={members.data ?? []}
@@ -748,7 +810,9 @@ export function TaskEditor({
           type="submit"
           form="task-form"
           variant="primary"
-          disabled={!isDirty || !isValid || save.isPending || readonly}
+          disabled={
+            !isDirty || !isValid || save.isPending || markPending || readonly
+          }
         >
           Save <Kbd>Ctrl+S</Kbd>
         </Button>

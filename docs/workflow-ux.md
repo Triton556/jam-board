@@ -194,6 +194,24 @@ not available before that read succeeds. Busy Close buttons visibly disable,
 and success moves focus to stable context if the original action disappears.
 Ready remains a planning condition, never a new execution grant.
 
+## 10. Keep human status changes attached to their original intent
+
+A concrete race showed that an old drag or readiness decision could change a new
+claim's status, including a same-agent release/reclaim. The native writer now
+requires the task revision captured at drag start or decision opening. This applies
+[RFC 9110's conditional-write rationale](https://www.rfc-editor.org/rfc/rfc9110.html#name-if-match)
+to local SQLite commands; it is not an HTTP protocol implementation or a new role.
+The atomic check runs before status, ordering, rounds, comments or journal writes.
+
+The UI never refills the validator after a background update. A stale drop restores
+authoritative board state. Readiness retains the human's reason, names the changed
+state, and offers an intentional reread with the full saved brief. Unsaved fields
+must be saved before an override of the saved brief is considered. This follows
+the correction/error-recovery guidance above, without adding a generic confirmation
+to every ordinary move. Ready still does not grant execution, and moving a card does
+not terminate a worker process. Task revisions fence task intent only; they do not
+claim to capture every concurrent ancestor planning edit.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests

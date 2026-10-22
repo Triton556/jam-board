@@ -671,6 +671,7 @@ export type MemberWithStats = {
 
 export type MoveInput = {
 	key: string,
+	expectedUpdatedAt: string,
 	status: string,
 	beforeKey: string | null,
 	afterKey: string | null,
@@ -803,6 +804,7 @@ export type ReadinessIssue = {
 
 export type ReadyInput = {
 	key: string,
+	expectedUpdatedAt: string,
 	overrideReason: string | null,
 };
 

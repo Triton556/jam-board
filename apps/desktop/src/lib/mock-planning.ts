@@ -15,7 +15,7 @@ import type {
   SubmitReport,
   TaskBrief,
 } from "../bindings";
-import type { EpicInput, StoryInput } from "./planning-api";
+import type { EpicInput, ReadyTaskInput, StoryInput } from "./planning-api";
 import {
   type ActivityEvent,
   JamError,
@@ -91,7 +91,7 @@ type Host = {
     epicId?: string,
     sentence?: string,
   ): void;
-  move(key: string, reason?: string): Promise<unknown>;
+  move(input: ReadyTaskInput): Promise<unknown>;
 };
 const copy = <T>(v: T): T => structuredClone(v);
 const now = () => new Date().toISOString();
@@ -452,10 +452,10 @@ export class MockPlanning {
     this.sync();
     return mockReadiness(this.task(key));
   }
-  async markReady(key: string, reason?: string) {
-    await this.h.call("mark_ready", { key, reason });
-    await this.h.move(key, reason);
-    return copy(this.task(key));
+  async markReady(input: ReadyTaskInput) {
+    await this.h.call("mark_ready", input);
+    await this.h.move(input);
+    return copy(this.task(input.key));
   }
   async updateTaskBrief(key: string, patch: BriefPatch_Serialize) {
     await this.h.call("update_task_brief", { key, ...patch });
