@@ -287,7 +287,8 @@ it("F08 member lost response after persistence retains copyable draft without du
 it("F08 archive and explicit unarchive complete once and refresh the same task", async () => {
   const { user } = await task();
   const archive = vi.spyOn(mockApi, "archiveTask"),
-    unarchive = vi.spyOn(mockApi, "unarchiveTask");
+    unarchive = vi.spyOn(mockApi, "unarchiveTask"),
+    execution = vi.spyOn(mockApi, "setExecution");
   await user.click(screen.getByRole("button", { name: "Task actions" }));
   await user.click(screen.getByRole("button", { name: "Archive" }));
   await user.click(screen.getByRole("button", { name: "Archive" }));
@@ -305,4 +306,5 @@ it("F08 archive and explicit unarchive complete once and refresh the same task",
   const key = archive.mock.calls[0]?.[0];
   if (!key) throw Error("Missing archived key");
   expect((await mockApi.getTask(key)).archivedAt).toBeNull();
+  expect(execution).not.toHaveBeenCalled();
 });
