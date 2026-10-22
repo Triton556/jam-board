@@ -170,3 +170,11 @@ answer using existing scope/cursor rules. It does not restart a finished chat.
 The human copy aid names exact IDs and requests fresh project/question/appointment
 and phase checks. An answer supplies information, not Start permission or worker
 launch. No new MCP tool, subscription, session binding or adapter is introduced.
+
+## Alpha35 human feedback and overlay delta
+
+The 44-tool MCP inventory, task readiness/claim/review, validators and execution
+permissions are unchanged. Local read receipts, autosave presentation, frame Fit,
+reference menus, select placement and live tooltip text do not generate agent
+work, grants or activity. Presence still distinguishes heartbeat freshness from
+reported task activity; no inference of live session streaming is introduced.

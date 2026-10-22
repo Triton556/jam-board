@@ -143,3 +143,8 @@ text and refuses an absent/switched project before dispatch. See the scoped
 H-R03/H-D01: compact searchable selects can use a native top layer while retaining
 modal DOM ownership; unsupported engines have an in-flow fallback. First Escape
 closes the select, then its parent. See [placement contract](overlay-placement.md).
+
+H-R02/R03: narrow frame headers use a separate title row; explicit Fit includes
+painted header/tool extents. Item Actions supports Escape and outside dismissal,
+then returns child-dialog focus to its visible summary. Neither changes stored
+frame geometry or resets the saved camera on route entry.

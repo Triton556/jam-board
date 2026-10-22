@@ -55,7 +55,7 @@ permission or browser security-setting change is involved.
 Seven new DOM cases cover native-method delegation (modeled, not real paint),
 unsupported/throwing fallback, nested Escape, search/selection, scroll-out/resize,
 new-dialog focus and backdrop isolation; combined with existing placement tests,
-14 pass. Four hosted-browser scenarios cover real option hit-testing and unchanged
+15 pass. Four hosted-browser scenarios cover real option hit-testing and unchanged
 canvas/data/camera in light/dark and simulated unsupported/throwing engines,
 including a 400 CSS-pixel viewport. They are added/typechecked, **NOT RUN locally**.
 Exact native35 opening and lower-edge regression remain required. A narrow CSS

@@ -3,6 +3,30 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.35] — 2026-10-22
+
+### Visible outcomes and usable nested controls
+
+- Explicit Questions, Journal, Assets, References and notification-history reads
+  show local Checking, checked-at or error feedback. Repeated pending input is
+  single-flight; background read failures preserve cached answer drafts and table
+  rows instead of replacing them with an empty/error-only view.
+- Planning-field autosave distinguishes submitted success from newer unsaved text,
+  retains uncertain outcomes, and refuses missing/switched projects before dispatch.
+  Confirmed saves after leaving an entity reconcile only the captured draft:
+  newer text stays unsaved; unchanged confirmed text returns clean.
+  Board presence tooltips update while open when a report becomes fresh or expires.
+- Narrow reference frames give titles their own row above visible controls.
+  Explicit Fit includes painted headers and toolbar bounds without resetting a
+  saved camera on ordinary entry. Reference Actions supports nested Escape,
+  outside dismissal and visible dialog-opener focus restoration.
+- Searchable selects in compact modals escape ancestor clipping through a
+  feature-detected native top layer, with an in-flow fallback for unsupported or
+  throwing implementations. Keyboard/modal ownership remains in the same DOM.
+
+No tool/schema, execution permission, agent launch or session integration change.
+[Verification and evidence boundaries](docs/verification/0.3.0-alpha.35.md).
+
 ## [0.3.0-alpha.34] — 2026-10-22
 
 ### Saved answers and manual continuation

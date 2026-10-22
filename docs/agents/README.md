@@ -48,3 +48,17 @@ acceptance, and does not validate every possible state or model response.
 answers and persisted Answered cards. It does not wake a finished client session,
 launch a worker, send a chat message or grant execution. CLI/API workspace ideas
 remain separate concepts, not implemented connection surfaces.
+
+## Alpha35 feedback and native-found overlay corrections
+
+The [feedback inventory](deltas/feedback35-inventory.md) records 23 inspected action
+rows and remaining gaps. The candidate preserves cached editing on read failure,
+reports explicit checks, and repairs native-found tooltip/frame/menu/compact-select
+issues. See [alpha35 verification](../verification/0.3.0-alpha.35.md); neither a
+scoped fix nor an aggregate test count is a whole-application usability pass.
+
+The final local alpha35 checkpoint passed 749 DOM and 26 Node checks, both
+TypeScript configurations, lint/build, and 161 Rust tests (three existing opt-in
+volume cases unrun). The 89 prepared browser scenarios remain NOT RUN; exact35
+native and hosted acceptance are separate pending gates. See verification for the
+failed initial checkpoint and its real autosave correction, not only totals.

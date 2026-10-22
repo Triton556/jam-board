@@ -123,3 +123,10 @@ See the [23-row inventory](deltas/feedback35-inventory.md) for remaining callers
 autosave and Activity gaps. Native34 also exposed compact Link reference select
 clipping, distinct from the corrected lower-edge Task Status menu; alpha35's
 feature-detected top layer/in-flow fallback needs actual native closure.
+
+Native34 also confirmed short frame-title truncation at 49% and reference menu
+Escape/outside non-dismissal. Alpha35 source repairs are independently reviewed;
+26 focused tests and prepared browser scenarios do not close native appearance.
+Explicit Fit is corrected; a deliberately preserved saved origin camera can still
+require Fit/pan to reveal a header. Remaining family feedback gaps stay in the
+inventory rather than being implicitly accepted by this release.

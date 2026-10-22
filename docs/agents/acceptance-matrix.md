@@ -210,6 +210,22 @@ RF04 / KB03 / VS01: open Link reference's searchable select in the short modal;
 actual options must be visible and hit-testable, with selected versus active state
 unchanged until intentional choice. Test two Escapes, outside dismissal, newer
 modal focus, scroll-out/resize, native support and throwing/unsupported fallback.
-Seven new DOM cases plus seven existing placement cases pass; four browser cases
+Seven new DOM cases plus eight existing placement cases pass; four browser cases
 are prepared/typechecked, NOT RUN. Native34's clipped screenshot is red baseline,
 not native35 closure. Preserve the separately passing native34 Task Status case.
+
+H-R02 / RF02: narrow headers prioritize the full short title above always-visible
+controls, including overview. Explicit Fit/F reserves painted expanded/collapsed
+headers and measured tools, excluding hidden children. Stored camera on route
+entry remains unchanged; at the minimum 10% zoom, impossible full bounds require
+pan rather than a false all-content-visible claim. H-R03/RF04/KB03: reference
+Actions Escape closes only that disclosure, outside pointer keeps the clicked
+focus target, and a child dialog returns to the visible summary. Twenty-six focused
+DOM/geometry cases pass; three browser scenarios are prepared/typechecked,
+NOT RUN. Exact native title/control/hit-target inspection remains pending.
+
+H-P01 / H-P03 / AS01: submit a planning field, leave while pending, then return
+after confirmation. Newer text remains editable and a later intentional blur
+saves it; unchanged confirmed text is clean and blur sends nothing. Unmounted
+project ABA, replaced cache identity and real remote edits cannot authorize old
+baseline updates. No departed success receipt, refetch or focus move is emitted.
