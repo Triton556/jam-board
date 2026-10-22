@@ -78,3 +78,12 @@ singleflight, foreign project, unmount and zero copy-triggered board calls.
 Existing `workflow-feedback.test.tsx` and `v22.test.tsx` are adjacent regressions.
 DOM/mock and typecheck are not native, real-client or visual acceptance. No real
 brain, live database, user PC, external message or automatic wake was tested.
+
+### Revealed prompt spacing followup
+
+Dedicated `answer-continuation.css` uses a 16px preview rhythm, 8px label/input
+spacing, restrained border grouping and a 14px/1.6 selectable vertically resizable
+textarea. Width and wrapping are bounded to the host card, using existing theme
+colors. No shared form CSS changes. Prompt language follows original human notes
+or the latest human request and asks when unclear; no automatic translation.
+Actual narrow-window, light/dark and native visual acceptance remains pending.

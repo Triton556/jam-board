@@ -56,6 +56,10 @@ it("IDs-only continuation preserves authority and is bounded in size", async () 
   expect(prompt).toContain("Verify the current appointed epic brain");
   expect(prompt).toContain("not Start approval");
   expect(prompt).toContain("previously requested phase");
+  expect(prompt).toContain("original human notes or latest human request");
+  expect(prompt).toContain(
+    "if unclear, ask rather than translating or guessing",
+  );
   expect(prompt).not.toContain(q.answerText ?? "Private original answer");
   expect(prompt).not.toContain(q.bodyMd);
   expect(prompt.split(/\s+/).length).toBeLessThan(180);
