@@ -130,18 +130,19 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
             epicKeys={epicKeys}
             disabled={create.isPending}
           />
-          <p className="small muted">
-            Choose a story in the selected epics so your draft stays visible.
-            Need one? Create it in Plan.
-          </p>
+          <p className="small muted">Choose the Story for this draft.</p>
         </div>
       )}
       {!filtered && (
         <p className="small muted">
-          Saved as a draft in Unplanned work. Add context and a story before
-          Ready.
+          This draft goes to Unplanned work. Filter by Epic first to choose a
+          Story.
         </p>
       )}
+      <p className="small muted">
+        A task’s Story cannot be changed after creation. Refine its brief before
+        Ready.
+      </p>
       {create.error && <p role="alert">{create.error.message}</p>}
       <div className="quick-create-actions">
         <span>Enter to add · Esc to close</span>

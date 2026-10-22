@@ -369,6 +369,43 @@ it("quick capture is Backlog-only and cards show readable story context", async 
     screen.getByText("Brief ready · scope permission still required"),
   ).toBeVisible();
 });
+it("unfiltered quick capture names its default and does not promise later Story reassignment", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  expect(
+    screen.getByText(
+      "This draft goes to Unplanned work. Filter by Epic first to choose a Story.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      "A task’s Story cannot be changed after creation. Refine its brief before Ready.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("combobox", { name: "Story for new draft" }),
+  ).toBeNull();
+  await user.type(
+    screen.getByRole("textbox", { name: "New task in Backlog" }),
+    "Rough capture in the default Story",
+  );
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await screen.findByRole("button", {
+    name: /Open .*Rough capture in the default Story/,
+  });
+  const saved = (await mockApi.listBoardTasks()).backlog.find(
+    (task) => task.title === "Rough capture in the default Story",
+  );
+  expect(saved).toBeDefined();
+  if (!saved) throw new Error("Missing created capture");
+  const detail = await mockApi.getTask(saved.key);
+  expect(detail.story.title).toBe("Unplanned work");
+  expect(detail.status).toBe("backlog");
+});
 it("filtered quick capture requires a matching story and keeps its draft visible in that epic", async () => {
   const { Wrapper } = wrapper(),
     user = userEvent.setup();
@@ -378,6 +415,13 @@ it("filtered quick capture requires a matching story and keeps its draft visible
   await user.click(
     await screen.findByRole("button", { name: "Add task to Backlog" }),
   );
+  expect(screen.getByText("Choose the Story for this draft.")).toBeVisible();
+  expect(
+    screen.getByText(
+      "A task’s Story cannot be changed after creation. Refine its brief before Ready.",
+    ),
+  ).toBeVisible();
+  expect(screen.queryByText(/This draft goes to Unplanned work/)).toBeNull();
   const input = screen.getByRole("textbox", { name: "New task in Backlog" });
   await user.type(input, "A scoped draft");
   await user.keyboard("{Enter}");
