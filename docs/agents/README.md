@@ -19,6 +19,12 @@ This is the maintained map of **what people and agents can do**, how nested inte
 - This documentation audit ran **source inspection and web research**, not new application acceptance tests. Prior exact-version results remain in [verification](../verification/0.3.0-alpha.28.md); do not transfer their pass status to another version/platform.
 - Build/type/lint/hash checks establish engineering integrity or artifact identity, not ease of use. A quality claim needs observed behavior and an inspected open-state layout. Browser/mock, DOM, native package and actual-human observations are different evidence classes.
 
+## Current readability and movement pass
+
+[Alpha40 ledger](readability-motion.md) covers all 46 mapped families as source review,
+with explicit functional/rendered evidence boundaries. See its version record for
+actual terminal gates; historical appendices below retain their original status.
+
 ## Invariants to preserve
 
 Human description is not the agent's entire implementation schema. A prepared prompt is not a connected or launched session. Ready is not execution permission. Start is not assignment or process launch. A question answer is not Start approval. A heartbeat is not proof of task work. Release/Pause do not stop external processes. A historical report is persistent board evidence, not a copy of all chat or source files.
@@ -87,10 +93,15 @@ The user rejected the alpha30–36 canvas form as still feeling modal. The new
 [direct-note contract](direct-sticky-notes.md) supersedes that creation/editing
 path: placement, immediate writing, optional persisted heading and guarded
 autosave. Existing media/result cards are not silently rewritten. Read the
-[alpha38 verification record](../verification/0.3.0-alpha.38.md) for current gates;
+[alpha38 verification record](../verification/0.3.0-alpha.38.md) for its checkpoint gates;
 a source implementation or a prepared screenshot test is not visual acceptance.
 
-Alpha38 local integration passes 792 DOM / 26 Node / 178 Rust checks, both
-frontend typechecks, actual binding export and isolated stdio smoke. Its 96
-hosted-browser scenarios and requested actual-paper screenshots are still pending;
+At the alpha38 freeze, local integration passed 792 DOM / 26 Node / 178 Rust
+checks, both frontend typechecks, actual binding export and isolated stdio smoke.
+Its 96 hosted-browser scenarios and actual-paper screenshots were still pending;
 see the [exact verification boundary](../verification/0.3.0-alpha.38.md).
+
+The historical alpha38 pending statement above is superseded for the repaired
+alpha39 runtime by [its terminal record](../verification/0.3.0-alpha.39.md):
+Linux96/96 and Windows green; six actual synthetic paper PNGs inspected.
+This does not convert native-unrun cases into passes. Alpha40 has separate gates.

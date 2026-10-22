@@ -18,7 +18,7 @@ export function QueryError({
   busy?: boolean;
 }) {
   return (
-    <EmptyState text="This page needs another try">
+    <EmptyState text="Could not load this view">
       <p role="alert">{error.message}</p>
       <Button
         variant="primary"

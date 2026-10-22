@@ -87,9 +87,9 @@ test("Activity filters agents, loads earlier events and holds new events while r
     }),
   );
   await expect(
-    page.getByRole("button", { name: "1 new steps ↑" }),
+    page.getByRole("button", { name: "1 new update ↑" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "1 new steps ↑" }).click();
+  await page.getByRole("button", { name: "1 new update ↑" }).click();
   await expect(
     page
       .locator(".activity-entry")

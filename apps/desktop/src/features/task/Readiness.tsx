@@ -249,9 +249,9 @@ function ReadyDialog({ complete }: { complete(key: string): void }) {
       busy={save.isPending}
       className="readiness-dialog"
     >
-      <p>Complete the brief so a worker knows what success looks like.</p>
+      <p>Add task details so a worker knows what success looks like.</p>
       <p className="small">
-        Ready describes the brief. It does not grant execution permission or
+        Ready describes the task plan. It does not grant execution permission or
         launch an agent session.
       </p>
       {!snapshot && initial.isPending && (

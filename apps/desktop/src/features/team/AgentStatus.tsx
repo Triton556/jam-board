@@ -78,7 +78,7 @@ export const AgentStatus = memo(function AgentStatus({
           <b>{member.name}</b>
           <AgentStatusLine member={member} />
           {!member.statusText && (
-            <p className="muted">Online and ready to help</p>
+            <p className="muted">No activity message reported</p>
           )}
           {scope && (
             <Button

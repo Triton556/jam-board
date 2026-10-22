@@ -111,7 +111,7 @@ it.each(
       }),
     );
     await within(dialog).findByText(/before this write was sent/);
-    expect(within(dialog).queryByText(/outcome is unconfirmed/)).toBeNull();
+    expect(within(dialog).queryByText(/Could not confirm whether/)).toBeNull();
     expect(call).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
     expect(input).toHaveValue("Retained intent");

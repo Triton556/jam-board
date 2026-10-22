@@ -243,12 +243,12 @@ it("explains stable connection identities without changing configuration, role o
   expect(screen.getByText(/replace its default Codex or Claude/)).toBeVisible();
   await user.click(screen.getByText("Several workers or inherited subagents?"));
   expect(
-    screen.getByText(/same normalized name share one board member/),
+    screen.getByText(/matching names share one board member/),
   ).toBeVisible();
   expect(
-    screen.getByText(/Subagents inheriting the same MCP connection/),
+    screen.getByText(/Subagents that inherit an MCP connection/),
   ).toBeVisible();
-  expect(screen.getByText(/hides those peers' events/)).toBeVisible();
+  expect(screen.getByText(/hides peers’ events too/)).toBeVisible();
   expect(
     mockApi.calls.some((c) =>
       [

@@ -727,7 +727,7 @@
   background: transparent;
   padding: 2px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
 }
 .sticky-editor-tools button:hover {
   color: var(--ink);
@@ -767,7 +767,7 @@
 }
 .sticky-save-state {
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.4;
   min-height: 16px;
 }
@@ -847,7 +847,7 @@
 /* A compact existing paper stays a scrollable editor, never clips recovery/status. */
 .reference-card.kind-note .reference-content:has(.sticky-editor) {
   overflow: auto;
-  padding: 6px;
+  padding: 8px 12px;
 }
 .reference-card.kind-note .sticky-editor {
   min-height: 0;

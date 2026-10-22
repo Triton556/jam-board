@@ -51,7 +51,7 @@ it("Story permission uses a full-width heading and a separate action row without
     expect(getComputedStyle(actions).justifyContent).toBe("flex-start");
     expect(getComputedStyle(count).whiteSpace).toBe("nowrap");
     expect(actions).toHaveTextContent(
-      "Start permits Ready claims; it does not launch an agent.",
+      "Start lets agents take Ready tasks; it does not launch them.",
     );
     expect(screen.getByRole("button", { name: "Start story" })).toBeEnabled();
   } finally {

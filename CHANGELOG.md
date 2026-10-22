@@ -3,6 +3,16 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.40] — 2026-10-22
+
+### Clearer instructions and restrained card movement
+
+- Explain Ready, Start and Pause in short points; preserve the distinction between planning, permission, taking a task and launching a session. Connection identity guidance now has labelled, scannable points without changing the MCP contract.
+- Use explicit project-data/export/import/loading labels, larger secondary guidance and note controls, and plain-language retained-draft errors. Notification marking states that older updates are included; no-message agent status no longer claims the agent is online or ready.
+- Activity loading/read failures no longer claim empty history or completion. Failed older-page retries keep the requested cursor and existing rows; automatic pagination does not retry a failed read indefinitely. Distinguish a table with nothing to show from filters with no matches.
+- Actual Kanban pointer pickup has a small lift/tilt and a calmer settle; reduced motion removes nonessential transforms/layout animation. No drag mutation, optimistic permission, claim or fabricated agent activity was added.
+- Record a source-level readability pass across all 46 mapped interaction families, with targeted behavior tests and synthetic hosted-render scenarios. Source inventory and DOM checks are not a blanket visual/accessibility certification; see the version verification record.
+
 ## [0.3.0-alpha.39] — 2026-10-22
 
 ### Reopen a saved sticker without a false conflict

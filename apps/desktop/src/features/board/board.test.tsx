@@ -503,7 +503,7 @@ it("unfiltered quick capture names its default and does not promise later Story 
   ).toBeVisible();
   expect(
     screen.getByText(
-      "A task’s Story cannot be changed after creation. Refine its brief before Ready.",
+      "Choose the Story carefully: it cannot be changed later. Prepare the task details before moving it to Ready.",
     ),
   ).toBeVisible();
   expect(
@@ -538,7 +538,7 @@ it("filtered quick capture requires a matching story and keeps its draft visible
   expect(screen.getByText("Choose the Story for this draft.")).toBeVisible();
   expect(
     screen.getByText(
-      "A task’s Story cannot be changed after creation. Refine its brief before Ready.",
+      "Choose the Story carefully: it cannot be changed later. Prepare the task details before moving it to Ready.",
     ),
   ).toBeVisible();
   expect(screen.queryByText(/This draft goes to Unplanned work/)).toBeNull();

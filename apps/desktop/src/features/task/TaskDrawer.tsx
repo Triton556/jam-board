@@ -1075,9 +1075,10 @@ export function TaskEditor({
             />
             {archiveWrite.error && archiveDispatched.current && (
               <p role="alert">
-                The archive outcome is unconfirmed. Your reason is retained.
-                Close the task drawer and reopen it to inspect the task before
-                trying again; this request will not be replayed.
+                Could not confirm whether the archive change was saved. Your
+                reason is kept. Close the task drawer and reopen it to check the
+                task before trying again; this request will not be sent again
+                automatically.
               </p>
             )}
             {archiveRefreshError && <p role="alert">{archiveRefreshError}</p>}

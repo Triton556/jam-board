@@ -216,7 +216,7 @@ export function TaskConflictDialog({
     >
       <p>
         {snapshot.actor} saved a newer version. Your draft is kept. Compare the
-        saved snapshot with your edits before choosing.
+        saved version with your edits before choosing.
       </p>
       {changed && (
         <div className="review-context-changed">
@@ -270,7 +270,7 @@ export function TaskConflictDialog({
                     {
                       [
                         "Your starting version",
-                        "Saved version inspected",
+                        "Saved version you reviewed",
                         "Your edits",
                       ][index]
                     }

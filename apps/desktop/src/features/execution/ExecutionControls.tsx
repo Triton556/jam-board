@@ -20,13 +20,13 @@ export function ExecutionConsequences({ state }: { state: ExecutionState }) {
   return (
     <>
       <p>
-        The brain may claim Ready tasks and organize workers inside this{" "}
-        {state.scope.type}. It may not expand to another scope.
+        The brain may take Ready tasks and organize workers inside this{" "}
+        {state.scope.type}. It may not start work outside it.
       </p>
       <p>
-        Drafts still need refinement; workers claim Ready tasks in active
-        stories. Starting records permission on the board—it does not launch an
-        agent session or program on this computer.
+        Drafts still need details; workers take Ready tasks in active stories.
+        Starting records permission on the board—it does not launch an agent
+        session or program on this computer.
       </p>
       <p className="small muted">
         {state.readyCount} Ready · {state.inProgressCount} already In progress
@@ -179,7 +179,7 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
               )}
               {state.effectiveState === "paused" && state.canStart && (
                 <span className="small muted">
-                  Start permits Ready claims; it does not launch an agent.
+                  Start lets agents take Ready tasks; it does not launch them.
                 </span>
               )}
               {pendingWrites > 0 && (
@@ -190,14 +190,25 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
             </div>
             <details className="execution-help">
               <summary>How starting works</summary>
-              <p className="small muted">
-                Planning status describes this scope, not worker permission.
-                Ready is a brief state, not permission to execute. Start allows
-                connected workers to take Ready work; it never launches a
-                session. Pause blocks new claims, not running work or its
-                reports. Switching projects does not pause anything. In progress
-                counts include archived tasks.
-              </p>
+              <ul className="execution-help-points small">
+                <li>
+                  <strong>Ready</strong> describes the task plan. It is not
+                  permission to begin.
+                </li>
+                <li>
+                  <strong>Start</strong> allows connected agents to take Ready
+                  tasks in this epic or story. It does not launch a program or
+                  wake a chat.
+                </li>
+                <li>
+                  <strong>Pause</strong> blocks new tasks from being taken. Work
+                  already taken may continue and submit reports.
+                </li>
+                <li>
+                  Opening another project does not pause any work. In progress
+                  counts include archived tasks.
+                </li>
+              </ul>
             </details>
           </>
         )

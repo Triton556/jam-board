@@ -417,27 +417,36 @@ export function SettingsPage({
                   </p>
                   <details className="connection-help">
                     <summary>Several workers or inherited subagents?</summary>
-                    <p>
-                      Connections using the same normalized name share one board
-                      member: tasks and activity are aggregated, not separate
-                      process sessions. Names that differ only in capitalization
-                      or punctuation can match. A new chat does not create a new
-                      board identity.
-                    </p>
-                    <p>
-                      Subagents inheriting the same MCP connection also inherit
-                      its identity. Separately tracked workers need separately
-                      configured connections with distinct names; Jam Board does
-                      not launch or reconfigure them. An agent cannot
-                      independently review its own report under the same
-                      identity.
-                    </p>
-                    <p>
-                      With shared identities, <code>excludeSelf=true</code> also
-                      hides those peers' events. Coordination should use the
-                      documented <code>excludeSelf=false</code> observation
-                      policy. Project pinning still applies to every connection.
-                    </p>
+                    <ul className="connection-help-points">
+                      <li>
+                        <strong>One name, one member.</strong> Connections with
+                        matching names share one board member, tasks and
+                        activity. Capitalization or punctuation alone may not
+                        make names distinct. A new chat is not a new board
+                        identity.
+                      </li>
+                      <li>
+                        <strong>
+                          Separate workers need separate connections.
+                        </strong>{" "}
+                        Subagents that inherit an MCP connection also inherit
+                        its identity. Give independently tracked workers
+                        distinct names. Jam Board does not launch or reconfigure
+                        them.
+                      </li>
+                      <li>
+                        <strong>Reviews need another identity.</strong> An agent
+                        cannot independently review its own report using the
+                        same identity.
+                      </li>
+                      <li>
+                        <strong>Observe shared work.</strong> With shared
+                        identities, <code>excludeSelf=true</code> hides peers’
+                        events too. Use the documented{" "}
+                        <code>excludeSelf=false</code> observation policy. Each
+                        connection remains pinned to its project.
+                      </li>
+                    </ul>
                   </details>
                 </SettingsRow>
                 <SettingsRow
@@ -579,7 +588,7 @@ export function SettingsPage({
             </>
           )}
           {section === "Data" && (
-            <SettingsSection title="Your local sketchbook">
+            <SettingsSection title="Project data">
               <SettingsRow label="Database">
                 <p className="mono path-value">
                   {data?.dataDir}
@@ -595,8 +604,8 @@ export function SettingsPage({
                 </Button>
               </SettingsRow>
               <SettingsRow
-                label="Take your jam with you"
-                hint="Export a JSON snapshot, or import one into a new jam. Existing history stays here."
+                label="Export or import a project"
+                hint="Export this project as JSON. Import creates a separate project; it does not replace this one."
               >
                 <div className="button-row">
                   <Button
@@ -628,7 +637,7 @@ export function SettingsPage({
                 </div>
               </SettingsRow>
               <SettingsRow
-                label="A fresh page"
+                label="Demo project"
                 hint="A demo creates a separate project. Your current board remains available under Your projects."
               >
                 <Button onClick={() => setConfirm("demo")}>
@@ -693,11 +702,11 @@ export function SettingsPage({
                 />
               </SettingsRow>
               <SettingsRow
-                label="Doing limit"
+                label="In progress limit"
                 hint="Highlights In progress above this number, even when epic filters hide cards. Review is tracked separately."
               >
                 <input
-                  aria-label="Doing limit"
+                  aria-label="In progress limit"
                   type="number"
                   min={1}
                   max={99}

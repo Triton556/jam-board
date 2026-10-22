@@ -242,7 +242,7 @@ export function WorkflowGuide() {
       <p className="workflow-hierarchy">
         <strong>Project</strong> is your separate board. <strong>Epic</strong>{" "}
         is a larger goal. <strong>Story</strong> is a feature or outcome.{" "}
-        <strong>Task</strong> is one executable brief.
+        <strong>Task</strong> is one piece of work with a plan.
       </p>
       <ol>
         <li>
@@ -255,8 +255,9 @@ export function WorkflowGuide() {
         <li>
           <strong>Refine</strong>
           <span>
-            Ask the brain to review the scope, read its sources and ask project
-            decisions in Inbox; conversation may stay in chat.
+            Ask the brain to read this epic or story and its references. It can
+            record project decisions as questions in Inbox; discussion may stay
+            in chat.
           </span>
         </li>
         <li>
@@ -267,11 +268,11 @@ export function WorkflowGuide() {
           </span>
         </li>
         <li>
-          <strong>Start a scope</strong>
+          <strong>Allow work to begin</strong>
           <span>
-            Start a story or epic in Plan, or ask the brain in chat and approve
-            its Start request in Inbox. Authorize the scope, not each worker.
-            The brain organizes execution inside it.
+            Start a story or epic in Plan, or approve its Start request in
+            Inbox. You approve the area of work, not each worker. The brain
+            organizes work within it; Start does not launch or wake the agent.
           </span>
         </li>
         <li>

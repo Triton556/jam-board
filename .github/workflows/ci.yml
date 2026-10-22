@@ -76,11 +76,13 @@ jobs:
           name: diagnostics-${{ matrix.os }}
           path: .dev-data/playwright
           if-no-files-found: ignore
-      - name: Preserve synthetic sticky-note screenshots
+      - name: Preserve synthetic UI screenshots
         if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: sticky-note-visuals
-          path: test-visuals/sticky-note-*.png
+          path: |
+            test-visuals/sticky-note-*.png
+            test-visuals/readability-*.png
           if-no-files-found: ignore
           retention-days: 7

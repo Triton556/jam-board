@@ -234,7 +234,7 @@ export function Welcome() {
                 Your name
                 <input
                   {...register("yourName")}
-                  placeholder="How should we call you?"
+                  placeholder="What should we call you?"
                   aria-invalid={!!errors.yourName}
                 />
               </label>
@@ -245,7 +245,7 @@ export function Welcome() {
               )}
               <Button variant="primary" type="submit" disabled={busy}>
                 {create.isPending
-                  ? "Making room…"
+                  ? "Creating project…"
                   : template === "game_jam"
                     ? "Create jam"
                     : "Create project"}
