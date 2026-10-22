@@ -384,7 +384,7 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
   await expect(page).toHaveURL(/\/inbox/);
 });
 
-test("brief conflict compares fields and Keep mine preserves the agent's other edits", async ({
+test("brief conflict compares fields and Save my edits against latest preserves the agent's other edits", async ({
   page,
 }) => {
   await page.goto("/");
@@ -422,12 +422,49 @@ test("brief conflict compares fields and Keep mine preserves the agent's other e
     exact: true,
   });
   await expect(dialog).toContainText("game/bridge/next-tile.gd");
-  await dialog.getByRole("button", { name: "Keep mine", exact: true }).click();
+  await page.evaluate(async () => {
+    const task = await window.__jamMock.getTask("JB-2");
+    await window.__jamMock.simulateAgent({
+      action: "task.brief_updated",
+      key: task.key,
+      patch: {
+        brief: {
+          ...task.brief,
+          contextMd: "A newer context arrived while comparing.",
+        },
+      },
+    });
+  });
+  await expect(
+    dialog.getByRole("button", {
+      name: "Save my edits against latest",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(dialog).not.toContainText(
+    "A newer context arrived while comparing.",
+  );
+  await dialog
+    .getByRole("button", { name: "Read latest comparison", exact: true })
+    .click();
+  await expect(dialog).toContainText(
+    "A newer context arrived while comparing.",
+  );
+  await expect(
+    dialog.getByRole("heading", { name: "Compared task · JB-2", exact: true }),
+  ).toBeFocused();
+  await expect(dialog).toContainText("Entries are not merged individually");
+  await dialog
+    .getByRole("button", { name: "Save my edits against latest", exact: true })
+    .click();
   await expect(
     page.getByText("All changes saved", { exact: true }),
   ).toBeVisible();
   const saved = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
   expect(saved.brief.goalMd).toBe("The agent clarified the route goal.");
+  expect(saved.brief.contextMd).toBe(
+    "A newer context arrived while comparing.",
+  );
   expect(saved.brief.whereMd).toBe("game/bridge/next-tile.gd");
   expect(saved.brief.changes?.[0]?.required).toBe(
     "Keep exactly one neighboring safe tile illuminated.",
@@ -456,6 +493,11 @@ test("brief conflict compares fields and Keep mine preserves the agent's other e
   await page
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
-  await page.getByRole("button", { name: "Take theirs", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Discard my edits and use latest",
+      exact: true,
+    })
+    .click();
   await expect(required).toHaveValue("Use the newly reviewed tile boundary.");
 });

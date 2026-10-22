@@ -212,6 +212,25 @@ to every ordinary move. Ready still does not grant execution, and moving a card 
 not terminate a worker process. Task revisions fence task intent only; they do not
 claim to capture every concurrent ancestor planning edit.
 
+## 11. Reconcile human drafts without guessing what “mine” means
+
+A reproduced task-edit conflict showed live server values replacing an open
+comparison, while failed saves put the error outside the modal. The comparison now
+freezes the starting task, local fields and inspected saved task. A changed version
+requires explicit rereading; closing, failed reads and failed writes retain the
+draft. This applies the same conditional-write and HAX correction principles as
+report review, not a new merge engine or extra approval gate.
+
+Human-readable field names and structured list entries replace JSON dumps. Each
+field shows three labelled versions, stacked at narrow widths. Action labels say
+whether local edits are saved or discarded. Unchanged top-level and brief fields
+keep the inspected saved values; Changes and acceptance-test arrays are replaced
+as whole lists, with that limitation visible before saving. The design follows
+[Nielsen Norman Group's recognition-over-recall guidance](https://www.nngroup.com/articles/ten-usability-heuristics/)
+and keeps pending/error/retry controls within the
+[WAI-ARIA modal boundary](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+No automatic rebase, fresh-token replay or external-worker control was added.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests

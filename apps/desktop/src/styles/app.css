@@ -1603,31 +1603,6 @@ input[aria-invalid="true"] {
   justify-content: flex-end;
   margin-top: 24px;
 }
-.review-dialog {
-  width: 760px;
-}
-.comparison {
-  margin-top: 20px;
-  font-size: 12px;
-}
-.comparison-row {
-  display: grid;
-  grid-template-columns: 100px 1fr 1fr 1fr;
-  gap: 12px;
-  border-bottom: 1px solid var(--line-soft);
-  padding: 12px 0;
-}
-.comparison-row > * {
-  overflow-wrap: anywhere;
-  max-height: 150px;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-.comparison-head {
-  color: var(--ink-2);
-  font-size: 11px;
-  text-transform: uppercase;
-}
 kbd {
   display: inline-flex;
   align-items: center;

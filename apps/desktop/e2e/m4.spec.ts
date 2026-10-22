@@ -130,7 +130,12 @@ test("dirty guard and agent conflict preserve input then take theirs", async ({
   await expect(
     page.getByRole("dialog", { name: "Review changes", exact: true }),
   ).toContainText("Agent's new title");
-  await page.getByRole("button", { name: "Take theirs", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Discard my edits and use latest",
+      exact: true,
+    })
+    .click();
   await expect(title).toHaveValue("Agent's new title");
   await expect(page.getByRole("button", { name: /^Save/ })).toBeDisabled();
 });

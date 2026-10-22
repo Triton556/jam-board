@@ -49,6 +49,7 @@ import { historyText } from "./history-text";
 import { announceReady, ReadinessStrip } from "./Readiness";
 import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
+import { TaskConflictDialog } from "./TaskConflictDialog";
 import type { TaskFields } from "./task-form";
 import {
   equalValue,
@@ -106,6 +107,7 @@ export function TaskEditor({
   const seenVersions = useRef(new Set([task.updatedAt]));
   const [latest, setLatest] = useState<TaskDetail | null>(null);
   const [review, setReview] = useState(false);
+  const [reviewError, setReviewError] = useState<Error | null>(null);
   const [assetLink, setAssetLink] = useState(false);
   const [menu, setMenu] = useState(false);
   const [archive, setArchive] = useState(false);
@@ -143,6 +145,7 @@ export function TaskEditor({
     reset(taskValues(value));
     setLatest(null);
     setReview(false);
+    setReviewError(null);
   };
   const resetRef = useRef(resetTask);
   resetRef.current = resetTask;
@@ -170,11 +173,28 @@ export function TaskEditor({
     ])
       void client.invalidateQueries({ queryKey });
   };
+  const conflictRead = useMutation({
+    mutationFn: async () => {
+      const fresh = await api.getTask(task.key);
+      if (fresh.id !== task.id || fresh.jamId !== task.jamId)
+        throw new Error(
+          "The project or task changed. Your draft was not retargeted.",
+        );
+      return fresh;
+    },
+    onSuccess: (fresh) => {
+      client.setQueryData(["task", task.key], fresh);
+      setLatest(fresh);
+      setReviewError(null);
+      setReview(true);
+    },
+  });
   const save = useMutation({
     mutationFn: (input: UpdateInput) => api.updateTask(input),
     onMutate: () => {
       setSaveNotice("");
-      return structuredClone(getValues());
+      setReviewError(null);
+      return { values: structuredClone(getValues()), fromReview: review };
     },
     onSuccess: (value, _input, submitted) => {
       const current = getValues();
@@ -182,15 +202,30 @@ export function TaskEditor({
       resetTask(value);
       // Preserve typing made while the previous section's blur-save was in flight.
       for (const field of fieldNames) {
-        if (submitted && !equalValue(current[field], submitted[field]))
+        if (submitted && !equalValue(current[field], submitted.values[field]))
           form.setValue(field, current[field], {
             shouldDirty: true,
             shouldValidate: true,
           });
       }
       invalidate();
+      if (submitted?.fromReview)
+        useUiStore
+          .getState()
+          .notify("Edits saved against the reviewed version.");
     },
-    onError: async (error, input) => {
+    onError: async (error, input, submitted) => {
+      if (submitted?.fromReview) {
+        setReviewError(error);
+        if ("code" in error && error.code === "conflict") {
+          try {
+            setLatest(await api.getTask(task.key));
+          } catch {
+            /* The captured comparison and error remain; explicit reread can retry. */
+          }
+        }
+        return;
+      }
       if ("code" in error && error.code === "not_ready") {
         form.setValue("status", base.status as TaskFields["status"], {
           shouldDirty: true,
@@ -209,9 +244,7 @@ export function TaskEditor({
             },
           });
       } else if ("code" in error && error.code === "conflict") {
-        const fresh = await api.getTask(task.key);
-        setLatest(fresh);
-        setReview(true);
+        conflictRead.mutate();
       } else useUiStore.getState().error(error.message);
     },
   });
@@ -282,7 +315,14 @@ export function TaskEditor({
   };
   const submitRef = useRef(() => {});
   submitRef.current = () => {
-    if (isDirty && !task.archivedAt && !save.isPending && !markLock.current)
+    if (
+      isDirty &&
+      !task.archivedAt &&
+      !save.isPending &&
+      !conflictRead.isPending &&
+      !markLock.current &&
+      !review
+    )
       void handleSubmit((values) => submit(values))();
   };
   useEffect(() => {
@@ -655,6 +695,26 @@ export function TaskEditor({
           {saveNotice}
         </p>
       )}
+      {conflictRead.isPending && (
+        <p role="status">
+          The task changed. Reading the latest saved version; your edits are
+          kept…
+        </p>
+      )}
+      {conflictRead.error && (
+        <div className="notice">
+          <p role="alert">
+            The task changed, but its latest version could not be read:{" "}
+            {conflictRead.error.message}. Your edits are kept.
+          </p>
+          <Button
+            disabled={conflictRead.isPending}
+            onClick={() => conflictRead.mutate()}
+          >
+            Read latest version
+          </Button>
+        </div>
+      )}
       <Rounds
         task={task}
         members={members.data ?? []}
@@ -811,7 +871,12 @@ export function TaskEditor({
           form="task-form"
           variant="primary"
           disabled={
-            !isDirty || !isValid || save.isPending || markPending || readonly
+            !isDirty ||
+            !isValid ||
+            save.isPending ||
+            conflictRead.isPending ||
+            markPending ||
+            readonly
           }
         >
           Save <Kbd>Ctrl+S</Kbd>
@@ -872,76 +937,47 @@ export function TaskEditor({
         </Dialog>
       )}
       {review && latest && (
-        <Dialog
-          title="Review changes"
-          onClose={() => setReview(false)}
-          className="review-dialog"
-        >
-          <p>{actor} saved a newer version. Compare it with your edits.</p>
-          <div className="comparison">
-            <div className="comparison-row comparison-head">
-              <strong>Field</strong>
-              <strong>Was</strong>
-              <strong>Theirs</strong>
-              <strong>Yours</strong>
-            </div>
-            {fieldNames
-              .filter((field) => field !== "brief")
-              .filter(
-                (field) =>
-                  !equalValue(
-                    taskValues(base)[field],
-                    taskValues(latest)[field],
-                  ) || !equalValue(taskValues(base)[field], values[field]),
-              )
-              .map((field) => (
-                <div className="comparison-row" key={field}>
-                  <strong>{field}</strong>
-                  {[
-                    taskValues(base)[field],
-                    taskValues(latest)[field],
-                    values[field],
-                  ].map((value, index) => (
-                    <span key={["was", "theirs", "yours"][index]}>
-                      {Array.isArray(value)
-                        ? value.join(", ")
-                        : String(value ?? "–")}
-                    </span>
-                  ))}
-                </div>
-              ))}
-            {Object.keys(values.brief)
-              .filter((key) => {
-                const k = key as keyof typeof values.brief;
-                return (
-                  !equalValue(base.brief[k], latest.brief[k]) ||
-                  !equalValue(base.brief[k], values.brief[k])
-                );
-              })
-              .map((key) => (
-                <div className="comparison-row" key={key}>
-                  <strong>{key}</strong>
-                  {[base.brief, latest.brief, values.brief].map((b, i) => (
-                    <span key={["was", "theirs", "yours"][i]}>
-                      {JSON.stringify(b[key as keyof typeof values.brief])}
-                    </span>
-                  ))}
-                </div>
-              ))}
-          </div>
-          <div className="dialog-actions">
-            <Button onClick={() => resetTask(latest)}>Take theirs</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                const parsed = taskSchema.safeParse(getValues());
-                if (parsed.success) submit(parsed.data, latest.updatedAt);
-              }}
-            >
-              Keep mine
-            </Button>
-          </div>
-        </Dialog>
+        <TaskConflictDialog
+          base={base}
+          latest={latest}
+          yours={values}
+          live={task}
+          members={members.data ?? []}
+          actor={actor}
+          pending={save.isPending}
+          error={reviewError}
+          close={() => {
+            setReview(false);
+            setReviewError(null);
+          }}
+          read={(fresh) => {
+            setLatest(fresh);
+            setReviewError(null);
+            client.setQueryData(["task", task.key], fresh);
+          }}
+          discard={(fresh) => {
+            resetTask(fresh);
+            useUiStore
+              .getState()
+              .notify(
+                "Local edits discarded. Loaded the reviewed saved version.",
+              );
+          }}
+          save={(snapshot) => {
+            const patch = taskPatch(
+              taskValues(snapshot.base),
+              snapshot.yours,
+              taskValues(snapshot.remote),
+            );
+            if (Object.keys(patch).length)
+              save.mutate({
+                key: snapshot.remote.key,
+                expectedUpdatedAt: snapshot.remote.updatedAt,
+                ...patch,
+              });
+            else resetTask(snapshot.remote);
+          }}
+        />
       )}
     </Drawer>
   );
