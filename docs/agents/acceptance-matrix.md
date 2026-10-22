@@ -186,3 +186,13 @@ phase instructions, clipboard failure/selectable fallback, repeated copy and
 project ABA/unmount. Copy must not change task/assignment/permission or send a
 message. Inspect the revealed preview at narrow width in light/dark; source or
 prompt-string assertions do not establish actual agent compliance or visual ease.
+
+## Alpha35 card-tooltip correction
+
+H-B01 / CP01 / CP03 / CP05: keep the pointer stationary while an existing status becomes
+fresh and then expires. The visible label and open tooltip must agree; keep the
+same card focus/activation and remove the tooltip when the card disappears.
+Longer live text must stay inside the viewport. Four new DOM probes and existing
+activity tests pass (23 total); position tests use synthetic coordinates. Native
+alpha34 established the old stale-open-title defect; exact alpha35 native closure
+is pending, not inherited from those observations.

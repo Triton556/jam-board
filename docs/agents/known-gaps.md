@@ -107,3 +107,9 @@ that starts a new model turn in a finished conversation. CLI/API/embedded-chat
 design is concept-only and not an implementation prerequisite or implicit grant.
 The prompt cannot guarantee that a model follows the instructions; real-client
 workflow observation is separate from DOM/clipboard checks.
+
+- Alpha34 native presence observation: the visible Board activity label refreshes
+  and expires correctly, but an already-open browser-native title popup stays old
+  until re-hover. Alpha35 replaces that Board label popup with live React content;
+  focused DOM checks pass, exact native closure remains pending. Other native-title
+  tooltips are not claimed as redesigned or dynamically validated by this repair.

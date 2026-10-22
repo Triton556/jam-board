@@ -9,6 +9,7 @@ import {
 } from "react";
 import rough from "roughjs";
 import type { WorkingState } from "../../lib/agent-working";
+import { Tooltip } from ".";
 
 let visibility: IntersectionObserver | undefined;
 const watched = new Set<Element>();
@@ -174,15 +175,16 @@ export function WorkingLine({ state }: { state: WorkingState }) {
     <div
       className={`working-line ${state.mode}`}
       style={paint(state)}
-      title={state.tooltip}
       data-testid="working-line"
       data-mode={state.mode}
     >
-      <WorkingPencil staticMotion={!!reduced} />
-      <span className="working-copy">
-        {state.text}
-        <Underline staticMotion={!!reduced || state.mode === "quiet"} />
-      </span>
+      <Tooltip text={state.tooltip}>
+        <WorkingPencil staticMotion={!!reduced} />
+        <span className="working-copy">
+          {state.text}
+          <Underline staticMotion={!!reduced || state.mode === "quiet"} />
+        </span>
+      </Tooltip>
     </div>
   );
 }

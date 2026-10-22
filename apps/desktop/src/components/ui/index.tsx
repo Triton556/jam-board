@@ -15,7 +15,15 @@ export { TabPanels, Tabs } from "./Tabs";
 
 import { Bot, X } from "lucide-react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
-import { createContext, useContext, useId, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import laptop from "../../assets/chibi/danil-laptop-256.webp";
 import type { MemberRef } from "../../bindings";
@@ -67,7 +75,7 @@ export function Tooltip({
     left: number;
     top: number;
   } | null>(null);
-  const show = () => {
+  const show = useCallback(() => {
     const rect = anchor.current?.getBoundingClientRect();
     if (rect)
       setPosition({
@@ -83,7 +91,11 @@ export function Tooltip({
             ? rect.bottom + 8
             : rect.top - 34,
       });
-  };
+  }, [text]);
+  const open = position !== null;
+  useLayoutEffect(() => {
+    if (open) show();
+  }, [open, show]);
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: The wrapper observes descendant focus without becoming another focus target.
     <span
