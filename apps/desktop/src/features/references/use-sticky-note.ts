@@ -42,6 +42,7 @@ export function useStickyNote({
   const client = useQueryClient();
   const initial = useRef({ projectId, id: item?.id });
   const baseline = useRef(item);
+  const observed = useRef(item);
   const draft = useRef<Text>(item ? text(item) : { title: "", body: "" });
   const [value, setValue] = useState(draft.current);
   const [phase, setPhase] = useState<Phase>(item ? "saved" : "local");
@@ -145,8 +146,23 @@ export function useStickyNote({
     );
   }, [unavailable]);
 
-  // Geometry/tag updates do not affect the editor. A remote text change does.
+  // Canvas rebuilds clone query rows for geometry/selection before the next
+  // read arrives. Re-presenting that same saved observation is not evidence of
+  // a remote edit after our own acknowledgement. Compare the content and its
+  // update marker, never object identity or timestamp ordering. A changed
+  // value (even in the same millisecond) still goes through conflict handling.
   useEffect(() => {
+    const prior = observed.current;
+    observed.current = item;
+    if (
+      item &&
+      prior &&
+      item.id === prior.id &&
+      item.title === prior.title &&
+      item.captionMd === prior.captionMd &&
+      item.updatedAt === prior.updatedAt
+    )
+      return;
     if (
       !item ||
       !baseline.current ||

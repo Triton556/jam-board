@@ -274,3 +274,13 @@ assertion using a non-note reference, alongside direct-note editing and Tags/Lin
 dialog return. Actual-dialog/router DOM checks cover all three modal modes; the
 hosted regression remains required. Generic Dialog-only fixtures missed React
 child autofocus replacing the captured opener, so they are not sufficient here.
+
+## Alpha39 own-save observation regression
+
+RF03/H-R04: a geometry/selection clone of the unchanged previous query row after
+our save must not lock the reopened editor as a remote conflict. Body/heading
+values and exact editor close/reopen are asserted. Different text with the same
+update marker, and reverting old text with a new marker, still stop saving and
+retain the draft. Three new DOM regressions pass; the original hosted96-case
+suite and six sticky PNG states must rerun unchanged. Alpha38 body-only PNGs are
+partial visual evidence, not successful heading/reopen or native acceptance.

@@ -3,6 +3,19 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.39] — 2026-10-22
+
+### Reopen a saved sticker without a false conflict
+
+- Canvas geometry/selection redraws no longer mistake an unchanged previously
+  observed note for a remote text edit after the user's own save. Optional heading
+  edits can settle and leave the direct editor without the false conflict lock.
+- Actual changed text, including changes with the same timestamp, still stops
+  autosave and retains the draft. Server-side expected-content checks, project
+  fencing and no-retry handling for uncertain creation are unchanged.
+
+[Behavioral evidence and remaining hosted checks](docs/verification/0.3.0-alpha.39.md).
+
 ## [0.3.0-alpha.38] — 2026-10-22
 
 ### Place a note and write on the paper

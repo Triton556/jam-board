@@ -1,7 +1,7 @@
 {
   "repository": "Triton556/jam-board",
   "branch": "rumi/human-first-workflow",
-  "note": "Source and API-created published commits have different metadata but identical trees. This map covers approved alpha29–38 source checkpoints through caeb37d6 / d8664a8d, with the prior alpha28 documentation base. It does not by itself prove CI, native acceptance, installation or release; the first alpha38 hosted run passed Windows but had three browser test-contract failures. The test-only follow-up is not predicted.",
+  "note": "Tree-identical approved source/publication checkpoints through alpha38 test-only cf2e8fd0 / a022e564, including the alpha28 base. This is provenance, not acceptance: latest alpha38 hosted Windows passed; Linux94/96 exposed a note recovery defect addressed separately in alpha39. Future remote hashes are not predicted.",
   "commits": [
     {
       "source": "2b263795b31767da29db0b62dc81f4da19dfc4d1",
@@ -308,6 +308,12 @@
       "published": "d8664a8d9283254c1ade39a993528fbb6c2e8cfc",
       "tree": "873967f1de772f8abfe421331ee787dd8e0c8031",
       "subject": "release: checkpoint alpha38 direct notes and verified recovery contracts"
+    },
+    {
+      "source": "cf2e8fd03d5753a9ea316c9408e6da9f74f0cbc7",
+      "published": "a022e564e920096d542dd58ef1bf5beaccf49564",
+      "tree": "8d0e25cb1e399a65981136a40a8e9c3bc6a46a67",
+      "subject": "test: exercise the actual direct-note canvas and autosave contract"
     }
   ]
 }
