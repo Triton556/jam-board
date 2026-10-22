@@ -73,3 +73,13 @@ Legend: `D0` base route; `D1` revealed editor/menu/modal; `D2+` nested layers. E
 ## Alpha29 validation handoff (2026-10-22)
 
 Implementation owner reports **539 DOM tests passed**, including 30 new behavior probes. Four new functional-browser scenarios were added/typechecked but **not executed** at this checkpoint. This documentation author did not rerun those tests; the release verification record must supply final source/version and exact terminal evidence. DOM success does not establish native pixel geometry, Windows GUI behavior or browser visual acceptance. These results apply to human-first Task/Story work, not proposed frames/notes/bell/zoom/prompt features.
+
+## Alpha30 candidate: H-R01/R02/R04/R05/R07
+
+Add → Note is a local canvas paper, not a modal or immediate empty record. Explicit
+Save creates one unframed note at captured coordinates; pending guards, retained
+unconfirmed text/read-only Refresh and local-only discard are explicit. Frame-only
+content hides the empty art; the full-width visible grip and selected resize
+controls do not capture frame interiors. Existing persisted note/agent-result
+editing is unchanged. Image source selection accounts for painted device pixels;
+read-only image retry does not change references. See [alpha30 verification](../verification/0.3.0-alpha.30.md).

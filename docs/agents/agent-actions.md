@@ -122,3 +122,11 @@ Reserved future variants under AG02/AG11: explicit Full setup / Continue refinem
 | AG11.handover | Same dialog → Recover context for new brain → copy read-only request → recover → separate appointment | Full relevant report/review bodies and answered/withdrawn decisions; no hidden role takeover or worker release |
 
 Additional future tests: renamed/deleted scope cannot silently retarget; immutable scope ID must come from actual DTO (baseline HandoffScope carries only type/key, so adding ID needs coordinated type/call-site tests); same MCP identity/new conversation is not remembered context; running scope does not convert Refine into execution permission; long historical `list_changes_since` response is not falsely treated as a paginated API. These extend AC02/AC03/AC10/AC11, not replace their safety gates. Exact proposed clipboard copy should be reviewed in its implementing change, not treated as already available UI.
+
+## Alpha30 canvas delta
+
+AG12 reference/image changes are human presentation/creation paths only. No tool,
+schema, execution permission, result-card contract or persisted kind changes.
+An inline note is local until Save; uncertain response is not rollback and must
+not be blindly replayed. Image Retry is read-only. Existing agent-published results
+remain available in the same canvas.

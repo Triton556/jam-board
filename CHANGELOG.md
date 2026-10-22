@@ -3,6 +3,27 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.30] — 2026-10-22
+
+### References canvas editing and image resolution
+
+- Add → Note now opens a local paper on the canvas, with title/body editing and
+  explicit Save. It creates no blank record; pending, dirty exit and unconfirmed
+  results retain text and never automatically replay creation.
+- Frame-only canvases no longer show the empty illustration. Frames have an
+  explicit full-width grip/header and clearer resize controls; their interiors
+  remain available to canvas/child gestures. Reference dialogs share field spacing.
+- Inline draft entry uses measured available canvas space and readable zoom;
+  confirmation focus, overlay stacking and router exit guards are covered.
+- Readable images use a thumbnail only when its pixel dimensions cover the actual
+  painted size, canvas zoom and device pixel ratio; otherwise use the original.
+  Failed thumbnails retain the original, and failed images offer read-only retry.
+  This does not establish that text/canvas compositing blur is fixed.
+
+No database, MCP or permission changes. Browser/native geometry and gesture
+acceptance remain separate from source/DOM checks; see
+[verification](docs/verification/0.3.0-alpha.30.md).
+
 ## [0.3.0-alpha.29] — 2026-10-22
 
 ### Human-first task and story editing
