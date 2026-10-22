@@ -487,9 +487,7 @@ it("quick capture is Backlog-only and cards show readable story context", async 
     1,
   );
   expect(document.querySelectorAll(".column-policy")).toHaveLength(5);
-  expect(
-    screen.getByText("Brief ready · scope permission still required"),
-  ).toBeVisible();
+  expect(screen.getByText("Prepared briefs")).toBeVisible();
 });
 it("unfiltered quick capture names its default and does not promise later Story reassignment", async () => {
   const { Wrapper } = wrapper(),
@@ -753,4 +751,48 @@ it("announces pending move without a speculative jump and exposes read-only reco
   expect(client.getQueryData(["boardTasks"])).toEqual(before);
   move.mockRestore();
   read.mockRestore();
+});
+
+it("H-B01: empty columns use one short neutral phrase without granting or claiming work", async () => {
+  const { Wrapper, client } = wrapper();
+  client.setQueryData(["boardTasks"], {
+    backlog: [],
+    ready: [],
+    in_progress: [],
+    review: [],
+    done: [],
+  });
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  for (const name of ["Backlog", "Ready", "In progress", "Review", "Done"]) {
+    const column = await screen.findByRole("region", {
+      name: `${name} column`,
+    });
+    expect(within(column).getByText("No tasks yet")).toHaveClass(
+      "column-empty",
+    );
+    expect(column.querySelectorAll(".column-empty")).toHaveLength(1);
+  }
+  expect(
+    mockApi.calls.filter((call) =>
+      /claim_task|move_task|set_execution/.test(call.command),
+    ),
+  ).toEqual([]);
+});
+
+it("H-B01: a filtered-out column distinguishes hidden work from no tasks", async () => {
+  const { Wrapper } = wrapper();
+  render(<Board open={() => {}} epicKeys={["missing-epic"]} />, {
+    wrapper: Wrapper,
+  });
+  const source = await api.listBoardTasks();
+  await screen.findByRole("region", { name: "Backlog column" });
+  for (const [status, tasks] of Object.entries(source)) {
+    const column = document.querySelector(`[data-column="${status}"]`);
+    if (!column) throw new Error("Missing column");
+    await waitFor(() =>
+      expect(column.querySelector(".column-empty")).toHaveTextContent(
+        tasks.length ? "No matching tasks" : "No tasks yet",
+      ),
+    );
+  }
 });
