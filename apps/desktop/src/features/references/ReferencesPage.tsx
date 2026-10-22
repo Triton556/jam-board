@@ -37,6 +37,7 @@ import { epicsQuery } from "../../lib/planning-queries";
 import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useUiStore } from "../../lib/ui-store";
+import { useClipboardImagePaste } from "./clipboard-paste";
 import {
   AddReferenceDialog,
   EditReferenceDialog,
@@ -88,7 +89,8 @@ export const referencesQuery = {
   staleTime: Infinity,
 };
 function Canvas() {
-  const batch = useFileDropBatch("references");
+  const batch = useFileDropBatch("references"),
+    pasteImage = useClipboardImagePaste();
   const query = useQuery(referencesQuery),
     epics = useQuery(epicsQuery),
     stories = useQuery({
@@ -756,29 +758,14 @@ function Canvas() {
           e.preventDefault();
           void (async () => {
             if (content.kind === "image") {
-              const image = await createImageBitmap(content.file),
-                c = document.createElement("canvas");
-              c.width = image.width;
-              c.height = image.height;
-              c.getContext("2d")?.drawImage(image, 0, 0);
-              image.close();
-              const blob = await new Promise<Blob>((resolve, reject) =>
-                c.toBlob(
-                  (b) =>
-                    b
-                      ? resolve(b)
-                      : reject(Error("Clipboard image could not be encoded")),
-                  "image/png",
-                ),
+              await pasteImage(
+                content.file,
+                center(),
+                (item) => {
+                  selectNext.current = item.id;
+                },
+                refresh,
               );
-              const p = center();
-              const item = await api.clipboardReference(
-                Array.from(new Uint8Array(await blob.arrayBuffer())),
-                p.x,
-                p.y,
-              );
-              selectNext.current = item.id;
-              await refresh();
             } else
               await addInput(
                 content.kind === "link"

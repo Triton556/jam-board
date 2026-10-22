@@ -555,3 +555,25 @@ Ordinary explicit user blur still saves Markdown, as before. We do not conflate
 clicking away from an autosaving field with a write-free background refetch. This
 continues the visibility/recovery rationale in section 23, without a new draft store,
 backend revision mechanism or permission change.
+
+## 25. Keep prepared clipboard images in their captured project
+
+An independent actual-App/generated-binding probe delayed image decoding, switched
+projects, then observed the old image being dispatched under the new selection.
+Returning to the original project or leaving References also failed to stop it.
+The native transport/persistence in this proof is modeled, not a disk-write test.
+
+Image paste now captures the project and page epoch before preparation, checks them
+after asynchronous decode/encode/byte reads and immediately before native dispatch,
+and closes decoded bitmap resources before waiting on encoding. An invalidated
+operation cannot revive on an A→B→A switch or a new instance of the same page.
+Already dispatched requests are not cancelled: their captured-project receipts
+separate confirmed, unconfirmed and not-attempted results, without selecting or
+refreshing a new page. Explicit origin-page Refresh is the read recovery path.
+
+This follows the same [visible status and recovery rationale](https://www.nngroup.com/articles/visibility-system-status/)
+as file-drop receipts. Only a concise summary is announced; details retain errors
+and context within the existing three-notice in-memory bound. No mutation retry,
+queue, backend identity change, automatic rollback or process-exit receipt promise
+is introduced. This repair is specific to the proven image-preparation path, not a
+claim that every asynchronous interaction has been exhaustively audited.

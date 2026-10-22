@@ -31,6 +31,11 @@ export function FileDropSessionProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Share the existing app-lifetime receipt boundary with clipboard image preparation. */
+export function useFileDropSession() {
+  return useContext(FileDropSession);
+}
+
 type Progress = { project: string; total: number; current: number };
 type AppState = Awaited<ReturnType<typeof api.appState>>;
 /** UI continuation fence only: already dispatched commands are not cancelled or rolled back. */
