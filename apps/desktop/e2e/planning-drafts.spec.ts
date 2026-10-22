@@ -247,6 +247,7 @@ test("saving Story Outcome preserves unsaved acceptance until its explicit save"
     )
     .toBe("New user criterion that is not saved yet");
   await page.reload();
+  await openAgentPlan(page);
   await expect(criterion).toHaveValue(
     "New user criterion that is not saved yet",
   );
