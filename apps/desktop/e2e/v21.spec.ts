@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectPoliteNotice } from "./assertions";
+import { expectPoliteNotice, openAgentPlan } from "./assertions";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -60,10 +60,11 @@ test("an incomplete task dropped into Ready remains in Backlog with the not_read
     expectedUpdatedAt: before.updatedAt,
   });
 });
-test("brief editor and latest report/review coexist with editable Notes", async ({
+test("brief editor and latest report/review coexist with editable Description", async ({
   page,
 }) => {
   await page.goto("/board?task=JB-7");
+  await openAgentPlan(page);
   await expect(page.getByTestId("task-brief")).toContainText("Boundaries");
   await expect(
     page.getByRole("region", { name: "Latest report" }),
@@ -71,5 +72,7 @@ test("brief editor and latest report/review coexist with editable Notes", async 
   await expect(
     page.getByRole("region", { name: "Latest review" }),
   ).toContainText("Changes requested");
-  await expect(page.getByRole("textbox", { name: "Notes" })).toBeEnabled();
+  await expect(
+    page.getByRole("textbox", { name: "Description" }),
+  ).toBeEnabled();
 });

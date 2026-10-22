@@ -20,3 +20,12 @@ export async function expectPoliteNotice(page: Page, text: string) {
   await expect(summary).toHaveAttribute("aria-live", "polite");
   await expect(summary).toContainText(text);
 }
+
+/** Open the human-first inspection layer explicitly, retaining its actual controls. */
+export async function openAgentPlan(page: Page) {
+  const plan = page.getByRole("dialog").locator("details.agent-plan");
+  await expect(plan).toBeVisible();
+  if (!(await plan.evaluate((element) => element.hasAttribute("open"))))
+    await plan.locator(":scope > summary").click();
+  await expect(plan).toHaveAttribute("open", "");
+}

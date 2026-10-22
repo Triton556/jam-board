@@ -736,3 +736,60 @@
   padding: 24px;
   line-height: 1.6;
 }
+
+/* Human descriptions stay primary; the unchanged agent schema is an inspection layer. */
+.agent-plan {
+  margin-block: 24px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.agent-plan > summary {
+  cursor: pointer;
+  padding: 16px 18px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.agent-plan-summary {
+  display: block;
+  margin-left: 18px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.agent-plan-content {
+  padding: 4px 20px 20px;
+}
+.agent-plan-explanation {
+  margin: 0 0 20px;
+  line-height: 1.7;
+}
+.agent-plan-content .markdown-field,
+.agent-plan-content > section,
+.agent-plan-content .brief-editor > section {
+  margin-block: 22px;
+}
+.agent-plan-content .list-editor-row,
+.task-form .agent-plan-content fieldset.list-editor-row {
+  padding: 16px;
+}
+.human-plan-preview {
+  margin-block: 16px 24px;
+  padding: 16px 18px;
+  background: var(--paper-2);
+  border-radius: var(--r-input);
+}
+.human-plan-preview h3 {
+  margin-top: 0;
+}
+.task-form .field-hint {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+@media (max-width: 600px) {
+  .agent-plan-content {
+    padding-inline: 14px;
+  }
+}

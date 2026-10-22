@@ -53,7 +53,7 @@ This candidate has **no UI or MCP action to change an existing task’s Story**;
 choose the intended Story at creation when placement matters. Refining a brief
 in place does not relocate the task or its evidence.
 
-A title and rough Notes are enough to start planning in **Backlog**; do not invent
+A title and rough Description are enough to start planning in **Backlog**; do not invent
 a complete specification just to capture an idea. Attach local
 assets or link material from **References** to the task, story or epic.
 Local-file references retain their paths; they are not uploaded or copied to the
@@ -77,7 +77,7 @@ planning prompt into the connected brain's chat. For example, add:
 For a whole-project capture review, the prepared prompt asks the brain to page
 `list_tasks` through `nextCursor`, including non-archived, unassigned Backlog cards.
 `get_board` is a summary, not the complete task inventory. The brain then inspects
-relevant task Notes, assets, questions and linked sources. Epic/Story/Task refinement
+relevant task descriptions, comments, assets, questions and linked sources. Epic/Story/Task refinement
 stays within the requested scope; it does not scan every other project task or
 archived work by default. This is an instruction, not proof that a model obeyed it.
 
@@ -91,11 +91,27 @@ Answer the brain's questions in **Inbox**. An ordinary answer is information,
 not permission to start work. The connected brain can read it and revise the plan;
 Jam Board does not start a new chat session when you answer.
 
-Review the proposed Story acceptance and task **Goal / Context / Where / Changes /
-Tests / Boundaries / Result**. Use a field’s explicit **Edit** action; prose and
-reference links are reading surfaces, not edit buttons. Edit the brief or Notes,
-save, then ask the brain to reconcile your changes with the current version. It
-should explain what changed and what remains unclear instead of overwriting your edits.
+Start with **Description** in the Story or Task. Write the outcome and wishes in
+your own language; Jam Board preserves your text and does not automatically
+translate or generate a summary. A Task also has **Comments** for follow-up
+corrections or questions. Posting one does not start the brain. Story-level
+comments are not part of this candidate; do not use **Open decisions** as a hidden
+comment thread.
+
+Open **Agent plan** when you want to inspect the proposed acceptance criteria or
+**Goal / Context / Where / Changes / Tests / Boundaries / Result**. It starts
+collapsed to keep the human description visible; collapsing it does not erase
+fields or bypass readiness. Existing tasks without a description can show
+**From the agent plan**, a clearly labelled existing goal for context, not a saved
+or automatically generated description.
+
+Use a prose field's explicit **Edit** action; text and reference links remain
+reading surfaces. Save your description or structured edits, then choose
+**Refine with brain** and ask the connected brain to reconcile them. It should
+explain what changed and what remains unclear instead of overwriting your edits.
+Task descriptions use **Save**; Story prose also retains its existing blur and
+Ctrl/Command+S save behavior. In-session draft retention is not a durable backup
+across an app restart.
 
 If your save conflicts with another edit, inspect the comparison. **Read latest**
 updates the comparison while retaining your draft; it does not replay the save.

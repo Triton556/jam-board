@@ -14,7 +14,6 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Markdown } from "../../components/Markdown";
 import {
-  Avatar,
   Button,
   Combobox,
   DateTimeInput,
@@ -44,6 +43,7 @@ import { JamError, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
 import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
+import { AgentPlan } from "../plan/AgentPlan";
 import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
@@ -51,6 +51,7 @@ import { historyText } from "./history-text";
 import { announceReady, ReadinessStrip } from "./Readiness";
 import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
+import { TaskComments } from "./TaskComments";
 import { TaskConflictDialog } from "./TaskConflictDialog";
 import type { TaskFields } from "./task-form";
 import {
@@ -127,7 +128,6 @@ export function TaskEditor({
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState("Write");
   const notesTabs = useId();
-  const [comment, setComment] = useState("");
   const [markPending, setMarkPending] = useState(false);
   const markLock = useRef(false);
   const [saveNotice, setSaveNotice] = useState("");
@@ -349,14 +349,6 @@ export function TaskEditor({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, []);
-  const commentMutation = useMutation({
-    mutationFn: () => api.addComment({ key: task.key, bodyMd: comment }),
-    onSuccess: () => {
-      setComment("");
-      invalidate();
-    },
-    onError: (error) => useUiStore.getState().error(error.message),
-  });
   const archiveMutation = useMutation({
     mutationFn: () =>
       task.archivedAt
@@ -485,7 +477,7 @@ export function TaskEditor({
           disabled={readonly}
         />
         <span className="small muted">
-          Save your notes before asking the brain to read them.
+          Save your description before asking the brain to read it.
         </span>
       </div>
       {!readonly && <TaskExecutionNotice task={task} />}
@@ -543,6 +535,52 @@ export function TaskEditor({
           {errors.title && (
             <p className="field-error">{errors.title.message}</p>
           )}
+          <div className="section-heading">
+            <h2>Description</h2>
+            <Tabs
+              id={notesTabs}
+              label="Description editor mode"
+              value={tab}
+              onChange={setTab}
+              items={["Write", "Preview"]}
+            />
+          </div>
+          <p className="field-hint">
+            Describe what you want in your own words. Add wishes, context or
+            corrections; the brain can turn them into a plan.
+          </p>
+          <TabPanels id={notesTabs} value={tab} items={["Write", "Preview"]}>
+            {tab === "Write" ? (
+              <textarea
+                aria-label="Description"
+                className="description-input"
+                placeholder="What should this task do, and what matters to you?"
+                {...register("descriptionMd")}
+              />
+            ) : (
+              <Markdown>
+                {watch("descriptionMd") || "*No description yet.*"}
+              </Markdown>
+            )}
+          </TabPanels>
+          {!values.descriptionMd.trim() && values.brief.goalMd.trim() && (
+            <section
+              className="human-plan-preview"
+              aria-label="Existing planned outcome"
+            >
+              <h3>From the agent plan</h3>
+              <p className="small muted">
+                Existing goal, shown for context. It has not been copied into
+                your description.
+              </p>
+              <Markdown>{values.brief.goalMd}</Markdown>
+            </section>
+          )}
+          <TaskComments
+            task={task}
+            members={members.data ?? []}
+            changed={invalidate}
+          />
           {readiness.data && (
             <ReadinessStrip
               readiness={readiness.data}
@@ -673,45 +711,31 @@ export function TaskEditor({
               />
             </div>
           </div>
-          <Controller
-            name="brief"
-            control={control}
-            render={({ field }) => (
-              <BriefEditor
-                value={field.value}
-                onChange={field.onChange}
-                onSave={() => submitRef.current()}
-                disabled={readonly}
-              />
-            )}
-          />
-          {errors.brief && (
-            <p role="alert">
-              Complete required Change and Test fields before saving.
-            </p>
-          )}
-          <div className="section-heading">
-            <h2>Notes</h2>
-            <Tabs
-              id={notesTabs}
-              label="Notes editor mode"
-              value={tab}
-              onChange={setTab}
-              items={["Write", "Preview"]}
-            />
-          </div>
-          <TabPanels id={notesTabs} value={tab} items={["Write", "Preview"]}>
-            {tab === "Write" ? (
-              <textarea
-                aria-label="Notes"
-                className="description-input"
-                {...register("descriptionMd")}
-              />
-            ) : (
-              <Markdown>{watch("descriptionMd") || "*No notes yet.*"}</Markdown>
-            )}
-          </TabPanels>
         </fieldset>
+        <AgentPlan
+          summary={`${values.brief.changes.length} changes · ${values.brief.tests.length} checks`}
+        >
+          <fieldset disabled={readonly || save.isPending || markPending}>
+            <Controller
+              name="brief"
+              control={control}
+              render={({ field }) => (
+                <BriefEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  onSave={() => submitRef.current()}
+                  disabled={readonly}
+                />
+              )}
+            />
+          </fieldset>
+        </AgentPlan>
+        {errors.brief && (
+          <p role="alert">
+            Open Agent plan and complete required Change and Test fields before
+            saving.
+          </p>
+        )}
       </form>
       {saveNotice && (
         <p role="alert" className="notice">
@@ -823,52 +847,6 @@ export function TaskEditor({
             )}
           </div>
         ))}
-      </section>
-      <section className="task-section">
-        <h2>
-          Comments <span className="muted">{task.comments.length}</span>
-        </h2>
-        {!task.comments.length && <p className="muted">No comments yet.</p>}
-        {task.comments.map((item) => {
-          const author = members.data?.find((m) => m.id === item.authorId);
-          return (
-            <article className="comment" key={item.id}>
-              <div className="comment-author">
-                {author && <Avatar member={author} />}
-                <strong>{author?.name ?? "Teammate"}</strong>
-                {author?.kind === "agent" && <Stamp>agent</Stamp>}
-                <time dateTime={item.createdAt}>
-                  {relativeTime(item.createdAt)}
-                </time>
-              </div>
-              <Markdown>{item.bodyMd}</Markdown>
-            </article>
-          );
-        })}
-        {!readonly && (
-          <div className="comment-compose">
-            <textarea
-              aria-label="Write a comment"
-              placeholder="Leave a note for your teammates…"
-              maxLength={4000}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  if (comment.trim() && !commentMutation.isPending)
-                    commentMutation.mutate();
-                }
-              }}
-            />
-            <Button
-              disabled={!comment.trim() || commentMutation.isPending}
-              onClick={() => commentMutation.mutate()}
-            >
-              Add comment <Kbd>Ctrl ↵</Kbd>
-            </Button>
-          </div>
-        )}
       </section>
       <details className="task-section history">
         <summary>

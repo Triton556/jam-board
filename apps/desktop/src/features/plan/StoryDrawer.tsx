@@ -16,6 +16,7 @@ import {
 import { ExecutionControls } from "../execution/ExecutionControls";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
+import { AgentPlan } from "./AgentPlan";
 import { BrainHandoff } from "./BrainHandoff";
 import { NewPlanningDialog } from "./NewPlanningDialog";
 import { PlanningStatus, SavedMarkdown } from "./PlanningControls";
@@ -102,6 +103,15 @@ export function StoryDrawer({
                 disabled={story.status === "archived"}
               />
             </div>
+            <SavedMarkdown
+              key={`${story.id}:outcomeMd`}
+              identity={`${story.id}:outcomeMd`}
+              label="Description"
+              hint="Describe the outcome you want in your own words. The brain can refine the details."
+              value={story.outcomeMd}
+              save={(value) => api.updateStory(storyKey, { outcomeMd: value })}
+              disabled={story.status === "archived"}
+            />
             <PlanningStatus
               level="Story"
               entityKey={storyKey}
@@ -123,25 +133,38 @@ export function StoryDrawer({
                 q.scopeType === "story" &&
                 q.scopeId === story.id,
             ) && <Stamp className="needs-info">Needs info</Stamp>}
-            {intentFields.map(([field, label]) => (
-              <SavedMarkdown
-                key={`${story.id}:${field}`}
-                label={label}
-                value={story[field]}
-                save={(value) => api.updateStory(storyKey, { [field]: value })}
-                disabled={story.status === "archived"}
-              />
-            ))}
-            <AcceptanceDraft
+            <AgentPlan
               key={story.id}
-              identity={`${story.id}:acceptance`}
-              value={story.acceptance}
-              disabled={story.status === "archived"}
-              save={(acceptance) =>
-                save.mutateAsync({ key: storyKey, patch: { acceptance } })
-              }
-            />
-            {save.error && <p role="alert">{save.error.message}</p>}
+              summary={`${story.acceptance.length} acceptance criteria · context and boundaries`}
+            >
+              {intentFields.slice(1).map(([field, label]) => (
+                <SavedMarkdown
+                  key={`${story.id}:${field}`}
+                  identity={`${story.id}:${field}`}
+                  label={label}
+                  value={story[field]}
+                  save={(value) =>
+                    api.updateStory(storyKey, { [field]: value })
+                  }
+                  disabled={story.status === "archived"}
+                />
+              ))}
+              <AcceptanceDraft
+                key={story.id}
+                identity={`${story.id}:acceptance`}
+                value={story.acceptance}
+                disabled={story.status === "archived"}
+                save={(acceptance) =>
+                  save.mutateAsync({ key: storyKey, patch: { acceptance } })
+                }
+              />
+            </AgentPlan>
+            {save.error && (
+              <p role="alert">
+                {save.error.message}. Open Agent plan to inspect the retained
+                draft before retrying.
+              </p>
+            )}
             <div className="section-heading">
               <h2>Tasks</h2>
               <Button

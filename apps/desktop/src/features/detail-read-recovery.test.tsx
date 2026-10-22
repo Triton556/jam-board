@@ -21,7 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 type Kind = "epic" | "story";
 const descriptor = (kind: Kind, index = 1) => ({
-  label: kind === "epic" ? "Goal and audience" : "Outcome",
+  label: kind === "epic" ? "Goal and audience" : "Description",
   key: `JB-${kind === "epic" ? "E" : "S"}${index}`,
   method: kind === "epic" ? ("getEpic" as const) : ("getStory" as const),
 });

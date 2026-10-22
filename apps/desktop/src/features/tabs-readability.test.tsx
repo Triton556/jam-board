@@ -94,11 +94,11 @@ it("tabs wrap with arrows/Home/End, leave vertical scrolling alone and activate 
   await user.keyboard("{Shift>}{Tab}{/Shift}");
   expect(start).toHaveFocus();
 });
-it("Notes mode arrows never erase unsaved text, and explicit Preview/Write round-trip preserves it without saving", async () => {
+it("Description mode arrows never erase unsaved text, and explicit Preview/Write round-trip preserves it without saving", async () => {
   const user = userEvent.setup();
   wrap(<TaskDrawer taskKey="JB-7" close={() => {}} />);
   const notes = await screen.findByRole("textbox", {
-    name: "Notes",
+    name: "Description",
   });
   await user.clear(notes);
   await user.type(notes, "Unsaved **careful plan**");
@@ -112,7 +112,7 @@ it("Notes mode arrows never erase unsaved text, and explicit Preview/Write round
     await screen.findByRole("tabpanel", { name: "Preview" }),
   ).toHaveTextContent("careful plan");
   await user.keyboard("{ArrowLeft} ");
-  expect(screen.getByRole("textbox", { name: "Notes" })).toHaveValue(
+  expect(screen.getByRole("textbox", { name: "Description" })).toHaveValue(
     "Unsaved **careful plan**",
   );
   expect(mockApi.calls.some((call) => call.command === "update_task")).toBe(
