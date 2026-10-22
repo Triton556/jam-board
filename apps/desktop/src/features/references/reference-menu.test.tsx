@@ -11,7 +11,7 @@ import { CanvasContext, type CanvasRuntime } from "./runtime";
 const item: RefItem = {
   id: "reference1",
   jamId: "j",
-  kind: "note",
+  kind: "link",
   title: "Agent findings",
   captionMd: "Keep this content",
   x: 0,
@@ -28,7 +28,7 @@ const item: RefItem = {
   z: 0,
   frameId: null,
   assetId: null,
-  url: null,
+  url: "https://example.test/agent-findings",
   linkPreview: null,
   metadata: null,
 };
@@ -49,9 +49,13 @@ function actions(): CanvasRuntime {
 function Harness({
   runtime = actions(),
   outerEscape = vi.fn(),
+  reference = item,
+  editNote,
 }: {
   runtime?: CanvasRuntime;
   outerEscape?: () => void;
+  reference?: RefItem;
+  editNote?: () => void;
 }) {
   return (
     <CanvasContext.Provider value={runtime}>
@@ -62,7 +66,8 @@ function Harness({
         aria-label="Synthetic canvas"
       >
         <ReferenceActions
-          item={item}
+          item={reference}
+          editNote={editNote}
           links={[{ key: "JB-1", viaFrame: false, color: "red" }]}
         />
         <button type="button">Outside target</button>
@@ -185,4 +190,31 @@ it("RF04 summary Space preserves native activation without enabling canvas panni
   expect(screen.getByLabelText("Canvas pan key")).toHaveTextContent("false");
   // Actual native summary activation is covered by the unchanged hosted
   // Enter → Escape → Space scenario; Happy DOM does not implement that default.
+});
+
+it("RF04 note editing hands directly to its editor without a caption dialog or content mutation", async () => {
+  const runtime = actions();
+  let summary: HTMLElement;
+  const editNote = vi.fn(() => {
+    // The new editor receives control only after the menu has closed and its
+    // still-visible opener owns focus, not a now-hidden menu action.
+    expect(summary).toHaveFocus();
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+  });
+  render(
+    <Harness
+      runtime={runtime}
+      reference={{ ...item, kind: "note", url: null }}
+      editNote={editNote}
+    />,
+  );
+  summary = screen.getByLabelText("Actions for Agent findings");
+  await userEvent.click(summary);
+  expect(screen.queryByRole("button", { name: "Edit caption" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Edit note" }));
+  expect(editNote).toHaveBeenCalledOnce();
+  expect(runtime.edit).not.toHaveBeenCalled();
+  expect(runtime.caption).not.toHaveBeenCalled();
+  expect(runtime.archive).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

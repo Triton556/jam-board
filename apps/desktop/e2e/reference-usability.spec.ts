@@ -48,7 +48,7 @@ test("RF01/RF02 frame-only canvas has no empty art and a visible movable grip at
   }
 });
 
-test("RF03 local inline title/body keyboard save and explicit dirty cancel preserve note integrity", async ({
+test("RF03 direct paper autosave and empty removal preserve note integrity at high zoom", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 800, height: 600 });
@@ -58,20 +58,27 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
   const add = async () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByRole("button", { name: "Note", exact: true }).click();
+    await expect(
+      page.getByRole("region", { name: "References canvas" }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
   };
   await add();
-  const draft = page.getByRole("form", { name: "New note draft" });
+  const draft = page.getByRole("article", { name: "New note paper" });
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    draft.getByRole("textbox", { name: "Title", exact: true }),
+    draft.getByRole("textbox", { name: "Note text", exact: true }),
   ).toBeFocused();
+  await expect(draft.getByRole("button", { name: "Save note" })).toHaveCount(0);
+  await draft.getByRole("button", { name: "Add heading" }).click();
   await draft
-    .getByRole("textbox", { name: "Title", exact: true })
+    .getByRole("textbox", { name: "Optional note heading" })
     .fill("Snow lighting");
-  await draft
-    .getByRole("textbox", { name: "Note", exact: true })
-    .fill("Keep silhouettes readable.");
-  await page.keyboard.press("Control+s");
+  const body = draft.getByRole("textbox", { name: "Note text", exact: true });
+  await body.fill("Keep silhouettes readable.");
+  await expect(draft.getByRole("status")).toHaveText("Saved");
+  await expect(body).toBeFocused();
+  await page.keyboard.press("Escape");
   await expect(draft).toHaveCount(0);
   await expect
     .poll(async () =>
@@ -83,21 +90,42 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
       ),
     )
     .toBe(1);
-  await page.evaluate(async () => {
-    const camera = window.__jamCanvas?.getViewport();
+  const savedId = await page.evaluate(async () => {
+    const saved = (await window.__jamMock.referenceCanvas()).items.find(
+      (item) => item.title === "Snow lighting",
+    );
+    if (!saved) throw Error("Missing saved note");
+    return saved.id;
+  });
+  const savedNode = page.locator(`.react-flow__node[data-id="${savedId}"]`);
+  await savedNode.click();
+  await expect(savedNode).toHaveClass(/selected/);
+  await page.evaluate(async (id) => {
+    const saved = (await window.__jamMock.referenceCanvas()).items.find(
+      (item) => item.id === id,
+    );
     const canvas = document
       .querySelector(".references-page")
       ?.getBoundingClientRect();
-    if (camera && canvas) {
-      const centerX = (canvas.width / 2 - camera.x) / camera.zoom;
-      const centerY = (canvas.height / 2 - camera.y) / camera.zoom;
-      await window.__jamCanvas?.setViewport({
-        x: canvas.width / 2 - centerX * 4,
-        y: canvas.height / 2 - centerY * 4,
-        zoom: 4,
-      });
-    }
-  });
+    if (
+      !saved ||
+      !canvas ||
+      saved.x === null ||
+      saved.y === null ||
+      saved.w === null ||
+      saved.h === null
+    )
+      throw Error("Missing saved-note/canvas geometry");
+    // Center the actual selected note, not an assumed camera center, so the
+    // next placed paper demonstrably overlaps the elevated persisted node.
+    const centerX = saved.x + saved.w / 2;
+    const centerY = saved.y + saved.h / 2;
+    await window.__jamCanvas?.setViewport({
+      x: canvas.width / 2 - centerX * 4,
+      y: canvas.height / 2 - centerY * 4,
+      zoom: 4,
+    });
+  }, savedId);
   await add();
   const canvasBounds = await page
     .getByRole("region", { name: "References canvas" })
@@ -112,10 +140,24 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
   expect(draftBounds.y + draftBounds.height).toBeLessThanOrEqual(
     canvasBounds.y + canvasBounds.height,
   );
-  // The selected saved node shares this position; the new local paper must win hit testing.
+  const savedBounds = await savedNode.boundingBox();
+  if (!savedBounds) throw Error("Missing overlapped saved-note geometry");
+  expect(
+    Math.min(
+      savedBounds.x + savedBounds.width,
+      draftBounds.x + draftBounds.width,
+    ) - Math.max(savedBounds.x, draftBounds.x),
+  ).toBeGreaterThan(0);
+  expect(
+    Math.min(
+      savedBounds.y + savedBounds.height,
+      draftBounds.y + draftBounds.height,
+    ) - Math.max(savedBounds.y, draftBounds.y),
+  ).toBeGreaterThan(0);
+  // The actual selected saved node overlaps; the new paper must win hit testing.
   expect(
     await draft
-      .getByRole("textbox", { name: "Title", exact: true })
+      .getByRole("textbox", { name: "Note text", exact: true })
       .evaluate((element) => {
         const box = element.getBoundingClientRect();
         return (
@@ -126,17 +168,9 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
         );
       }),
   ).toBe(true);
-  await draft
-    .getByRole("textbox", { name: "Note", exact: true })
-    .fill("Cancel me");
+  // Empty papers are local and removable; Escape on nonblank text now flushes
+  // intentionally rather than pretending an already-autosaved note is undone.
   await page.keyboard.press("Escape");
-  await expect(draft).toBeVisible();
-  await draft.getByRole("button", { name: "Keep editing" }).click();
-  await expect(
-    draft.getByRole("textbox", { name: "Note", exact: true }),
-  ).toHaveValue("Cancel me");
-  await draft.getByRole("button", { name: "Cancel", exact: true }).click();
-  await draft.getByRole("button", { name: "Discard draft" }).click();
   await expect(draft).toHaveCount(0);
   expect(
     await page.evaluate(
@@ -170,9 +204,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(receipt).toContainText("Last checked:");
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByRole("button", { name: "Note", exact: true }).click();
-    const draft = page.getByRole("form", { name: "New note draft" });
-    const title = draft.getByRole("textbox", { name: "Title", exact: true });
-    await expect(title).toBeFocused();
+    await page.keyboard.press("Enter");
+    const draft = page.getByRole("article", { name: "New note paper" });
+    const body = draft.getByRole("textbox", { name: "Note text", exact: true });
+    await expect(body).toBeFocused();
     const toolbarBounds = await page
       .locator(".reference-toolbar")
       .boundingBox();
@@ -190,7 +225,7 @@ for (const theme of ["light", "dark"] as const) {
       receiptBounds.y + receiptBounds.height,
     );
     expect(
-      await title.evaluate((element) => {
+      await body.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return (
           document.elementFromPoint(
@@ -200,7 +235,7 @@ for (const theme of ["light", "dark"] as const) {
         );
       }),
     ).toBe(true);
-    await draft.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.keyboard.press("Escape");
     await expect(draft).toHaveCount(0);
     expect(
       await page.evaluate(() => window.__jamMock.referenceCanvas()),

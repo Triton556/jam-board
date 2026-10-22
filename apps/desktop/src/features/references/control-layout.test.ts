@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { referenceControlsBottom } from "./control-layout";
-import { noteDraftLayout } from "./note-draft-layout";
+import { placedNoteLayout } from "./note-draft-layout";
 
 // Synthetic DOM rectangles establish shared measurement, not native CSS layout.
 it("RF03/VS01 measures the complete current overlay, including wrapped feedback", () => {
@@ -18,12 +18,13 @@ it("RF03/VS01 measures the complete current overlay, including wrapped feedback"
   bounds.mockReturnValue(new DOMRect(96, 136, 668, 210));
   const toolsBottom = referenceControlsBottom(container);
   expect(toolsBottom).toBe(226);
-  const note = noteDraftLayout(
+  const note = placedNoteLayout(
+    { x: 350, y: 250 },
     { x: 350, y: 250 },
     { width: 700, height: 500, toolsBottom },
   );
-  expect(note.y).toBeGreaterThan(toolsBottom);
-  expect(note.y + note.maxHeight).toBeLessThanOrEqual(500);
+  expect(note.y + note.viewport.y).toBeGreaterThan(toolsBottom);
+  expect(note.y + note.viewport.y + 180).toBeLessThanOrEqual(500);
   // No stale cached measurement after a successful retry removes the notice.
   bounds.mockReturnValue(new DOMRect(96, 136, 668, 90));
   expect(referenceControlsBottom(container)).toBe(106);

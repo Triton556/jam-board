@@ -1,26 +1,49 @@
 import { expect, it } from "vitest";
-import { noteDraftLayout, noteDraftWidth } from "./note-draft-layout";
+import { placedNoteLayout } from "./note-draft-layout";
 
-it.each([
-  { width: 540, height: 450, toolsBottom: 104 },
-  { width: 920, height: 570, toolsBottom: 96 },
-  { width: 1180, height: 750, toolsBottom: 96 },
-  { width: 310, height: 350, toolsBottom: 110 },
-])(
-  "RF03 initial paper fits actual canvas bounds %o at readable editing zoom",
-  (canvas) => {
-    const center = { x: 1234, y: -456 };
-    const layout = noteDraftLayout(center, canvas);
-    const left = canvas.width / 2 + (layout.x - center.x) * layout.zoom;
-    const top = canvas.height / 2 + (layout.y - center.y) * layout.zoom;
-    expect(left).toBeGreaterThanOrEqual(15.99);
-    expect(left + noteDraftWidth * layout.zoom).toBeLessThanOrEqual(
-      canvas.width - 15.99,
-    );
-    expect(top).toBeGreaterThanOrEqual(canvas.toolsBottom + 15.99);
-    expect(top + layout.maxHeight * layout.zoom).toBeLessThanOrEqual(
-      canvas.height - 15.99,
-    );
-    expect(layout.zoom).toBeLessThanOrEqual(1);
-  },
-);
+it("places the real paper around the clicked world point, independently of camera scale", () => {
+  const result = placedNoteLayout(
+    { x: 800, y: 900 },
+    { x: 300, y: 450 },
+    { width: 800, height: 600, toolsBottom: 112 },
+  );
+  expect(result).toEqual({
+    x: 680,
+    y: 810,
+    maxHeight: 224,
+    viewport: { x: -500, y: -450, zoom: 1 },
+  });
+  expect(result.x + 120).toBe(800);
+  expect(result.y + 90).toBe(900);
+});
+it("only shifts the camera when a click would place the paper under wrapping controls", () => {
+  const result = placedNoteLayout(
+    { x: 50, y: 60 },
+    { x: 40, y: 20 },
+    { width: 800, height: 600, toolsBottom: 130 },
+  );
+  expect(result.x).toBe(-70);
+  expect(result.y).toBe(-30);
+  expect(result.x + result.viewport.x).toBe(16);
+  expect(result.y + result.viewport.y).toBe(146);
+});
+it("keeps a lower-right paper inside the actual narrow canvas without changing its world point", () => {
+  const result = placedNoteLayout(
+    { x: 600, y: 700 },
+    { x: 790, y: 590 },
+    { width: 800, height: 600, toolsBottom: 120 },
+  );
+  expect(result.x + result.viewport.x + 240).toBe(784);
+  expect(result.y + result.viewport.y + 180).toBe(584);
+  expect(result.x + 120).toBe(600);
+  expect(result.y + 90).toBe(700);
+});
+it("uses the freshly measured whole controls stack after a long receipt wraps", () => {
+  const result = placedNoteLayout(
+    { x: 0, y: 0 },
+    { x: 400, y: 300 },
+    { width: 800, height: 600, toolsBottom: 250 },
+  );
+  expect(result.y + result.viewport.y).toBe(266);
+  expect(result.y + result.viewport.y + 180).toBeLessThan(600);
+});

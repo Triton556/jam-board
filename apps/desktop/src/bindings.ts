@@ -47,9 +47,12 @@ export const commands = {
 	setBrain: (input: BrainInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
 	listChangesSince: (input: ChangesInput) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_changes_since", { input })),
 	epicJournal: (epicKey: string, after: number) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("epic_journal", { epicKey, after })),
-	addReference: (input: AddReference) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input })),
+	addReference: (input: AddReference, untitled: boolean | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
 	listReferences: (input: ReferenceListInput) => typedError<RefItem[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
-	updateReference: (input: ReferenceEditInput_Deserialize) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input })),
+	updateReference: (input: ReferenceEditInput_Deserialize, expected: {
+	title: string,
+	caption: string,
+} | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input, expected })),
 	linkReference: (input: ReferenceLinkInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
 	unlinkReference: (input: ReferenceLinkInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("unlink_reference", { input })),
 	archiveReference: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_reference", { id })),
@@ -869,6 +872,15 @@ export type ReferenceCanvas = {
 	frames: RefFrame[],
 	edges: RefEdge[],
 	links: RefLink[],
+};
+
+/**
+ *  Optional human-editor compare-and-set boundary. Kept separate from the MCP
+ *  ReferenceEditInput contract so existing agent clients remain unchanged.
+ */
+export type ReferenceContentExpectation = {
+	title: string,
+	caption: string,
 };
 
 export type ReferenceEditInput = ReferenceEditInput_Serialize | ReferenceEditInput_Deserialize;

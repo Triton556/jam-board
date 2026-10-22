@@ -10,7 +10,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import type { ReferenceCanvas } from "../../bindings";
 import { api } from "../../lib/api";
 import { decodedThumbnail } from "./Media";
-import { referenceKind, worldPosition } from "./model";
+import { referenceKind, referenceLabel, worldPosition } from "./model";
 import { roughPaths } from "./rough";
 // At overview scale a cached raster avoids repainting hundreds of text/card layers
 // on every zoom frame. Real React Flow nodes remain the interactive/accessible model.
@@ -190,7 +190,7 @@ export const OverviewScene = memo(function OverviewScene({
         }
         c.fillStyle = ink;
         c.font = '600 16px "Manrope Variable"';
-        c.fillText(item.title, p.x + 10, p.y + 22, w - 20);
+        c.fillText(referenceLabel(item), p.x + 10, p.y + 22, w - 20);
         const highlight = highlights[item.id];
         if (highlight) {
           c.strokeStyle = color(highlight.color);

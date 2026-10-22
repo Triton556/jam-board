@@ -127,7 +127,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("RF04 item actions dismiss with Escape/outside and hand back from a dialog", async ({
+test("RF04 note actions edit directly and retain menu/dialog dismissal ownership", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 800, height: 600 });
@@ -150,35 +150,58 @@ test("RF04 item actions dismiss with Escape/outside and hand back from a dialog"
   await summary.focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("button", { name: "Edit caption" }),
+    page.getByRole("button", { name: "Edit note", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Tab");
   await page.keyboard.press("Escape");
   await expect(summary).toBeFocused();
-  await expect(page.getByRole("button", { name: "Edit caption" })).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Edit note", exact: true }),
+  ).toBeHidden();
   await page.keyboard.press("Space");
   await expect(
-    page.getByRole("button", { name: "Edit caption" }),
+    page.getByRole("button", { name: "Edit note", exact: true }),
   ).toBeVisible();
   const canvas = await page
     .getByRole("region", { name: "References canvas" })
     .boundingBox();
   if (!canvas) throw Error("Missing canvas bounds");
   await page.mouse.click(canvas.x + canvas.width - 40, canvas.y + 200);
-  await expect(page.getByRole("button", { name: "Edit caption" })).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Edit note", exact: true }),
+  ).toBeHidden();
   await summary.click();
   await page.getByRole("button", { name: "Toggle minimap" }).click();
   await expect(
     page.getByRole("button", { name: "Toggle minimap" }),
   ).toBeFocused();
-  await expect(page.getByRole("button", { name: "Edit caption" })).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Edit note", exact: true }),
+  ).toBeHidden();
   await summary.click();
-  await page.getByRole("button", { name: "Edit caption" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Edit note", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(summary).toBeFocused();
+  const body = page.getByRole("textbox", { name: "Note text", exact: true });
+  await expect(body).toBeFocused();
+  await expect(body).toHaveValue("Keep this original result.");
+  await expect(
+    page.getByRole("button", { name: "Edit note", exact: true }),
+  ).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(body).toHaveCount(0);
+  // Merely opening an existing note editor must not rewrite agent content.
   expect(await page.evaluate(() => window.__jamMock.referenceCanvas())).toEqual(
     initial,
   );
+  for (const action of ["Tags", "Link to…"]) {
+    await summary.click();
+    await page.getByRole("button", { name: action, exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(summary).toBeFocused();
+    expect(
+      await page.evaluate(() => window.__jamMock.referenceCanvas()),
+    ).toEqual(initial);
+  }
 });

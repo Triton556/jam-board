@@ -1,4 +1,4 @@
-// RF01/RF03: functional DOM evidence only, not native pointer/visual acceptance.
+// RF01/RF03: real editable-paper behavior; DOM is not native pointer/visual proof.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -32,7 +32,7 @@ async function mountDraft() {
   client.setQueryData(["app"], app);
   const saved = vi.fn(),
     close = vi.fn(),
-    refresh = vi.fn().mockResolvedValue(undefined);
+    confirmed = vi.fn();
   const rendered = render(
     <QueryClientProvider client={client}>
       <DraftNote
@@ -41,43 +41,128 @@ async function mountDraft() {
         y={80}
         saved={saved}
         close={close}
-        refresh={refresh}
+        confirmed={confirmed}
       />
     </QueryClientProvider>,
   );
-  return { ...rendered, client, app, saved, close, refresh };
+  return { ...rendered, client, app, saved, close, confirmed };
 }
-async function fill() {
+async function fill(withHeading = true) {
+  if (withHeading) {
+    await userEvent.click(screen.getByRole("button", { name: "Add heading" }));
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Optional note heading" }),
+      "Lighting notes",
+    );
+  }
   await userEvent.type(
-    screen.getByRole("textbox", { name: "Title" }),
-    "Lighting notes",
-  );
-  await userEvent.type(
-    screen.getByRole("textbox", { name: "Note" }),
+    screen.getByRole("textbox", { name: "Note text" }),
     "Amber lantern on snow",
   );
 }
-it("RF03 blank and whitespace drafts never persist; Cancel returns without a mutation", async () => {
-  const create = vi.spyOn(mockApi, "addReference");
-  const { close } = await mountDraft();
-  expect(screen.getByRole("textbox", { name: "Title" })).toHaveFocus();
-  fireEvent.submit(screen.getByRole("form"));
-  expect(create).not.toHaveBeenCalled();
-  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(close).toHaveBeenCalledOnce();
-  fireEvent.change(screen.getByRole("textbox", { name: "Note" }), {
-    target: { value: "   " },
+function flush() {
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Note text" }), {
+    key: "s",
+    ctrlKey: true,
   });
-  fireEvent.submit(screen.getByRole("form"));
-  expect(create).not.toHaveBeenCalled();
-});
-it("RF03 inline title/body creates exactly once and preserves world geometry", async () => {
+}
+it.each(["", "   "])(
+  "RF03 empty/whitespace paper %j removes without any create or form",
+  async (body) => {
+    const create = vi.spyOn(mockApi, "addReference");
+    const { close } = await mountDraft();
+    expect(
+      screen.getByRole("article", { name: "New note paper" }),
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Note text" })).toHaveFocus();
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save note" }),
+    ).not.toBeInTheDocument();
+    if (body)
+      await userEvent.type(
+        screen.getByRole("textbox", { name: "Note text" }),
+        body,
+      );
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(create).not.toHaveBeenCalled();
+  },
+);
+it("RF03 heading alone autosaves exactly once without copying heading into its empty body", async () => {
   const create = vi.spyOn(mockApi, "addReference");
-  const { saved } = await mountDraft();
-  await fill();
-  fireEvent.submit(screen.getByRole("form"));
-  fireEvent.submit(screen.getByRole("form"));
+  const { close, saved, confirmed } = await mountDraft();
+  await userEvent.click(screen.getByRole("button", { name: "Add heading" }));
+  const heading = screen.getByRole("textbox", {
+    name: "Optional note heading",
+  });
+  await userEvent.type(heading, "Heading only");
+  await waitFor(() => expect(confirmed).toHaveBeenCalledOnce(), {
+    timeout: 2000,
+  });
+  expect(create).toHaveBeenCalledExactlyOnceWith({
+    kind: "note",
+    title: "Heading only",
+    text: "",
+    x: 40,
+    y: 80,
+  });
+  expect(heading).toHaveValue("Heading only");
+  expect(heading).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Note text" })).toHaveValue("");
+  expect(screen.getByRole("status")).toHaveTextContent("Saved");
+  const created = confirmed.mock.calls[0]?.[0];
+  expect(
+    (await mockApi.referenceCanvas()).items.find(
+      (item) => item.id === created?.id,
+    ),
+  ).toMatchObject({ title: "Heading only", captionMd: "" });
+  expect(close).not.toHaveBeenCalled();
+  expect(saved).not.toHaveBeenCalled();
+  await userEvent.keyboard("{Escape}");
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(create).toHaveBeenCalledOnce();
+});
+it("RF03 body directly autosaves once without a heading, preserving world coordinates and focused textarea", async () => {
+  const create = vi.spyOn(mockApi, "addReference");
+  const { confirmed, saved } = await mountDraft();
+  const body = screen.getByRole("textbox", { name: "Note text" });
+  await fill(false);
+  await waitFor(() => expect(confirmed).toHaveBeenCalledOnce(), {
+    timeout: 2000,
+  });
+  expect(create).toHaveBeenCalledExactlyOnceWith(
+    {
+      kind: "note",
+      text: "Amber lantern on snow",
+      x: 40,
+      y: 80,
+    },
+    true,
+  );
+  expect(screen.getByRole("textbox", { name: "Note text" })).toBe(body);
+  expect(body).toHaveFocus();
+  expect(screen.getByRole("status")).toHaveTextContent("Saved");
+  expect(saved).not.toHaveBeenCalled();
+  const created = confirmed.mock.calls[0]?.[0];
+  expect(
+    (await mockApi.referenceCanvas()).items.find(
+      (item) => item.id === created?.id,
+    ),
+  ).toMatchObject({
+    title: "",
+    captionMd: "Amber lantern on snow",
+    x: 40,
+    y: 80,
+  });
+});
+it("RF03 optional heading/body flush exactly once; Escape finishes only after confirmation", async () => {
+  const create = vi.spyOn(mockApi, "addReference");
+  const { confirmed, saved } = await mountDraft();
+  await fill();
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(confirmed).toHaveBeenCalledOnce();
   expect(create).toHaveBeenCalledExactlyOnceWith({
     kind: "note",
     title: "Lighting notes",
@@ -85,101 +170,71 @@ it("RF03 inline title/body creates exactly once and preserves world geometry", a
     x: 40,
     y: 80,
   });
-  const created = saved.mock.calls[0]?.[0];
-  if (!created) throw Error("Missing created item");
-  expect(
-    (await mockApi.referenceCanvas()).items.find(
-      (item) => item.id === created.id,
-    ),
-  ).toMatchObject({
-    title: "Lighting notes",
-    captionMd: "Amber lantern on snow",
-  });
 });
-it("RF03 pending Escape/Cancel and repeated keyboard save cannot dismiss or duplicate", async () => {
+it("RF03 pending Escape and repeated keyboard flush cannot finish early or duplicate create", async () => {
   const item = await mockApi.addReference({
     kind: "note",
-    text: "Existing fixture",
+    title: "Lighting notes",
+    text: "Amber lantern on snow",
   });
-  let resolve!: (
-    value: Awaited<ReturnType<typeof mockApi.addReference>>,
-  ) => void;
+  let resolve!: (value: typeof item) => void;
   const create = vi.spyOn(mockApi, "addReference").mockImplementation(
     () =>
       new Promise((done) => {
         resolve = done;
       }),
   );
-  const { close, saved } = await mountDraft();
+  const { close, saved, confirmed } = await mountDraft();
   await fill();
-  fireEvent.keyDown(screen.getByRole("textbox", { name: "Note" }), {
-    key: "s",
-    ctrlKey: true,
-  });
+  flush();
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
-  fireEvent.keyDown(screen.getByRole("form"), { key: "Escape" });
-  fireEvent.keyDown(screen.getByRole("form"), { key: "s", metaKey: true });
+  await userEvent.keyboard("{Escape}{Escape}");
+  flush();
   expect(close).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  expect(saved).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Finish editing note" }),
+  ).toBeDisabled();
+  expect(screen.getByRole("status")).toHaveTextContent("Saving…");
   await act(async () => resolve(item));
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(confirmed).toHaveBeenCalledOnce();
   expect(create).toHaveBeenCalledOnce();
 });
-it("RF03 commit then lost response retains text and read reconciliation never retries create", async () => {
+it("RF03 commit then lost response retains editable text and read reconciliation never retries create", async () => {
   const original = mockApi.addReference.bind(mockApi);
   const create = vi
     .spyOn(mockApi, "addReference")
-    .mockImplementation(async (input) => {
-      await original(input);
+    .mockImplementation(async (input, untitled) => {
+      await original(input, untitled);
       throw Error("Response lost");
     });
-  const { saved, refresh } = await mountDraft();
+  const { saved, close, confirmed } = await mountDraft();
   await fill();
-  fireEvent.submit(screen.getByRole("form"));
-  await screen.findByText(/Creation is unconfirmed/);
-  expect(
-    screen.getByText("Creation unconfirmed · text retained"),
-  ).toBeVisible();
-  expect(screen.queryByText("Local draft · not saved yet")).toBeNull();
-  expect(screen.getByRole("textbox", { name: "Note" })).toHaveValue(
-    "Amber lantern on snow",
-  );
-  expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
-  await userEvent.click(
-    screen.getByRole("button", { name: "Refresh references" }),
-  );
-  fireEvent.submit(screen.getByRole("form"));
-  expect(refresh).toHaveBeenCalledOnce();
+  flush();
+  await screen.findByText("Save unconfirmed · text retained");
+  const body = screen.getByRole("textbox", { name: "Note text" });
+  expect(body).toHaveValue("Amber lantern on snow");
+  expect(body).not.toHaveAttribute("readonly");
+  const read = vi.spyOn(mockApi, "referenceCanvas");
+  await userEvent.click(screen.getByRole("button", { name: "Check latest" }));
+  await screen.findByText(/Board checked\. Inspect its notes/);
+  expect(read).toHaveBeenCalledOnce();
+  await userEvent.type(body, " — newer local detail");
+  await userEvent.keyboard("{Escape}");
+  flush();
   expect(create).toHaveBeenCalledOnce();
   expect(saved).not.toHaveBeenCalled();
+  expect(confirmed).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  expect(body).toHaveValue("Amber lantern on snow — newer local detail");
   expect(
     (await mockApi.referenceCanvas()).items.filter(
       (item) => item.title === "Lighting notes",
     ),
   ).toHaveLength(1);
 });
-it("RF03 dirty Escape requires explicit discard and Keep editing preserves both fields", async () => {
-  const create = vi.spyOn(mockApi, "addReference");
-  const { close } = await mountDraft();
-  await fill();
-  fireEvent.keyDown(screen.getByRole("textbox", { name: "Note" }), {
-    key: "Escape",
-  });
-  expect(close).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Keep editing" })).toHaveFocus();
-  fireEvent.keyDown(screen.getByRole("form"), { key: "s", ctrlKey: true });
-  fireEvent.submit(screen.getByRole("form"));
-  expect(create).not.toHaveBeenCalled();
-  await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-  expect(screen.getByRole("textbox", { name: "Note" })).toHaveFocus();
-  expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue(
-    "Lighting notes",
-  );
-  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  await userEvent.click(screen.getByRole("button", { name: "Discard draft" }));
-  expect(close).toHaveBeenCalledOnce();
-});
-it("RF03 A→B→A project epoch refuses dispatch while keeping text copyable", async () => {
+it("RF03 A→B→A project epoch refuses dispatch while retaining copyable draft", async () => {
   const create = vi.spyOn(mockApi, "addReference");
   const { client, app } = await mountDraft();
   await fill();
@@ -187,36 +242,39 @@ it("RF03 A→B→A project epoch refuses dispatch while keeping text copyable", 
     client.setQueryData(["app"], { ...app, jam: { ...app.jam, id: "other" } });
     client.setQueryData(["app"], app);
   });
-  await screen.findByText(/project or form target changed/);
-  fireEvent.submit(screen.getByRole("form"));
+  await screen.findByText(/The project changed/);
+  flush();
   expect(create).not.toHaveBeenCalled();
-  expect(screen.getByRole("textbox", { name: "Note" })).toHaveValue(
+  expect(screen.getByRole("textbox", { name: "Note text" })).toHaveValue(
     "Amber lantern on snow",
   );
+  expect(screen.getByRole("textbox", { name: "Note text" })).toHaveAttribute(
+    "readonly",
+  );
+  expect(screen.getByRole("textbox", { name: "Note text" })).not.toBeDisabled();
 });
-it("RF03 late response after unmount never invokes completion on a newer surface", async () => {
+it("RF03 late response after unmount cannot confirm or finish a newer surface", async () => {
   const item = await mockApi.addReference({
     kind: "note",
     text: "Existing fixture",
   });
-  let resolve!: (
-    value: Awaited<ReturnType<typeof mockApi.addReference>>,
-  ) => void;
+  let resolve!: (value: typeof item) => void;
   vi.spyOn(mockApi, "addReference").mockImplementation(
     () =>
       new Promise((done) => {
         resolve = done;
       }),
   );
-  const { saved, unmount } = await mountDraft();
-  await fill();
-  fireEvent.submit(screen.getByRole("form"));
+  const { saved, confirmed, unmount } = await mountDraft();
+  await fill(false);
+  flush();
   await waitFor(() => expect(resolve).toBeDefined());
   unmount();
   await act(async () => resolve(item));
   expect(saved).not.toHaveBeenCalled();
+  expect(confirmed).not.toHaveBeenCalled();
 });
-it("RF01 frame-only canvas hides empty artwork and Add note opens a local inline paper, not dialog", async () => {
+it("RF01 frame-only canvas hides empty artwork; placement is cancellable and Enter creates only a local paper", async () => {
   vi.spyOn(mockApi, "referenceCanvas").mockResolvedValue({
     items: [],
     frames: [
@@ -250,9 +308,28 @@ it("RF01 frame-only canvas hides empty artwork and Add note opens a local inline
   expect(
     screen.queryByText("Drop images, sounds, videos or links here"),
   ).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Add" }));
-  await userEvent.click(screen.getByRole("button", { name: "Note" }));
-  await screen.findByRole("form", { name: "New note draft" });
+  const arm = async () => {
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Note" }));
+    await screen.findByText(/Click the canvas to place a note/);
+    expect(
+      screen.getByRole("region", { name: "References canvas" }),
+    ).toHaveFocus();
+    expect(
+      screen.queryByRole("article", { name: "New note paper" }),
+    ).not.toBeInTheDocument();
+  };
+  await arm();
+  await userEvent.keyboard("{Escape}");
+  expect(
+    screen.queryByText(/Click the canvas to place a note/),
+  ).not.toBeInTheDocument();
+  expect(create).not.toHaveBeenCalled();
+  await arm();
+  await userEvent.keyboard("{Enter}");
+  await screen.findByRole("article", { name: "New note paper" });
+  expect(screen.getByRole("textbox", { name: "Note text" })).toHaveFocus();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.queryByRole("form")).not.toBeInTheDocument();
   expect(create).not.toHaveBeenCalled();
 });

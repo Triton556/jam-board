@@ -253,8 +253,9 @@ function installTransport() {
             kind: input.kind,
             assetId: null,
             url: null,
-            title: input.filePath,
-            captionMd: "",
+            title:
+              input.kind === "note" ? (input.title ?? "Note") : input.filePath,
+            captionMd: input.kind === "note" ? (input.text ?? "") : "",
             tags: [],
             x: input.x,
             y: input.y,
@@ -759,14 +760,16 @@ it("offers read-only Refresh after late settlement in all four page/project-retu
   emitWrites = true;
 }, 20000);
 
-it("retains cached References canvas and note draft through repeated read failures and recovery", async () => {
+it("retains the exact sticky paper and newer local typing through pending create, repeated read failures and recovery", async () => {
   installTransport();
   const user = userEvent.setup();
   render(<App />);
   if (selected === "A") await switchTo("B", user);
   await switchTo("A", user);
   await route("/references");
-  await screen.findByRole("region", { name: "References canvas" });
+  const canvas = await screen.findByRole("region", {
+    name: "References canvas",
+  });
   calls = [];
   await user.click(
     within(screen.getByRole("toolbar", { name: "Canvas tools" })).getByRole(
@@ -775,16 +778,28 @@ it("retains cached References canvas and note draft through repeated read failur
     ),
   );
   await user.click(screen.getByRole("button", { name: "Note" }));
-  const note = await screen.findByRole("form", { name: "New note draft" });
-  const title = within(note).getByLabelText("Title"),
-    body = within(note).getByLabelText("Note");
+  expect(canvas).toHaveFocus();
+  await user.keyboard("{Enter}");
+  const note = await screen.findByRole("article", { name: "New note paper" });
+  await user.click(within(note).getByRole("button", { name: "Add heading" }));
+  const title = within(note).getByLabelText("Optional note heading"),
+    body = within(note).getByLabelText("Note text");
   fireEvent.change(title, {
     target: { value: "Unsaved title before background read" },
   });
+  fireEvent.change(body, { target: { value: "First submitted note text" } });
+  body.focus();
+  // Autosave is intentional in this UI. Hold its real native-binding request,
+  // then assert read failures never duplicate it or replace newer local typing.
+  gate = deferred();
+  const pendingCreate = gate;
+  await user.keyboard("{Control>}s{/Control}");
+  await waitFor(() =>
+    expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(1),
+  );
   fireEvent.change(body, {
     target: { value: "Unsaved note body must not disappear" },
   });
-  body.focus();
   referenceReadError = true;
   for (let attempt = 0; attempt < 2; attempt++) {
     const count = calls.filter((c) => c.command === "reference_canvas").length;
@@ -797,29 +812,47 @@ it("retains cached References canvas and note draft through repeated read failur
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Synthetic background reference read failed",
     );
-    expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
-    expect(
-      screen.getByRole("region", { name: "References canvas" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "New note paper" })).toBe(note);
+    expect(screen.getByRole("region", { name: "References canvas" })).toBe(
+      canvas,
+    );
+    expect(within(note).getByLabelText("Optional note heading")).toBe(title);
+    expect(within(note).getByLabelText("Note text")).toBe(body);
     expect(title).toHaveValue("Unsaved title before background read");
     expect(body).toHaveValue("Unsaved note body must not disappear");
     expect(body).toHaveFocus();
+    expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(1);
   }
   referenceReadError = false;
   act(() => emit("reference.added"));
   await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-  expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
+  expect(screen.getByRole("article", { name: "New note paper" })).toBe(note);
   expect(title).toHaveValue("Unsaved title before background read");
   expect(body).toHaveValue("Unsaved note body must not disappear");
   expect(body).toHaveFocus();
-  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
-  await user.keyboard("{Escape}");
-  expect(screen.getByRole("form", { name: "New note draft" })).toBe(note);
-  await user.click(screen.getByRole("button", { name: "Discard draft" }));
-  await waitFor(() =>
-    expect(screen.queryByRole("form", { name: "New note draft" })).toBeNull(),
+  await act(async () =>
+    pendingCreate.reject({
+      code: "internal",
+      message: "Synthetic unconfirmed create outcome",
+    }),
   );
-  // Without a modal, retry is an ordinary read control, not a hidden mutation retry.
+  await within(note).findByText("Save unconfirmed · text retained");
+  expect(body).toHaveFocus();
+  expect(body).toHaveValue("Unsaved note body must not disappear");
+  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(1);
+  const confirm = vi.fn(() => true);
+  vi.stubGlobal("confirm", confirm);
+  await user.click(
+    within(note).getByRole("button", { name: "Discard local paper" }),
+  );
+  expect(confirm).toHaveBeenCalledOnce();
+  vi.unstubAllGlobals();
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("article", { name: "New note paper" }),
+    ).toBeNull(),
+  );
+  // Retry is a read control, not an implicit replay of the unconfirmed create.
   referenceReadError = true;
   await user.click(screen.getByRole("button", { name: "Refresh references" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -840,7 +873,12 @@ it("retains cached References canvas and note draft through repeated read failur
   referenceReadError = false;
   await user.click(screen.getByRole("button", { name: "Try again" }));
   await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
+  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(1);
+  expect(
+    calls.filter(
+      (c) => c.command === "update_reference" || c.command === "canvas_archive",
+    ),
+  ).toHaveLength(0);
 }, 20000);
 
 it("keeps a References initial read failure distinct and recoverable without cached canvas", async () => {

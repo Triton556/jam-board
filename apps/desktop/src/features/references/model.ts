@@ -225,3 +225,17 @@ export function readingOrder<
     visit(n);
   return ordered;
 }
+
+/** Display/search aid only; never persisted as a substitute for an empty title. */
+export function referenceLabel(
+  item: Pick<RefItem, "kind" | "title" | "captionMd">,
+) {
+  if (item.title || item.kind !== "note") return item.title;
+  return (
+    item.captionMd
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean)
+      ?.slice(0, 72) || "Empty note"
+  );
+}

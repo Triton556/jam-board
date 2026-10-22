@@ -20,15 +20,23 @@ import {
   Type,
   Video,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { RefFrame, RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
 import { frameHeaderLayout } from "./frame-layout";
 import { LocalMedia } from "./Media";
-import { palette, referenceKind } from "./model";
+import { palette, referenceKind, referenceLabel } from "./model";
 import { useCanvas } from "./runtime";
+import { StickyEditor } from "./StickyEditor";
 export type TargetChip = { key: string; viaFrame: boolean; color?: string };
 export type ItemData = {
   item: RefItem;
@@ -39,6 +47,7 @@ export type ItemData = {
   highlight?: string;
   connect: boolean;
   expanded?: boolean;
+  missing?: boolean;
   fitContent?: boolean;
 };
 export type FrameData = { frame: RefFrame; dim: boolean };
@@ -58,9 +67,13 @@ const icons = {
 export function ReferenceActions({
   item,
   links,
+  editNote,
+  noteEditing = false,
 }: {
   item: RefItem;
   links: TargetChip[];
+  editNote?: () => void;
+  noteEditing?: boolean;
 }) {
   const runtime = useCanvas();
   const [open, setOpen] = useState(false);
@@ -106,7 +119,7 @@ export function ReferenceActions({
         summary.current?.focus();
       }}
     >
-      <summary ref={summary} aria-label={`Actions for ${item.title}`}>
+      <summary ref={summary} aria-label={`Actions for ${referenceLabel(item)}`}>
         <MoreHorizontal size={18} />
       </summary>
       <fieldset
@@ -115,9 +128,15 @@ export function ReferenceActions({
       >
         <button
           type="button"
-          onClick={() => activate(() => runtime.edit(item.id, "caption"))}
+          onClick={() =>
+            activate(() =>
+              item.kind === "note"
+                ? editNote?.()
+                : runtime.edit(item.id, "caption"),
+            )
+          }
         >
-          Edit caption
+          {item.kind === "note" ? "Edit note" : "Edit caption"}
         </button>
         <button
           type="button"
@@ -142,6 +161,12 @@ export function ReferenceActions({
         ))}
         <button
           type="button"
+          disabled={noteEditing}
+          title={
+            noteEditing
+              ? "Finish editing this note before archiving it"
+              : undefined
+          }
           onClick={() => activate(() => runtime.archive("item", item.id))}
         >
           Archive
@@ -158,8 +183,17 @@ export const ReferenceNode = memo(function ReferenceNode({
     runtime = useCanvas(),
     kind = referenceKind(item, path),
     Icon = icons[kind];
+  const editNote = useRef<(() => void) | null>(null);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const editingChanged = useCallback(
+    (active: boolean) => {
+      setNoteEditing(active);
+      runtime.noteEditing?.(item.id, active);
+    },
+    [item.id, runtime.noteEditing],
+  );
   const overview = useStore((s) => s.transform[2] < 0.4);
-  if (overview && !selected && !data.connect && !data.expanded)
+  if (overview && !selected && !data.connect && !data.expanded && !noteEditing)
     return (
       <article
         className="reference-overview-hit"
@@ -168,7 +202,7 @@ export const ReferenceNode = memo(function ReferenceNode({
         aria-label={
           kind +
           " reference: " +
-          item.title +
+          referenceLabel(item) +
           ", linked to " +
           links.map((l) => l.key).join(", ")
         }
@@ -188,7 +222,7 @@ export const ReferenceNode = memo(function ReferenceNode({
       className={`reference-card kind-${kind} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
       data-reference-id={item.id}
       data-highlighted={!!data.highlight}
-      aria-label={`${kind} reference: ${item.title}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
+      aria-label={`${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
       style={
         {
           opacity: data.dim ? 0.15 : 1,
@@ -207,8 +241,15 @@ export const ReferenceNode = memo(function ReferenceNode({
       <Handle type="target" position={Position.Left} isConnectable />
       <header className="reference-card-header">
         <Icon size={15} />
-        <strong>{item.title}</strong>
-        <ReferenceActions item={item} links={links} />
+        <strong className={kind === "note" ? "sticky-kind-label" : undefined}>
+          {kind === "note" ? "Note" : item.title}
+        </strong>
+        <ReferenceActions
+          item={item}
+          links={links}
+          editNote={() => editNote.current?.()}
+          noteEditing={noteEditing}
+        />
       </header>
       <div className="reference-content">
         {item.kind === "asset" ? (
@@ -252,7 +293,12 @@ export const ReferenceNode = memo(function ReferenceNode({
           </div>
         ) : null}
         {kind === "note" ? (
-          <NoteContent item={item} />
+          <NoteContent
+            item={item}
+            beginRef={editNote}
+            editingChanged={editingChanged}
+            unavailable={data.missing}
+          />
         ) : (
           <div className="reference-caption">
             <Markdown>{item.captionMd || ""}</Markdown>
@@ -283,63 +329,28 @@ export const ReferenceNode = memo(function ReferenceNode({
     </article>
   );
 });
-function NoteContent({ item }: { item: RefItem }) {
-  const [editing, setEditing] = useState(false),
-    [value, setValue] = useState(item.captionMd),
-    [error, setError] = useState("");
+function NoteContent({
+  item,
+  beginRef,
+  editingChanged,
+  unavailable,
+}: {
+  item: RefItem;
+  beginRef: RefObject<(() => void) | null>;
+  editingChanged(active: boolean): void;
+  unavailable?: boolean;
+}) {
   const runtime = useCanvas();
-  const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (editing) input.current?.focus();
-  }, [editing]);
-  const save = () =>
-    void runtime
-      .caption(item, value)
-      .then(() => setEditing(false))
-      .catch((e) => setError(String(e)));
-  if (editing)
-    return (
-      <div className="nodrag nowheel">
-        <textarea
-          aria-label="Note text"
-          ref={input}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setValue(item.captionMd);
-              setEditing(false);
-            }
-            if (e.ctrlKey && e.key === "s") {
-              e.preventDefault();
-              save();
-            }
-          }}
-        />
-        <button type="button" className="button secondary" onClick={save}>
-          Save note
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </div>
-    );
   return (
-    <button
-      type="button"
-      className="reference-note-text reference-caption nodrag"
-      onDoubleClick={() => {
-        setValue(item.captionMd);
-        setEditing(true);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          setValue(item.captionMd);
-          setEditing(true);
-        }
-      }}
-      aria-label={`Edit note ${item.title}`}
-    >
-      <Markdown>{item.captionMd}</Markdown>
-    </button>
+    <StickyEditor
+      key={item.id}
+      beginRef={beginRef}
+      editingChanged={editingChanged}
+      unavailable={unavailable}
+      item={item}
+      projectId={item.jamId}
+      confirmed={(saved, previous) => runtime.noteSaved?.(saved, previous)}
+    />
   );
 }
 export const ReferenceFrame = memo(function ReferenceFrame({

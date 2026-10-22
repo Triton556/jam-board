@@ -10,6 +10,8 @@ export type CanvasRuntime = {
   open(key: string): void;
   lightbox(url: string, title: string): void;
   edgeLabel(id: string, label: string): void;
+  noteEditing?(id: string, active: boolean): void;
+  noteSaved?(item: RefItem, previous?: RefItem): void;
   caption(item: RefItem, value: string): Promise<void>;
 };
 export const CanvasContext = createContext<CanvasRuntime | null>(null);

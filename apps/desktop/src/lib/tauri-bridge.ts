@@ -67,25 +67,28 @@ export const tauriApi: JamApi = {
   },
 
   referenceCanvas: () => unwrap(commands.referenceCanvas()),
-  addReference: (input) =>
+  addReference: (input, untitled) =>
     unwrap(
-      commands.addReference({
-        filePath: null,
-        url: null,
-        text: null,
-        title: null,
-        caption: null,
-        tags: null,
-        frameEpicKey: null,
-        frameId: null,
-        linkTo: null,
-        x: null,
-        y: null,
-        ...input,
-      }),
+      commands.addReference(
+        {
+          filePath: null,
+          url: null,
+          text: null,
+          title: null,
+          caption: null,
+          tags: null,
+          frameEpicKey: null,
+          frameId: null,
+          linkTo: null,
+          x: null,
+          y: null,
+          ...input,
+        },
+        untitled ?? null,
+      ),
     ),
-  updateReference: (itemId, patch) =>
-    unwrap(commands.updateReference({ itemId, ...patch })),
+  updateReference: (itemId, patch, expected) =>
+    unwrap(commands.updateReference({ itemId, ...patch }, expected ?? null)),
   linkReference: (itemId, targetKey) =>
     unwrap(commands.linkReference({ itemId, targetKey })),
   canvasGeometry: (input) => unwrap(commands.canvasGeometry(input)),

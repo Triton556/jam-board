@@ -190,7 +190,8 @@ export class MockBridge implements JamApi {
     save: () => this.checkpoint(),
   });
   referenceCanvas = () => this.canvas.snapshot();
-  addReference: JamApi["addReference"] = (input) => this.canvas.add(input);
+  addReference: JamApi["addReference"] = (input, untitled) =>
+    this.canvas.add(input, undefined, untitled);
   updateReference: JamApi["updateReference"] = (...a) =>
     this.canvas.update(...a);
   linkReference: JamApi["linkReference"] = (...a) => this.canvas.link(...a);
