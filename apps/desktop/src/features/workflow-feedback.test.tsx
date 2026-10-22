@@ -51,8 +51,12 @@ it("answering leaves a live receipt and focus after the open question disappears
       screen.queryByRole("article", { name: `Question: ${q.title}` }),
     ).toBeNull(),
   );
-  expect(screen.getByRole("status")).toHaveTextContent("Answer saved");
-  expect(screen.getByRole("status")).toHaveTextContent("does not start work");
+  expect(
+    screen.getByText(/Answer saved/, { selector: '[role="status"]' }),
+  ).toHaveTextContent("Answer saved");
+  expect(
+    screen.getByText(/Answer saved/, { selector: '[role="status"]' }),
+  ).toHaveTextContent("does not start work");
   expect(
     screen.getByRole("heading", { name: "Questions", level: 2 }),
   ).toHaveFocus();

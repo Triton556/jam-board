@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -104,8 +105,11 @@ it("inline submission captures values, blocks same-event duplicates and dismissa
   expect(
     screen.getByRole("button", { name: "Cancel new task" }),
   ).toBeDisabled();
-  expect(screen.getByRole("status")).toHaveFocus();
-  expect(screen.getByRole("status")).toHaveTextContent("Wait for the result");
+  const progress = within(
+    screen.getByRole("form", { name: "New table task" }),
+  ).getByRole("status");
+  expect(progress).toHaveFocus();
+  expect(progress).toHaveTextContent("Wait for the result");
   await h.user.keyboard("{Escape}{Enter}");
   act(() => window.dispatchEvent(new Event("table-new-task")));
   expect(screen.getByRole("textbox", { name: "New task title" })).toHaveValue(
@@ -115,10 +119,11 @@ it("inline submission captures values, blocks same-event duplicates and dismissa
   await waitFor(() =>
     expect(screen.queryByRole("form", { name: "New table task" })).toBeNull(),
   );
-  expect(screen.getByRole("status")).toHaveTextContent(
-    /Created JB-\d+ in Backlog/,
-  );
-  expect(screen.getByRole("status")).toHaveFocus();
+  const receipt = screen.getByText(/Created JB-\d+ in Backlog/, {
+    selector: '[role="status"]',
+  });
+  expect(receipt).toHaveTextContent(/Created JB-\d+ in Backlog/);
+  expect(receipt).toHaveFocus();
   expect(create).toHaveBeenCalledTimes(1);
 });
 it("known failure retains the whole draft, restores title focus and allows exactly one explicit retry", async () => {
@@ -192,7 +197,10 @@ it.each(["success", "failure"] as const)(
       "Newer unsaved task",
     );
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getAllByRole("status")).toEqual([
+      document.querySelector(".read-receipt"),
+    ]);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(useUiStore.getState().highlights).toEqual({});
     expect(useUiStore.getState().toasts).toEqual([]);
   },
@@ -242,7 +250,10 @@ it.each([false, true])(
     ).toBe(true);
     expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
     expect(useUiStore.getState().highlights).toEqual({});
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getAllByRole("status")).toEqual([
+      document.querySelector(".read-receipt"),
+    ]);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     await h.user.click(screen.getByRole("button", { name: "Cancel new task" }));
     await draft(h.user, "Fresh deliberate draft");
     expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
