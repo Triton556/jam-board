@@ -29,3 +29,11 @@ The standalone hook has one visible/current-project 30-second timer and an immed
 - Scoped Biome checks and `git diff --check`: **PASS**.
 
 Root integration, integrated full suite/typecheck, actual native visibility/minimize/restore, Windows rendering, light/dark open layout and human readability are **NOT RUN in this lane**. IntersectionObserver currently pauses animation for offscreen cards; it does not remove the status line. No animation-gating defect was reproduced here. Missing text and paused animation remain separate diagnostic branches.
+
+## Independent review correction (2026-10-22, 08:59 UTC)
+
+The initial `17e978d` hook had a confirmed cache overwrite race: a newer member observation that is structurally identical in the same millisecond preserves both the data reference and `dataUpdatedAt`. A pending older poll could therefore overwrite it. This defect was independently reproduced and is not evidence about the user's native incident.
+
+The corrected publication guard captures the exact query object, QueryState object and monotonic `dataUpdateCount`, plus a cache lifecycle generation for member-query add/remove events. All must still match before publication, in addition to the original project/ABA/visibility/mount/query-in-flight checks. The lifecycle generation also rejects an absent→created→removed cache cycle, where both endpoint query identities would otherwise be absent.
+
+Deterministic same-millisecond regression: **RED against 17e978d**, **GREEN against corrected source**. Added query removal/recreation, initially absent query with/without intervening lifecycle, and project ABA with an absent query. Final focused run: **46 PASS / 3 files**, including **15 hook tests**, `--maxWorkers=1`, 1.99 seconds. Scoped Biome and diff checks pass. Earlier 10-hook-test result did not cover this race. Integrated typecheck/full suite and native visible/restore/reduced-motion acceptance remain pending with the integration owner.

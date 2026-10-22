@@ -124,6 +124,71 @@ describe("H-B01 / AG10: bounded heartbeat cache renewal", () => {
     await flush();
     expect(client.getQueryData(["members"])).toEqual(data("newer"));
   });
+  it("rejects a stale poll after an identical newer observation in the same millisecond", async () => {
+    vi.setSystemTime(new Date("2026-10-22T08:00:00Z"));
+    client.setQueryData(["members"], data("latest"));
+    const pending = deferred<Members>();
+    vi.spyOn(api, "listMembers").mockReturnValue(pending.promise);
+    stop = startMemberPresenceRefresh(client);
+    const before = client.getQueryState(["members"]);
+    client.setQueryData(["members"], structuredClone(data("latest")));
+    const newer = client.getQueryState(["members"]);
+    if (!before || !newer) throw new Error("Expected existing member query");
+    expect(newer.data).toBe(before.data);
+    expect(newer.dataUpdatedAt).toBe(before.dataUpdatedAt);
+    expect(newer.dataUpdateCount).toBeGreaterThan(before.dataUpdateCount);
+    pending.resolve(data("old"));
+    await flush();
+    expect(client.getQueryData(["members"])).toEqual(data("latest"));
+  });
+  it("rejects a poll after member query removal and recreation", async () => {
+    const pending = deferred<Members>();
+    vi.spyOn(api, "listMembers").mockReturnValue(pending.promise);
+    stop = startMemberPresenceRefresh(client);
+    const before = client
+      .getQueryCache()
+      .find({ queryKey: ["members"], exact: true });
+    client.removeQueries({ queryKey: ["members"], exact: true });
+    client.setQueryData(["members"], data("cached"));
+    expect(
+      client.getQueryCache().find({ queryKey: ["members"], exact: true }),
+    ).not.toBe(before);
+    pending.resolve(data("old"));
+    await flush();
+    expect(client.getQueryData(["members"])).toEqual(data("cached"));
+  });
+  it.each([false, true])(
+    "handles an initially absent member query, lifecycle changed=%s",
+    async (changed) => {
+      client.removeQueries({ queryKey: ["members"], exact: true });
+      const pending = deferred<Members>();
+      vi.spyOn(api, "listMembers").mockReturnValue(pending.promise);
+      stop = startMemberPresenceRefresh(client);
+      if (changed) {
+        client.setQueryData(["members"], data("intermediate"));
+        client.removeQueries({ queryKey: ["members"], exact: true });
+      }
+      pending.resolve(data("fresh"));
+      await flush();
+      expect(client.getQueryData(["members"])).toEqual(
+        changed ? undefined : data("fresh"),
+      );
+    },
+  );
+  it("fences project ABA even with no initial member query", async () => {
+    client.removeQueries({ queryKey: ["members"], exact: true });
+    const pending = deferred<Members>();
+    vi.spyOn(api, "listMembers")
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(data("current"));
+    stop = startMemberPresenceRefresh(client);
+    select("B");
+    select("A");
+    pending.resolve(data("old"));
+    await flush();
+    await flush();
+    expect(client.getQueryData(["members"])).toEqual(data("current"));
+  });
   it("coalesces periodic reads and preserves data after errors before recovery", async () => {
     const pending = deferred<Members>();
     const read = vi
