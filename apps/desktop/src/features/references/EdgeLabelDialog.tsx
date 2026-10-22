@@ -18,6 +18,11 @@ export function EdgeLabelDialog({
 }) {
   const client = useQueryClient();
   const form = useRef<HTMLFormElement>(null);
+  // Let the child Dialog capture its real opener before focusing this editor.
+  // Native autoFocus runs earlier and would make the removed input its return target.
+  useEffect(() => {
+    form.current?.querySelector("input")?.focus();
+  }, []);
   const owner = useRef({
     mounted: true,
     invalidated: false,
@@ -91,7 +96,6 @@ export function EdgeLabelDialog({
         <label className="field">
           Label
           <input
-            autoFocus
             value={label}
             disabled={write.pending || write.checking}
             readOnly={!write.ready || !!write.error || !!refreshError}
