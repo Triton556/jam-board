@@ -77,6 +77,22 @@ fn assert_tools(tools: &[Tool]) {
         30
     );
     assert!(wait.output_schema.is_some());
+    let context = tools
+        .iter()
+        .find(|t| t.name == "get_session_context")
+        .unwrap();
+    let output = context.output_schema.as_ref().unwrap();
+    assert_eq!(
+        output["properties"]["latestActivityCursor"]["type"],
+        "integer"
+    );
+    assert_eq!(output["properties"]["latestActivityCursor"]["minimum"], 0);
+    assert!(
+        output["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("latestActivityCursor"))
+    );
     let create = tools.iter().find(|t| t.name == "create_task").unwrap();
     assert_eq!(
         create.input_schema["properties"]["storyKey"]["type"],
@@ -1275,6 +1291,26 @@ async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
     assert_eq!(context["projectId"], project_a.id);
     assert_eq!(context["keyPrefix"], project_a.key_prefix);
     assert_eq!(context["canSwitchProject"], false);
+    let expected_a = s
+        .for_project(&project_a.id)
+        .unwrap()
+        .list_changes_since(0, None)
+        .unwrap()
+        .last()
+        .map_or(0, |event| event.seq);
+    assert_eq!(context["latestActivityCursor"], expected_a);
+    assert!(
+        expected_a < s.latest_seq().unwrap(),
+        "foreign activity must not leak into the pinned high-water"
+    );
+    // UI churn cannot retarget the initialized session or its high-water.
+    s.select_project(&project_a.id).unwrap();
+    s.select_project(&project_b.id).unwrap();
+    let seq_before_read = s.latest_seq().unwrap();
+    let reread = data(call_fresh(&worker, "get_session_context", json!({})).await);
+    assert_eq!(reread, context);
+    assert_eq!(s.latest_seq().unwrap(), seq_before_read);
+
     assert_eq!(
         data(call_fresh(&worker, "get_board", json!({})).await)["jam"]["id"],
         project_a.id
@@ -1754,4 +1790,53 @@ async fn caller_captured_context_fences_every_task_write_and_missing_arguments_f
     assert_eq!(s.get_task(key).unwrap().task.status, "done");
     worker.cancel().await.unwrap();
     brain.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn board_and_epic_resources_share_bounded_observation_policy() {
+    let (_dir, store, human) = fixture();
+    let epic = store
+        .create_epic(
+            &human.id,
+            jam_core::NewEpic {
+                title: "Fictional policy scope".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let c = client(&store.path, "Policy reader").await;
+    let mut policies = Vec::new();
+    for (uri, heading) in [
+        ("jam://board".to_string(), "## Waiting as a brain\n"),
+        (format!("jam://epic/{}", epic.key), "## Journal\n\n"),
+    ] {
+        let resource = c
+            .read_resource(ReadResourceRequestParams::new(uri.clone()))
+            .await
+            .unwrap();
+        let value = serde_json::to_value(resource).unwrap();
+        let text = value["contents"][0]["text"].as_str().unwrap();
+        assert!(!text.contains("Recover with list_changes_since at turn start"));
+        let policy = text
+            .split_once(heading)
+            .unwrap()
+            .1
+            .split("\n\n")
+            .next()
+            .unwrap()
+            .trim();
+        for marker in [
+            "latestActivityCursor BEFORE",
+            "unprocessed checkpoints",
+            "excludeSelf=false",
+            "before checkpointing nextCursor",
+            "never infer rewind",
+            "No execution grant",
+        ] {
+            assert!(policy.contains(marker), "{uri} lacks {marker}");
+        }
+        policies.push(policy.to_owned());
+    }
+    assert_eq!(policies[0], policies[1], "Resources must share one policy");
+    c.cancel().await.unwrap();
 }

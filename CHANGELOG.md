@@ -3,6 +3,47 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.15] - 2026-10-21
+
+### Added
+
+- `get_session_context` now returns `latestActivityCursor`, the latest committed
+  activity sequence belonging to the pinned project (zero for no history). Identity
+  and high-water are read in the same snapshot; switching the human's selected
+  project cannot redirect the session. This is a bootstrap aid, not an execution
+  grant, per-project sequence counter or database-generation identity.
+
+### Improved
+
+- Plan/work/review prompts and board/epic resources now share bounded observation
+  guidance: retain saved project/scope/filter checkpoints, use inclusive
+  `wait_for_changes` pages, handle a page before saving its cursor, and use fresh
+  pre-baseline capture only when there is no unprocessed recovery checkpoint.
+  Continued observation requires an assigned role/request and ends at its stopping
+  condition; recovery does not create an extra monitoring assignment.
+- Removed default unbounded recovery and duplicate task/resource reads while
+  preserving complete decision evidence and captured claim/review validators.
+  Deliberate historical audit and the legacy API remain available unchanged.
+
+### Fixed
+
+- Kept Welcome's chunk-error screen component stable across empty-project shell
+  clock updates. Reload/Projects controls now retain their DOM identity and keyboard
+  focus instead of being replaced each second. This closes the independent alpha14
+  review regression; there is still no automatic reload or fake chunk retry.
+
+### Compatibility and verification
+
+- This adds a required output property on the new server's schema, not a new tool
+  or database migration. Tolerant older consumers may ignore it; strict/cached
+  output schemas need coordinated updates. Missing on an older server is not zero.
+- A saved scan cursor may exceed project high-water after foreign/nonmatching
+  events. Never treat that comparison as database rewind or overwrite recovery
+  progress. Pages cap event count, not bytes; continuous catch-up may not finish.
+- [Exact verification, source provenance and limitations](docs/verification/0.3.0-alpha.15.md).
+  Guidance is longer than alpha12; no measured token, model-quality or latency
+  improvement is claimed, and no automated checkpoint client was introduced.
+
 ## [0.3.0-alpha.14] - 2026-10-21
 
 ### Fixed

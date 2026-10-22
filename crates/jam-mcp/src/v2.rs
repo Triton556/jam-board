@@ -292,6 +292,9 @@ pub(crate) fn tools() -> Vec<Tool> {
     ]
 }
 
+// Shared by handoff resources and prompts so bootstrap/recovery policy stays aligned.
+pub(crate) const OBSERVATION_GUIDANCE: &str = "Use the human's established language. Verify get_session_context against the intended exact project ID before reads; matching names/prefixes are insufficient. Unknown/mismatched ID: stop and ask. Preserve saved cursor and project/epic/filter identity; never replace/reset unprocessed checkpoints. Fresh bootstrap only: capture latestActivityCursor BEFORE baseline reads, then replay; finish the baseline before checkpointing. No historical-audit shortcut. Missing differs from 0: older servers require conservative saved-checkpoint recovery, or cursor0 for genuinely new history. Recover with wait_for_changes(cursor, epicKey, includeProject=true, excludeSelf=false, timeoutSeconds=1), omitting actions/actorKind unless intentionally filtering. Handle each page before checkpointing nextCursor, including timeouts; drain until timedOut=true, not a short page, use timeoutSeconds=60 only if the assigned role/request requires continued observation. Finish/report at the assigned stopping condition; recovery creates no monitoring assignment. With epicKey, includeProject adds only project-wide human events; otherwise it does not narrow scope. Filters consume exclusions: widening needs explicit reconciliation. Foreign/nonmatching sequences advance nextCursor beyond project high-water; never infer rewind. No database-generation identity: restore needs explicit reconciliation, not automatic recovery. 100 events is not a byte cap; continuous catch-up may never finish. Checkpoint handled progress and honestly summarize incompleteness before context limits. Baseline/replay is neither atomic snapshot nor audit; deduplicate overlapping observations. Use targeted list_tasks/get_task while preserving required questions/comments/reports/reviews/linked evidence and inspected validators; resource duplication only for missing content. list_changes_since remains for deliberate audit. No execution grant or OS-session launch follows from bootstrap/waiting.";
+
 pub(crate) fn epic_markdown(tree: &EpicTree) -> String {
     let e = &tree.epic;
     let mut md = format!(
@@ -347,7 +350,8 @@ pub(crate) fn epic_markdown(tree: &EpicTree) -> String {
         md.push_str(&format!("- {} · {}\n", q.id, q.title));
     }
     md.push_str("\n## Journal\n\n");
-    md.push_str("Recover with list_changes_since at turn start. Then wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits; handle events, save nextCursor even on timeout, and repeat. Omit actions to observe every change.\n\n");
+    md.push_str(OBSERVATION_GUIDANCE);
+    md.push_str("\n\n");
     for event in &tree.journal {
         md.push_str(&format!("- {} · {}\n", event.created_at, event.sentence));
     }
@@ -447,12 +451,15 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
     md
 }
 pub(crate) fn prompt(name: &str) -> Option<String> {
-    Some(match name{
-    "plan_epic"=>"Read the connected tool schemas first. Optional agent-playbook procedures (requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md) are workflow guidance, not a protocol guarantee; older examples may omit required validators. If they are unavailable, use these instructions and the live schemas without installing anything automatically. Call get_session_context and verify the intended exact project ID before reading get_project/get_board; matching names or prefixes alone are not enough. If the intended ID is unknown or differs, stop and ask the human before reading the board. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Inspect the requested existing epic, its stories/tasks, questions, comments and linked sources before proposing changes; reconcile human edits without duplicating existing work. Create a draft epic only when a new one is intended. Use become_brain only for an unassigned epic after explicit appointment, never to replace another brain. Record the agreed participation/reviewer/workerModel, create or refine stories with intent cards and mandatory acceptance, and tasks with complete Goal, Context, Where, Changes, Tests, Boundaries and Result briefs. Activate complete epics/stories, check_ready and mark_ready for actionable tasks using expectedClaimGeneration and expectedUpdatedAt from get_task. Use those captured validators for every task edit/brief edit/status/archive intent; on conflict reread and reconcile instead of replaying, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Once the human starts a scope, coordinate workers within it without requesting approval for each worker. Never auto-launch OS sessions. Keep unresolved decisions visible as questions. Recover with list_changes_since at turn start; then use wait_for_changes with epicKey, includeProject=true and timeoutSeconds=60 for reports, answers and human edits. Handle events, save nextCursor even on timeout and repeat. Never invent the user's worker model.".into(),
-    "work_on_next_task"=>"Read the connected tool schemas first. Optional agent-playbook procedures such as brief-writing.md are workflow guidance, not a protocol guarantee; older examples may omit required validators. If unavailable, use these instructions and the live schemas without installing anything automatically. Call get_session_context and verify the intended exact project ID before get_board or list_tasks with status=[ready]; matching names or prefixes alone are not enough. If the intended ID is unknown or differs, stop and ask the human before reading the board. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task and jam://task/{key}, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. Supply expectedClaimGeneration and expectedUpdatedAt from the task you inspected; retain the returned claimGeneration for this work attempt. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. submit_report with expectedClaimGeneration from that claim, summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. A stale_claim/conflict means the context changed: reread and reconcile, never fetch a new token merely to replay old evidence. Task edits, brief edits, moves, Ready and archive require both expectedClaimGeneration and expectedUpdatedAt from the context you decided against. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
-    "review_task"=>"Read the connected tool schemas first. Optional agent-playbook procedures such as task-brief-and-acceptance.md are workflow guidance, not a protocol guarantee; older examples may omit required validators. If unavailable, use these instructions and the live schemas without installing anything automatically. Call get_session_context and verify the intended exact project ID before inspecting tasks; matching names or prefixes alone are not enough. If the intended ID is unknown or differs, stop and ask the human before reading the board. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Retain the exact report ID and TaskDetail.reviewContextRevision while assessing it. Call review_task with expectedReportId and expectedReviewContextRevision from that inspected snapshot, never an auto-refreshed latest token; on conflict inspect the new context and reconsider. Use accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and use wait_for_changes (timeoutSeconds=60) for human corrections; save nextCursor and repeat. Use list_changes_since for recovery at turn start.".into(),
+    let mut text: String = match name{
+    "plan_epic"=>"Read the connected tool schemas first. Optional agent-playbook procedures (requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md) are workflow guidance, not a protocol guarantee; older examples may omit required validators. If they are unavailable, use these instructions and the live schemas without installing anything automatically. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Inspect the requested existing epic, its stories/tasks, questions, comments and linked sources before proposing changes; reconcile human edits without duplicating existing work. Create a draft epic only when a new one is intended. Use become_brain only for an unassigned epic after explicit appointment, never to replace another brain. Record the agreed participation/reviewer/workerModel, create or refine stories with intent cards and mandatory acceptance, and tasks with complete Goal, Context, Where, Changes, Tests, Boundaries and Result briefs. Activate complete epics/stories, check_ready and mark_ready for actionable tasks using expectedClaimGeneration and expectedUpdatedAt from get_task. Use those captured validators for every task edit/brief edit/status/archive intent; on conflict reread and reconcile instead of replaying, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Once the human starts a scope, coordinate workers within it without requesting approval for each worker. Keep unresolved decisions visible as questions. Never invent the user's worker model.".into(),
+    "work_on_next_task"=>"Read the connected tool schemas first. Optional agent-playbook procedures such as brief-writing.md are workflow guidance, not a protocol guarantee; older examples may omit required validators. If unavailable, use these instructions and the live schemas without installing anything automatically. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. Supply expectedClaimGeneration and expectedUpdatedAt from the task you inspected; retain the returned claimGeneration for this work attempt. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. submit_report with expectedClaimGeneration from that claim, summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. A stale_claim/conflict means the context changed: reread and reconcile, never fetch a new token merely to replay old evidence. Task edits, brief edits, moves, Ready and archive require both expectedClaimGeneration and expectedUpdatedAt from the context you decided against. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
+    "review_task"=>"Read the connected tool schemas first. Optional agent-playbook procedures such as task-brief-and-acceptance.md are workflow guidance, not a protocol guarantee; older examples may omit required validators. If unavailable, use these instructions and the live schemas without installing anything automatically. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Retain the exact report ID and TaskDetail.reviewContextRevision while assessing it. Call review_task with expectedReportId and expectedReviewContextRevision from that inspected snapshot, never an auto-refreshed latest token; on conflict inspect the new context and reconsider. Use accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and follow the shared observation policy below for human corrections and recovery.".into(),
     _=>return None,
-})
+};
+    text.push_str("\n\n");
+    text.push_str(OBSERVATION_GUIDANCE);
+    Some(text)
 }
 
 #[cfg(test)]
@@ -467,7 +474,7 @@ mod tests {
             assert!(text.contains("Optional agent-playbook"));
             assert!(text.contains("without installing anything automatically"));
             assert!(text.contains("intended exact project ID"));
-            assert!(text.contains("matching names or prefixes alone are not enough"));
+            assert!(text.contains("matching names/prefixes are insufficient"));
             assert!(!text.contains("1.1.0"));
             if name == "plan_epic" {
                 assert!(text.contains("Inspect the requested existing epic"));
@@ -569,5 +576,59 @@ impl AgentReady {
             expected_claim_generation: self.expected_claim_generation.clone(),
             expected_updated_at: self.expected_updated_at.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod observation_guidance_tests {
+    use super::*;
+
+    #[test]
+    fn prompts_preserve_bootstrap_recovery_and_evidence_boundaries() {
+        for name in ["plan_epic", "work_on_next_task", "review_task"] {
+            let text = prompt(name).unwrap();
+            // Assert operational boundaries, not a verbatim long prose snapshot.
+            for required in [
+                "intended exact project ID",
+                "BEFORE baseline reads",
+                "finish the baseline before checkpointing",
+                "never replace/reset unprocessed checkpoints",
+                "project/epic/filter identity",
+                "excludeSelf=false",
+                "timeoutSeconds=1",
+                "timeoutSeconds=60 only if the assigned role/request",
+                "Finish/report at the assigned stopping condition",
+                "recovery creates no monitoring assignment",
+                "before checkpointing nextCursor",
+                "until timedOut=true, not a short page",
+                "project-wide human events",
+                "widening needs explicit reconciliation",
+                "beyond project high-water; never infer rewind",
+                "not automatic recovery",
+                "Missing differs from 0",
+                "not a byte cap",
+                "catch-up may never finish",
+                "summarize incompleteness",
+                "neither atomic snapshot nor audit",
+                "questions/comments/reports/reviews/linked evidence",
+                "inspected validators",
+                "established language",
+                "No execution grant or OS-session launch",
+            ] {
+                assert!(text.contains(required), "{name} missing {required}");
+            }
+            assert!(!text.contains("Recover with list_changes_since at turn start"));
+            assert!(!text.contains("Read get_task and jam://task/{key}"));
+        }
+        assert!(
+            prompt("review_task")
+                .unwrap()
+                .contains("expectedReviewContextRevision")
+        );
+        assert!(
+            prompt("work_on_next_task")
+                .unwrap()
+                .contains("effectiveState=running")
+        );
     }
 }

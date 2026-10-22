@@ -26,6 +26,9 @@ struct SessionContext {
     project_name: String,
     binding: String,
     can_switch_project: bool,
+    /// Project-filtered global activity high-water; capture before fresh baseline reads.
+    #[schemars(range(min = 0))]
+    latest_activity_cursor: i64,
 }
 
 #[derive(Clone)]
@@ -146,13 +149,14 @@ impl JamServer {
         match name {
             "get_session_context" => {
                 parse::<Empty>(args)?;
-                let project = store.active_jam()?;
+                let (project, latest_activity_cursor) = store.project_activity_context()?;
                 value(SessionContext {
                     project_id: project.id,
                     key_prefix: project.key_prefix,
                     project_name: project.name,
                     binding: "session".into(),
                     can_switch_project: false,
+                    latest_activity_cursor,
                 })
             }
             "get_board" => {
@@ -363,7 +367,7 @@ fn tools() -> Vec<Tool> {
     let mut list = vec![
         tool::<Empty>(
             "get_session_context",
-            "Read this session's pinned project identity. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
+            "Read this session's pinned project identity and project-filtered latestActivityCursor in one snapshot. Capture the cursor before fresh current-state reads; never replace an unprocessed saved recovery cursor. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
             true,
         ),
         tool::<Empty>(
@@ -600,7 +604,9 @@ impl ServerHandler for JamServer {
                             ));
                         }
                     }
-                    md.push_str("\n## Waiting as a brain\nRecover with list_changes_since at turn start, then call wait_for_changes (timeoutSeconds=60) for reports, answers and human edits. Handle events, save nextCursor even on timeout, and repeat. With epicKey, includeProject=true also observes project-wide human events.\n");
+                    md.push_str("\n## Waiting as a brain\n");
+                    md.push_str(crate::v2::OBSERVATION_GUIDANCE);
+                    md.push('\n');
                     Ok(md)
                 } else if let Some(key) = uri.strip_prefix("jam://epic/") {
                     Ok(crate::v2::epic_markdown(&store.get_epic(key)?))

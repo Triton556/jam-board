@@ -152,9 +152,17 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
     let (first, h) = s
         .create_jam("HTTP first", None, None, None, "UTC", "Human")
         .unwrap();
-    let (second, _) = s
+    let (second, second_human) = s
         .create_jam("HTTP second", None, None, None, "UTC", "Other human")
         .unwrap();
+    s.create_epic(
+        &second_human.id,
+        jam_core::NewEpic {
+            title: "Foreign pre-bootstrap event".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let bearer = token(d.path()).unwrap();
     let server = start_http(
         s.clone(),
@@ -189,13 +197,68 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
         CallToolRequestParams::new("get_session_context")
             .with_arguments(serde_json::json!({}).as_object().unwrap().clone())
     };
+    // First tool call may register the agent. Establish a later foreign event
+    // after that existing presence behavior, not before session initialization.
+    assert_ne!(client.call_tool(read()).await.unwrap().is_error, Some(true));
+    s.set_status(
+        &second_human.id,
+        "Fictional foreign project observation",
+        None,
+    )
+    .unwrap();
     let result = client.call_tool(read()).await.unwrap();
-    assert_eq!(result.structured_content.unwrap()["projectId"], first.id);
+    let context = result.structured_content.unwrap();
+    assert_eq!(context["projectId"], first.id);
+    let expected = s
+        .for_project(&first.id)
+        .unwrap()
+        .list_changes_since(0, None)
+        .unwrap()
+        .last()
+        .map_or(0, |event| event.seq);
+    assert_eq!(context["latestActivityCursor"], expected);
+    assert!(expected < s.latest_seq().unwrap());
+    assert_session_context_compatibility(&context);
+    let tools = client.list_all_tools().await.unwrap();
+    let output = tools
+        .iter()
+        .find(|t| t.name == "get_session_context")
+        .unwrap()
+        .output_schema
+        .as_ref()
+        .unwrap();
+    let expected_properties: Vec<String> =
+        serde_json::from_str(include_str!("fixtures/session-context-properties.json")).unwrap();
+    let mut actual_properties = output["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    actual_properties.sort();
+    assert_eq!(actual_properties, expected_properties);
+    assert_eq!(
+        output["properties"]["latestActivityCursor"]["type"],
+        "integer"
+    );
+    assert_eq!(output["properties"]["latestActivityCursor"]["minimum"], 0);
+    assert!(
+        output["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("latestActivityCursor"))
+    );
     assert_eq!(s.active_jam().unwrap().id, second.id);
     s.select_project(&first.id).unwrap();
     s.select_project(&second.id).unwrap();
+    let before = s.latest_seq().unwrap();
     let result = client.call_tool(read()).await.unwrap();
-    assert_eq!(result.structured_content.unwrap()["projectId"], first.id);
+    assert_eq!(result.structured_content.unwrap(), context);
+    assert_eq!(
+        s.latest_seq().unwrap(),
+        before,
+        "context reads add no activity"
+    );
     // Agent changes still land in the pinned first project.
     let created = client
         .call_tool(
@@ -209,9 +272,33 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
         .await
         .unwrap();
     assert_eq!(created.structured_content.unwrap()["jamId"], first.id);
-    assert_eq!(s.get_project().unwrap().epics, 0);
+    assert_eq!(s.get_project().unwrap().epics, 1);
     let pinned = s.for_project(&first.id).unwrap();
     assert_eq!(pinned.get_project().unwrap().epics, 1);
+    let own_latest = pinned
+        .list_changes_since(0, None)
+        .unwrap()
+        .last()
+        .unwrap()
+        .seq;
+    assert!(own_latest > expected);
+    s.create_epic(
+        &second_human.id,
+        jam_core::NewEpic {
+            title: "Foreign post-bootstrap event".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(s.latest_seq().unwrap() > own_latest);
+    let advanced_context = client
+        .call_tool(read())
+        .await
+        .unwrap()
+        .structured_content
+        .unwrap();
+    assert_eq!(advanced_context["projectId"], first.id);
+    assert_eq!(advanced_context["latestActivityCursor"], own_latest);
     assert!(
         pinned
             .list_members()
@@ -628,4 +715,52 @@ async fn http_rejects_old_generation_after_same_identity_reclaim_and_never_fills
     assert_ne!(report.is_error, Some(true));
     client.cancel().await.unwrap();
     server.stop().await;
+}
+
+// Compatibility is a client boundary, not a promise that every cached old schema accepts additions.
+fn assert_session_context_compatibility(context: &serde_json::Value) {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct TolerantOldContext {
+        project_id: String,
+    }
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    #[allow(dead_code)]
+    struct StrictOldContext {
+        project_id: String,
+        key_prefix: String,
+        project_name: String,
+        binding: String,
+        can_switch_project: bool,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CrossVersionContext {
+        latest_activity_cursor: Option<i64>,
+    }
+    let tolerant: TolerantOldContext = serde_json::from_value(context.clone()).unwrap();
+    assert_eq!(tolerant.project_id, context["projectId"]);
+    let strict = serde_json::from_value::<StrictOldContext>(context.clone()).unwrap_err();
+    assert!(strict.to_string().contains("latestActivityCursor"));
+    let mut older_server = context.clone();
+    older_server
+        .as_object_mut()
+        .unwrap()
+        .remove("latestActivityCursor");
+    serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap();
+    assert!(
+        serde_json::from_value::<CrossVersionContext>(older_server)
+            .unwrap()
+            .latest_activity_cursor
+            .is_none()
+    );
+    let mut empty_project = context.clone();
+    empty_project["latestActivityCursor"] = serde_json::json!(0);
+    assert_eq!(
+        serde_json::from_value::<CrossVersionContext>(empty_project)
+            .unwrap()
+            .latest_activity_cursor,
+        Some(0)
+    );
 }
