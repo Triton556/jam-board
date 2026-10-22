@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { Dialog, modalTabStops } from "./controls";
 
 it("modal tab stops include closed disclosure summaries but not hidden, inert or negative-tabindex descendants", () => {
@@ -64,4 +64,27 @@ it("Tab wraps around visible controls rather than focusing a hidden earlier-repo
   expect(summary).toHaveFocus();
   await user.tab();
   expect(screen.getByRole("button", { name: "Close Evidence" })).toHaveFocus();
+});
+
+it("busy dialogs expose pending state and cannot dismiss until the operation settles", async () => {
+  const close = vi.fn(),
+    user = userEvent.setup();
+  const tree = (busy: boolean) => (
+    <Dialog title="Saving draft" onClose={close} busy={busy}>
+      <p>Saving…</p>
+    </Dialog>
+  );
+  const view = render(tree(true));
+  const dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveAttribute("aria-busy", "true");
+  expect(
+    screen.getByRole("button", { name: "Close Saving draft" }),
+  ).toBeDisabled();
+  await user.keyboard("{Escape}");
+  fireEvent.mouseDown(dialog.parentElement as HTMLElement);
+  expect(close).not.toHaveBeenCalled();
+  view.rerender(tree(false));
+  expect(dialog).not.toHaveAttribute("aria-busy");
+  await user.click(screen.getByRole("button", { name: "Close Saving draft" }));
+  expect(close).toHaveBeenCalledTimes(1);
 });

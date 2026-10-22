@@ -102,6 +102,7 @@ export function ReleaseClaim({
       {confirmation && (
         <Dialog
           title={`Return ${confirmation.task.key} to Backlog?`}
+          busy={release.isPending}
           onClose={() => {
             if (!release.isPending) setConfirmation(null);
           }}

@@ -206,6 +206,7 @@ export function ExecutionControls({ scope }: { scope: ExecutionScope }) {
       {confirmation && (
         <Dialog
           title={`Start ${confirmation.state.scopeKey}?`}
+          busy={change.isPending}
           onClose={() => {
             if (!change.isPending) setConfirmation(null);
           }}

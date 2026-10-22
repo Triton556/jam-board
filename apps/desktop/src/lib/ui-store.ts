@@ -24,6 +24,7 @@ type UiState = {
   setQuickColumn(status: string | null): void;
   receive(events: ActivityEvent[]): void;
   error(text: string): void;
+  notify(text: string): void;
   tick(now: number): void;
   pauseToast(id: string, pause: boolean): void;
 };
@@ -120,6 +121,13 @@ export const useUiStore = create<UiState>((set) => ({
       };
     }),
   error: (text) =>
+    set((s) => ({
+      toasts: [
+        ...s.toasts,
+        { id: crypto.randomUUID(), text, until: Date.now() + 5000 },
+      ].slice(-3),
+    })),
+  notify: (text) =>
     set((s) => ({
       toasts: [
         ...s.toasts,

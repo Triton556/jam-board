@@ -468,3 +468,25 @@
   max-height: 180px;
   overflow-y: auto;
 }
+
+/* Evidence must remain readable inside both the task drawer and review dialog. */
+.report-command {
+  display: block;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.review-captured-report .report-tests {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.review-decision-dialog {
+  width: 760px;
+}
+.report-tests td {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

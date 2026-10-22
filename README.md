@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.5**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.6**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.5.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.6.md).
 
 ## Features
 

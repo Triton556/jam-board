@@ -126,13 +126,18 @@ export function Dialog({
   children,
   onClose,
   className = "",
+  busy = false,
 }: {
   title: string;
   children: ReactNode;
   onClose(): void;
   className?: string;
+  busy?: boolean;
 }) {
-  const ref = useModal(onClose);
+  const close = () => {
+    if (!busy) onClose();
+  };
+  const ref = useModal(close);
   const id = useId();
   return createPortal(
     // biome-ignore lint/a11y/noStaticElementInteractions: Only direct backdrop clicks close; Escape and the close button provide keyboard access.
@@ -140,20 +145,21 @@ export function Dialog({
       className="dialog-backdrop"
       role="presentation"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div
         className={`dialog ${className}`}
         role="dialog"
         aria-modal="true"
+        aria-busy={busy || undefined}
         aria-labelledby={id}
         tabIndex={-1}
         ref={ref}
       >
         <div className="dialog-heading">
           <h2 id={id}>{title}</h2>
-          <IconButton label={`Close ${title}`} onClick={onClose}>
+          <IconButton label={`Close ${title}`} onClick={close} disabled={busy}>
             <X />
           </IconButton>
         </div>
