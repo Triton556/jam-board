@@ -16,9 +16,9 @@
 | HF06 | Dirty description/technical edit → Escape/Back/project navigation | Existing discard/save contract preserved; read-only archived state enforced | No hidden footer or accidental focus behind dialog |
 | RF01 | H-R01: truly empty → create only frame → archive last content | Empty illustration disappears after frame; returns only for genuine empty active canvas | No chibi covering frame; filtered state distinguishable |
 | RF02 | H-R02: frame + child node → grip move/resize/collapse/edit/archive/undo | Parent and child positions correct; controls don't start drag; undo scoped | Visible grip at 39/40/75/100% canvas zoom; target size and focus measured |
-| RF03 | H-R01/R04: proposed Add note → inline title/body → save/cancel | Immediate edit, intentional empty/cancel policy, one create/write; failed/ambiguous save preserves draft and reconciles | Typing/selection/scroll doesn't pan/zoom/drag canvas; no guessing double click |
+| RF03 | H-R01/R04: Add note → inline title/body → save/cancel | Immediate edit, intentional empty/cancel policy, one create/write; failed/ambiguous save preserves draft and reconciles | Typing/selection/scroll doesn't pan/zoom/drag canvas; no guessing double click |
 | RF04 | H-R03/R06: reference menu → edit/link dropdown; edge label → failed submit | Correct reference/edge changed once, error in active layer, retained draft | Dropdown/field/footer remain reachable at lower viewport edge |
-| NT01 | H-G03 proposed bell → history → View → back; project switches during event delivery | Declared retention/unread policy, deduplication, exact project/entity destination; stale/deleted target explained | Keyboard open/close, empty/long/error history, timestamp/context, no focus theft on arrival |
+| NT01 | H-G03 bell → history → View → back; project switches during event delivery | Declared retention/unread policy, deduplication, exact project/entity destination; stale/deleted target explained | Keyboard open/close, empty/long/error history, timestamp/context, no focus theft on arrival |
 | KB01 | H-D11: task → Add reference picker → New link/note dialog → cancel each layer | Escape removes only top layer; parent state retained; focus returns one layer at a time | Visible focus, background inert; no clipped child overlay |
 | KB02 | H-B02: task Status save relocates card → close → Enter | Focus replacement same-task card or stable Board fallback; no later refetch focus theft | Light/dark active-vs-selected dropdown highlight |
 | KB03 | H-D04/D01: actions menu / custom select / native date picker → Escape | Each surface follows its correct top-layer contract; native picker not assumed same as DOM popup | Native package evidence for native picker; pointer and keyboard separately |
@@ -138,3 +138,17 @@ newer-update reveal and explicit read watermark, exact View validation/question
 focus, cancelled scopes and recoverable reads/navigation. Candidate independent
 review closed latest/older overlap and suppressed navigation-failure feedback;
 this does not establish toast delivery or human approval.
+
+## Alpha32 visual/readability acceptance delta
+
+H-B01 / AS02 / VS02: all five columns distinguish “No tasks yet” from filtered
+“No matching tasks”; Quick create removes the empty hint. Confirm 14px text,
+medium/semibold weight, long-card wrapping and zero claim/move/execution effects.
+The dedicated Board DOM cases pass; narrow800×600 light/dark browser cases are
+prepared/typechecked, NOT RUN until hosted execution. Token contrast calculations
+exclude grain/compositing and do not establish rendered contrast certification.
+
+H-R02 / RF02 / VS03: inspect new frame boundary/header in light and dark, selected
+and unselected, at39/40/75/100% and fractional/high zoom. Verify one representation,
+clear grouping, readable title, unobstructed children/pan, grip/resize/collapse,
+and unchanged persisted reference content; source/style assertions are not pixels.

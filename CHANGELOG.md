@@ -3,6 +3,24 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.32] — 2026-10-22
+
+### Readable empty columns and calmer reference frames
+
+- Empty Kanban columns use a short genuine-empty or filtered-empty message,
+  larger medium/semibold text and concise subtitles. Scope controls retain the
+  Ready/Start/claim distinction; no status, assignment or permission rule changes.
+- Reference frames use one rounded, quiet theme-aware boundary and readable paper
+  header with clear grip and consistent controls. Selected/focused frames remain
+  distinct; interiors remain available to child manipulation and canvas gestures.
+- The same live frame representation remains at overview zoom; only duplicate
+  raster frame/title drawing is removed. Existing raster cards/edges, reference
+  content, image-resolution selection and inline-note safeguards are unchanged.
+
+This is a visual/readability candidate, not a claim that all canvas blur or hidden
+surface issues are solved. Native geometry, gestures and zoom evidence remain
+separate from DOM/style checks. [Verification](docs/verification/0.3.0-alpha.32.md).
+
 ## [0.3.0-alpha.31] — 2026-10-22
 
 ### Understandable coordination and revealed surfaces

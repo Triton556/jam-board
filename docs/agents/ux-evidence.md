@@ -25,3 +25,13 @@
 ## Research maintenance
 
 For future design changes add source URL, publication/update date if available, access date, a short supported principle, the actual Jam Board decision and stable test IDs. Do not send private task text, account details or repository secrets to web search. If a source changes, evaluate the relevant behavior rather than mechanically updating styles. Accessibility and usability require testing the implementation, not citing guidance.
+
+## Frame grouping and state distinction (alpha32 candidate)
+
+[Figma frames](https://help.figma.com/hc/en-us/articles/360041539473-Frames-in-Figma-Design)
+clarify the container role; [Atlassian border guidance](https://atlassian.design/foundations/border)
+distinguishes ordinary boundaries from interaction/state emphasis. Applied here:
+a restrained single frame outline and paper title, with stronger selected/focus
+cues and unchanged child/canvas gestures. These sources justify hierarchy, not a
+claim that our actual rendered frame is visually accepted. Native light/dark and
+low-zoom title/control overlap remain explicit acceptance checks.

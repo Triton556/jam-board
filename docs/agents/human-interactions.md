@@ -94,3 +94,14 @@ H-B01 distinguishes claimed agent activity, human assignment, unavailable holder
 Execution unconfirmed and Awaiting review. Review never borrows the old worker
 animation. Generic scoped nonassignee text is timestamped last-reported activity,
 not proof of a reviewer/claim. No new focus/modal depth. [Evidence and limits](../live-card-presence.md).
+
+## Alpha32 candidate: H-B01 and H-R02
+
+Empty columns use short genuine-empty versus filtered-empty text, readable weight
+and concise subtitles; Quick create still replaces its column's empty hint. Ready,
+Start and claim semantics remain in scope/readiness controls, not repeated in long
+column prose. Frames now have a single live rounded boundary/header at all zooms, a broad
+grip and selected/focus cues; the interior remains pointer-transparent. Duplicate
+raster frame/title output is removed, while cards/edges and all inline-draft
+safeguards remain unchanged. See the [alpha32 record](../verification/0.3.0-alpha.32.md)
+for exact source and observed versus pending evidence.
