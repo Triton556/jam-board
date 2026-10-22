@@ -352,50 +352,81 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  fill: none;
-  stroke: var(--reference-color);
-  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--reference-color) 4%, transparent);
+  stroke: color-mix(in srgb, var(--reference-color) 22%, var(--line-soft));
+  stroke-width: 1;
   pointer-events: none;
 }
 .reference-frame-tab {
   transform-origin: left bottom;
   position: absolute;
   left: 0;
-  top: -42px;
+  top: -46px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 200px;
   box-sizing: border-box;
   background: var(--paper);
-  border: 1.5px solid var(--reference-color);
-  border-radius: 7px;
-  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 12px;
   pointer-events: auto;
+  color: var(--ink);
   font-family: "Fraunces Variable", serif;
   font-size: 16px;
+  line-height: 1.3;
   cursor: grab;
   white-space: nowrap;
 }
-.reference-frame-tab span {
+.reference-frame-tab:active {
+  cursor: grabbing;
+}
+.reference-frame-title {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
 }
 .reference-frame-tab button {
-  min-width: 30px;
-  min-height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
   padding: 3px;
   border: 0;
+  border-radius: 6px;
   background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.reference-frame-tab button:hover {
   color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
-.reference-frame-overview .reference-frame-outline {
-  visibility: hidden;
+.reference-frame-tab button:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
 }
-.reference-frame-overview .reference-frame-tab {
-  opacity: 1;
+.reference-frame:has(:where(.reference-frame-tab:hover))
+  .reference-frame-outline {
+  stroke: var(--ink-2);
+}
+.reference-frame-tab:hover,
+.reference-frame-tab:focus-within {
+  border-color: var(--line-soft);
+  background: var(--card);
+}
+.reference-frame.selected .reference-frame-outline,
+.references-page
+  .react-flow__node-frame:focus-visible
+  .reference-frame-outline {
+  stroke: var(--coral);
+  stroke-width: 2;
 }
 .reference-frame.collapsed .reference-frame-tab {
   top: 0;
@@ -608,6 +639,7 @@ p.reference-read-notice {
 }
 .reference-frame-grip {
   flex-shrink: 0;
+  color: var(--ink-2);
 }
 .reference-note-draft {
   z-index: 2100;
@@ -644,5 +676,5 @@ p.reference-read-notice {
   display: none;
 }
 .reference-frame-tab:focus-within button {
-  display: block;
+  display: grid;
 }
