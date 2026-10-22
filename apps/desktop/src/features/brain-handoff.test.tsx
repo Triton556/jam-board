@@ -281,8 +281,9 @@ it("AG02 continuation is smaller without dropping identity, stale intent or plan
     "no claims",
     "do not replace it",
     "EMPTY task Description",
-    "preserve existing human text",
-    "my language",
+    "Preserve existing human text and wishes.",
+    "language of my original notes or latest human request",
+    "if unclear, ask which language",
     "can remain in chat",
   ])
     expect(short).toContain(text);

@@ -24,7 +24,7 @@ Legend: `D0` base route; `D1` revealed editor/menu/modal; `D2+` nested layers. E
 |---|---|---|---|---|
 | G01 | App rail → Search & commands dialog | Search text → task/navigation command results | Loading chunk, empty matches, results failure; Escape then opener focus; executing task opens correct drawer, no duplicate overlay | `app.tsx`; `command/CommandCenter.tsx`; `CommandPalette.tsx` |
 | G02 | App → Keyboard shortcuts dialog | Shortcut list; no nested mutation | Escape/close; hotkeys inactive in text fields and while incompatible modal open; modal tab loop | `command/CommandCenter.tsx`; `lib/shortcuts.ts` |
-| G03 | App → notification toast | File details disclosure; View → task drawer/Inbox; dismiss persistent receipt | Hover/focus pause, expiration, three-notice eviction, dismissal focus, error visibility under modal | `app.tsx:652–750`; `lib/ui-store.ts` |
+| G03 | App → transient toast or Project notifications bell | File receipt details remain separate; bell → paginated persisted agent updates → exact task/question View; explicit read watermark | Pending/read-error/older-latest races, partial history, project/ABA cancellation, route failure recovery, keyboard return; never claims toast delivery | `features/notifications/NotificationBell.tsx`; `app.tsx`; `lib/ui-store.ts` |
 | G04 | App → project-name control → Your projects | Active/Archived list → Restore & open / New project | Initial error retry, empty each list, selection pending, lost-response reread, back to current project; agents remain pinned | `projects/ProjectsPage.tsx`; `lib/project-selection.ts` |
 | O01 | `/welcome` → project setup steps | Template/timing controls → create | Back between steps, existing project return, validation, pending/error; no accidental demo replacing current work | `onboarding/Welcome.tsx`; `ProjectTiming.tsx` |
 | P01 | `/plan` → epic rail filter / selected epic | New epic dialog → create; epic menu → copy actions | Empty plan vs failed read; Draft/Archived visibility; long title/brain labels at narrow width | `plan/PlanPage.tsx:130–310,360+` |
@@ -87,3 +87,10 @@ read-only image retry does not change references. See [alpha30 verification](../
 ## Alpha31 candidate: H-P07
 
 Refine opens a captured target, explicit setup/continuation radio group, local What should change? request and selectable preview. Close/mode/project-return retain request per immutable target within this app session; copy failure retains it; pending Copy prevents overlapping input, and old completion cannot announce into another preview. No board write/launch. [Details and evidence](refinement-modes.md).
+
+## Alpha31 card presence
+
+H-B01 distinguishes claimed agent activity, human assignment, unavailable holder,
+Execution unconfirmed and Awaiting review. Review never borrows the old worker
+animation. Generic scoped nonassignee text is timestamped last-reported activity,
+not proof of a reviewer/claim. No new focus/modal depth. [Evidence and limits](../live-card-presence.md).

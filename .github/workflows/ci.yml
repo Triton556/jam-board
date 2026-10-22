@@ -34,7 +34,7 @@ jobs:
       - run: npm ci
         working-directory: apps/desktop
       - name: Check release version consistency
-        run: node scripts/check-versions.mjs && node --test scripts/check-versions.test.mjs scripts/smoke-contracts.test.mjs scripts/smoke-stdio.test.mjs
+        run: node scripts/check-versions.mjs && node --test scripts/check-versions.test.mjs scripts/smoke-contracts.test.mjs scripts/smoke-stdio.test.mjs scripts/check-interaction-map.test.mjs
       - name: Prepare sidecar for Tauri resource validation
         run: npm run prepare:sidecar
         working-directory: apps/desktop

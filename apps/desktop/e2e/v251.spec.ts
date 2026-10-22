@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("working presence is live, scoped, quiet when stale, and absent after clear/offline", async ({
+test("working presence is live and scoped; cleared/offline cards remain explicitly unconfirmed", async ({
   page,
 }) => {
   await page.goto("/");
@@ -21,7 +21,18 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
     return task.key;
   });
   const card = page.locator(`[data-testid="task-card"][data-key="${key}"]`);
-  await expect(card.getByTestId("working-line")).toHaveCount(0);
+  await expect(card.getByTestId("working-line")).toHaveText(
+    "Worker · task activity unconfirmed",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
   await page.evaluate(
     async (key) =>
       window.__jamMock.simulateAgent({
@@ -116,7 +127,8 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
   await expect(card.getByTestId("working-line")).toHaveText(
     "Worker · last update 42 min ago",
   );
-  await expect(card.locator(".working-ring")).toHaveCSS(
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
     "animation-name",
     "none",
   );
@@ -149,7 +161,8 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
     "data-mode",
     "quiet",
   );
-  await expect(card.locator(".working-ring")).toHaveCSS(
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
     "animation-name",
     "none",
   );
@@ -175,7 +188,18 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
       text: "",
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveCount(0);
+  await expect(card.getByTestId("working-line")).toHaveText(
+    "Worker · task activity unconfirmed",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
   await page.evaluate(async () =>
     window.__jamMock.simulateAgent({
       action: "agent.status",
@@ -184,7 +208,67 @@ test("working presence is live, scoped, quiet when stale, and absent after clear
       lastSeenAt: new Date(Date.now() - 121000).toISOString(),
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveCount(0);
+  await expect(card.getByTestId("working-line")).toHaveText(
+    "Worker · task activity unconfirmed",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+  await page.evaluate(async (key) => {
+    await window.__jamMock.simulateAgent({
+      action: "agent.status",
+      agent: "Worker",
+      scope: { type: "task", id: key },
+      text: "still implementing",
+    });
+    await window.__jamMock.simulateAgent({
+      action: "report.submitted",
+      agent: "Worker",
+      key,
+    });
+  }, key);
+  await expect(card.getByTestId("working-line")).toHaveText("Awaiting review");
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  await expect(card.locator(".working-pencil")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+  const submitted = await page.evaluate(
+    (key) => window.__jamMock.getTask(key),
+    key,
+  );
+  await page.evaluate(
+    async (key) =>
+      window.__jamMock.simulateAgent({
+        action: "agent.status",
+        agent: "Reader",
+        scope: { type: "task", id: key },
+        text: "Reading evidence",
+      }),
+    key,
+  );
+  await expect(card.getByTestId("working-line")).toContainText(
+    "Awaiting review · Reader last reported 0 min ago: Reading evidence",
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  await expect(card.locator(".working-ring")).toHaveCount(0);
+  const observed = await page.evaluate(
+    (key) => window.__jamMock.getTask(key),
+    key,
+  );
+  expect(observed.status).toBe("review");
+  expect(observed.assigneeId).toBe(submitted.assigneeId);
+  expect(observed.reports).toEqual(submitted.reports);
+  expect(observed.reviews).toEqual(submitted.reviews);
 });
 
 test("reduced motion stays readable and offscreen work animations pause", async ({

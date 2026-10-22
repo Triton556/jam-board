@@ -5,7 +5,7 @@ export type HandoffMode = "setup" | "continue";
 export type HandoffOptions = { mode?: HandoffMode; request?: string };
 
 const humanSummary =
-  "Fill an EMPTY task Description with a concise human-readable outcome in my language; preserve existing human text and wishes. Use the Story Description for its understandable outcome and the agent plan for technical detail. Do not translate or rewrite existing human text automatically.";
+  "Fill an EMPTY task Description with a concise human-readable outcome in the language of my original notes or latest human request; if unclear, ask which language. Preserve existing human text and wishes. Use the Story Description for its understandable outcome and the agent plan for technical detail. Do not translate or rewrite existing human text automatically.";
 
 const requestText = (request?: string) =>
   request?.trim()

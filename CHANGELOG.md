@@ -3,6 +3,33 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.31] — 2026-10-22
+
+### Understandable coordination and revealed surfaces
+
+- Project notifications reconstruct actionable agent updates from existing scoped
+  history. Explicit bounded pagination, newer-update reveal and read markers are
+  separate from transient toasts, approvals and full activity history. View checks
+  the captured project/entity and keeps read/navigation failures recoverable.
+- Refine offers explicit First / new chat and Continue in this chat modes, a local
+  scoped request draft and exact captured target IDs. Copy does not connect, save,
+  launch or execute. Guidance asks for a concise user-language description only
+  where human text is empty, preserving existing wishes and technical contracts.
+  Canonical MCP planning guidance uses the same distinction and asks which language
+  to use if the original notes/latest human request do not make it clear.
+- Board cards distinguish human assignment, unconfirmed execution, unavailable
+  holders and waiting review instead of inventing activity. A single visible-app
+  presence reader refreshes heartbeat data with project/lifetime/newer-cache fences.
+  Generic status is not a reviewer appointment or proof of execution.
+- Custom-select menus choose visible space above/below the trigger within viewport
+  and scroll clips, with keyboard semantics retained. Agent plan uses monochrome
+  disclosure ink and truthful archived help; singular counts are corrected.
+- Agent-facing maps now include these paths and evidence limits; CI checks duplicate
+  stable action/acceptance definitions as documentation integrity, not UX proof.
+
+No database migration, new MCP tool, identity/permission change, automatic model
+launch or raw session streaming. [Verification](docs/verification/0.3.0-alpha.31.md).
+
 ## [0.3.0-alpha.30] — 2026-10-22
 
 ### References canvas editing and image resolution

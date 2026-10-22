@@ -110,18 +110,18 @@ Committed reports/reviews/questions are database records (`crates/jam-core/src/m
 
 Tool registration/handling: `crates/jam-mcp/src/server.rs`, `v2.rs`; lifecycle and claim checks: `crates/jam-core/src/service.rs`; planning/role checks: `planning.rs`; questions/report/status: `workflow.rs`; clipboard handoff: `apps/desktop/src/lib/brain-handoff.ts` and `features/plan/BrainHandoff.tsx`.
 
-Reserved future variants under AG02/AG11: explicit Full setup / Continue refinement / read-only Handover. They must retain project binding, bootstrap recovery, captured validators and planning-only boundaries. They are not alpha29 runtime features. Optional visible session activity would require supported client transport, consent, identity, redaction, retention and disconnected states; no hidden model reasoning or forged approval bridge.
+Alpha31 adds explicit setup/continuation under AG02 with project binding, bootstrap recovery, captured validators and planning-only boundaries. AG11 read-only handover remains documentation-only. None was an alpha29 runtime feature. Optional visible session activity would require supported client transport, consent, identity, redaction, retention and disconnected states; no hidden model reasoning or forged approval bridge.
 
-## Proposed Refine mode paths (reserved, not shipped in alpha29)
+## Refine mode paths (alpha31 candidate; not shipped in alpha29)
 
 | Reserved node | Human depth → agent continuation | Required observable boundary |
 |---|---|---|
 | AG02.setup | Prepare prompt dialog → First time/new conversation → request field → copy setup | Honest default; verify project then bootstrap current schema/contract; no automatic install/connect/start |
 | AG02.continue | Same dialog → Continue this conversation → request field → copy short prompt | Explicit human choice, never inferred from heartbeat/name/copy history; missing remembered contract requires full setup |
 | AG02.request | Either mode → edit request → change mode / copy failure / close | Preserve scoped request, selectable preview, clear unsaved/cancel policy; copy is not board save |
-| AG11.handover | Same dialog → Recover context for new brain → copy read-only request → recover → separate appointment | Full relevant report/review bodies and answered/withdrawn decisions; no hidden role takeover or worker release |
+| AG11.handover | Documentation recipe → read-only context recovery → separate appointment (no handover UI mode) | Full relevant report/review bodies and answered/withdrawn decisions; no hidden role takeover or worker release |
 
-Additional future tests: renamed/deleted scope cannot silently retarget; immutable scope ID must come from actual DTO (baseline HandoffScope carries only type/key, so adding ID needs coordinated type/call-site tests); same MCP identity/new conversation is not remembered context; running scope does not convert Refine into execution permission; long historical `list_changes_since` response is not falsely treated as a paginated API. These extend AC02/AC03/AC10/AC11, not replace their safety gates. Exact proposed clipboard copy should be reviewed in its implementing change, not treated as already available UI.
+Additional acceptance: renamed/deleted scope cannot silently retarget; immutable scope ID comes from actual DTOs (unlike the alpha28 key-only baseline); same MCP identity/new conversation is not remembered context; running scope does not convert Refine into execution permission; long historical `list_changes_since` response is not falsely treated as a paginated API. These extend AC02/AC03/AC10/AC11, not replace their safety gates. Exact proposed clipboard copy should be reviewed in its implementing change, not treated as already available UI.
 
 ## Alpha30 canvas delta
 
@@ -134,3 +134,16 @@ remain available in the same canvas.
 ## Alpha31 Refine candidate delta
 
 AG02.setup/continue/request are implemented as explicit choices; see [Refine modes](refinement-modes.md). AG11.handover remains recipe-only, not a third UI mode. New prompts ask for an understandable user-language outcome in an EMPTY human Description and preserve existing human text; no model guarantee or new readiness condition. Exact entity IDs now come from DTOs. Native/browser acceptance remains separate.
+
+## Alpha31 history and presence
+
+AG04/AG10 history display reconstructs seven actionable agent event kinds from
+project-scoped activity pages; a read marker is not approval. No new tool/storage
+or identity API. The event bus invalidates reads only because its payload lacks
+project identity. See [notifications](notification-history.md).
+
+AG10 heartbeat remains distinct from task work. One Root reader refreshes visible
+member data every30seconds and on visible return; publication checks project/ABA,
+lifetime, cache lifecycle and newer observation count before writing the shared
+cache. Review status stays quiet; generic status is not an invented reviewer role.
+See [presence](../live-card-presence.md).
