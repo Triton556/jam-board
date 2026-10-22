@@ -57,8 +57,21 @@ reports explicit checks, and repairs native-found tooltip/frame/menu/compact-sel
 issues. See [alpha35 verification](../verification/0.3.0-alpha.35.md); neither a
 scoped fix nor an aggregate test count is a whole-application usability pass.
 
-The final local alpha35 checkpoint passed 749 DOM and 26 Node checks, both
+The final local alpha35 source checkpoint passed 749 DOM and 26 Node checks, both
 TypeScript configurations, lint/build, and 161 Rust tests (three existing opt-in
 volume cases unrun). The 89 prepared browser scenarios remain NOT RUN; exact35
-native and hosted acceptance are separate pending gates. See verification for the
+native follow-up is now recorded separately and hosted acceptance remains pending. See verification for the
 failed initial checkpoint and its real autosave correction, not only totals.
+
+## Alpha36 reference overlay spacing
+
+The [alpha36 record](../verification/0.3.0-alpha.36.md) addresses an actual native35
+toolbar/filter background overlap. Shared normal flow and current bounds replace
+fixed vertical offsets. The [alpha35 native addendum](../verification/0.3.0-alpha.35.md#subsequent-exact-alpha35-native-check)
+keeps the preceding package's observations and unrun paths attributable; it is not
+automatic acceptance of changed source.
+
+Local36 gates passed 752 DOM / 26 Node checks, both TypeScript configurations,
+lint/build and version/map checks. Rust source equivalence to35, formatting and
+locked metadata were checked without claiming a new full Rust test run. The 93
+prepared browser cases and exact36 native rendering are still separate gates.

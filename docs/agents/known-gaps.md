@@ -130,3 +130,14 @@ Escape/outside non-dismissal. Alpha35 source repairs are independently reviewed;
 Explicit Fit is corrected; a deliberately preserved saved origin camera can still
 require Fit/pan to reveal a header. Remaining family feedback gaps stay in the
 inventory rather than being implicitly accepted by this release.
+
+## Alpha35 native follow-up and alpha36 spacing
+
+Exact35 observed frame/Fit, reference-menu dismissal, dark compact Link Select,
+both-theme Task Status and stationary tooltip expiry corrections. The opposite
+stationary tooltip direction and native input/save/error cases remain unrun; see
+the exact-version verification addendum rather than treating all action rows as
+passed. It also observed a 13 px toolbar/filter background overlap after Refresh.
+Alpha36 replaces fixed overlay offsets with normal flow; DOM/source checks are
+not native spacing acceptance. Dynamic resizing of an already-open note and
+extreme control content consuming the viewport remain separate limits.

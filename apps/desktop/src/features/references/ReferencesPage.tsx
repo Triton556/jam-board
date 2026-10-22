@@ -41,6 +41,7 @@ import type { ReferenceInput } from "../../lib/references-api";
 import { useUiStore } from "../../lib/ui-store";
 import { useExplicitRead } from "../../lib/use-explicit-read";
 import { useClipboardImagePaste } from "./clipboard-paste";
+import { referenceControlsBottom } from "./control-layout";
 import { DraftNote } from "./DraftNote";
 import {
   AddReferenceDialog,
@@ -245,14 +246,7 @@ function Canvas() {
     (duration: number) => {
       const bounds = container.current?.getBoundingClientRect();
       if (!bounds) return Promise.resolve(false);
-      const toolsBottom = Math.max(
-        0,
-        ...Array.from(
-          container.current?.querySelectorAll<HTMLElement>(
-            ".reference-toolbar, .reference-filters",
-          ) ?? [],
-        ).map((element) => element.getBoundingClientRect().bottom - bounds.top),
-      );
+      const toolsBottom = referenceControlsBottom(container.current);
       const viewport = referenceFitViewport(
         flow
           .getNodes()
@@ -1102,205 +1096,204 @@ function Canvas() {
             />
           )}
         </ReactFlow>
-        <div className="reference-read-notice">
-          {query.error && query.data && (
-            <QueryRefreshNotice
-              error={query.error}
-              resource="references"
-              busy={query.isFetching}
-              retry={explicitRefresh}
-            />
-          )}
-
-          {query.isFetching && query.data && !query.error && !read.pending && (
-            <p role="status">
-              Refreshing references… showing the last loaded canvas.
-            </p>
-          )}
-        </div>
         <FileDropProgress progress={batch.progress} />
-        <div
-          className="reference-toolbar"
-          role="toolbar"
-          aria-label="Canvas tools"
-        >
-          <div className="reference-add">
-            <Button
-              data-reference-add
-              variant="primary"
-              onClick={() => setMenu(!menu)}
-            >
-              <Plus size={16} />
-              Add
+        <div className="reference-control-stack">
+          <div
+            className="reference-toolbar"
+            role="toolbar"
+            aria-label="Canvas tools"
+          >
+            <div className="reference-add">
+              <Button
+                data-reference-add
+                variant="primary"
+                onClick={() => setMenu(!menu)}
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+              {menu && (
+                <div className="reference-add-menu">
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      void api
+                        .pickFiles()
+                        .then((paths) => addFiles(paths))
+                        .catch(error);
+                    }}
+                  >
+                    File…
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      setAdd("link");
+                    }}
+                  >
+                    Link…
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      if (noteDraft || !app.data?.jam) return;
+                      const point = center();
+                      const bounds = container.current?.getBoundingClientRect();
+                      const toolsBottom = referenceControlsBottom(
+                        container.current,
+                      );
+                      const layout = noteDraftLayout(point, {
+                        width: bounds?.width || 800,
+                        height: bounds?.height || 600,
+                        toolsBottom,
+                      });
+                      setNoteDraft({
+                        projectId: app.data.jam.id,
+                        x: layout.x,
+                        y: layout.y,
+                        maxHeight: layout.maxHeight,
+                      });
+                      void flow.setCenter(point.x, point.y, {
+                        zoom: layout.zoom,
+                        duration: 0,
+                      });
+                    }}
+                    disabled={!!noteDraft || !app.data?.jam}
+                  >
+                    Note
+                  </Button>
+                </div>
+              )}
+            </div>
+            <Button variant="ghost" onClick={() => setAdd("frame")}>
+              <Frame size={16} />
+              Frame
             </Button>
-            {menu && (
-              <div className="reference-add-menu">
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    void api
-                      .pickFiles()
-                      .then((paths) => addFiles(paths))
-                      .catch(error);
-                  }}
-                >
-                  File…
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    setAdd("link");
-                  }}
-                >
-                  Link…
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    if (noteDraft || !app.data?.jam) return;
-                    const point = center();
-                    const bounds = container.current?.getBoundingClientRect();
-                    const toolsBottom = Math.max(
-                      0,
-                      ...Array.from(
-                        container.current?.querySelectorAll<HTMLElement>(
-                          ".reference-toolbar, .reference-filters",
-                        ) ?? [],
-                      ).map(
-                        (element) =>
-                          element.getBoundingClientRect().bottom -
-                          (bounds?.top ?? 0),
-                      ),
-                    );
-                    const layout = noteDraftLayout(point, {
-                      width: bounds?.width || 800,
-                      height: bounds?.height || 600,
-                      toolsBottom,
-                    });
-                    setNoteDraft({
-                      projectId: app.data.jam.id,
-                      x: layout.x,
-                      y: layout.y,
-                      maxHeight: layout.maxHeight,
-                    });
-                    void flow.setCenter(point.x, point.y, {
-                      zoom: layout.zoom,
-                      duration: 0,
-                    });
-                  }}
-                  disabled={!!noteDraft || !app.data?.jam}
-                >
-                  Note
-                </Button>
-              </div>
-            )}
+            <Button
+              variant="ghost"
+              aria-pressed={connect}
+              onClick={() => setConnect(!connect)}
+            >
+              <Link2 size={16} />
+              Connect
+            </Button>
+            <IconButton
+              label="Fit view · F"
+              onClick={() => void fitCanvas(reduced ? 0 : 220)}
+            >
+              <Focus size={18} />
+            </IconButton>
+            <IconButton
+              label="Zoom out"
+              onClick={() => void flow.zoomOut({ duration: 0 })}
+            >
+              <Minus size={18} />
+            </IconButton>
+            <ZoomReadout />
+            <IconButton
+              label="Zoom in"
+              onClick={() => void flow.zoomIn({ duration: 0 })}
+            >
+              <Plus size={18} />
+            </IconButton>
+            <IconButton
+              label="Toggle minimap"
+              onClick={() => setMinimap(!minimap)}
+            >
+              <MinimapIcon size={18} />
+            </IconButton>
+            <IconButton
+              label="Undo"
+              disabled={!history.canUndo}
+              onClick={() => void undo()}
+            >
+              <Undo2 size={18} />
+            </IconButton>
+            <IconButton
+              label="Redo"
+              disabled={!history.canRedo}
+              onClick={() => void undo(true)}
+            >
+              <Redo2 size={18} />
+            </IconButton>
+            <Button
+              variant="ghost"
+              disabled={read.pending || query.isFetching}
+              aria-busy={read.pending || query.isFetching}
+              onClick={explicitRefresh}
+            >
+              {read.pending ? "Checking references…" : "Refresh references"}
+            </Button>
+            <ReadReceipt
+              checkedAt={read.checkedAt}
+              phase={read.phase}
+              resource="references"
+            />
           </div>
-          <Button variant="ghost" onClick={() => setAdd("frame")}>
-            <Frame size={16} />
-            Frame
-          </Button>
-          <Button
-            variant="ghost"
-            aria-pressed={connect}
-            onClick={() => setConnect(!connect)}
+          <fieldset
+            className="reference-filters"
+            aria-label="Filter references"
           >
-            <Link2 size={16} />
-            Connect
-          </Button>
-          <IconButton
-            label="Fit view · F"
-            onClick={() => void fitCanvas(reduced ? 0 : 220)}
-          >
-            <Focus size={18} />
-          </IconButton>
-          <IconButton
-            label="Zoom out"
-            onClick={() => void flow.zoomOut({ duration: 0 })}
-          >
-            <Minus size={18} />
-          </IconButton>
-          <ZoomReadout />
-          <IconButton
-            label="Zoom in"
-            onClick={() => void flow.zoomIn({ duration: 0 })}
-          >
-            <Plus size={18} />
-          </IconButton>
-          <IconButton
-            label="Toggle minimap"
-            onClick={() => setMinimap(!minimap)}
-          >
-            <MinimapIcon size={18} />
-          </IconButton>
-          <IconButton
-            label="Undo"
-            disabled={!history.canUndo}
-            onClick={() => void undo()}
-          >
-            <Undo2 size={18} />
-          </IconButton>
-          <IconButton
-            label="Redo"
-            disabled={!history.canRedo}
-            onClick={() => void undo(true)}
-          >
-            <Redo2 size={18} />
-          </IconButton>
-          <Button
-            variant="ghost"
-            disabled={read.pending || query.isFetching}
-            aria-busy={read.pending || query.isFetching}
-            onClick={explicitRefresh}
-          >
-            {read.pending ? "Checking references…" : "Refresh references"}
-          </Button>
-          <ReadReceipt
-            checkedAt={read.checkedAt}
-            phase={read.phase}
-            resource="references"
-          />
-        </div>
-        <fieldset className="reference-filters" aria-label="Filter references">
-          <button
-            type="button"
-            aria-pressed={!filter.length}
-            onClick={() => setFilter([])}
-          >
-            All
-          </button>
-          {(epics.data ?? []).map((e) => (
             <button
               type="button"
-              key={e.id}
-              aria-pressed={filter.includes(e.id)}
-              style={
-                { "--chip-color": palette(e.color) } as React.CSSProperties
-              }
+              aria-pressed={!filter.length}
+              onClick={() => setFilter([])}
+            >
+              All
+            </button>
+            {(epics.data ?? []).map((e) => (
+              <button
+                type="button"
+                key={e.id}
+                aria-pressed={filter.includes(e.id)}
+                style={
+                  { "--chip-color": palette(e.color) } as React.CSSProperties
+                }
+                onClick={() =>
+                  setFilter((f) =>
+                    f.includes(e.id)
+                      ? f.filter((id) => id !== e.id)
+                      : [...f, e.id],
+                  )
+                }
+              >
+                {e.key}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={filter.includes("unlinked")}
               onClick={() =>
                 setFilter((f) =>
-                  f.includes(e.id)
-                    ? f.filter((id) => id !== e.id)
-                    : [...f, e.id],
+                  f.includes("unlinked")
+                    ? f.filter((id) => id !== "unlinked")
+                    : [...f, "unlinked"],
                 )
               }
             >
-              {e.key}
+              Unlinked
             </button>
-          ))}
-          <button
-            type="button"
-            aria-pressed={filter.includes("unlinked")}
-            onClick={() =>
-              setFilter((f) =>
-                f.includes("unlinked")
-                  ? f.filter((id) => id !== "unlinked")
-                  : [...f, "unlinked"],
-              )
-            }
-          >
-            Unlinked
-          </button>
-        </fieldset>
+          </fieldset>
+          <div className="reference-read-notice">
+            {query.error && query.data && (
+              <QueryRefreshNotice
+                error={query.error}
+                resource="references"
+                busy={query.isFetching}
+                retry={explicitRefresh}
+              />
+            )}
+
+            {query.isFetching &&
+              query.data &&
+              !query.error &&
+              !read.pending && (
+                <p role="status">
+                  Refreshing references… showing the last loaded canvas.
+                </p>
+              )}
+          </div>
+        </div>
         {!data?.items.some((item) => !item.archivedAt) &&
           !data?.frames.some((frame) => !frame.archivedAt) &&
           !noteDraft && (

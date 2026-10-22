@@ -148,3 +148,11 @@ H-R02/R03: narrow frame headers use a separate title row; explicit Fit includes
 painted header/tool extents. Item Actions supports Escape and outside dismissal,
 then returns child-dialog focus to its visible summary. Neither changes stored
 frame geometry or resets the saved camera on route entry.
+
+## Alpha36 reference control spacing
+
+H-R01/R02/R03: tools, filters and read notices now share one normal-flow overlay;
+receipt/error wrapping pushes subsequent surfaces down with a visible gap. Empty
+space between them still accepts canvas gestures. Fit and initial inline-note
+placement reserve the complete current overlay, not fixed toolbar offsets. Drafts,
+filter semantics, stored camera entry and mutation ownership remain unchanged.

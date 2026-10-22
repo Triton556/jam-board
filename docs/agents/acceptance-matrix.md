@@ -229,3 +229,14 @@ after confirmation. Newer text remains editable and a later intentional blur
 saves it; unchanged confirmed text is clean and blur sends nothing. Unmounted
 project ABA, replaced cache identity and real remote edits cannot authorize old
 baseline updates. No departed success receipt, refetch or focus move is emitted.
+
+## Alpha36 reference feedback spacing
+
+VS01/RF03/RF02: after a real Refresh receipt, tools and filters must remain at least
+8 px apart in both themes and at narrow widths. Repeat with a long read error,
+retry to remove it, then Add Note: preserve the complete local editor and visible
+controls below current overlay bounds. Verify filters do not pan the canvas and
+empty overlay gaps do; keyboard activation and draft cancellation remain intact.
+`reference-controls.spec.ts` contains four prepared browser cases, NOT RUN locally.
+`control-layout.test.ts` and `refresh-surfaces.test.tsx` cover measurement and DOM
+ownership only. Actual native36 spacing/hit-through must be checked separately.
