@@ -149,7 +149,7 @@ re-dropping only the files still needed; the app does not retry or roll back the
 Problematic receipts are retained only within the latest three notices of this app
 session, not a durable queue. Closing the app does not guarantee a later receipt.
 
-### Several independently tracked workers
+## Several independently tracked workers
 
 Settings → Agents shows the pinned project and the separate **Agent identity**
 explanation. Give independently configured connections distinct stable names via
@@ -158,3 +158,17 @@ inherited subagent does not automatically become a separate board member; shared
 names aggregate work and cannot independently review their own reports. This does
 not change Story/Epic worker permission or launch a session. The command palette's
 **Set up agent connection (MCP)…** opens this same setup flow.
+
+## A read fails or a file batch settles after you return
+
+Use **Refresh assets** or **Refresh references** on the captured project's page
+before inspecting a late or unconfirmed file result. Refresh only reads; it does
+not re-send files, resume an abandoned batch or roll anything back. Keep your
+filters, inspect what actually exists, and re-drop only the remaining files you
+still need. Captured-project receipts distinguish confirmed, unconfirmed and
+not-attempted requests.
+
+A failed background read can show the last loaded view with a warning. References
+note drafts, Board quick capture and the Plan new-epic dialog remain mounted through
+those list failures. The read retry does not save or clear your text. An initial
+failure with no cached view still shows a separate error/retry screen.

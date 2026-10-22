@@ -26,7 +26,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import paint from "../../assets/chibi/wife-paint-256.webp";
 import type { CanvasGeometry, RefFrame, RefItem } from "../../bindings";
 import { Button, Dialog, EmptyState, IconButton } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
 import { api } from "../../lib/api";
 import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { epicsQuery } from "../../lib/planning-queries";
@@ -732,7 +736,7 @@ function Canvas() {
     [flow, queueFrame, queueGeometry],
   );
   if (query.isPending) return <PaperSkeleton label="Loading references" />;
-  if (query.error)
+  if (query.error && !query.data)
     return (
       <QueryError error={query.error} retry={() => void query.refetch()} />
     );
@@ -1022,6 +1026,21 @@ function Canvas() {
             />
           )}
         </ReactFlow>
+        {query.error && query.data && (
+          <div className="reference-read-notice">
+            <QueryRefreshNotice
+              error={query.error}
+              resource="references"
+              busy={query.isFetching}
+              retry={() => void query.refetch()}
+            />
+          </div>
+        )}
+        {query.isFetching && query.data && !query.error && (
+          <p className="reference-read-notice" role="status">
+            Refreshing references… showing the last loaded canvas.
+          </p>
+        )}
         <FileDropProgress progress={batch.progress} />
         <div
           className="reference-toolbar"
@@ -1118,6 +1137,14 @@ function Canvas() {
           >
             <Redo2 size={18} />
           </IconButton>
+          <Button
+            variant="ghost"
+            disabled={query.isFetching}
+            aria-busy={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            Refresh references
+          </Button>
         </div>
         <fieldset className="reference-filters" aria-label="Filter references">
           <button

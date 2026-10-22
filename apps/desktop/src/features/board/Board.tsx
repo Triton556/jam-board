@@ -25,6 +25,7 @@ import { LayoutGroup } from "motion/react";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, IconButton } from "../../components/ui";
+import { QueryRefreshNotice } from "../../components/ui/AsyncState";
 import { RoughLine } from "../../components/ui/RoughLine";
 import { api } from "../../lib/api";
 import {
@@ -481,9 +482,10 @@ export function Board({
       `Dropped ${active.id}${over ? ` in ${labels[destination.current?.status ?? locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
     onDragCancel: ({ active }) => `Cancelled dragging ${active.id}.`,
   };
+  const backgroundError = tasks.error ?? members.error;
   if (tasks.isPending || members.isPending)
     return <div className="loading">Opening your sketchbook…</div>;
-  if (tasks.error || members.error)
+  if ((tasks.error && !tasks.data) || (members.error && !members.data))
     return (
       <div role="alert" className="page-error">
         {(tasks.error ?? members.error)?.message}
@@ -527,6 +529,17 @@ export function Board({
           destination.current = null;
         }}
       >
+        {backgroundError && (
+          <QueryRefreshNotice
+            error={backgroundError}
+            resource="board or team"
+            busy={tasks.isFetching || members.isFetching}
+            retry={() => {
+              void tasks.refetch();
+              void members.refetch();
+            }}
+          />
+        )}
         <BoardOverflow>
           <div className="board-columns">
             {statuses.map((status) => (

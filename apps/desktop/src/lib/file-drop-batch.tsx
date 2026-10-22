@@ -176,7 +176,7 @@ export function useFileDropBatch(kind: "assets" | "references") {
           useUiStore.getState().notify(summary, {
             persistent: problem,
             details,
-            hint: `${project ? `Project ID: ${project.id}. ` : ""}${problem ? "Inspect this project's results before re-dropping only the files still needed. Nothing was automatically retried or rolled back." : "All listed requests returned confirmation."}`,
+            hint: `${project ? `Project ID: ${project.id}. ` : ""}${problem ? `Open the captured project and use Refresh ${kind} before inspecting its results or re-dropping only the files still needed. Nothing was automatically retried or rolled back.` : "All listed requests returned confirmation."}`,
           });
         }
       }

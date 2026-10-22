@@ -25,7 +25,11 @@ import {
   Select,
   Stamp,
 } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { memberColors, WorkloadBar } from "../../components/ui/m5";
 import { api } from "../../lib/api";
@@ -120,7 +124,7 @@ export function PlanPage({
         <PaperSkeleton label="Loading plan" />
       </main>
     );
-  if (epics.error)
+  if (epics.error && !epics.data)
     return (
       <main className="feature-page">
         <QueryError error={epics.error} retry={() => void epics.refetch()} />
@@ -243,6 +247,14 @@ export function PlanPage({
         </div>
       </aside>
       <div className="plan-detail">
+        {epics.error && (
+          <QueryRefreshNotice
+            error={epics.error}
+            resource="epics"
+            busy={epics.isFetching}
+            retry={() => void epics.refetch()}
+          />
+        )}
         <WorkflowGuide />
         {!epics.data?.length ? (
           <EmptyState image={duo} size={180} text="No epics yet">
