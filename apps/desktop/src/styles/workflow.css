@@ -581,3 +581,30 @@
     white-space: normal;
   }
 }
+
+/* Onboarding instructions wrap inside the paper settings card, not the viewport. */
+.connection-help {
+  flex-basis: 100%;
+  width: 100%;
+  min-width: 0;
+  line-height: 1.65;
+}
+.connection-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.connection-help ol {
+  padding-left: 22px;
+}
+.connection-help li + li {
+  margin-top: 10px;
+}
+.playbook-clone-command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--paper-2);
+}

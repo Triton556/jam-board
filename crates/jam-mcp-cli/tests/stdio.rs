@@ -291,6 +291,8 @@ async fn full_stdio_contract_and_errors() {
     assert!(instructions.contains("Ready") && instructions.contains("submit_report"));
     assert!(instructions.contains("human") && instructions.contains("appointed brain"));
     assert!(!instructions.contains("comment with results"));
+    assert!(instructions.contains("Plan your project"));
+    assert!(!instructions.contains("Plan your game jam"));
     let tools = c.list_all_tools().await.unwrap();
     assert_tools(&tools);
     let story = planning_with_human_start(&s, &h);

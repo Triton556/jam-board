@@ -239,3 +239,23 @@ verify layout and interaction, but not filesystem operations, native dialogs,
 SQLite persistence or real agent execution. Those require native/runtime checks.
 No visual approval, unit-test pass or packaged binary substitutes for end-to-end
 human/brain/worker acceptance.
+
+## 12. Connection, project identity and optional guidance
+
+A native newcomer walkthrough found that a local-clone chooser was a dead end for
+someone without the playbook, and the setup sequence did not expose per-Epic Brain
+appointment. The project picker also needs an explicit session mental model: a new
+UI selection is not a change to an already connected agent.
+
+The setup now names the target, checks its exact ID before board reads, explains
+reconnection/duplicate-entry consequences, and separates mandatory MCP from optional
+skill installation. Source acquisition is a disclosed, user-triggered action; copying
+instructions is not treated as successful setup. Clipboard receipts name the captured
+project even if selection changes during an asynchronous token read. The displayed
+and copied configurations both prefer the immutable project ID.
+
+This applies [NN/G recognition rather than recall](https://www.nngroup.com/articles/ten-usability-heuristics/)
+and [Microsoft HAX capability/consequence guidance](https://www.microsoft.com/en-us/haxtoolkit/library/)
+to the observed scenario; those sources are design rationale, not external product
+validation. The [upstream compatibility audit](agent-playbook-compatibility.md) avoids
+implying that optional older call examples are a current integration guarantee.

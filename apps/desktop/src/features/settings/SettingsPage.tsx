@@ -8,7 +8,10 @@ import { Button, Dialog, IconButton, Select, Tabs } from "../../components/ui";
 import { CodeBlock, PageHeading, Switch } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
 import { api } from "../../lib/api";
-import { connectionPrompt } from "../../lib/brain-handoff";
+import {
+  connectionPrompt,
+  projectConnectionPrompt,
+} from "../../lib/brain-handoff";
 import { makeSnippets } from "../../lib/mcp-config";
 import { acceptProjectSelection } from "../../lib/project-selection";
 import { appQuery } from "../../lib/queries";
@@ -66,6 +69,7 @@ export function SettingsPage({
   const [tab, setTab] = useState(tabs[0] ?? "Codex · stdio");
   const [shown, setShown] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const configuration = useRef<HTMLElement>(null);
   const [confirm, setConfirm] = useState<"token" | "demo" | "archive" | null>(
     null,
   );
@@ -116,6 +120,12 @@ export function SettingsPage({
     },
   });
   const data = status.data;
+  const project = app.data?.jam;
+  const connectionReady =
+    !!project &&
+    data?.projectId === project.id &&
+    data?.projectKeyPrefix === project.keyPrefix;
+  const checkPrompt = project ? projectConnectionPrompt(project) : tryPrompt;
   const snippetKey = keys[tabs.indexOf(tab)] ?? "codexStdio";
   const masked = data ? makeSnippets(data, `••••${data.tokenTail}`) : null;
   const activate = async (
@@ -156,8 +166,24 @@ export function SettingsPage({
               <WorkflowGuide />
               <SettingsSection
                 title="Set up in three steps"
-                description="MCP connects the board. The playbook teaches the workflow. Your brain chat plans and coordinates the work."
+                description="Connect your agent, verify the project, then appoint a planning brain. Jam Board does not launch a model or change your client configuration."
               >
+                <SettingsRow
+                  label="Connection target"
+                  hint="The configuration and check below are for this project."
+                >
+                  {project ? (
+                    <strong>
+                      {project.name} · {project.keyPrefix}
+                    </strong>
+                  ) : (
+                    <span>Reading selected project…</span>
+                  )}
+                  <p className="small">
+                    Switching boards in Jam Board does not redirect an already
+                    connected agent.
+                  </p>
+                </SettingsRow>
                 <SettingsRow
                   label="1 · Connect MCP"
                   hint="Choose one transport below: stdio runs its own sidecar; HTTP needs Jam Board open."
@@ -166,23 +192,41 @@ export function SettingsPage({
                     Use the configuration for this project, then restart or
                     reconnect your agent.
                   </span>
+                  <Button onClick={() => configuration.current?.focus()}>
+                    Show configuration
+                  </Button>
                 </SettingsRow>
                 <SettingsRow
                   label="2 · Check the connection"
                   hint="The test prompt below only reads the board. It does not take a task."
                 >
-                  <Button onClick={() => void run(() => copy(tryPrompt))}>
+                  <Button
+                    disabled={busy || !connectionReady}
+                    onClick={() =>
+                      void run(() =>
+                        copy(
+                          checkPrompt,
+                          `Connection check copied for ${project?.name} · ${project?.keyPrefix}`,
+                        ),
+                      )
+                    }
+                  >
                     Copy connection check
                   </Button>
                 </SettingsRow>
                 <SettingsRow
-                  label="3 · Plan with a brain"
-                  hint="Install the local skill below if needed, then give your connected agent a planning scope."
+                  label="3 · Appoint a brain and plan"
+                  hint="In Plan, open an epic and choose its Brain. The connected agent appears after its first board call. Repeat for each epic it should coordinate."
                 >
                   <BrainHandoff
                     scope={{ type: "project" }}
                     label="Prepare planning prompt"
+                    disabled={busy || !connectionReady}
                   />
+                  <p className="small">
+                    No epic yet? Ask the connected agent to draft one first.
+                    Brain appointment and Ready are not Start permission.
+                  </p>
                 </SettingsRow>
               </SettingsSection>
               <SettingsSection
@@ -249,7 +293,54 @@ export function SettingsPage({
                   </IconButton>
                 </SettingsRow>
               </SettingsSection>
-              <SettingsSection title="Connect the board">
+              <SettingsSection
+                title="Connect the board"
+                ref={configuration}
+                description="Copying shows or copies instructions only. Apply them yourself in the intended agent client, then restart or reconnect it."
+              >
+                <SettingsRow
+                  label="Which project?"
+                  hint="Each MCP session keeps its original project binding."
+                >
+                  <p>
+                    {project?.name ?? "Selected project"} ·{" "}
+                    {project?.keyPrefix ?? "…"}
+                  </p>
+                  <details className="connection-help">
+                    <summary>
+                      Connect another project or upgrade a client
+                    </summary>
+                    <ol>
+                      <li>
+                        Choose the other project in Projects, then return to
+                        Settings → Agents for its configuration.
+                      </li>
+                      <li>
+                        These snippets use the same jam-board connection name.
+                        Intentionally replace the old entry, or use a separate
+                        client configuration and session to keep both boards
+                        connected. Do not paste duplicate entries.
+                      </li>
+                      <li>
+                        Restart or reconnect the intended agent session. An
+                        existing session does not move when the UI selection
+                        changes.
+                      </li>
+                      <li>
+                        Run this project's read-only connection check. Confirm
+                        its name, key prefix and project ID before planning or
+                        writing.
+                      </li>
+                    </ol>
+                    <p>
+                      After upgrading Jam Board, refresh the client's tool
+                      schemas and reread task/report context before a new
+                      action. Old call examples may lack required fields. A
+                      stale error means reconcile the draft with current
+                      evidence, not automatically retry it with new validators.
+                    </p>
+                  </details>
+                </SettingsRow>
                 <SettingsRow
                   label="Configuration"
                   hint={
@@ -259,17 +350,47 @@ export function SettingsPage({
                   }
                 >
                   <Tabs value={tab} onChange={setTab} items={tabs} />
-                  {masked && (
+                  {!connectionReady && (status.isPending || app.isPending) && (
+                    <p role="status">
+                      Reading the selected project's connection settings…
+                    </p>
+                  )}
+                  {!connectionReady && !status.isPending && !app.isPending && (
+                    <>
+                      <p role="alert">
+                        Connection settings are unavailable or do not match the
+                        selected project. Reread them before copying a
+                        configuration.
+                      </p>
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await Promise.all([
+                              status.refetch(),
+                              app.refetch(),
+                            ]);
+                          })
+                        }
+                      >
+                        Retry connection settings
+                      </Button>
+                    </>
+                  )}
+                  {masked && connectionReady && (
                     <CodeBlock
                       code={masked[snippetKey]}
                       onCopy={() =>
                         void run(async () => {
-                          const snippets = await api.mcpConfigSnippets();
+                          // Capture displayed settings before any asynchronous token read.
+                          const captured = data;
+                          const target = `${project?.name} · ${project?.keyPrefix}`;
+                          const http = tab.includes("HTTP");
+                          const token = http ? await api.revealMcpToken() : "";
+                          const snippets = makeSnippets(captured, token);
                           await copy(
                             snippets[snippetKey],
-                            tab.includes("HTTP")
-                              ? "Copied with your token"
-                              : "Copied",
+                            `Configuration copied for ${target}${http ? " (includes your token; keep it private)" : ""}`,
                           );
                         })
                       }
@@ -321,8 +442,18 @@ export function SettingsPage({
                   </div>
                 </SettingsRow>
                 <SettingsRow label="Read-only connection check">
-                  <p>{tryPrompt}</p>
-                  <Button onClick={() => void run(() => copy(tryPrompt))}>
+                  <p>{checkPrompt}</p>
+                  <Button
+                    disabled={busy || !connectionReady}
+                    onClick={() =>
+                      void run(() =>
+                        copy(
+                          checkPrompt,
+                          `Connection check copied for ${project?.name} · ${project?.keyPrefix}`,
+                        ),
+                      )
+                    }
+                  >
                     Copy prompt
                   </Button>
                 </SettingsRow>
