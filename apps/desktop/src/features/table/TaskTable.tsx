@@ -198,6 +198,7 @@ export function TaskTable({
     return () => window.removeEventListener("keydown", key);
   }, []);
   const matches = tasks.data?.tasks ?? [];
+  const total = tasks.data?.total ?? 0;
   const hiddenKeys = new Set(
     pinned
       .filter((t) => !matches.some((m) => m.key === t.key))
@@ -228,8 +229,12 @@ export function TaskTable({
           <h1>Task table</h1>
         </div>
         <div className="button-row">
-          <span className="muted task-count">
-            {tasks.data?.total ?? 0} tasks
+          <span className="muted task-count" aria-live="polite">
+            {tasks.isPending
+              ? "Reading tasks…"
+              : tasks.error
+                ? "Count unavailable"
+                : `${total} ${total === 1 ? "task" : "tasks"}`}
           </span>
           <NewTaskButton onClick={() => setCreating(true)} />
         </div>

@@ -3,6 +3,55 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.11] - 2026-10-21
+
+### Fixed
+
+- Paginated MCP task reads filter candidates before full context hydration and load
+  only the returned page. Foreign-ancestor checks, Unicode matching, field values,
+  ordering, offset behavior and same-call transaction consistency are preserved.
+- Table Ready filtering now matches authoritative Rust Unicode-whitespace rules.
+  Tab/newline, nonbreaking-space and em-space-only required fields no longer appear
+  ready in the table when the task and MCP correctly report them unready. Accepted
+  NUL-containing text also retains Rust emptiness semantics rather than SQLite
+  character-length behavior. This is filter parity, not new validation or permission.
+- A loading or failed table read no longer claims zero tasks. Counts distinguish
+  reading, unavailable and a genuine empty result; single-task counts are singular.
+- Planning handoffs capture the exact project ID and scope when opened. Later
+  selection/rename cannot rewrite an inspected prompt; overlapping copies are
+  refused and old completions cannot announce success in a reopened preview.
+- MCP prompts use live schemas and optional playbook guidance rather than a stale
+  mandatory version. Existing epics are inspected/refined before creating new work;
+  missing project identity requires clarification, not guessed board access.
+- Review reading shortcuts explicitly scroll their focused target into view without
+  animation. Report/criteria disclosures share the paper-style monochrome chevron
+  instead of native emoji-like markers; comments and test choices are preserved.
+
+### Added
+
+- Disposable three-project real-Store and four-client HTTP/stdio volume harnesses,
+  an exact same-database before/after probe, and 2,000-row frontend virtualization,
+  filtered-count, project-cancellation and honest-presence regression coverage.
+- Separate browser performance workloads for idle, fifty unscoped actors, fifty
+  task-scoped actors and an explicitly extreme 2,000-actor stress case. Existing
+  frame/row/bundle budgets are unchanged; discovery is not a browser timing pass.
+- A fictional general-project walkthrough from rough capture through brain
+  clarification, human edits, explicit scope Start and evidence-based review, plus
+  documented performance methodology and measured limits.
+
+### Verification and compatibility
+
+- Exact same-fixture comparison preserves all 171 serialized result cases and all
+  checked persistent table data. Observed 2,000-task page-of-50 median changed from
+  1303.73 to 38.44 ms in the same debug environment; see performance notes for p95,
+  hardware, profile and limits. Board-wide hydration is not claimed improved.
+- No database migration, tool count, mutation schema, role or execution-grant change.
+- Alpha10 native light-mode acceptance independently confirmed full report reading,
+  conflict draft preservation, setup guidance and manual tabs. Its partial comments
+  jump is the observed defect fixed here; new geometry still needs native acceptance.
+- Full current-version checks and exact platform/publication boundaries are recorded
+  in the versioned verification notes. No real project execution or agent launch.
+
 ## [0.3.0-alpha.10] - 2026-10-21
 
 ### Fixed

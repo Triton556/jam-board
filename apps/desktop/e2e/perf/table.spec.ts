@@ -3,12 +3,20 @@ import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
 
 const phase = process.env.JAM_PERF_PHASE === "before" ? "before" : "after";
-const baseDirectory = process.env.JAM_PERF_OUTPUT ?? "../../docs/media/m4";
+const baseDirectory =
+  process.env.JAM_PERF_OUTPUT ?? "../../.dev-data/perf/table";
+const workloads = [
+  { name: "idle", agents: 0, taskScoped: false },
+  { name: "quiet-50", agents: 50, taskScoped: false },
+  { name: "scoped-50", agents: 50, taskScoped: true },
+  { name: "scoped-stress-2000", agents: 2000, taskScoped: true },
+] as const;
 
-for (const working of [false, true]) {
-  const directory = working ? `${baseDirectory}/working` : baseDirectory;
+for (const workload of workloads) {
+  const working = workload.agents > 0;
+  const directory = `${baseDirectory}/${workload.name}`;
   for (const scenario of ["A", "B", "C"] as const) {
-    test(`${scenario}: production table with 2000 tasks${working ? " and 50 working agents" : ""}`, async ({
+    test(`${scenario}: production table with 2000 tasks · ${workload.name}`, async ({
       page,
     }) => {
       test.setTimeout(90000);
@@ -17,24 +25,41 @@ for (const working of [false, true]) {
       expect(await page.evaluate(() => window.__jamMock.buildMode)).toBe(
         "production",
       );
-      await page.evaluate(async (working) => {
+      await page.evaluate(async (workload) => {
         const startsAt = new Date().toISOString();
         await window.__jamMock.createJam({
-          name: "Performance jam",
-          yourName: "Danil",
+          name: "Disposable performance project",
+          yourName: "QA human",
           startsAt,
           endsAt: new Date(Date.now() + 172800000).toISOString(),
           timezone: "UTC",
           theme: "Small lights",
         });
         await window.__jamMock.seedBulk(2000);
-        if (working) await window.__jamMock.seedWorkingPresence(50);
-      }, working);
+        if (workload.agents)
+          await window.__jamMock.seedWorkingPresence(
+            workload.agents,
+            workload.taskScoped,
+          );
+      }, workload);
       const hierarchy = await page.evaluate(async () => ({
         epics: (await window.__jamMock.listEpics()).length,
         stories: (await window.__jamMock.listStories()).length,
       }));
       expect(hierarchy).toEqual({ epics: 5, stories: 20 });
+      const scopeCounts = await page.evaluate(async () => {
+        const members = await window.__jamMock.listMembers();
+        return {
+          scoped: members.filter(
+            (entry) =>
+              entry.handle.startsWith("perf-worker-") &&
+              entry.statusScope?.type === "task",
+          ).length,
+        };
+      });
+      expect(scopeCounts.scoped).toBe(
+        workload.taskScoped ? workload.agents : 0,
+      );
       await page.goto("/table?sort=key:asc");
       await expect(page.getByText("2000 tasks", { exact: true })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
@@ -90,6 +115,7 @@ for (const working of [false, true]) {
             let previous: number | undefined;
             let maxRows = 0;
             let maxWorking = 0;
+            let maxQuiet = 0;
             let maxPaintedRings = 0;
             let allRingsPainted = true;
             let allWorking = true;
@@ -111,6 +137,10 @@ for (const working of [false, true]) {
                     'tr[data-working="active"]',
                   ).length;
                   maxWorking = Math.max(maxWorking, active);
+                  maxQuiet = Math.max(
+                    maxQuiet,
+                    element.querySelectorAll('tr[data-working="quiet"]').length,
+                  );
                   allWorking &&= active === rows.length;
                   const painted = [
                     ...element.querySelectorAll<SVGPathElement>(
@@ -174,6 +204,7 @@ for (const working of [false, true]) {
               },
               maxRows,
               maxWorking,
+              maxQuiet,
               allWorking,
               maxPaintedRings,
               allRingsPainted,
@@ -202,10 +233,15 @@ for (const working of [false, true]) {
           ? { legacyM4: previous }
           : {};
       report.methodology = {
+        version: 2,
         build: "production VITE_MOCK_BRIDGE=1",
         viewport: { width: 1360, height: 860 },
         totalRows: 2000,
-        workingAgents: working ? 50 : 0,
+        workload: workload.name,
+        syntheticAgents: workload.agents,
+        taskScoped: workload.taskScoped,
+        warning:
+          "Fictional presence only; 2000 scoped actors is a stress case, not typical 50-worker behavior. Not comparable to historical M4 unscoped-as-active measurements.",
         warmupMs: 1000,
         measuredMs: 3000,
         displayCalibration: "median of 30 idle rAF intervals",
@@ -249,16 +285,23 @@ for (const working of [false, true]) {
       await done;
       await mkdir("../../.dev-data/perf-traces", { recursive: true });
       await writeFile(
-        `../../.dev-data/perf-traces/${phase}-${working ? "working-" : ""}${scenario}.json`,
+        `../../.dev-data/perf-traces/${phase}-${workload.name}-${scenario}.json`,
         JSON.stringify({ traceEvents }),
       );
       console.log(JSON.stringify({ ...result, frames: undefined }));
       expect(result.maxRows).toBeLessThanOrEqual(60);
-      if (working) {
-        expect(result.maxWorking).toBe(50);
-        expect(result.allWorking).toBe(true);
-        expect(result.maxPaintedRings).toBe(50);
+      if (workload.taskScoped) {
+        expect(result.maxWorking).toBeGreaterThan(0);
+        expect(result.maxWorking).toBeLessThanOrEqual(
+          Math.min(60, workload.agents),
+        );
+        expect(result.maxPaintedRings).toBe(result.maxWorking);
         expect(result.allRingsPainted).toBe(true);
+        if (workload.agents === 2000) expect(result.allWorking).toBe(true);
+      } else if (working) {
+        expect(result.maxWorking).toBe(0);
+        expect(result.maxPaintedRings).toBe(0);
+        expect(result.maxQuiet).toBeGreaterThan(0);
       }
       expect(result.longFrameFraction).toBeLessThanOrEqual(
         scenario === "B" ? 0.15 : 0.05,

@@ -25,7 +25,12 @@ test("epic overview exposes stories and a safe scoped planning handoff", async (
     name: /Plan JB-E\d+ with your brain/,
   });
   const prompt = dialog.getByRole("textbox", { name: "Planning prompt" });
-  await expect(prompt).toHaveValue(/verify its key prefix is JB/);
+  const project = await page.evaluate(() => window.__jamMock.appState());
+  await expect(prompt).toHaveValue(/key prefix is JB/);
+  expect(await prompt.inputValue()).toContain(
+    `project ID is ${project.jam?.id}`,
+  );
+  await expect(prompt).toHaveValue(/matching name or prefix is not enough/);
   await expect(prompt).toHaveValue(/Planning only: do not claim tasks/);
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();

@@ -2260,29 +2260,39 @@ export class MockBridge implements JamApi {
       sidecarPath: "C:\\Jam Board\\jam-board-mcp.exe",
     };
   }
-  async seedWorkingPresence(count = 50) {
+  async seedWorkingPresence(count = 50, taskScoped = false) {
     if (
       !(import.meta.env.DEV || import.meta.env.VITE_MOCK_BRIDGE === "1") ||
       count < 1 ||
-      count > 50
+      !Number.isInteger(count) ||
+      count > (taskScoped ? 5000 : 50) ||
+      (taskScoped && count > this.tasks.length)
     )
-      throw new JamError("validation", "Working fixture supports 1–50 agents");
-    await this.call("seed_working_presence", count);
+      throw new JamError(
+        "validation",
+        "Working fixture needs valid agents and one existing task per scoped agent",
+      );
+    await this.call("seed_working_presence", { count, taskScoped });
     const base = this.members.find((m) => m.kind === "agent");
     if (!base) throw new JamError("validation", "Seed bulk tasks first");
     const now = new Date().toISOString();
-    const workers = Array.from({ length: count }, (_, i) => ({
+    const workers: Member[] = Array.from({ length: count }, (_, i) => ({
       ...base,
       id: crypto.randomUUID(),
       name: `Worker ${i + 1}`,
       handle: `perf-worker-${i + 1}`,
       lastSeenAt: now,
       statusAt: now,
-      statusText: "implementing snow tiles",
-      statusScope: null,
+      statusText: "Synthetic QA activity — no real worker session",
+      statusScope: taskScoped
+        ? { type: "task", id: this.tasks[i]?.id ?? "" }
+        : null,
     }));
     this.members.push(...workers);
-    for (const [i, task] of this.tasks.entries()) {
+    // Explicit benchmark-only historical presence, never a grant of new work.
+    // A scoped actor reports activity on exactly one task, not every assignment.
+    const targets = taskScoped ? this.tasks.slice(0, count) : this.tasks;
+    for (const [i, task] of targets.entries()) {
       task.assigneeId = workers[i % workers.length]?.id ?? null;
       task.status = "in_progress";
     }

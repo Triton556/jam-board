@@ -9,6 +9,16 @@ import { relativeTime } from "../../lib/time";
 import { JamError, type Member, type TaskDetail } from "../../lib/types";
 import { ReportEvidence } from "./ReportEvidence";
 import { ReviewContext } from "./ReviewContext";
+
+function focusReadingTarget(
+  target: HTMLElement | null,
+  block: ScrollLogicalPosition = "start",
+) {
+  target?.focus({ preventScroll: true });
+  // Native WebKit can focus a field while leaving most of it below the modal.
+  target?.scrollIntoView({ block, behavior: "instant" });
+}
+
 export function ReviewDialog({
   report,
   close,
@@ -38,7 +48,7 @@ export function ReviewDialog({
   const commentsField = useRef<HTMLTextAreaElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: every explicitly reread snapshot needs focus, including a second reread while refreshed remains true.
   useEffect(() => {
-    if (refreshed) capturedHeading.current?.focus();
+    if (refreshed) focusReadingTarget(capturedHeading.current);
   }, [refreshed, context?.reviewContextRevision, report.id]);
   const missingTests = failed.filter(
     (name) => !report.tests.some((test) => test.name === name),
@@ -78,7 +88,7 @@ export function ReviewDialog({
         </span>
         <Button
           disabled={pending}
-          onClick={() => commentsField.current?.focus()}
+          onClick={() => focusReadingTarget(commentsField.current, "center")}
         >
           Go to comments
         </Button>
@@ -92,7 +102,7 @@ export function ReviewDialog({
       {context && <ReviewContext task={context} expanded={refreshed} />}
       <Button
         disabled={pending}
-        onClick={() => capturedHeading.current?.focus()}
+        onClick={() => focusReadingTarget(capturedHeading.current)}
       >
         Back to captured report
       </Button>
@@ -369,7 +379,11 @@ export function Rounds({
         const report = evidence.reports.find((r) => r.round === round),
           verdict = evidence.reviews.find((r) => r.round === round);
         return (
-          <details className="round" key={round} open={round === rounds[0]}>
+          <details
+            className="round ink-disclosure"
+            key={round}
+            open={round === rounds[0]}
+          >
             <summary>
               Round {round}
               {round === rounds[0]

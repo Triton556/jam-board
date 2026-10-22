@@ -17,13 +17,13 @@ export function ReviewContext({
       </div>
     ) : null;
   return (
-    <details className="review-context" open={expanded}>
+    <details className="review-context ink-disclosure" open={expanded}>
       <summary>Task, story and epic criteria · captured snapshot</summary>
       <p className="small muted">
         Review uses this saved context. Background edits cannot silently change
         which report or criteria you accept.
       </p>
-      <details>
+      <details className="ink-disclosure">
         <summary>
           {task.key} · {task.title}
         </summary>
@@ -61,7 +61,7 @@ export function ReviewContext({
         {text("Expected result", task.brief.resultMd)}
         {text("Original notes", task.brief.userQuotesMd)}
       </details>
-      <details>
+      <details className="ink-disclosure">
         <summary>
           {task.story.key} · {task.story.title}
         </summary>
@@ -86,7 +86,7 @@ export function ReviewContext({
           <p className="muted">No story acceptance criteria recorded.</p>
         )}
       </details>
-      <details>
+      <details className="ink-disclosure">
         <summary>
           {task.epic.key} · {task.epic.title}
         </summary>

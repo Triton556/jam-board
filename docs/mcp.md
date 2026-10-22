@@ -329,7 +329,7 @@ resources/list exposes jam://board as Markdown. Resource templates are jam://epi
 
 Three prompts are available:
 
-- plan_epic: interview rounds with ask_user/wait_for_answer, playback summary/confirmation, epic/story/task planning, complete briefs, mark_ready and scoped status; wait_for_changes for reports, answers and human edits, with list_changes_since for turn-start recovery. Names requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md from agent-playbook 1.1.0.
+- plan_epic: interview rounds with ask_user/wait_for_answer, playback summary/confirmation, epic/story/task planning, complete briefs, mark_ready and scoped status; wait_for_changes for reports, answers and human edits, with list_changes_since for turn-start recovery. Optional requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md are workflow guidance, not protocol prerequisites. Live tool schemas and captured validators take precedence; no automatic playbook installation is implied. All three prompts verify the intended exact project ID before board/task reads, not just a matching name or prefix.
 - work_on_next_task (optional tag): verify the pinned project and running story permission, pick Ready work, prefer own changes-requested tasks, read the full brief/context, claim, work and submit_report with evidence. Names brief-writing.md.
 - review_task: compare report evidence against brief tests, story acceptance and epic scope; accept or request changes, then publish status. Names task-brief-and-acceptance.md.
 

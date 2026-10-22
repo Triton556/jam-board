@@ -9,9 +9,10 @@ agent-colored ring, pencil and handwritten status remain part of the design.
 **Scenario:** work on more than one application without mixing plans or sending
 an existing agent to whichever board happens to be open.
 
-The project name in the top bar is a labeled navigation control. **Your projects**
+The project name in the navigation rail is a labeled control. **Your projects**
 provides creation, opening and restoration in one place. A current-project badge
-and immutable key prefix make the destination recognizable. A connected MCP
+and key prefix make the destination recognizable; connection binding uses the
+exact immutable project ID, not matching display text. A connected MCP
 session stays pinned to its project; switching the human view is not a command
 to redirect or stop workers.
 
@@ -284,3 +285,34 @@ clipboard invocation and success receipt. This also handles A→B→A without wa
 for a React render. Once a clipboard write has already been invoked, the platform
 has no cancellation primitive: the guard prevents stale invocation/receipt, not an
 undo of a previously accepted write. No token is logged or added to product data.
+
+## 14. Keep large-board feedback truthful and planning handoffs stable
+
+A multi-project fixture checks 2,000, 1,000 and 40 tasks without starting work. The
+table keeps a bounded virtual row window, exact filtered counts and selected-project
+results when an older request finishes late. Pending reads say “Reading tasks”,
+not zero tasks; failed reads say the count is unavailable rather than implying an
+empty board. [TanStack Virtual's visible-window model](https://tanstack.com/virtual/latest/docs/api/virtualizer)
+and [TanStack Query cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation)
+inform these implementation checks. DOM tests do not establish native frame rate;
+the [performance methodology](performance.md) separates those kinds of evidence.
+
+Activity fixtures also distinguish fifty unscoped online agents, fifty genuinely
+task-scoped actors and an explicitly extreme 2,000-actor stress workload. Assigning
+one online actor to many cards must not manufacture task activity. No readiness,
+authorization or honest-status rule is weakened to produce better measurements.
+
+Planning prompts capture the project ID and scope when opened. Changing the
+selection or receiving a rename does not silently rewrite an already inspected
+message. The captured label remains readable context, not identity or permission;
+close and reopen to prepare another target. Current MCP prompts likewise treat the
+playbook as optional guidance, with live schemas taking precedence over old examples.
+This applies the same visible-state and HAX consequence principles used for setup.
+
+Native alpha10 showed that focus alone could leave most of the review Comments
+field below the modal viewport. The reading shortcuts now explicitly scroll their
+focused target into view without animation. This follows the structured-content
+focus rationale in the [WAI modal pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+and uses the [scrollIntoView API](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView).
+The retained review draft and exact captured evidence are unchanged; actual visible
+field geometry remains a native acceptance check, not a DOM-test claim.

@@ -13,7 +13,7 @@ export function ReportEvidence({
   return (
     <>
       <Markdown>{report.summaryMd}</Markdown>
-      <details open={expandFiles}>
+      <details className="ink-disclosure" open={expandFiles}>
         <summary>Changed files · {report.changedFiles.length}</summary>
         {report.changedFiles.length ? (
           <ul>
