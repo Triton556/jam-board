@@ -180,6 +180,10 @@ test("archive with an omitted reason, URL archived flag and unarchive", async ({
   await expect(page.locator('[data-task-key="JB-7"]')).toHaveClass(/archived/);
   await page.locator('[data-task-key="JB-7"]').click();
   await page.getByRole("button", { name: "Unarchive", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Unarchive task", exact: true })
+    .getByRole("button", { name: "Unarchive", exact: true })
+    .click();
   await expect(page.getByRole("textbox", { name: "Task title" })).toBeEnabled();
 });
 test("table keyboard and live events preserve row focus and scroll", async ({
