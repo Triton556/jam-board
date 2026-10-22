@@ -172,3 +172,8 @@ A failed background read can show the last loaded view with a warning. Reference
 note drafts, Board quick capture and the Plan new-epic dialog remain mounted through
 those list failures. The read retry does not save or clear your text. An initial
 failure with no cached view still shows a separate error/retry screen.
+
+Selected-Epic and Story Markdown editors likewise remain mounted when their cached
+background detail read fails. A background retry does not blur or save the field.
+Markdown's normal user-blur save is unchanged: moving focus away yourself, including
+to a read-retry button, can still save your edit. These are separate actions.
