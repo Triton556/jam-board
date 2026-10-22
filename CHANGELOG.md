@@ -3,6 +3,28 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.21] - 2026-10-21
+
+### Fixed
+
+- Command-palette MCP setup opens the existing pinned Settings → Agents flow
+  instead of copying an unpinned duplicate configuration with invalid apostrophe
+  escaping. MCP/config/Codex/Claude searches remain discoverable; missing runtime
+  data no longer makes this action silently close without a destination.
+- Both Codex HTTP snippet builders explicitly send `X-Jam-Agent: Codex` with the
+  optional project header, matching the existing stdio identity default.
+- Enabled Table filters and archived/openable rows keep readable text instead of
+  whole-control opacity. Selection rings, pressed state and archived stamps remain.
+
+### Changed
+
+- Setup explains distinct stable brain/worker names, shared identity in inherited
+  connections, reconnecting after configuration changes, and the consequences for
+  status, event filtering and independent review. This is guidance for existing
+  behavior, not a new launcher, identity editor or authentication mechanism.
+- Claude command hints explicitly identify their existing PowerShell quoting.
+  The existing Ready/butter alias is centralized without changing its color.
+
 ## [0.3.0-alpha.20] - 2026-10-21
 
 ### Fixed

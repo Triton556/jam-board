@@ -210,7 +210,7 @@ pub fn project_config_snippets(
         .map(|p| format!(", JAM_BOARD_PROJECT = {}", quoted(p)))
         .unwrap_or_default();
     let header = project
-        .map(|p| format!("\nhttp_headers = {{ \"X-Jam-Project\" = {} }}", quoted(p)))
+        .map(|p| format!(", \"X-Jam-Project\" = {}", quoted(p)))
         .unwrap_or_default();
     let cli_env = project
         .map(|p| format!(" --env JAM_BOARD_PROJECT={}", shell_quote(p)))
@@ -225,7 +225,7 @@ pub fn project_config_snippets(
             quoted(data_dir)
         ),
         codex_http: format!(
-            "# Set JAM_BOARD_TOKEN to {bearer} in your environment.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\"{header}"
+            "# Set JAM_BOARD_TOKEN to {bearer} in your environment.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\"\nhttp_headers = {{ \"X-Jam-Agent\" = \"Codex\"{header} }}"
         ),
         claude_stdio: format!(
             "claude mcp add jam-board --env JAM_AGENT_NAME=Claude --env JAM_BOARD_DATA_DIR={}{cli_env} -- {}",

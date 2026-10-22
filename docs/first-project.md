@@ -148,3 +148,13 @@ An unconfirmed request may already have saved its file. Inspect that project bef
 re-dropping only the files still needed; the app does not retry or roll back the batch.
 Problematic receipts are retained only within the latest three notices of this app
 session, not a durable queue. Closing the app does not guarantee a later receipt.
+
+### Several independently tracked workers
+
+Settings → Agents shows the pinned project and the separate **Agent identity**
+explanation. Give independently configured connections distinct stable names via
+`JAM_AGENT_NAME` (stdio) or `X-Jam-Agent` (HTTP), then reconnect. A new chat or an
+inherited subagent does not automatically become a separate board member; shared
+names aggregate work and cannot independently review their own reports. This does
+not change Story/Epic worker permission or launch a session. The command palette's
+**Set up agent connection (MCP)…** opens this same setup flow.

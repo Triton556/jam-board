@@ -235,3 +235,29 @@ it("planning prompts defer to live schemas and preserve the separate per-epic ap
   );
   expect(prompt).toContain("never refill validators and replay blindly");
 });
+
+it("explains stable connection identities without changing configuration, role or authorization", async () => {
+  const user = userEvent.setup();
+  wrap(<SettingsPage initialSection="Agents" />);
+  expect(await screen.findByText("Agent identity")).toBeVisible();
+  expect(screen.getByText(/replace its default Codex or Claude/)).toBeVisible();
+  await user.click(screen.getByText("Several workers or inherited subagents?"));
+  expect(
+    screen.getByText(/same normalized name share one board member/),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/Subagents inheriting the same MCP connection/),
+  ).toBeVisible();
+  expect(screen.getByText(/hides those peers' events/)).toBeVisible();
+  expect(
+    mockApi.calls.some((c) =>
+      [
+        "reveal_mcp_token",
+        "mcp_config_snippets",
+        "set_brain",
+        "set_execution",
+        "run_skill",
+      ].includes(c.command),
+    ),
+  ).toBe(false);
+});

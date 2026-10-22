@@ -107,3 +107,44 @@ it.each(["light", "dark"] as const)(
     expect(app).toMatch(/\.countdown\.ending\s*\{\s*color: var\(--coral-ink\)/);
   },
 );
+
+it.each(["light", "dark"] as const)(
+  "%s enabled table filters and archived text retain normal-text contrast",
+  (theme) => {
+    const colors = theme === "light" ? light : dark;
+    const rules =
+      app.match(/\.status-filters button \{([\s\S]*?)\}/)?.[1] ?? "";
+    const opacity = Number(rules.match(/opacity:\s*([.\d]+)/)?.[1] ?? "1");
+    const archived = Number(
+      app.match(/\.archived\s*\{[^}]*opacity:\s*([.\d]+)/)?.[1] ?? "1",
+    );
+    const over = (foreground: RGB, background: RGB, alpha: number) =>
+      foreground.map(
+        (channel, i) => channel * alpha + (background[i] ?? 0) * (1 - alpha),
+      ) as RGB;
+    for (const palette of ["lilac", "butter", "sky", "rose", "mint"]) {
+      const base = color(colors, "paper"),
+        background = over(color(colors, palette), base, opacity),
+        ink = over(color(colors, "ink"), base, opacity);
+      expect(
+        contrast(ink, background),
+        `${theme} ${palette} enabled filter`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const base of ["paper", "card"])
+      expect(
+        contrast(
+          over(color(colors, "ink-2"), color(colors, base), archived),
+          color(colors, base),
+        ),
+      ).toBeGreaterThanOrEqual(4.5);
+    expect(app).toMatch(
+      /\.status-filters button\[aria-pressed="true"\][\s\S]*?box-shadow:/,
+    );
+    expect(readFileSync("src/features/table/TableRow.tsx", "utf8")).toContain(
+      'className="table-stamp">archived',
+    );
+    expect(`${css}\n${app}`).toMatch(/--st-ready:\s*var\(--st-todo\)/);
+    expect(css).toMatch(/--st-todo:\s*var\(--butter\)/);
+  },
+);
