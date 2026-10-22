@@ -76,7 +76,7 @@ it.each([
     const summary = await screen.findByLabelText("Actions for Focus fixture");
     await userEvent.click(summary);
     await userEvent.click(
-      screen.getByRole("button", { name: action, exact: true }),
+    screen.getByRole("button", { name: action }),
     );
     // The modal owns initial focus. Child React autoFocus must not replace its
     // captured return target with an input that disappears on close.
