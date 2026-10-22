@@ -56,6 +56,7 @@ import {
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
 import { useBoardReturnFocus } from "./features/board/use-board-return-focus";
+import { NotificationBell } from "./features/notifications/NotificationBell";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
 import { executionRequestsQuery } from "./lib/execution-queries";
@@ -482,6 +483,14 @@ function Shell() {
             <Stamp className="theme-stamp">{board.data.jam.theme}</Stamp>
           )}
           <div className="topbar-space" />
+          {app.data.jam && (
+            <NotificationBell
+              key={`${app.data.jam.id}:${app.data.currentMember.id}`}
+              projectId={app.data.jam.id}
+              projectName={app.data.jam.name}
+              memberId={app.data.currentMember.id}
+            />
+          )}
           <IconButton label="New task · N" onClick={newTask}>
             <Plus size={17} />
           </IconButton>
@@ -819,7 +828,15 @@ const placeholders = navigation
       path: item.path,
       validateSearch: (
         search: Record<string, unknown>,
-      ): { task?: string; section?: string } => ({
+      ): {
+        task?: string;
+        section?: string;
+        question?: string;
+        status?: string;
+      } => ({
+        question:
+          typeof search.question === "string" ? search.question : undefined,
+        status: typeof search.status === "string" ? search.status : undefined,
         task: typeof search.task === "string" ? search.task : undefined,
         section:
           typeof search.section === "string" ? search.section : undefined,
