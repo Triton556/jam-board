@@ -133,6 +133,7 @@
   display: grid;
   gap: 20px;
 }
+.epic-process-choice,
 .epic-process label {
   display: grid;
   gap: 8px;

@@ -3,6 +3,29 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.17] - 2026-10-21
+
+### Fixed
+
+- Plan's Participation and Separate reviewer labels now target only their triggers,
+  not the entire custom option subtree. Each choice keeps its own accessible name;
+  the existing layout, values, pointer/keyboard selection and Escape behavior remain.
+  This is a narrowly reproduced label association repair, not a custom-select rewrite.
+
+### Documentation
+
+- README clearly separates optional legacy playbook guidance from required MCP
+  connection, flags strict output-schema upgrades, and distinguishes historical
+  media/public downloads from the unreleased development candidate.
+- The walkthrough uses the exact **New work paused** label. An empty MCP project
+  scope means the session's pinned project, never whichever board the UI displays.
+
+### Verification
+
+- [Exact checks and limits](docs/verification/0.3.0-alpha.17.md). No backend, schema,
+  dependency, permission or migration change. Native checks on the preceding
+  alpha16 candidate retain that version attribution.
+
 ## [0.3.0-alpha.16] - 2026-10-21
 
 ### Fixed
