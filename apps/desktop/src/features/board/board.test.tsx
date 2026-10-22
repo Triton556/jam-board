@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -17,7 +21,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
 import { mockApi } from "../../lib/mock-bridge";
-import { useMoveTask } from "../../lib/queries";
+import { tasksQuery, useMoveTask } from "../../lib/queries";
 import type {
   ActivityEvent,
   BoardTasks,
@@ -37,6 +41,7 @@ function wrapper(
     },
   }),
 ) {
+  client.setQueryData(["app"], appState);
   return {
     client,
     Wrapper: ({ children }: { children: React.ReactNode }) => (
@@ -44,11 +49,13 @@ function wrapper(
     ),
   };
 }
+let appState: Awaited<ReturnType<typeof api.appState>>;
 let members: Member[];
 let task: TaskSummary;
 beforeEach(async () => {
   mockApi.setLatency(0);
   await mockApi.resetDemo();
+  appState = await api.appState();
   members = await mockApi.listMembers();
   const board = await mockApi.listBoardTasks();
   task = board.in_progress.find(
@@ -138,13 +145,14 @@ describe("agent events", () => {
     expect(useUiStore.getState().toasts).toHaveLength(0);
   });
 });
-it("rolls back the optimistic move when move_task fails", async () => {
+it("keeps last-read positions and reconciles an unconfirmed move by reading, never rollback", async () => {
   const board = await api.listBoardTasks();
   const source = board.ready[0];
   if (!source) throw new Error("Missing task");
   const { client, Wrapper } = wrapper();
   client.setQueryData(["boardTasks"], board);
   function Move() {
+    useQuery(tasksQuery);
     const move = useMoveTask();
     return (
       <button
@@ -165,23 +173,27 @@ it("rolls back the optimistic move when move_task fails", async () => {
   mockApi.failNext("move_task");
   mockApi.setLatency(100);
   fireEvent.click(screen.getByText("Move"));
+  expect(
+    client
+      .getQueryData<BoardTasks>(["boardTasks"])
+      ?.ready.some((t) => t.key === source.key),
+  ).toBe(true);
   await waitFor(() =>
-    expect(
-      client
-        .getQueryData<BoardTasks>(["boardTasks"])
-        ?.review.some((t) => t.key === source.key),
-    ).toBe(true),
+    expect(useUiStore.getState().toasts[0]?.text).toContain(
+      `Move result unconfirmed for ${source.key}`,
+    ),
   );
   await waitFor(() =>
-    expect(
-      client
-        .getQueryData<BoardTasks>(["boardTasks"])
-        ?.ready.some((t) => t.key === source.key),
-    ).toBe(true),
+    expect(client.isFetching({ queryKey: ["boardTasks"] })).toBe(0),
   );
-  expect(useUiStore.getState().toasts[0]?.text).toBe(
-    `Couldn't move ${source.key} — Simulated failure`,
-  );
+  expect(
+    client
+      .getQueryData<BoardTasks>(["boardTasks"])
+      ?.ready.some((t) => t.key === source.key),
+  ).toBe(true);
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(1);
   mockApi.setLatency(0);
 });
 it("creates on Enter, keeps the editor, ignores blank titles and cancels on Escape", async () => {
@@ -256,7 +268,8 @@ describe("onboarding validation", () => {
       );
   });
   it("shows field errors without sending an invalid form to Rust", async () => {
-    const { Wrapper } = wrapper();
+    const { client, Wrapper } = wrapper();
+    client.removeQueries({ queryKey: ["app"] });
     const router = createRouter({
       routeTree: createRootRoute({ component: Welcome }),
       history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -586,4 +599,49 @@ it("a keyboard drag keeps its starting version after a newer task arrives, refus
       captured.key,
     ),
   ).toBeVisible();
+});
+
+it("announces pending move without a speculative jump and exposes read-only recovery after an uncertain reply", async () => {
+  const { client, Wrapper } = wrapper(),
+    user = userEvent.setup();
+  let reject!: (error: Error) => void;
+  const pending = new Promise<never>((_, no) => {
+    reject = no;
+  });
+  const move = vi.spyOn(api, "moveTask").mockReturnValue(pending);
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
+  const before = client.getQueryData<BoardTasks>(["boardTasks"]);
+  button.focus();
+  await user.keyboard("[Space][ArrowRight][Space]");
+  await waitFor(() => expect(move).toHaveBeenCalledTimes(1));
+  expect(
+    await screen.findByText(/Saving move and refreshing the board/),
+  ).toBeVisible();
+  expect(client.getQueryData(["boardTasks"])).toEqual(before);
+  const read = vi
+    .spyOn(api, "listBoardTasks")
+    .mockRejectedValue(new Error("read unavailable"));
+  await act(async () => reject(new Error("notification unavailable")));
+  expect(
+    await screen.findByText(
+      "Could not refresh board or team. Showing the last loaded view.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  expect(useUiStore.getState().toasts.at(-1)).toMatchObject({
+    persistent: true,
+    text: expect.stringContaining("Move result unconfirmed for JB-7"),
+  });
+  read.mockResolvedValue(before as BoardTasks);
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(/Could not refresh board or team/),
+    ).not.toBeInTheDocument(),
+  );
+  expect(move).toHaveBeenCalledTimes(1);
+  expect(client.getQueryData(["boardTasks"])).toEqual(before);
+  move.mockRestore();
+  read.mockRestore();
 });

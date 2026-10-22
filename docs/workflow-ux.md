@@ -577,3 +577,22 @@ and context within the existing three-notice in-memory bound. No mutation retry,
 queue, backend identity change, automatic rollback or process-exit receipt promise
 is introduced. This repair is specific to the proven image-preparation path, not a
 claim that every asynchronous interaction has been exhaustively audited.
+
+
+## 26. Move intent is not confirmed persistence
+
+An independent probe reproduced late generic move errors restoring an entire old
+board snapshot into a newly selected project. A→B→A and unmounted completion also
+restored stale data; a modeled post-commit failure falsely looked like rollback.
+The correction captures selection generation and input at invocation and fences
+all view-side effects, including pre-dispatch and read reconciliation.
+
+Rather than introduce a per-task optimistic transaction ledger, Board now keeps
+last-read/event positions while saving. There is no speculative whole-board cache
+write or snapshot rollback. Known conflict/readiness/execution refusals retain
+their existing handling; other errors conservatively mean an unconfirmed result.
+The read can fail independently and remains explicitly retryable without replaying
+the mutation. This follows [visible system status](https://www.nngroup.com/articles/visibility-system-status/)
+and [drag-and-drop feedback guidance](https://atlassian.design/components/pragmatic-drag-and-drop/accessibility-guidelines/).
+It does not add a Move menu or claim complete drag accessibility. Motion remains
+presentation only; no animation callback, new library or backend policy is involved.
