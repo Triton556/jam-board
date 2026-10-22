@@ -19,11 +19,13 @@ import {
 } from "../../components/ui";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { epicsQuery } from "../../lib/planning-queries";
 import { membersQuery } from "../../lib/queries";
 import type { ActivityEvent } from "../../lib/types";
 import { eventText, useUiStore } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
 import {
   journalSessions,
   journalWithProjectPrelude,
@@ -79,6 +81,11 @@ export function Journal({
       return journalWithProjectPrelude(scoped, project);
     },
   });
+  const read = useExplicitRead(
+    JSON.stringify(["journal", epicKey ?? "all", kind, member]),
+  );
+  const refresh = () =>
+    void read.run(() => query.refetch({ cancelRefetch: false }));
   const scroll = useRef<HTMLDivElement>(null);
   const batch = useUiStore((s) => s.boardEvents);
   const processed = useRef(batch);
@@ -138,6 +145,24 @@ export function Journal({
           ]}
         />
       </div>
+      <Button
+        onClick={refresh}
+        disabled={read.pending || query.isFetching}
+        aria-busy={read.pending || query.isFetching}
+      >
+        {read.pending ? "Checking journal…" : "Refresh"}
+      </Button>
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="journal"
+      />
+      {query.error && query.data && (
+        <p role="alert">
+          Could not refresh journal. Showing the last loaded journal.{" "}
+          {query.error.message}
+        </p>
+      )}
       {pending > 0 && (
         <Button
           className="new-events"
@@ -153,12 +178,20 @@ export function Journal({
       <div className="journal-scroll" ref={scroll} data-testid="journal-scroll">
         {query.isPending ? (
           <PaperSkeleton label="Loading journal" />
-        ) : query.error ? (
-          <QueryError error={query.error} retry={() => void query.refetch()} />
+        ) : query.error && !query.data ? (
+          <QueryError
+            error={query.error}
+            retry={refresh}
+            busy={read.pending || query.isFetching}
+          />
         ) : !rows.length ? (
-          <EmptyState text="Every small step will find a place here">
-            <Button onClick={() => void query.refetch()}>Refresh</Button>
-          </EmptyState>
+          <EmptyState
+            text={
+              kind || member
+                ? "No journal steps match these filters"
+                : "Every small step will find a place here"
+            }
+          />
         ) : (
           days.map((day) => (
             <section key={day}>

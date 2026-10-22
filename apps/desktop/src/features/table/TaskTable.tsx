@@ -20,6 +20,7 @@ import {
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Switch } from "../../components/ui/m5";
 import { NewTaskButton } from "../../components/ui/NewTaskButton";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { agentWorking, useWorkingClock } from "../../lib/agent-working";
 import { api } from "../../lib/api";
 import { avatarInitials } from "../../lib/avatar-initials";
@@ -28,6 +29,7 @@ import { membersQuery, useBoardSettings } from "../../lib/queries";
 import type { Member, Status, TaskSummary } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
 import { InlineTaskCreate } from "./InlineTaskCreate";
 import type { TableSearch } from "./search";
 import { nextSort, tableQuery } from "./search";
@@ -117,6 +119,7 @@ export function TaskTable({
     queryKey: ["tableTasks", query],
     queryFn: () => api.listTasks(query),
   });
+  const read = useExplicitRead(JSON.stringify(["tableTasks", query]));
   const members = useQuery(membersQuery);
   const tags = useQuery({ queryKey: ["tags"], queryFn: () => api.listTags() });
   const [text, setText] = useState(search.q ?? "");
@@ -384,18 +387,29 @@ export function TaskTable({
       )}
       {tasks.error && (
         <div className="table-read-error">
-          <p role="alert">{tasks.error.message}</p>
+          <p role="alert">
+            {tasks.error.message}{" "}
+            {tasks.data ? "Showing the last loaded task list." : ""}
+          </p>
           <Button
-            onClick={() => void tasks.refetch()}
-            disabled={tasks.isFetching}
+            onClick={() =>
+              void read.run(() => tasks.refetch({ cancelRefetch: false }))
+            }
+            disabled={read.pending || tasks.isFetching}
+            aria-busy={read.pending || tasks.isFetching}
           >
             {tasks.isFetching ? "Retrying…" : "Retry task list"}
           </Button>
         </div>
       )}
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="task list"
+      />
       {tasks.isPending && <p className="loading">Opening the task list…</p>}
       <VirtualTaskTable
-        rows={tasks.isPending || tasks.error ? [] : rows}
+        rows={tasks.isPending ? [] : rows}
         loading={tasks.isPending}
         focused={focusedTask}
         setFocused={setFocusedTask}

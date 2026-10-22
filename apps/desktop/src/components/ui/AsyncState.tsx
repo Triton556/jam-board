@@ -8,11 +8,24 @@ export function PaperSkeleton({ label = "Loading…" }: { label?: string }) {
     </div>
   );
 }
-export function QueryError({ error, retry }: { error: Error; retry(): void }) {
+export function QueryError({
+  error,
+  retry,
+  busy = false,
+}: {
+  error: Error;
+  retry(): void;
+  busy?: boolean;
+}) {
   return (
     <EmptyState text="This page needs another try">
       <p role="alert">{error.message}</p>
-      <Button variant="primary" onClick={retry}>
+      <Button
+        variant="primary"
+        onClick={retry}
+        disabled={busy}
+        aria-busy={busy}
+      >
         Try again
       </Button>
     </EmptyState>
