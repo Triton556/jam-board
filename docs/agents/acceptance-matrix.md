@@ -98,3 +98,13 @@ pass. `e2e/human-first.spec.ts` adds actual browser input/disclosure/persisted-s
 and computed field-padding assertions; they are typechecked and listed but not
 run at this source checkpoint. Native light/dark layout, Windows interaction and
 human findability remain pending. See [alpha29 verification](../verification/0.3.0-alpha.29.md).
+
+## Alpha30 canvas candidate
+
+RF01/RF02: frame-only empty-art state, explicit grip, resize and child/blank-canvas
+gestures. RF03: local note title/body → save/cancel/dirty-confirm/pending/uncertain
+read-recovery; exact single create, scope/lifetime fencing, no replay. VS01: nested
+reference dialog form spacing and draft confirmation focus. VS03: image dimensions
+at fractional zoom × DPR and stale/failure paths. DOM/pure cases are recorded in
+alpha30 verification; native geometry, both themes, 800×600/200% scaling and
+500-card gesture/clarity checks remain unrun at this source checkpoint.
