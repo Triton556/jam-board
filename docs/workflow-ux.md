@@ -9,7 +9,7 @@ agent-colored ring, pencil and handwritten status remain part of the design.
 **Scenario:** work on more than one application without mixing plans or sending
 an existing agent to whichever board happens to be open.
 
-The project name in the navigation rail is a labeled control. **Your projects**
+The project name in the top bar is a labeled Switch project control. **Your projects**
 provides creation, opening and restoration in one place. A current-project badge
 and key prefix make the destination recognizable; connection binding uses the
 exact immutable project ID, not matching display text. A connected MCP
@@ -115,8 +115,8 @@ and partial grants remain explicit; repeated background explanation lives in a
 consequences. [Progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 supports this layering; the concrete layout is our inference, verified separately.
 
-Keyboard Enter retains the task-opening meaning advertised by its button; Space
-is the distinct drag action. [WAI-ARIA dialog guidance](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+Keyboard Enter and Space both open a task through normal button activation.
+Board task dragging is pointer-only; keyboard Status editing remains available. [WAI-ARIA dialog guidance](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
 requires focus inside the dialog and return to an appropriate workflow target.
 Native pointer focus already worked in the baseline; explicit activation focus
 also covers programmatic/accessibility activation without relying on pointer focus.
@@ -596,3 +596,25 @@ the mutation. This follows [visible system status](https://www.nngroup.com/artic
 and [drag-and-drop feedback guidance](https://atlassian.design/components/pragmatic-drag-and-drop/accessibility-guidelines/).
 It does not add a Move menu or claim complete drag accessibility. Motion remains
 presentation only; no animation callback, new library or backend policy is involved.
+
+## Human-first descriptions and progressive disclosure (alpha29)
+
+The existing Task `descriptionMd` is now labelled **Description**, and the existing
+comment thread sits directly below it. Story **Description** is its existing
+`outcomeMd`. Neither mapping creates or rewrites stored text. If a task has no
+saved description, its existing planned goal can appear as **From the agent plan**
+with an explicit not-copied explanation; this is not generated prose.
+
+**Agent plan** is a native, keyboard-operable disclosure around the existing
+structured fields. It starts closed but keeps editors mounted, preserves local
+drafts, and exposes save errors outside the hidden region. Readiness and agent
+contracts still use the complete plan. This applies progressive disclosure to the
+user's observed editing difficulty, rather than deleting useful implementation
+structure. [NN/g progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
+provides the design rationale; actual behavior and spacing require the separate
+acceptance checks in the [agent-facing map](agents/README.md).
+
+Human-language text is preserved; no translation, AI generation or session launch
+is inferred from an edit or comment. Story comments require a later model decision
+and are not simulated with open decisions. Refinement remains prompt preparation,
+not a regeneration request sent automatically to a model.

@@ -1,5 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
-import { expectPoliteNotice, markdownReadView } from "./assertions";
+import {
+  expectPoliteNotice,
+  markdownReadView,
+  openAgentPlan,
+} from "./assertions";
 
 async function select(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label, exact: true }).click();
@@ -63,7 +67,8 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     .getByRole("textbox", { name: "Story name" })
     .fill("Readable bridge");
   await page.getByRole("button", { name: "Create story", exact: true }).click();
-  await writeBlock(page, "Outcome", "The next safe tile is obvious.");
+  await writeBlock(page, "Description", "The next safe tile is obvious.");
+  await openAgentPlan(page);
   await page
     .getByRole("button", { name: "Add criterion", exact: true })
     .click();
@@ -89,6 +94,7 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     .getByRole("textbox", { name: "New planned task title" })
     .fill("Light one safe tile");
   await page.getByRole("button", { name: "Create task", exact: true }).click();
+  await openAgentPlan(page);
   for (const [label, text] of [
     ["Goal", "Show the safe next step."],
     ["Where", "game/lantern.gd"],
@@ -326,6 +332,7 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
     }),
   );
   await page.goto("/board?task=JB-1");
+  await openAgentPlan(page);
   for (const label of ["Change", "Test"]) {
     const first = page.getByRole("button", {
       name: `Drag ${label} 1`,
@@ -394,6 +401,7 @@ test("brief conflict compares fields and Save my edits against latest preserves 
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   await page.goto("/board?task=JB-2");
+  await openAgentPlan(page);
   const required = page.getByRole("textbox", {
     name: "Change 1 required",
     exact: true,

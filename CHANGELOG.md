@@ -3,6 +3,30 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.29] — 2026-10-22
+
+### Human-first task and story editing
+
+- Task Description and actual Comments now come before the structured agent plan.
+  Existing descriptions, comments and brief fields are preserved; an empty
+  description may show the existing goal as a clearly labelled read-only context,
+  never as silently copied or generated text.
+- Story Description uses its existing outcome field. Remaining context and
+  acceptance criteria live in an explicit Agent plan disclosure. Both task and
+  story technical editors remain mounted while collapsed, retaining drafts and
+  the existing readiness/review rules.
+- Comment drafts and Story description drafts stay attached to their entity in
+  this app session. Comment posting captures its original target and body,
+  prevents duplicate pending sends, and keeps an unconfirmed result for manual
+  inspection rather than automatically retrying.
+- Added an agent-facing interaction/state map, acceptance matrix and remaining
+  gaps under `docs/agents/`. Story-level comments, notification history, canvas
+  ergonomics, shorter refinement prompts and session streaming are not implied
+  by this first increment.
+
+No database migration, MCP schema, execution permission or task readiness
+policy changed. [Verification](docs/verification/0.3.0-alpha.29.md).
+
 ## [0.3.0-alpha.28] - 2026-10-22
 
 ### Fixed

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openAgentPlan } from "./assertions";
 
 test("Plan journal includes a labeled project interview before epic creation", async ({
   page,
@@ -151,6 +152,7 @@ test("planning and Inbox polish preserve shared controls and readable placement"
     /\d+ of \d+ criteria mandatory/,
   );
   await page.goto("/board?task=JB-2");
+  await openAgentPlan(page);
   const required = page.getByRole("textbox", {
     name: "Change 1 required",
     exact: true,

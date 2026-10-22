@@ -82,19 +82,21 @@ export function PlanningStatus({
   );
 }
 export function SavedMarkdown({
+  identity,
   label,
   value,
   save,
   hint,
   disabled = false,
 }: {
+  identity?: string;
   label: string;
   value: string;
   save(value: string): Promise<unknown>;
   hint?: string;
   disabled?: boolean;
 }) {
-  const draft = usePlanningDraft(value);
+  const draft = usePlanningDraft(value, identity);
   const saveScope = useId();
   const client = useQueryClient();
   const mutation = useMutation({

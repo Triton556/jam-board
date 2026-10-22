@@ -17,13 +17,13 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Historical Snowball dogfood recording in the real desktop app (not current-prerelease acceptance): a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.28**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.29**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
 > Alpha15 adds `latestActivityCursor` to session context; strict/cached output
 > schemas also need updating. Missing on an older server does not mean zero.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.28.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.29.md).
 
 ## Features
 
@@ -60,6 +60,13 @@ New here? Follow [one project from rough idea to reviewed work](docs/first-proje
 6. Check the journal and steer the plan with edits, references and answers. The brain asks before closing an epic when your participation calls for it.
 
 **Where are features?** Open **Plan**, select an epic and choose **Stories** (or the story-count button in its overview). A story is the feature-sized outcome with acceptance criteria; its tasks are the implementation briefs. There is no additional Feature level.
+
+**Write naturally first.** Open a Story or Task and use **Description**. Task
+**Comments** are the place for wishes and follow-up corrections. **Agent plan**
+reveals the structured implementation fields and acceptance checks without
+requiring a human to fill them all first. Readiness still uses those fields;
+collapsing them does not change permissions or erase content. A Story's description
+is its existing outcome field; this increment does not add Story-level comments.
 
 **Rough idea or corrections?** Use **Refine with brain** on an epic, story or task. Review and copy the scoped planning prompt into your connected agent's chat. It asks the brain to read existing notes and references, clarify gaps in Inbox, and reconcile your edits without starting implementation. Copying a prompt does not launch an agent.
 
@@ -260,3 +267,9 @@ Tauri 2 · Rust · SQLite · rmcp · React 19 · TypeScript 7 · Vite 8 · TanSt
 MIT © 2026 Danil Volodin. Built by Danil Volodin with AI coding agents (Codex, Claude Code).
 
 See [CREDITS.md](CREDITS.md) and [third-party licenses](docs/third-party-licenses.md).
+
+## Working on Jam Board
+
+Start with the [agent-facing interaction and acceptance map](docs/agents/README.md).
+Keep it current when adding or changing a user or agent action; build and content
+integrity checks are not substitutes for functional and visual acceptance.
