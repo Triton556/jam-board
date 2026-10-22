@@ -48,11 +48,31 @@ test("agent setup distinguishes connection, skill and planning without starting 
     page.getByText("Set up in three steps", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(/This is a read-only connection check/),
+    page.getByText(
+      /Use the jam-board MCP connection for a read-only connection check/,
+    ),
   ).toBeAttached();
+  const current = await page.evaluate(() => window.__jamMock.appState());
+  await expect(
+    page.getByText(
+      /Use the jam-board MCP connection for a read-only connection check/,
+    ),
+  ).toContainText(current.jam?.id ?? "missing project");
+  await expect(
+    page.getByText(/Switching boards in Jam Board does not redirect/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Show configuration" }).click();
+  const configuration = page.getByRole("region", { name: "Connect the board" });
+  await expect(configuration).toBeFocused();
+  await expect(configuration.locator("pre")).toContainText(
+    current.jam?.id ?? "missing project",
+  );
   await page.getByRole("button", { name: "Prepare planning prompt" }).click();
   const dialog = page.getByRole("dialog", { name: "Plan with your brain" });
   await expect(dialog).toContainText("not an agent launch");
+  await expect(
+    dialog.getByRole("textbox", { name: "Planning prompt" }),
+  ).toHaveValue(/do not replace another brain/);
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),

@@ -73,7 +73,7 @@ test("Agents validates locally, copies exact commands and confirms install after
   await expect(page.getByText("Playbook 1.3.0")).toBeVisible();
   const card = page.locator(".settings-card").filter({
     has: page.getByRole("heading", {
-      name: "Give your agent the skill",
+      name: "Optional · Give your agent workflow guidance",
       exact: true,
     }),
   });

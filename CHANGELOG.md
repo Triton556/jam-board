@@ -3,6 +3,37 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.9] - 2026-10-21
+
+### Changed
+
+- Agent setup names the selected project and separates MCP connection, read-only
+  verification, per-Epic Brain appointment and optional workflow-skill installation.
+  It explains that changing boards cannot redirect an existing agent session.
+- Connection checks verify the exact intended project ID and key prefix before
+  reading the board. Configuration display and copy use the same captured project
+  ID; delayed token access cannot silently copy a newly selected board. Feedback
+  names the captured target, and stdio copy does not reveal an unused HTTP token.
+- Reconnection and upgrade guidance covers duplicate client entries, refreshed tool
+  schemas and rereading/reconciling current task evidence rather than stale replay.
+- Optional playbook acquisition now has user-triggered source instructions and a
+  copyable clone command. Nothing is downloaded, installed or configured by reading
+  the guide. Installation verification is not advertised as protocol compatibility.
+- Known legacy playbook examples are documented honestly: the current live MCP
+  schema and in-app prompts take precedence for project binding, execution grants
+  and captured task/review context. The separate playbook repository is unchanged.
+- Agent-facing initialization and the product introduction say “project”, not
+  “game jam” only; existing game-jam templates and branding are preserved.
+
+### Verification and compatibility
+
+- No database migration, role, execution-gate or mutation-schema change.
+- Exact alpha8 independently passed 26 interaction probes and six source-contrast
+  checks. Alpha7 native screenshot-only acceptance confirmed stale keyboard drag
+  and Ready decisions refuse safely, with preserved drafts and no automatic work.
+- Current-version checks and remaining native/browser limitations are recorded in
+  the versioned verification notes. No automatic client setup or process launch.
+
 ## [0.3.0-alpha.8] - 2026-10-21
 
 ### Fixed

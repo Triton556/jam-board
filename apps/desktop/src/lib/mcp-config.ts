@@ -1,13 +1,14 @@
 import type { ConfigSnippets, McpStatus } from "./types";
 export function makeSnippets(
   status: Pick<McpStatus, "sidecarPath" | "dataDir" | "port"> & {
+    projectId?: string | null;
     projectKeyPrefix?: string | null;
   },
   token: string,
 ): ConfigSnippets {
   const port = status.port ?? 47321;
   const shellQuote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-  const project = status.projectKeyPrefix;
+  const project = status.projectId ?? status.projectKeyPrefix;
   const projectEnv = project
     ? `, JAM_BOARD_PROJECT = ${JSON.stringify(project)}`
     : "";

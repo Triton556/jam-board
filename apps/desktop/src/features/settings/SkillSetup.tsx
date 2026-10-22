@@ -1,10 +1,13 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SkillCheck, SkillInput } from "../../bindings";
 import { Button, Dialog, SegmentedControl, Select } from "../../components/ui";
 import { CodeBlock } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
 import { api } from "../../lib/api";
 import { skillCommands } from "../../lib/skill-setup";
+export const playbookRepository = "https://github.com/Triton556/agent-playbook";
+export const playbookCloneCommand =
+  "git clone -c core.longpaths=true https://github.com/Triton556/agent-playbook.git";
 export function SkillSetup() {
   const [input, setInput] = useState<SkillInput>({
     playbook: "",
@@ -105,13 +108,84 @@ export function SkillSetup() {
       setBusy(false);
     }
   };
+  const openInstructions = async () => {
+    try {
+      await api.openUrl(`${playbookRepository}#quick-start`);
+      setNotice(
+        "Opened the playbook instructions. Nothing was downloaded or installed by Jam Board.",
+      );
+    } catch {
+      setNotice(
+        `Could not open the browser. Open ${playbookRepository} manually; nothing was installed.`,
+      );
+    }
+  };
+  const copyClone = async () => {
+    try {
+      await navigator.clipboard.writeText(playbookCloneCommand);
+      setNotice(
+        "Clone command copied. Run it yourself in a chosen parent folder; then choose the downloaded agent-playbook folder below.",
+      );
+    } catch {
+      setNotice(
+        "Clipboard unavailable. Select and copy the clone command shown above.",
+      );
+    }
+  };
   const commands = skillCommands(input, check?.python ?? "py -3");
   return (
     <SettingsSection
       className="skill-setup"
-      title="Give your agent the skill"
-      description="Use a local playbook. Nothing is downloaded, and global client settings stay unchanged."
+      title="Optional · Give your agent workflow guidance"
+      description="MCP works without installing this skill. Installation adds instructions and helpers to a project folder; it does not connect MCP, appoint a brain or launch a model."
     >
+      <SettingsRow
+        label="Before installing"
+        hint="The live MCP schema is the current calling contract."
+      >
+        <p>
+          Older playbook examples target the legacy board contract and may omit
+          project binding, Start permission and required task/review context.
+          Installation verification checks files, not protocol compatibility.
+        </p>
+        <p>
+          Use this app's connection and planning prompts. Restart or reconnect
+          after an upgrade, refresh tool schemas, then reread and reconcile
+          before writing. Never copy old mutation calls blindly.
+        </p>
+      </SettingsRow>
+      <SettingsRow
+        label="Get the optional playbook"
+        hint="Already have a local checkout? Skip this step and choose its folder below."
+      >
+        <details className="connection-help">
+          <summary>I don't have agent-playbook yet</summary>
+          <p>
+            Read the source and installation instructions before running its
+            installer. Jam Board does not download anything automatically.
+          </p>
+          <Button disabled={busy} onClick={() => void openInstructions()}>
+            Open playbook instructions ↗
+          </Button>
+          <p>
+            With Git installed, run this in a parent folder you choose. It
+            creates a new agent-playbook subfolder; it does not install the
+            skill into your project.
+          </p>
+          <pre className="playbook-clone-command">
+            <code>{playbookCloneCommand}</code>
+          </pre>
+          <Button disabled={busy} onClick={() => void copyClone()}>
+            Copy clone command
+          </Button>
+          <p>
+            Then choose that subfolder below. It must contain harness.py and
+            manifest.json. Check setup, inspect the install plan, and confirm
+            only the intended project folder. Global client settings stay
+            unchanged.
+          </p>
+        </details>
+      </SettingsRow>
       <SettingsRow
         label="What to install"
         hint="Jam Board skill includes the playbook procedures it uses."
@@ -236,13 +310,15 @@ export function SkillSetup() {
           {notice === "Installed · verified" && (
             <>
               <p>
-                Start a new agent session in {input.target}, then ask it: 'Use
-                the jam-board MCP server: plan an epic with me.'
+                Files verified, not the MCP connection. Start a new agent
+                session in {input.target}, refresh its tools, and use the
+                project connection check above. Then appoint its Brain in Plan
+                and prepare a planning prompt. This does not start work.
               </p>
               <Button
                 onClick={() =>
                   void navigator.clipboard.writeText(
-                    `Start a new agent session in ${input.target}, then ask it: 'Use the jam-board MCP server: plan an epic with me.'`,
+                    `Start a new agent session in ${input.target}. Refresh its tool schemas. In Jam Board Settings > Agents, copy the intended project's read-only connection check. Confirm the exact project before writing, appoint a Brain for each epic in Plan, and use Prepare planning prompt. Installing the skill did not connect MCP or authorize execution.`,
                   )
                 }
               >

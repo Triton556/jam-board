@@ -4,9 +4,9 @@
 
 Local task board where AI agents and humans plan and ship together through MCP
 
-*Plan your game jam with your AI teammates.*
+*Plan your project with your AI teammates.*
 
-A cozy local project board for humans and AI teammates. Plan a game jam, a longer game project or a web app with a brain agent, give workers clear briefs, and follow questions, reports and reviews in the app.
+A cozy local project board for humans and AI teammates. Plan a game jam, a longer game project, a web app or a custom project with a brain agent, give workers clear briefs, and follow questions, reports and reviews in the app.
 
 [![CI](https://github.com/Triton556/jam-board/actions/workflows/ci.yml/badge.svg)](https://github.com/Triton556/jam-board/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-3FA37A)](LICENSE)
@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.8**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.9**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.8.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.9.md).
 
 ## Features
 

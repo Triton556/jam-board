@@ -1,6 +1,6 @@
 # Jam Board MCP
 
-Plan your game jam with your AI teammates. Both transports invoke the same `jam-core` services and SQLite transactions as the desktop application. There is no cloud service, account, or telemetry.
+Plan your project with your AI teammates. Both transports invoke the same `jam-core` services and SQLite transactions as the desktop application. There is no cloud service, account, or telemetry.
 
 ## Build and connect
 
@@ -57,6 +57,37 @@ claude mcp add --transport http jam-board http://127.0.0.1:47321/mcp --header "A
 The name-before-`--env` stdio form and HTTP header form follow the [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp). Replace `<token>` locally; if the default port is occupied, use the actual port stored in `settings.mcp_http_port`. These are instructions for the user, not commands that this implementation runs against real agent configuration.
 
 Replace the executable path with the absolute path shown in Settings → Agents. TOML does not expand %LOCALAPPDATA%; the example is a placeholder, not a literal path to paste unchanged. Installed stdio needs no data override. For development, add JAM_BOARD_DATA_DIR pointing at <checkout>/.dev-data. The default data folder is %APPDATA%\dev.triton556.jamboard.
+
+### Connect, appoint, then authorize
+
+1. Choose the intended project in **Projects**, then open **Settings → Agents**.
+   Its displayed name and key identify the configuration you are about to copy.
+2. Choose one transport, apply the configuration in your agent client yourself,
+   and restart/reconnect that session. Snippets share a connection name: replace
+   the old entry intentionally, or keep different boards in separate client
+   configurations/sessions; do not paste duplicate TOML entries.
+3. Copy the project's read-only check. It calls `get_session_context` first and
+   verifies the exact project ID/key prefix before `get_project`/`get_board`.
+   Copying a prompt or configuration is not proof that a connection succeeded.
+4. In **Plan**, open an epic and choose its **Brain**. The connected agent appears
+   after its first board call. Appoint it separately for each epic it coordinates.
+   When there is no epic yet, draft one with the agent first. An agent may use
+   `become_brain` for an unassigned epic only after the human appoints it; it must
+   not overwrite another brain's appointment.
+5. Prepare a planning prompt; refine questions, stories and tasks together. Brain
+   appointment, Active plan status and Ready tasks do not grant execution. Start
+   the chosen Story/Epic explicitly in Plan, or approve the brain's typed Inbox
+   request. The board never launches an operating-system agent process for you.
+
+Switching the app's board only changes the UI; existing MCP sessions remain pinned.
+To connect another project, repeat steps 1–3 with that project's configuration.
+After a version upgrade, refresh cached tools and reread task/report evidence before
+new actions. Never repair a rejected stale payload by silently filling new tokens.
+
+The [optional playbook compatibility note](agent-playbook-compatibility.md) separates
+workflow instructions from this version's calling contract. Installing that skill
+is not required for MCP, does not configure the connection, and cannot certify that
+older examples match the live tool schemas.
 
 ## Transports and authentication
 
