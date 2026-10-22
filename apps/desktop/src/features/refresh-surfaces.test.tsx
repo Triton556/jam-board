@@ -112,12 +112,22 @@ it("VS01 reference feedback stays in one flow container without replacing contro
   expect(filters.parentElement).toBe(stack);
   const notice = stack?.querySelector(".reference-read-notice");
   expect(notice).toBeEmptyDOMElement();
-  const write = vi.spyOn(api, "addReference");
+  const pendingCreate =
+    deferred<Awaited<ReturnType<typeof api.addReference>>>();
+  const write = vi
+    .spyOn(api, "addReference")
+    .mockReturnValue(pendingCreate.promise);
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Add" }));
   await user.click(screen.getByRole("button", { name: "Note" }));
-  const title = screen.getByRole("textbox", { name: "Title" });
-  await user.type(title, "Retained local note");
+  await screen.findByText(/Click the canvas to place a note/);
+  expect(
+    screen.getByRole("region", { name: "References canvas" }),
+  ).toHaveFocus();
+  expect(write).not.toHaveBeenCalled();
+  await user.keyboard("{Enter}");
+  const body = await screen.findByRole("textbox", { name: "Note text" });
+  await user.type(body, "Retained local note");
   vi.spyOn(api, "referenceCanvas").mockRejectedValueOnce(
     new Error("Fictional long read diagnostic. ".repeat(40)),
   );
@@ -128,8 +138,8 @@ it("VS01 reference feedback stays in one flow container without replacing contro
     "Fictional long read diagnostic",
   );
   expect(notice).toContainElement(screen.getByRole("alert"));
-  expect(title).toHaveFocus();
-  expect(title).toHaveValue("Retained local note");
+  expect(body).toHaveFocus();
+  expect(body).toHaveValue("Retained local note");
   expect(screen.getByRole("toolbar", { name: "Canvas tools" })).toBe(toolbar);
   expect(screen.getByRole("group", { name: "Filter references" })).toBe(
     filters,
@@ -137,6 +147,15 @@ it("VS01 reference feedback stays in one flow container without replacing contro
   await user.click(screen.getByRole("button", { name: "Try again" }));
   await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   expect(notice).toBeEmptyDOMElement();
-  expect(title).toHaveValue("Retained local note");
-  expect(write).not.toHaveBeenCalled();
+  expect(screen.getByRole("textbox", { name: "Note text" })).toBe(body);
+  expect(body).toHaveValue("Retained local note");
+  // Leaving the paper deliberately flushes its autosave. The failed read and
+  // retry must not replace the editor or duplicate that pending first create.
+  await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+  expect(write.mock.calls[0][0]).toMatchObject({
+    kind: "note",
+    text: "Retained local note",
+  });
+  expect(write.mock.calls[0][0].title).toBeUndefined();
+  expect(write.mock.calls[0][1]).toBe(true);
 });
