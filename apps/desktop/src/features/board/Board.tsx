@@ -261,10 +261,10 @@ function Column({
           </>
         ) : (
           {
-            backlog: "Draft ideas · refine before Ready",
-            ready: "Brief ready · scope permission still required",
-            review: "Reports awaiting independent review",
-            done: "Reviewed or manually completed",
+            backlog: "Draft ideas",
+            ready: "Prepared briefs",
+            review: "Reports to review",
+            done: "Completed tasks",
           }[status]
         )}
       </p>
@@ -287,18 +287,8 @@ function Column({
         {tasks.length === 0 && !quick && (
           <p className="column-empty">
             {epicKeys.length && totalCount
-              ? "No matching tasks. Other epics have work in this column."
-              : {
-                  backlog:
-                    "Capture an idea here, then add context with your brain.",
-                  ready:
-                    "Refined tasks will wait here until their story or epic allows work.",
-                  in_progress:
-                    "Claimed work appears here. Starting a scope permits claims; it does not launch a worker.",
-                  review:
-                    "Worker reports arrive here for acceptance or another round.",
-                  done: "Accepted results and manually completed tasks collect here.",
-                }[status]}
+              ? "No matching tasks"
+              : "No tasks yet"}
           </p>
         )}
         {isOver && <RoughLine frame />}

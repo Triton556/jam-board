@@ -291,9 +291,10 @@
 }
 .column-policy {
   margin: -4px 2px 10px;
-  min-height: 32px;
-  font-size: 11px;
-  line-height: 1.4;
+  min-height: 42px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
   color: var(--ink-2);
 }
 .column-policy.over-wip {
@@ -408,9 +409,10 @@
 .column-empty {
   margin: 0;
   padding: 20px 10px;
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.65;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
 }
 .quick-create > .quick-create-story {
   display: grid;

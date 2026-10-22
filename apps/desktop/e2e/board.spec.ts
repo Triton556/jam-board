@@ -15,18 +15,10 @@ test("onboarding creates a jam and an empty board", async ({ page }) => {
   await expect(page).toHaveURL(/\/board/);
   await expect(page.getByTestId("task-card")).toHaveCount(0);
   await expect(page.locator(".column-empty")).toHaveCount(5);
-  for (const [status, guidance] of Object.entries({
-    backlog: "Capture an idea here, then add context with your brain.",
-    ready:
-      "Refined tasks will wait here until their story or epic allows work.",
-    in_progress:
-      "Claimed work appears here. Starting a scope permits claims; it does not launch a worker.",
-    review: "Worker reports arrive here for acceptance or another round.",
-    done: "Accepted results and manually completed tasks collect here.",
-  })) {
+  for (const status of ["backlog", "ready", "in_progress", "review", "done"]) {
     await expect(
       page.locator(`[data-column="${status}"] .column-empty`),
-    ).toHaveText(guidance);
+    ).toHaveText("No tasks yet");
   }
   await expect(
     page.getByRole("link", {
@@ -288,5 +280,70 @@ for (const theme of ["light", "dark"] as const) {
     expect(await page.evaluate(() => window.__jamMock.getTask("JB-2"))).toEqual(
       before,
     );
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`H-B01: concise readable empty columns with a long card at narrow width (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Game jam", exact: true }).click();
+    await page
+      .getByLabel("Jam name", { exact: true })
+      .fill("Empty column readability");
+    await page
+      .getByLabel("Your name", { exact: true })
+      .fill("Synthetic reviewer");
+    await page.getByRole("button", { name: "Create jam", exact: true }).click();
+    await expect(page.locator(".column-empty")).toHaveCount(5);
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute("data-theme", value),
+      theme,
+    );
+    for (const element of await page
+      .locator(".column-empty, .column-policy")
+      .all()) {
+      await expect(element).toHaveCSS("font-size", "14px");
+      const metrics = await element.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const box = node.getBoundingClientRect();
+        const parent = node.closest(".board-column")?.getBoundingClientRect();
+        return {
+          weight: Number(style.fontWeight),
+          overflow: node.scrollWidth > node.clientWidth,
+          fits:
+            !!parent && box.left >= parent.left && box.right <= parent.right,
+        };
+      });
+      expect(metrics.weight).toBeGreaterThanOrEqual(500);
+      expect(metrics.overflow).toBe(false);
+      expect(metrics.fits).toBe(true);
+    }
+    await page.getByRole("button", { name: "Add task to Backlog" }).click();
+    await expect(
+      page.locator('[data-column="backlog"] .column-empty'),
+    ).toHaveCount(0);
+    const title =
+      "A very long human task title with enough context to wrap across several lines without crowding adjacent empty columns";
+    const input = page.getByRole("textbox", { name: "New task in Backlog" });
+    await input.fill(title);
+    await input.press("Enter");
+    await expect(page.getByTestId("task-card")).toHaveCount(1);
+    await input.press("Escape");
+    await expect(page.locator(".column-empty")).toHaveCount(4);
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    expect(
+      await page
+        .getByTestId("task-card")
+        .evaluate((node) => node.scrollWidth <= node.clientWidth),
+    ).toBe(true);
+    const mutations = await page.evaluate(() =>
+      window.__jamMock.calls.filter((call) =>
+        /claim_task|move_task|set_execution/.test(call.command),
+      ),
+    );
+    expect(mutations).toEqual([]);
   });
 }
