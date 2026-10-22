@@ -170,3 +170,14 @@ Actual-router review also caught a pristine saved-note blocker after project
 context loss. Alpha38 allows a genuinely clean departure, while a dispatched
 unresolved operation remains protected even if the user types back to baseline.
 DOM/source checks cover this distinction; no native interruption claim is made.
+
+## Alpha38 actual rendering and alpha39 correction
+
+The corrected alpha38 hosted run passed94/96; body-only paper creation/autosave
+was rendered in light/dark. Optional-heading/reopen failed because a canvas clone
+of an old query row was treated as a new remote edit after our own acknowledgement.
+Alpha39 distinguishes repeated observation from changed content without removing
+the server equality guard. Full lifecycle/heading PNG acceptance awaits its hosted
+run; the conflict screenshot is retained as failure evidence. No native38/39 note
+input or rendering claim is made. Exact content+marker ABA remains indistinguishable
+without revision history; no stronger concurrency guarantee is claimed.

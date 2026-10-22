@@ -454,3 +454,64 @@ it("whitespace-only heading uses explicit no-title once without a repeat autosav
   expect(body).toHaveValue("Exact body preserved");
   expect((await mockApi.referenceCanvas()).items[0]?.title).toBe("");
 });
+
+it("a canvas geometry rerender after our save is not a remote text edit", async () => {
+  const item = await mockApi.addReference(
+    { kind: "note", text: "Body only" },
+    true,
+  );
+  const h = await mount(item);
+  const update = vi.spyOn(mockApi, "updateReference");
+  await edit();
+  await userEvent.click(screen.getByRole("button", { name: "Add heading" }));
+  const heading = screen.getByRole("textbox", {
+    name: "Optional note heading",
+  });
+  await userEvent.type(heading, "Lantern idea");
+  await userEvent.keyboard("{Control>}s{/Control}");
+  await waitFor(() => expect(h.confirmed).toHaveBeenCalledOnce());
+  const saved = h.confirmed.mock.calls[0]?.[0] as RefItem;
+  // Canvas geometry/selection can clone the still-displayed query row before
+  // the acknowledged write's refetch arrives. No server text changed here.
+  h.rerender(h.view({ ...item, x: 200 }));
+  expect(screen.getByRole("status")).toHaveTextContent("Saved");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  h.rerender(h.view(saved));
+  await userEvent.keyboard("{Escape}");
+  await screen.findByRole("button", { name: "Edit note Lantern idea" });
+  const reopened = await edit();
+  expect(reopened).toHaveValue("Body only");
+  expect(
+    screen.getByRole("textbox", { name: "Optional note heading" }),
+  ).toHaveValue("Lantern idea");
+  expect(update).toHaveBeenCalledOnce();
+});
+
+it.each(["changed-text-same-marker", "old-text-new-marker"])(
+  "an actual newer observation still stops editing after our own save: %s",
+  async (kind) => {
+    const item = await makeNote();
+    const h = await mount(item);
+    const update = vi.spyOn(mockApi, "updateReference");
+    const body = await edit();
+    await userEvent.type(body, " human addition");
+    await userEvent.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(h.confirmed).toHaveBeenCalledOnce());
+    // Different content must be detected even if clock precision is identical;
+    // an actual new observation reverting old content must not be mistaken for
+    // a geometry-only clone. No chronological timestamp comparison is used.
+    h.rerender(
+      h.view({
+        ...item,
+        ...(kind === "changed-text-same-marker"
+          ? { captionMd: "A different agent result" }
+          : { updatedAt: "another-observation-marker" }),
+      }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Changed elsewhere");
+    expect(body).toHaveValue(`${item.captionMd} human addition`);
+    await userEvent.keyboard("{Escape}");
+    expect(body).toBeInTheDocument();
+    expect(update).toHaveBeenCalledOnce();
+  },
+);
