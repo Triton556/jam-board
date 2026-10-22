@@ -57,3 +57,8 @@ Four new DOM probes cover stationary-hover updates/expiry, card focus/activation
 unmount cleanup and synthetic longer-text positioning; **23 focused tests pass**
 including existing activity behavior. Synthetic coordinates are not native layout
 proof. Exact alpha35 hover/geometry acceptance remains pending.
+
+Two additional hosted-browser scenarios (light/dark) hold the pointer still across
+fresh/expired mock status updates, inspect real tooltip bounds, compare the task
+record before/after and save screenshots. They are added/typechecked, **NOT RUN**
+locally; mock status injection is not a real external-agent heartbeat or AI session.
