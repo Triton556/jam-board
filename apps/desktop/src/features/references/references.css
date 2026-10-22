@@ -569,3 +569,24 @@
     top: 68px;
   }
 }
+
+.reference-read-notice {
+  position: absolute;
+  z-index: 8;
+  left: 16px;
+  right: 16px;
+  top: 128px;
+  margin: 0;
+  max-height: min(32vh, 240px);
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+p.reference-read-notice {
+  padding: 12px;
+}
+.reference-toolbar {
+  max-width: calc(100% - 32px);
+  flex-wrap: wrap;
+}

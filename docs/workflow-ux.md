@@ -522,3 +522,23 @@ contrast in both themes and preserve semantic cues, following
 [W3C normal-text contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
 These calculations exclude grain/antialiasing and are not whole-app rendered WCAG
 certification. Paper colors and decorative animation remain unchanged.
+
+## 23. Recover a read without discarding local work
+
+The independent late-settlement tests deliberately suppress native events: an old
+request persists after the user has returned to a new origin view. Its write epoch
+must remain invalid, so the old continuation cannot refresh or dispatch as though
+it were the new page. Assets and References now offer an explicit **read-only
+Refresh**, and captured-project receipts explain when to use it before inspecting
+results or re-dropping only remaining files. This is neither mutation retry nor a
+new event-delivery guarantee.
+
+Cached read failures also used to replace the References canvas, Board columns and
+Plan list subtree, destroying unsaved note/quick-capture/new-epic state. These views
+now keep cached editable content mounted while showing a bounded read-error/retry
+notice. Initial no-data failures remain distinct and retryable; stale cached data
+is not presented as a fresh successful read. The existing Table behavior is a
+negative control and is unchanged. This applies the same
+[visibility and recovery principle](https://www.nngroup.com/articles/visibility-system-status/)
+to reads: state what failed without silently removing the user's local draft.
+No backend, execution permission, cache lifetime or draft-store architecture changes.

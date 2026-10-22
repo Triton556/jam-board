@@ -3,6 +3,27 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.22] - 2026-10-21
+
+### Fixed
+
+- Assets and References offer explicit read-only Refresh for late-settled file
+  requests after returning to their origin. Captured-project receipts explain this
+  recovery; the old batch stays fenced and no write is replayed automatically.
+- References cached background read errors no longer unmount the canvas and erase
+  an unsaved note dialog. Repeated failures and eventual read recovery retain the
+  same fields, text and focus; errors with no cached data stay distinct.
+- Board task/member list failures retain quick-capture drafts, and Plan epic-list
+  failures retain the new-epic dialog. Cached data is labelled as the last loaded
+  view, with a read-only retry; initial failures still block unavailable content.
+  The already-safe Table inline draft behavior is unchanged.
+
+### Changed
+
+- Read refreshes have explicit processing feedback. References read notices are
+  bounded within the canvas; filtering remains intact when refreshing Assets.
+  No backend schema, execution permission, mutation retry or persistent queue changed.
+
 ## [0.3.0-alpha.21] - 2026-10-21
 
 ### Fixed

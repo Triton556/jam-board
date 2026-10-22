@@ -422,6 +422,13 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               { value: "list", label: <List size={18} />, title: "List view" },
             ]}
           />
+          <Button
+            disabled={assets.isFetching}
+            aria-busy={assets.isFetching}
+            onClick={() => void assets.refetch()}
+          >
+            Refresh assets
+          </Button>
           <Button variant="primary" onClick={() => setEdit(true)}>
             Add asset
           </Button>

@@ -92,6 +92,8 @@ let selected: Project = "A",
   serial = 0,
   gate: ReturnType<typeof deferred> | null = null,
   failAt = 0,
+  postCommitFailAt = 0,
+  referenceReadError = false,
   emitWrites = true,
   readOverride:
     | ((scope: Project) => Promise<ReturnType<typeof asset>[]>)
@@ -226,6 +228,11 @@ function installTransport() {
         case "asset_preview":
           return null;
         case "reference_canvas":
+          if (referenceReadError)
+            throw {
+              code: "internal",
+              message: "Synthetic background reference read failed",
+            };
           return {
             items: structuredClone(referenceStores[scope]),
             frames: [],
@@ -289,6 +296,11 @@ function installTransport() {
             ...input,
           };
           stores[scope].push(row);
+          if (number === postCommitFailAt)
+            throw {
+              code: "internal",
+              message: "Synthetic response error after persistence",
+            };
           // Match execute_with_store selected_events: off-selected project successes are not emitted.
           if (emitWrites && scope === selected) emit();
           return structuredClone(row);
@@ -616,3 +628,237 @@ it("fences Assets and References continuation across project switching, ABA and 
   expect(referenceStores.A).toHaveLength(1);
   expect(referenceStores.B).toHaveLength(0);
 }, 20000);
+
+it("offers read-only Refresh after late settlement in all four page/project-return cases", async () => {
+  installTransport();
+  const user = userEvent.setup();
+  render(<App />);
+  if (selected === "A") await switchTo("B", user);
+  await switchTo("A", user);
+  await startAssets();
+  failAt = 0;
+  emitWrites = false;
+  for (const navigation of ["same-project", "ABA"] as const) {
+    for (const response of ["success", "post-persistence-error"] as const) {
+      postCommitFailAt = response === "success" ? 0 : 1;
+      calls = [];
+      useUiStore.setState({ toasts: [] });
+      gate = deferred();
+      const late = gate;
+      const name = `late-${navigation}-${response}`;
+      act(() =>
+        drop([`/synthetic/${name}.txt`, `/synthetic/${name}-unsent.txt`]),
+      );
+      await waitFor(() => expect(creates()).toHaveLength(1));
+      if (navigation === "same-project") {
+        await route("/plan");
+        await screen.findByRole("heading", { name: "Plan" });
+      } else {
+        await switchTo("B", user);
+        await switchTo("A", user);
+      }
+      await startAssets();
+      expect(screen.queryByRole("heading", { name })).toBeNull();
+      const readsAtSettlement = calls.filter(
+        (c) => c.command === "list_assets",
+      ).length;
+      await act(async () => late.resolve(undefined));
+      await waitFor(() =>
+        expect(useUiStore.getState().toasts.at(-1)?.text).toContain(
+          response === "success"
+            ? "1 confirmed; 0 unconfirmed requests; 1 not attempted"
+            : "0 confirmed; 1 unconfirmed request; 1 not attempted",
+        ),
+      );
+      expect(creates().map((c) => c.scope)).toEqual(["A"]);
+      expect(stores.A.some((a) => a.name === name)).toBe(true);
+      expect(stores.A.some((a) => a.name === `${name}-unsent`)).toBe(false);
+      // The old write epoch stays invalid; refresh is a NEW explicit read, not replay.
+      expect(calls.filter((c) => c.command === "list_assets")).toHaveLength(
+        readsAtSettlement,
+      );
+      expect(screen.queryByRole("heading", { name })).toBeNull();
+      const refresh = screen.getByRole("button", { name: "Refresh assets" });
+      expect(useUiStore.getState().toasts.at(-1)?.hint).toContain(
+        "Refresh assets",
+      );
+      expect(useUiStore.getState().toasts.at(-1)?.text).toContain(
+        "Audit A [A]",
+      );
+      await user.type(
+        screen.getByRole("textbox", { name: "Search assets" }),
+        name,
+      );
+      const heldRead = deferred<ReturnType<typeof asset>[]>();
+      readOverride = () => heldRead.promise;
+      await user.click(refresh);
+      expect(refresh).toBeDisabled();
+      expect(
+        screen.getByText("Refreshing assets… showing the last loaded list."),
+      ).toBeVisible();
+      await act(async () => heldRead.resolve(structuredClone(stores.A)));
+      readOverride = null;
+      expect(await screen.findByRole("heading", { name })).toBeVisible();
+      expect(
+        screen.getByRole("textbox", { name: "Search assets" }),
+      ).toHaveValue(name);
+      expect(creates()).toHaveLength(1);
+      await user.clear(screen.getByRole("textbox", { name: "Search assets" }));
+    }
+  }
+  postCommitFailAt = 0;
+  // References exposes the same read recovery without reviving an abandoned batch.
+  await route("/references");
+  await screen.findByRole("region", { name: "References canvas" });
+  await waitFor(() => expect(native.drops.size).toBe(1));
+  calls = [];
+  useUiStore.setState({ toasts: [] });
+  gate = deferred();
+  const late = gate;
+  act(() =>
+    drop([
+      "/synthetic/reference-refresh-first.txt",
+      "/synthetic/reference-refresh-unsent.txt",
+    ]),
+  );
+  await waitFor(() =>
+    expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(1),
+  );
+  await route("/plan");
+  await screen.findByRole("heading", { name: "Plan" });
+  await route("/references");
+  await screen.findByRole("region", { name: "References canvas" });
+  await act(async () => late.resolve(undefined));
+  await waitFor(() =>
+    expect(useUiStore.getState().toasts.at(-1)?.text).toContain(
+      "references: 1 confirmed; 0 unconfirmed requests; 1 not attempted",
+    ),
+  );
+  expect(useUiStore.getState().toasts.at(-1)?.hint).toContain(
+    "Refresh references",
+  );
+  const reads = calls.filter((c) => c.command === "reference_canvas").length;
+  await user.click(screen.getByRole("button", { name: "Refresh references" }));
+  await waitFor(() =>
+    expect(
+      calls.filter((c) => c.command === "reference_canvas").length,
+    ).toBeGreaterThan(reads),
+  );
+  expect(
+    await within(
+      screen.getByRole("region", { name: "References canvas" }),
+    ).findByText("/synthetic/reference-refresh-first.txt", {
+      selector: "strong",
+    }),
+  ).toBeVisible();
+  expect(
+    calls.filter((c) => c.command === "add_reference").map((c) => c.scope),
+  ).toEqual(["A"]);
+  emitWrites = true;
+}, 20000);
+
+it("retains cached References canvas and note draft through repeated read failures and recovery", async () => {
+  installTransport();
+  const user = userEvent.setup();
+  render(<App />);
+  if (selected === "A") await switchTo("B", user);
+  await switchTo("A", user);
+  await route("/references");
+  await screen.findByRole("region", { name: "References canvas" });
+  calls = [];
+  await user.click(
+    within(screen.getByRole("toolbar", { name: "Canvas tools" })).getByRole(
+      "button",
+      { name: "Add" },
+    ),
+  );
+  await user.click(screen.getByRole("button", { name: "Note" }));
+  const note = await screen.findByRole("dialog", { name: "Add note" });
+  const title = within(note).getByLabelText("Title"),
+    body = within(note).getByLabelText("Note");
+  fireEvent.change(title, {
+    target: { value: "Unsaved title before background read" },
+  });
+  fireEvent.change(body, {
+    target: { value: "Unsaved note body must not disappear" },
+  });
+  body.focus();
+  referenceReadError = true;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const count = calls.filter((c) => c.command === "reference_canvas").length;
+    act(() => emit("reference.added"));
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.command === "reference_canvas").length,
+      ).toBeGreaterThan(count),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Synthetic background reference read failed",
+    );
+    expect(screen.getByRole("dialog", { name: "Add note" })).toBe(note);
+    expect(
+      screen.getByRole("region", { name: "References canvas" }),
+    ).toBeInTheDocument();
+    expect(title).toHaveValue("Unsaved title before background read");
+    expect(body).toHaveValue("Unsaved note body must not disappear");
+    expect(body).toHaveFocus();
+  }
+  referenceReadError = false;
+  act(() => emit("reference.added"));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(screen.getByRole("dialog", { name: "Add note" })).toBe(note);
+  expect(title).toHaveValue("Unsaved title before background read");
+  expect(body).toHaveValue("Unsaved note body must not disappear");
+  expect(body).toHaveFocus();
+  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Add note" })).toBeNull(),
+  );
+  // Without a modal, retry is an ordinary read control, not a hidden mutation retry.
+  referenceReadError = true;
+  await user.click(screen.getByRole("button", { name: "Refresh references" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Synthetic background reference read failed",
+  );
+  const readCount = calls.filter(
+    (c) => c.command === "reference_canvas",
+  ).length;
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() =>
+    expect(
+      calls.filter((c) => c.command === "reference_canvas").length,
+    ).toBeGreaterThan(readCount),
+  );
+  expect(
+    screen.getByRole("region", { name: "References canvas" }),
+  ).toBeInTheDocument();
+  referenceReadError = false;
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
+}, 20000);
+
+it("keeps a References initial read failure distinct and recoverable without cached canvas", async () => {
+  installTransport();
+  const user = userEvent.setup();
+  render(<App />);
+  if (selected === "B") await switchTo("A", user);
+  await switchTo("B", user);
+  referenceReadError = true;
+  calls = [];
+  await route("/references");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Synthetic background reference read failed",
+  );
+  expect(
+    screen.queryByRole("region", { name: "References canvas" }),
+  ).toBeNull();
+  expect(screen.getByText("This page needs another try")).toBeVisible();
+  referenceReadError = false;
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(
+    await screen.findByRole("region", { name: "References canvas" }),
+  ).toBeInTheDocument();
+  expect(calls.filter((c) => c.command === "add_reference")).toHaveLength(0);
+});
