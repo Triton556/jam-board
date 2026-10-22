@@ -26,9 +26,11 @@ import {
   TabPanels,
   Tabs,
 } from "../../components/ui";
+import { QueryError } from "../../components/ui/AsyncState";
 import { FileDropZone, PageHeading } from "../../components/ui/m5";
 import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { api } from "../../lib/api";
+import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { useBoardSettings } from "../../lib/queries";
 import type { Asset, AssetWithTasks } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
@@ -349,11 +351,11 @@ function AssetCard({
 }
 export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const { settings, update } = useBoardSettings();
-  const client = useQueryClient();
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: () => api.listAssets(),
   });
+  const batch = useFileDropBatch("assets");
   const [kind, setKind] = useState("all");
   const [dragActive, setDragActive] = useState(false);
   const [text, setText] = useState("");
@@ -365,22 +367,19 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
     () =>
       api.onFileDrop((paths) => {
         if (document.querySelector(".drawer")) return;
-        void (async () => {
-          let count = 0;
-          for (const location of paths) {
-            await api.createAsset({
+        void batch.run(
+          paths,
+          (location) =>
+            api.createAsset({
               name: assetName(location),
               kind: assetKind(location),
               location,
               notes: null,
-            });
-            count++;
-          }
-          await client.invalidateQueries({ queryKey: ["assets"] });
-          useUiStore.getState().error(`Added ${count} assets`);
-        })().catch((e) => useUiStore.getState().error(String(e)));
+            }),
+          [["assets"]],
+        );
       }, setDragActive),
-    [client],
+    [batch.run],
   );
   const filtered =
     assets.data
@@ -439,7 +438,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               <span className="capitalize">{k}</span>{" "}
               <small>
                 {assets.data?.filter((a) => k === "all" || a.kind === k)
-                  .length ?? 0}
+                  .length ?? "—"}
               </small>
             </Button>
           ))}
@@ -460,9 +459,26 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           onChange={(e) => setText(e.target.value)}
         />
       </div>
-      {assets.error && <p role="alert">{assets.error.message}</p>}
+      {assets.error && (
+        <QueryError error={assets.error} retry={() => void assets.refetch()} />
+      )}
+      {assets.error && assets.data && (
+        <p className="small muted">
+          Showing the last loaded asset list; retry to check for changes.
+        </p>
+      )}
+      {assets.isFetching && assets.data && (
+        <p className="small muted" role="status">
+          Refreshing assets… showing the last loaded list.
+        </p>
+      )}
+      <FileDropProgress progress={batch.progress} />
       <FileDropZone active={dragActive}>
-        {filtered.length ? (
+        {assets.isPending ? (
+          <p className="loading" role="status">
+            Reading assets…
+          </p>
+        ) : !assets.data ? null : filtered.length ? (
           settings?.assetsView === "list" ? (
             <AssetList
               assets={filtered}
@@ -473,7 +489,12 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
             />
           ) : (
             <div className="asset-groups">
-              {(kind === "all" ? assetKinds : [kind]).map((k) => (
+              {(kind === "all"
+                ? assetKinds.filter((k) =>
+                    filtered.some((asset) => asset.kind === k),
+                  )
+                : [kind]
+              ).map((k) => (
                 <section key={k} className="asset-group">
                   {kind === "all" && (
                     <button
@@ -534,6 +555,22 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               ))}
             </div>
           )
+        ) : assets.data.length ? (
+          <EmptyState text="No assets match these filters">
+            <Button
+              onClick={() => {
+                setKind("all");
+                setLinked("all");
+                setText("");
+              }}
+            >
+              Clear asset filters
+            </Button>
+          </EmptyState>
+        ) : assets.error ? (
+          <p className="muted">
+            The last loaded list was empty. Retry to check the current project.
+          </p>
         ) : (
           <EmptyState text="No assets yet — add a file or URL for your project" />
         )}

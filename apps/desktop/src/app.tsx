@@ -168,6 +168,7 @@ const TeamPage = lazy(() =>
 );
 
 import { api } from "./lib/api";
+import { FileDropSessionProvider } from "./lib/file-drop-batch";
 import { preparePaperGrain } from "./lib/grain";
 import { appQuery, boardQuery, membersQuery, tasksQuery } from "./lib/queries";
 import { paperRustle } from "./lib/sound";
@@ -633,12 +634,21 @@ function FeatureRoute({ name }: { name: string }) {
 function Toasts() {
   const toasts = useUiStore((s) => s.toasts);
   const navigate = useNavigate();
+  const container = useRef<HTMLElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   return (
-    <div
+    <section
+      ref={container}
       className="toast-stack"
-      role="status"
       aria-label="Notifications"
-      aria-live="polite"
+      tabIndex={-1}
+      onFocusCapture={(event) => {
+        if (
+          event.relatedTarget instanceof HTMLElement &&
+          !container.current?.contains(event.relatedTarget)
+        )
+          previousFocus.current = event.relatedTarget;
+      }}
     >
       {toasts.map((toast) => (
         // biome-ignore lint/a11y/useSemanticElements: Notifications contain no form fields; fieldset would imply a form.
@@ -652,7 +662,57 @@ function Toasts() {
           onBlur={() => useUiStore.getState().pauseToast(toast.id, false)}
         >
           {toast.actor && <Avatar member={toast.actor} size={32} />}
-          <span>{toast.text}</span>
+          <div className="toast-content">
+            <span role="status" aria-live="polite">
+              {toast.text}
+            </span>
+            {toast.details && (
+              <details className="toast-details" aria-live="off">
+                <summary>File details ({toast.details.length})</summary>
+                {toast.hint && <p>{toast.hint}</p>}
+                {toast.persistent && (
+                  <p>
+                    Kept in this app session only, among the latest three
+                    notices.
+                  </p>
+                )}
+                <ol>
+                  {toast.details.map((detail) => (
+                    <li key={detail.id}>
+                      <strong>{detail.label}</strong>:{" "}
+                      <code>{detail.text}</code>
+                      {detail.note && <p>{detail.note}</p>}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </div>
+          {toast.persistent && (
+            <Button
+              variant="ghost"
+              data-dismiss-receipt={toast.id}
+              onClick={() => {
+                const next = Array.from(
+                  container.current?.querySelectorAll<HTMLButtonElement>(
+                    "[data-dismiss-receipt]",
+                  ) ?? [],
+                ).find((button) => button.dataset.dismissReceipt !== toast.id);
+                useUiStore.getState().dismissToast(toast.id);
+                (
+                  next ??
+                  (previousFocus.current?.isConnected
+                    ? previousFocus.current
+                    : document.querySelector<HTMLElement>(
+                        ".project-switcher",
+                      )) ??
+                  container.current
+                )?.focus();
+              }}
+            >
+              Dismiss receipt
+            </Button>
+          )}
           {(toast.taskKey || toast.href) && (
             <Button
               variant="ghost"
@@ -670,7 +730,7 @@ function Toasts() {
           )}
         </div>
       ))}
-    </div>
+    </section>
   );
 }
 const rootRoute = createRootRoute({
@@ -855,7 +915,9 @@ declare module "@tanstack/react-router" {
 export function App() {
   return (
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <FileDropSessionProvider>
+        <RouterProvider router={router} />
+      </FileDropSessionProvider>
     </QueryClientProvider>
   );
 }

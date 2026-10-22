@@ -3,6 +3,33 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.20] - 2026-10-21
+
+### Fixed
+
+- Assets and References file batches capture their originating project and page
+  lifetime. Leaving or switching projects stops files not yet dispatched, including
+  an A → B → A return; it does not cancel an already-dispatched command.
+- Partial batches distinguish confirmed writes, unconfirmed requests and files
+  not attempted. A transport error can occur after persistence, so receipts do not
+  promise rollback or automatically retry. Only the still-current origin's lists
+  are refreshed/marked stale, including when a normal change event is absent.
+- Assets shows reading/error/retry states instead of false empty results. Cached
+  results remain available after a refresh error, and no-match filters have an
+  explicit reset. All-kind grids omit empty groups while preserving kind filters
+  and collapsed-group preferences.
+
+### Changed
+
+- File batches show scoped processing feedback and captured-project receipts.
+  Problematic receipts are dismissible and retained within the existing latest-three
+  in-memory notice bound; expandable file details do not become live announcements.
+  Fully confirmed successes remain transient. There is no persistent import queue,
+  automatic replay or delivery guarantee after the app exits.
+- The restricted alpha19 Linux native pass independently closed the targeted Table
+  header/partial-row and Story permission-layout findings at 1180px; this is not
+  alpha20 native import acceptance. See this version's verification for limits.
+
 ## [0.3.0-alpha.19] - 2026-10-21
 
 ### Fixed

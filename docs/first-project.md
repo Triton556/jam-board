@@ -137,3 +137,14 @@ manual Done is different from a recorded report review.
   Do not replace validators and resend an old decision automatically.
 
 For precise tool contracts and inheritance rules, see [MCP documentation](mcp.md).
+
+## File-drop receipts
+
+Dropping multiple files into Assets or References sends separate requests. Leaving
+that page or switching projects stops the unsent remainder, not the request already
+in flight. Check the receipt's project name/prefix and expanded file details:
+**confirmed**, **unconfirmed request**, and **not attempted** are different outcomes.
+An unconfirmed request may already have saved its file. Inspect that project before
+re-dropping only the files still needed; the app does not retry or roll back the batch.
+Problematic receipts are retained only within the latest three notices of this app
+session, not a durable queue. Closing the app does not guarantee a later receipt.
