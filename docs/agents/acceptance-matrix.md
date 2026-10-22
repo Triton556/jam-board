@@ -16,7 +16,7 @@
 | HF06 | Dirty description/technical edit → Escape/Back/project navigation | Existing discard/save contract preserved; read-only archived state enforced | No hidden footer or accidental focus behind dialog |
 | RF01 | H-R01: truly empty → create only frame → archive last content | Empty illustration disappears after frame; returns only for genuine empty active canvas | No chibi covering frame; filtered state distinguishable |
 | RF02 | H-R02: frame + child node → grip move/resize/collapse/edit/archive/undo | Parent and child positions correct; controls don't start drag; undo scoped | Visible grip at 39/40/75/100% canvas zoom; target size and focus measured |
-| RF03 | H-R01/R04: Add note → inline title/body → save/cancel | Immediate edit, intentional empty/cancel policy, one create/write; failed/ambiguous save preserves draft and reconciles | Typing/selection/scroll doesn't pan/zoom/drag canvas; no guessing double click |
+| RF03 | H-R01/R04: Add note → place paper → direct writing → autosave → reopen | New blank stays local; body-only/heading-only/literal Note/cleared existing round-trip; one flight, newer typing retained, uncertain creation never replayed; guarded updates refuse remote change | Actual paper, no creation-form chrome or required heading; typing/selection/scroll does not pan/drag; visible truthful outcome |
 | RF04 | H-R03/R06: reference menu → edit/link dropdown; edge label → failed submit | Correct reference/edge changed once, error in active layer, retained draft | Dropdown/field/footer remain reachable at lower viewport edge |
 | NT01 | H-G03 bell → history → View → back; project switches during event delivery | Declared retention/unread policy, deduplication, exact project/entity destination; stale/deleted target explained | Keyboard open/close, empty/long/error history, timestamp/context, no focus theft on arrival |
 | KB01 | H-D11: task → Add reference picker → New link/note dialog → cancel each layer | Escape removes only top layer; parent state retained; focus returns one layer at a time | Visible focus, background inert; no clipped child overlay |
@@ -248,3 +248,29 @@ then outside dismissal and exact dialog-opener return. The actual ReactFlow-hook
 DOM regression proves default-not-prevented and unchanged canvas Space handling,
 not browser-native disclosure activation. Hosted rerun is required. RF02 retains
 all original geometry/hit-test/state assertions after explicit lazy-route readiness.
+
+## Alpha38 direct-note acceptance additions (not blanket PASS)
+
+RF03/H-R01/R04: exercise body-only create → finish → reload/reopen with no heading;
+heading-only paper; literal `Note` heading; remove a heading; deliberately clear
+an existing paper; old default-heading notes. Verify stored/exported/imported
+content, not only a temporary hidden heading. New blank placement/cancel must
+produce zero records/events. Auto-save during newer typing must not replace the
+new text on acknowledgement. Lost response after create must not replay.
+
+AC12/AG12: two real Store connections competing from the same inspected content
+must produce one winner and one conflict without a losing activity event. Verify
+unrelated geometry/tags survive content writes, archived records refuse edits,
+and old successful callers remain compatible. Shared heading-only acceptance is
+additive and must be documented; no MCP schema or global revision claim.
+
+VS01/VS03: actual browser screenshots must show the placed, optional-heading and
+reopened paper in both themes after real typing/autosave. The upload allowlist is
+only named synthetic PNGs. These are hosted-browser observations when executed,
+not native/Windows evidence; prepared tests and builds cannot establish appearance.
+
+RF04/KB03: retain the original caption-dialog Escape→exact Actions summary focus
+assertion using a non-note reference, alongside direct-note editing and Tags/Link
+dialog return. Actual-dialog/router DOM checks cover all three modal modes; the
+hosted regression remains required. Generic Dialog-only fixtures missed React
+child autofocus replacing the captured opener, so they are not sufficient here.

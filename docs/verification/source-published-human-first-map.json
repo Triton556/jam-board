@@ -1,0 +1,259 @@
+{
+  "repository": "Triton556/jam-board",
+  "branch": "rumi/human-first-workflow",
+  "note": "Source and API-created published commits have different metadata but identical trees. This map covers the approved alpha29–37 source checkpoints and their exact published history, with the prior alpha28 documentation base. It does not by itself prove CI, native acceptance, installation or release. Alpha38 is not represented before its checked publication.",
+  "commits": [
+    {
+      "source": "2b263795b31767da29db0b62dc81f4da19dfc4d1",
+      "published": "ee6b2e9a1ada70db18a661caa003660ea7d9a8de",
+      "tree": "c4831b4cd028a5d2c4a5ec951076b8758a09ea1a",
+      "subject": "docs: record green alpha28 CI and native acceptance"
+    },
+    {
+      "source": "f1fab10922508da0301fec4785572b981600a047",
+      "published": "2e6bdea89a807dd2958efd24f3d7ef066001e37f",
+      "tree": "e50911bd15139815b5288e287743347ef1a1adc5",
+      "subject": "feat: make task and story descriptions human-first (alpha29)"
+    },
+    {
+      "source": "fcf5e4f063dcd1ee3aeaba7824acc196bc5a376f",
+      "published": "b964ddbfbef1ffe41363dfc05bf7a1a4cd3950f7",
+      "tree": "9eb939d49193dae6ee0ac2d913f1c69a4fa2809e",
+      "subject": "fix: isolate technical autosave and expose collapsed plan recovery"
+    },
+    {
+      "source": "34b3a39b36c8a6a0e1f462858f633c15aed78610",
+      "published": "ce59f00fe9f001fd09794ef35d876ce2b4093029",
+      "tree": "0834cb59fbf3af9f362feb4d9a0f8b83d2b4b5d4",
+      "subject": "feat: create reference notes inline and clarify frame controls"
+    },
+    {
+      "source": "29dcfb49543cbcdec788141d479c1668694e69cb",
+      "published": "4e737c1c2109a19035bf73866516632577c884df",
+      "tree": "6b6ac4d392248e2d48f71f2b07693d731d999e48",
+      "subject": "test: cover inline note recovery and frame grip scenarios"
+    },
+    {
+      "source": "dd51c27203d7429b111d8104d3f3be8452cb107a",
+      "published": "b7c9ec3fb91020eb9bea48abc74d7142d8f607d3",
+      "tree": "c7d46d146ba875a8b4883fd26544e180df0d70fc",
+      "subject": "fix: keep inline note editing visible and navigation safe"
+    },
+    {
+      "source": "7576a5909999ba7454d2dad36ee93e020a5eb4ff",
+      "published": "0c2a73d71bd583466aba10a024e8761cf1d55061",
+      "tree": "f7024f2670f040b958249f5229301430dd61b2c0",
+      "subject": "fix: choose reference media resolution by painted device pixels"
+    },
+    {
+      "source": "d97195bd63fcea9cf9b23d0d08dc04cafd0def6e",
+      "published": "c48341f7061d983e49ad2ae56d0146fbae03af58",
+      "tree": "5b78cc0ae91000142f5b4af0c68b0dab1c0e5a0c",
+      "subject": "release: record alpha30 canvas behavior and verification"
+    },
+    {
+      "source": "50e483d82b25be3791ace15c5f0e933003ce7014",
+      "published": "9c42514fd9863b74140e844299b9e6a71d5fce11",
+      "tree": "0a680885f419470d34fdbaa876392d483f07b1fd",
+      "subject": "feat: add scoped persisted project notification history"
+    },
+    {
+      "source": "003adc4ed9a6bc16c40adc9604871e16b3faaf1a",
+      "published": "dd7a70b053d8162ab92d0b29bb19eb51a23dc81a",
+      "tree": "03ddbac3801a9404afde4266a800c126757df313",
+      "subject": "fix: preserve notification paging and navigation failure recovery"
+    },
+    {
+      "source": "66a91fec48f9fd54000c9c49dd173a356dca8a24",
+      "published": "efffd12ac1596fa01c1ecbb3cfae0c15847f7235",
+      "tree": "71409ea801ccec45e1767ca704f622f107d15a6d",
+      "subject": "fix: distinguish card activity evidence and refresh member presence safely"
+    },
+    {
+      "source": "5ac54c407d933d3a65d5b7d995d8b3f7e11d861d",
+      "published": "97c7bd6aef83307cd37216e5c68cda394bd47b20",
+      "tree": "e59a887abd2e137fd596e934eba17bf0749a5c84",
+      "subject": "fix: fence presence polls against identical newer cache observations"
+    },
+    {
+      "source": "ec7749d3793fff8f7eedf859a062969fbf53cd66",
+      "published": "49b15133129e3862ef436a1a5475a1ee3a5cf464",
+      "tree": "5dce8d727d4eb1728cee1b7bfcfce9d79f85a9f1",
+      "subject": "feat: distinguish new-chat setup from scoped refinement"
+    },
+    {
+      "source": "425713b15c8c88c20c3ddc25a7ec40d0e1c5c598",
+      "published": "c5b8d656db43efed6aebf607d29f62b363d8b89e",
+      "tree": "cd7ba7d815bbc8f4fac9fc4100fee6021a2a8a56",
+      "subject": "docs: distinguish later execution and preserve stable interaction IDs"
+    },
+    {
+      "source": "802746685a8709180063da3a27ec967b3d45ae91",
+      "published": "162892b9178b8036f2a2971af633dd0dedeb1ad6",
+      "tree": "425aea1f667bf8c5c5065ab009d1def85b50fba8",
+      "subject": "fix: keep nested selects inside visible scroll bounds"
+    },
+    {
+      "source": "6b861686b2d1f13b7d71541ea88b801db855020b",
+      "published": "3de813a1f6f08fefb9ff7a780080989436fff5cc",
+      "tree": "343980b8cf5a0a7e9e3ad604fd29979fc75bf64a",
+      "subject": "fix: dismiss select when its trigger scrolls out of view"
+    },
+    {
+      "source": "f0344ffd6b757e46ee9f6e5af7f68fb6e1d24a01",
+      "published": "822edbbb5bea81cba299f18e99be55ae5d10001a",
+      "tree": "a2fdbeaf2056e5c0ea3411b89f7c9fb5d14caffa",
+      "subject": "feat: complete scoped coordination and overlay usability alpha31"
+    },
+    {
+      "source": "d5162e1109bc9a6c8d30a326c914019c73e88bb7",
+      "published": "87e1a095702da9e568bed33f5feac04409b04f00",
+      "tree": "e6ba831ba1a27d3267249745f03c971665779504",
+      "subject": "fix: make empty Kanban columns concise and readable"
+    },
+    {
+      "source": "6a882daeb577998b6815875b6ec4fedf002481df",
+      "published": "c8d7e6186c2fa18fbbb2183370debcfa2ba5c55b",
+      "tree": "590ca0ec14e3deedfb23cc7f2fa9a320eff3f771",
+      "subject": "design: give reference frames a quieter single paper boundary"
+    },
+    {
+      "source": "d70dae9fd286c8edffd0557fac2b63367d5c7cbe",
+      "published": "ecca6aec030c2b35262ea9dbdf5bc3b6d5a60bed",
+      "tree": "f7654fb5b30ee8b38fffc0432a5ffdbbd3ea462d",
+      "subject": "design: refine frame and empty-column readability alpha32"
+    },
+    {
+      "source": "cdd6814f08f1f518c54c7c59a8fc06f6daf10a4c",
+      "published": "30af577f45f85f4dd3fc4d23cd370f21c7c4fa68",
+      "tree": "387735e24ff3240dfd19b3e1996059793ab5b2cc",
+      "subject": "fix: guard hidden pending editors and command loading"
+    },
+    {
+      "source": "8c608ef7fbedbe5d92b28026dd1ee23172d920ba",
+      "published": "5578f182626fe3d3af80cb446514d01cd8e8f4a8",
+      "tree": "eda82f418c135bda758450d331423490755235b8",
+      "subject": "test: restoration does not grant execution permission"
+    },
+    {
+      "source": "f2bb3fb3245ccd9bc4bc48da004cc728862bf2e8",
+      "published": "2dab23a4ccdc5a716973536f270cd70c1174790e",
+      "tree": "b533c236478adfa72dd6336fc061f949fca78463",
+      "subject": "fix: restore edge editor focus and exercise real pending navigation"
+    },
+    {
+      "source": "6d51324066de95e5bd636c88e652e3094b311054",
+      "published": "c9bd60d43d6cec2bcc92ef333e59fb207b3a6a63",
+      "tree": "0675a71540a9beb41a2acc821c743c5caf20259b",
+      "subject": "fix: distinguish refused intent from unconfirmed dispatched writes"
+    },
+    {
+      "source": "c90714e581e36fab85bcc6fa1270cd161a7e37a0",
+      "published": "2fc09d4c5851286d5aa41e4acdb82755e4e56ee3",
+      "tree": "16e85ab2f1104f0475d6c7f215c5c2deb1743bee",
+      "subject": "release: verify hidden interaction recovery alpha33"
+    },
+    {
+      "source": "b17ed51517e73a0b9cf599230a95a5ecf284db4f",
+      "published": "f6eb05fdd5022b208c6c0f81694b7ac51649890d",
+      "tree": "09ce4b6d7f3f7d6b0a0558823863539211441094",
+      "subject": "feat(inbox): offer honest copy-only answer continuation"
+    },
+    {
+      "source": "18c640f907cb669e7827a28e0eb55e481028e47c",
+      "published": "8e18c21d9c6a67bbf1dee76c312b08d4b2ec2eaa",
+      "tree": "0151627f03df89a01fe7f6d4b4c0c7c83d4f6db6",
+      "subject": "style(inbox): space and wrap answer continuation preview"
+    },
+    {
+      "source": "3cf2b8b5ad0e6d115268572dde5c6573f293b6ef",
+      "published": "5a8fa3cce085c7d21bebad4f029e7b95c3496e53",
+      "tree": "edadb236b53766d6d0cb478ee61a0d572c6f142f",
+      "subject": "release: verify manual answer continuation and combined polish alpha34"
+    },
+    {
+      "source": "7d02d2819de1f4432187761bcbba87e124daeef4",
+      "published": "cc3031b8a3ac61e4ff28866b8b2ce03fbde085ef",
+      "tree": "86de125e7cc89677bc0cf3ed6bb5d5784c99933f",
+      "subject": "test: exercise disclosure restoration and actual notification expiry"
+    },
+    {
+      "source": "5602cb163ce8d78194f1c07a35c17fe4331f0a2c",
+      "published": "5e49908960d45e98a26cadd0001b04faa5e0e374",
+      "tree": "d8b75eb86513386045f0404151d63a7300379e66",
+      "subject": "fix: keep open card activity tooltip synchronized"
+    },
+    {
+      "source": "fb5acc0d87545f123aad3413e1d735c7ffd1c500",
+      "published": "f2fa24010373d9d6e38ee408b2274683e32595ce",
+      "tree": "0c4c2b0cf5bc736d81606891aa3a477d3a22aa05",
+      "subject": "fix: preserve read drafts and expose scoped action feedback"
+    },
+    {
+      "source": "e7686d13c42b74c06ada75718bfff4fa16295a30",
+      "published": "647e73608dd814d6cd2c0a7c4402c2542ff33cfc",
+      "tree": "9dabf00710ca3b0c06042125a93ff2cc69b8c531",
+      "subject": "test: cover live presence tooltip in both browser themes"
+    },
+    {
+      "source": "166b5c0cc29520f2cd6789239e1d5f7260e24869",
+      "published": "e4b0e1026edd10251e4f357e9daec90722cf8a8c",
+      "tree": "76b831d184375b3d52555b19186e928477096908",
+      "subject": "fix: report explicit refresh results across asset canvas and history views"
+    },
+    {
+      "source": "fb2308f56f0d56b2697630ccc6add37823f19334",
+      "published": "0c2c10e6ab156a6c13780aea0563671e3b6f84c2",
+      "tree": "7e6e2a7d45696c2dad40208b43e449909a74112a",
+      "subject": "fix: bind autosave to project and place receipts within measured tools"
+    },
+    {
+      "source": "d2245b4e7b3c85da88634faa2007b6a6f0f26520",
+      "published": "09f5150feda65be8a67be836d1bb2bba9233f04b",
+      "tree": "c35398e77d339805ed78d8746e9b802c53b9479e",
+      "subject": "fix: keep compact modal choices reachable and scoped"
+    },
+    {
+      "source": "2b1a55ad788b1a67bb1fc26e45569b8431c2bf5a",
+      "published": "7888a59140c15d9d4a80946f46efc3bd3c7fc58d",
+      "tree": "beb30f6e8b9b45bb436caaf6c2d7f5ec259b8139",
+      "subject": "fix(references): prioritize frame titles and dismiss item actions"
+    },
+    {
+      "source": "b2fbf868aff866232bee8c743d42111634106cd8",
+      "published": "c9fdcb7bfb7ff436c8f7dca49ed48f2ef9960949",
+      "tree": "84136ccdf0cc12614c55788e2553266d6b323e31",
+      "subject": "test: scope write receipts alongside explicit read feedback"
+    },
+    {
+      "source": "b83c8376dabe0810cc641500ab2f61b1a5778b09",
+      "published": "10c837818877060ced75bd187821700e25f28de4",
+      "tree": "cd2e8baba1dd5b12334c5164c25559a27558731e",
+      "subject": "fix: reconcile confirmed retained draft baselines after field departure"
+    },
+    {
+      "source": "3829fe1fbc41f48ceabf715e11d4aa85507aeeae",
+      "published": "f16be20729ec62a4c2c42148f81ad968b5ce8853",
+      "tree": "d265ab9d3d57d2a328c295e04500c8597e7c30b9",
+      "subject": "fix: mark unchanged departed confirmed drafts clean"
+    },
+    {
+      "source": "86889c1c54cb6d7fc71e04cc10131f06dc38717c",
+      "published": "f73a997fab2025fca035df361d9bb3e2117668c6",
+      "tree": "5e33090da01b282cb960fee184e6478c53d12a1b",
+      "subject": "release: checkpoint alpha35 feedback and nested overlay recovery"
+    },
+    {
+      "source": "5721f7e63ba67ec6e1adedf2c8017f6eedf4eaab",
+      "published": "986f2a7568f039a41d844d604e2a18bcb3f25976",
+      "tree": "6f8ab3c073549a012883392566d364ac8fdc0c3b",
+      "subject": "fix: keep reference feedback controls in flow (alpha36)"
+    },
+    {
+      "source": "8f944bb301742045edea7ac5b6587eb6931846de",
+      "published": "6a91f469d4a4ec919d8de039857b64f41bc39fd6",
+      "tree": "35cb9e7321d11c5d4ae9ede381898639306dd9c1",
+      "subject": "fix: preserve reference menu Space activation (alpha37)"
+    }
+  ]
+}

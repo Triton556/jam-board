@@ -3,6 +3,35 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.38] — 2026-10-22
+
+### Place a note and write on the paper
+
+- Add note selects placement: click the canvas to place paper and write directly
+  in its body. A heading is optional, not a required form field. Notes reopen in
+  the same direct editor; there is no separate creation form or Save button.
+- Idle/blur autosave reports local, pending, saved and unconfirmed states. A new
+  untouched blank stays local. Unconfirmed creation is never automatically
+  replayed; read-only recovery keeps the text available rather than claiming a
+  rollback. Existing saved paper can intentionally be cleared without deletion.
+- Human note updates compare the inspected heading and body inside the database
+  write transaction. A changed remote value stops the save and retains the draft.
+  This is content-equality protection, not revision history or idempotency.
+- Native no-heading creation preserves an empty heading across reload/export/import.
+  Explicit `Note` headings and existing default headings remain unchanged.
+  Shared create validation now also accepts a heading-only note through existing
+  MCP callers; blank-new notes remain rejected. Tool schemas, execution authority
+  and the database schema are unchanged.
+- Reference caption dialogs return focus to their visible Actions opener instead
+  of remembering an input that disappears on close. Tags and Link keep the same
+  nested dismissal contract.
+- Preview timeout validation now identifies curl exit 28 specifically. Tests check
+  the complete unchanged five-second command and a real silent transfer, rather
+  than treating a server-observed socket interval as curl's exact clock. The
+  deadline and network safety flags are not widened.
+
+[Verification, storage contract and remaining evidence](docs/verification/0.3.0-alpha.38.md).
+
 ## [0.3.0-alpha.37] — 2026-10-22
 
 ### Keyboard reference menu recovery

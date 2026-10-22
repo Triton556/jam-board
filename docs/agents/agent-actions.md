@@ -190,3 +190,18 @@ grant execution, create references or infer session activity.
 AG12 reference content/state and all agent tool contracts are unchanged. Human
 menu activation is repaired; no reference mutation, agent claim, Start or launch
 is implied by opening or dismissing that menu.
+
+## Alpha38 note content compatibility
+
+AG12 tool names and argument schemas are unchanged. Shared `add_reference`
+validation is **broadened**, not behavior-identical: a nonblank explicit heading
+alone now suffices, as does a nonblank body. Blank-both creation still fails.
+Existing callers without a heading retain the legacy default `Note`; native
+paper can explicitly persist no heading. Existing cleared notes remain valid
+records and survive export/import.
+
+Human/native direct-note autosave adds an optional inspected-heading/body
+expectation checked in the same write transaction. Existing MCP updates remain
+unguarded and can still replace content; do not claim all clients now have CAS,
+revision history, idempotency or automatic conflict merging. No note operation
+creates an execution grant, takes a claim or starts a session.
