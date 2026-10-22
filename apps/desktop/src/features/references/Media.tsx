@@ -1,82 +1,136 @@
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@xyflow/react";
 import { File, Pause, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import type { RefItem } from "../../lib/references-api";
+import {
+  decodedImageThumbnail,
+  type Thumbnail,
+  thumbnailFits,
+} from "./image-resolution";
 import { referenceKind } from "./model";
 import { useCanvas } from "./runtime";
 
 let currentAudio: HTMLAudioElement | null = null;
-const thumbnails = new Map<string, Promise<string>>(),
-  audioCache = new Map<
-    string,
-    Promise<{ peaks: number[]; duration: number }>
-  >();
+const audioCache = new Map<
+  string,
+  Promise<{ peaks: number[]; duration: number }>
+>();
 export function stopReferenceAudio() {
   currentAudio?.pause();
   currentAudio = null;
 }
 export async function decodedThumbnail(url: string) {
-  let promise = thumbnails.get(url);
-  if (!promise) {
-    promise = (async () => {
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.src = url;
-      await image.decode();
-      const scale = Math.min(
-          1,
-          512 / Math.max(image.naturalWidth, image.naturalHeight),
-        ),
-        canvas = document.createElement("canvas");
-      canvas.width = Math.round(image.naturalWidth * scale);
-      canvas.height = Math.round(image.naturalHeight * scale);
-      canvas
-        .getContext("2d")
-        ?.drawImage(image, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL("image/webp", 0.82);
-    })();
-    thumbnails.set(url, promise);
-  }
-  return promise;
+  return (await decodedImageThumbnail(url)).src;
 }
-export function ImageMedia({ url, title }: { url: string; title: string }) {
+export function ImageMedia(props: { url: string; title: string }) {
+  // Remount before paint: never display the previous URL while an effect resets.
+  return <ScopedImageMedia key={props.url} {...props} />;
+}
+function ScopedImageMedia({ url, title }: { url: string; title: string }) {
   const runtime = useCanvas(),
-    small = useStore((s) => s.transform[2] < 1),
-    [thumb, setThumb] = useState<string>(),
-    [pixel, setPixel] = useState(false);
+    zoom = useStore((s) => s.transform[2]),
+    [thumb, setThumb] = useState<Thumbnail>(),
+    [size, setSize] = useState({ width: 0, height: 0 }),
+    [dpr, setDpr] = useState(() => window.devicePixelRatio || 1),
+    [pixel, setPixel] = useState(false),
+    [thumbFailed, setThumbFailed] = useState(false),
+    [failed, setFailed] = useState(false),
+    [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
-    void decodedThumbnail(url)
-      .then((t) => {
-        if (live) setThumb(t);
+    void decodedImageThumbnail(url)
+      .then((value) => {
+        if (live) {
+          setThumb(value);
+          setPixel(Math.max(value.originalWidth, value.originalHeight) <= 128);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        /* Original remains usable if thumbnail generation fails. */
+      });
     return () => {
       live = false;
     };
   }, [url]);
+  // Observe the image's own untransformed content box, not its screen rect.
+  const measureImage = useCallback((element: HTMLImageElement | null) => {
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry)
+        setSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    let query: MediaQueryList;
+    const update = () => {
+      query?.removeEventListener("change", update);
+      const value = window.devicePixelRatio || 1;
+      setDpr(value);
+      query = window.matchMedia(`(resolution: ${value}dppx)`);
+      query.addEventListener("change", update);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => {
+      query.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  const useThumb =
+    !thumbFailed &&
+    thumb &&
+    thumbnailFits(thumb, size.width, size.height, zoom, dpr);
+  const src = useThumb ? thumb.src : url;
+  if (failed)
+    return (
+      <div className="reference-file nodrag">
+        <span role="status">Image unavailable</span>
+        <button
+          type="button"
+          className="button ghost"
+          onClick={() => {
+            setThumbFailed(true);
+            setFailed(false);
+            setAttempt((value) => value + 1);
+          }}
+        >
+          Retry image
+        </button>
+      </div>
+    );
   return (
     <button
       type="button"
       className="reference-image nodrag"
       aria-label={`Open ${title}`}
-      onDoubleClick={() => runtime.lightbox(url, title)}
       onClick={() => runtime.lightbox(url, title)}
     >
       <img
-        src={small ? thumb : url}
+        ref={measureImage}
+        key={`${src}:${attempt}`}
+        src={src}
         alt={title}
         loading="lazy"
         style={{ imageRendering: pixel ? "pixelated" : "auto" }}
         onLoad={(e) => {
-          setPixel(
-            Math.max(
-              e.currentTarget.naturalWidth,
-              e.currentTarget.naturalHeight,
-            ) <= 128,
-          );
+          if (!useThumb)
+            setPixel(
+              Math.max(
+                e.currentTarget.naturalWidth,
+                e.currentTarget.naturalHeight,
+              ) <= 128,
+            );
+        }}
+        onError={() => {
+          if (useThumb) setThumbFailed(true);
+          else setFailed(true);
         }}
       />
     </button>
@@ -282,7 +336,7 @@ export function LocalMedia({ item, path }: { item: RefItem; path: string }) {
     };
   }, [kind, url.data, item.id]);
   if (url.data && kind === "image")
-    return <ImageMedia url={url.data} title={item.title} />;
+    return <ImageMedia key={item.id} url={url.data} title={item.title} />;
   if (url.data && kind === "audio")
     return <AudioMedia url={url.data} item={item} />;
   if (url.data && kind === "video")
