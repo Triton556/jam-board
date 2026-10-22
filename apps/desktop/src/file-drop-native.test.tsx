@@ -355,7 +355,9 @@ it("distinguishes asset reading, failures, genuine empty, no matches and retaine
     expect(calls.some((c) => c.command === "list_assets")).toBe(true),
   );
   expect(screen.queryByText(emptyText)).toBeNull();
-  expect(screen.getByRole("status")).toHaveTextContent("Reading assets");
+  expect(
+    screen.getByText("Reading assets…", { selector: '[role="status"]' }),
+  ).toBeVisible();
   await act(async () =>
     hold.reject({ code: "internal", message: "Synthetic initial read failed" }),
   );
@@ -694,7 +696,7 @@ it("offers read-only Refresh after late settlement in all four page/project-retu
       await user.click(refresh);
       expect(refresh).toBeDisabled();
       expect(
-        screen.getByText("Refreshing assets… showing the last loaded list."),
+        screen.getByText("Checking assets…", { selector: '[role="status"]' }),
       ).toBeVisible();
       await act(async () => heldRead.resolve(structuredClone(stores.A)));
       readOverride = null;
