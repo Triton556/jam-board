@@ -66,6 +66,7 @@ import {
   ReferenceFrame,
   ReferenceNode,
 } from "./Nodes";
+import { noteDraftLayout } from "./note-draft-layout";
 import { OverviewScene } from "./OverviewScene";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
 import "@xyflow/react/dist/style.css";
@@ -119,6 +120,7 @@ function Canvas() {
       projectId: string;
       x: number;
       y: number;
+      maxHeight: number;
     } | null>(null),
     [menu, setMenu] = useState(false),
     [frameEdit, setFrameEdit] = useState<RefFrame | null>(null),
@@ -1105,13 +1107,32 @@ function Canvas() {
                     setMenu(false);
                     if (noteDraft || !app.data?.jam) return;
                     const point = center();
+                    const bounds = container.current?.getBoundingClientRect();
+                    const toolsBottom = Math.max(
+                      0,
+                      ...Array.from(
+                        container.current?.querySelectorAll<HTMLElement>(
+                          ".reference-toolbar, .reference-filters",
+                        ) ?? [],
+                      ).map(
+                        (element) =>
+                          element.getBoundingClientRect().bottom -
+                          (bounds?.top ?? 0),
+                      ),
+                    );
+                    const layout = noteDraftLayout(point, {
+                      width: bounds?.width || 800,
+                      height: bounds?.height || 600,
+                      toolsBottom,
+                    });
                     setNoteDraft({
                       projectId: app.data.jam.id,
-                      x: point.x - 170,
-                      y: point.y - 160,
+                      x: layout.x,
+                      y: layout.y,
+                      maxHeight: layout.maxHeight,
                     });
                     void flow.setCenter(point.x, point.y, {
-                      zoom: Math.max(0.85, flow.getZoom()),
+                      zoom: layout.zoom,
                       duration: 0,
                     });
                   }}

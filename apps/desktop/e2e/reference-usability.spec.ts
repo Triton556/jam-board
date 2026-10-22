@@ -51,6 +51,7 @@ test("RF01/RF02 frame-only canvas has no empty art and a visible movable grip at
 test("RF03 local inline title/body keyboard save and explicit dirty cancel preserve note integrity", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 800, height: 600 });
   await page.goto("/");
   await page.getByRole("button", { name: "Load demo jam" }).click();
   await page.goto("/references");
@@ -82,7 +83,49 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
       ),
     )
     .toBe(1);
+  await page.evaluate(async () => {
+    const camera = window.__jamCanvas?.getViewport();
+    const canvas = document
+      .querySelector(".references-page")
+      ?.getBoundingClientRect();
+    if (camera && canvas) {
+      const centerX = (canvas.width / 2 - camera.x) / camera.zoom;
+      const centerY = (canvas.height / 2 - camera.y) / camera.zoom;
+      await window.__jamCanvas?.setViewport({
+        x: canvas.width / 2 - centerX * 4,
+        y: canvas.height / 2 - centerY * 4,
+        zoom: 4,
+      });
+    }
+  });
   await add();
+  const canvasBounds = await page
+    .getByRole("region", { name: "References canvas" })
+    .boundingBox();
+  const draftBounds = await draft.boundingBox();
+  if (!canvasBounds || !draftBounds) throw Error("Missing canvas/draft bounds");
+  expect(draftBounds.x).toBeGreaterThanOrEqual(canvasBounds.x);
+  expect(draftBounds.x + draftBounds.width).toBeLessThanOrEqual(
+    canvasBounds.x + canvasBounds.width,
+  );
+  expect(draftBounds.y).toBeGreaterThanOrEqual(canvasBounds.y);
+  expect(draftBounds.y + draftBounds.height).toBeLessThanOrEqual(
+    canvasBounds.y + canvasBounds.height,
+  );
+  // The selected saved node shares this position; the new local paper must win hit testing.
+  expect(
+    await draft
+      .getByRole("textbox", { name: "Title", exact: true })
+      .evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return (
+          document.elementFromPoint(
+            box.x + box.width / 2,
+            box.y + box.height / 2,
+          ) === element
+        );
+      }),
+  ).toBe(true);
   await draft
     .getByRole("textbox", { name: "Note", exact: true })
     .fill("Cancel me");
