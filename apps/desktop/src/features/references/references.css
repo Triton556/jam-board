@@ -683,3 +683,11 @@ p.reference-read-notice {
   margin: 0;
   padding: 12px;
 }
+
+/* Explicit receipts participate in the toolbar bounds used by new-note placement. */
+.reference-toolbar > .read-receipt:not(:empty) {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 2px 3px;
+  overflow-wrap: anywhere;
+}

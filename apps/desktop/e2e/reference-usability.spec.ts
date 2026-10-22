@@ -144,3 +144,66 @@ test("RF03 local inline title/body keyboard save and explicit dirty cancel prese
     ),
   ).toBe(1);
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`AS02/RF03 checked receipt does not cover a new note at 800×600 in ${theme}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Load demo jam", exact: true })
+      .click();
+    await page.goto("/references");
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute("data-theme", value),
+      theme,
+    );
+    const before = await page.evaluate(() =>
+      window.__jamMock.referenceCanvas(),
+    );
+    await page
+      .getByRole("button", { name: "Refresh references", exact: true })
+      .click();
+    const receipt = page.locator(".reference-toolbar .read-receipt");
+    await expect(receipt).toContainText("Checked references.");
+    await expect(receipt).toContainText("Last checked:");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: "Note", exact: true }).click();
+    const draft = page.getByRole("form", { name: "New note draft" });
+    const title = draft.getByRole("textbox", { name: "Title", exact: true });
+    await expect(title).toBeFocused();
+    const toolbarBounds = await page
+      .locator(".reference-toolbar")
+      .boundingBox();
+    const receiptBounds = await receipt.boundingBox();
+    const draftBounds = await draft.boundingBox();
+    if (!toolbarBounds || !receiptBounds || !draftBounds)
+      throw Error("Missing receipt/draft geometry");
+    expect(receiptBounds.y + receiptBounds.height).toBeLessThanOrEqual(
+      toolbarBounds.y + toolbarBounds.height + 1,
+    );
+    expect(draftBounds.y).toBeGreaterThanOrEqual(
+      toolbarBounds.y + toolbarBounds.height,
+    );
+    expect(draftBounds.y).toBeGreaterThanOrEqual(
+      receiptBounds.y + receiptBounds.height,
+    );
+    expect(
+      await title.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return (
+          document.elementFromPoint(
+            rect.x + rect.width / 2,
+            rect.y + rect.height / 2,
+          ) === element
+        );
+      }),
+    ).toBe(true);
+    await draft.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(draft).toHaveCount(0);
+    expect(
+      await page.evaluate(() => window.__jamMock.referenceCanvas()),
+    ).toEqual(before);
+  });
+}
