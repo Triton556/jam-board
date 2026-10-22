@@ -11,6 +11,8 @@ fn recursive_json_event_exports_without_changing_the_wire_shape() {
     export_event_bindings(&file).unwrap();
     let generated = std::fs::read_to_string(file).unwrap();
     assert!(generated.contains("payload: JsonPayload"));
+    assert!(generated.contains("releaseTask: (input: ReleaseClaim)"));
+    assert!(generated.contains("__TAURI_INVOKE(\"release_task\", { input })"));
     assert!(generated.contains("JsonPayload[]"));
     assert!(!generated.contains("\"Null\""));
     let committed = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/bindings.ts");

@@ -1,5 +1,5 @@
 use jam_board_lib::commands::{ApiError, MoveInput};
-use jam_core::{CreateTask, Error, TaskEditInput};
+use jam_core::{CreateTask, Error, ReleaseClaim, TaskEditInput};
 
 #[test]
 fn command_inputs_reject_a_frontend_actor() {
@@ -49,5 +49,36 @@ fn domain_errors_keep_the_public_command_contract() {
         if code == "validation" {
             assert_eq!(result["field"], "title");
         }
+    }
+}
+
+#[test]
+fn release_claim_input_requires_a_version_and_cannot_choose_actor_or_destination() {
+    let valid = serde_json::json!({"key":"JB-1","expectedUpdatedAt":"opaque-version"});
+    let input: ReleaseClaim = serde_json::from_value(valid.clone()).unwrap();
+    assert_eq!(input.expected_updated_at, "opaque-version");
+    for (field, value) in [
+        ("actor", "agent"),
+        ("status", "done"),
+        ("assigneeId", "other"),
+        ("projectId", "other-project"),
+    ] {
+        let mut forged = valid.clone();
+        forged[field] = serde_json::json!(value);
+        assert!(
+            serde_json::from_value::<ReleaseClaim>(forged).is_err(),
+            "unexpected field {field}"
+        );
+    }
+    assert!(serde_json::from_value::<ReleaseClaim>(serde_json::json!({"key":"JB-1"})).is_err());
+    for (error, code) in [
+        (Error::Conflict, "conflict"),
+        (Error::WrongStatus("No claim".into()), "wrong_status"),
+        (Error::Forbidden("Human only".into()), "forbidden"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(ApiError::from(error)).unwrap()["code"],
+            code
+        );
     }
 }

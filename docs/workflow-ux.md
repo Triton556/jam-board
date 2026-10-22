@@ -125,6 +125,29 @@ assigned to it. Fresh unscoped/other-task presence remains visible but quiet;
 matching task-scoped updates retain the colored paper ring, pencil and handwritten
 status. This follows the same visible-state/capability-boundary rationale above.
 
+## 7. Recover tracking without pretending to stop external work
+
+**Scenario:** a worker has stopped responding, a claim was left behind, or an
+imported In progress row has no holder. The person needs a visible route back to
+planning without making up a report or restarting an archived scope.
+
+Release claim names the captured project, task and holder, checks the task revision
+atomically and explains that it only clears board tracking. It does not terminate
+a process; scope permission is unchanged. Saved evidence stays available. This is
+a concrete application of HAX correction/control and explicit consequences, not a
+new worker-process controller. Stale confirmations fail with retained context;
+unsaved edits must be saved or discarded first.
+
+**Reports:** the newest round is expanded first, with review actions next to its
+evidence. Previous rounds remain available through disclosures rather than
+pushing the current decision down the page. This applies progressive disclosure
+without hiding historical evidence. Modal focus follows WAI-ARIA's dialog pattern:
+closed disclosure content and hidden controls cannot receive keyboard focus.
+
+Checks: cancel makes no change; pending submission is locked; failure is inside
+the dialog; success leaves a persistent receipt and logical focus; changed holder,
+project or task cannot silently retarget release; archived evidence remains intact.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests

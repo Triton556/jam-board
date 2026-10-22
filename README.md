@@ -17,9 +17,9 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.3**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.4**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.3.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.4.md).
 
 ## Features
 
@@ -65,7 +65,7 @@ MCP connections are pinned to one project for their lifetime. Opening another bo
 
 **Start / Pause:** Ready describes a task brief, while execution permission belongs to its story or epic. Starting an epic includes its inheriting stories; a separately paused story stays paused. Pausing the epic blocks new work in all its stories, including separately started ones. Already-running tasks may still submit evidence. Closing, archiving, restoring or importing work never silently resumes a grant. [Full execution policy](docs/mcp.md#human-authorized-execution).
 
-**Settings → Data → Archive this project** keeps its data for **Your projects → Archived projects → Restore & open**. Finish or release all In progress tasks before archiving, including individually archived cards. Restore an archived card to release its existing claim; restoring visibility does not authorize new work. Archiving does not silently cancel workers or rewrite individual task archive flags. Data archived by older builds keeps its original per-task flags.
+**Settings → Data → Archive this project** keeps its data for **Your projects → Archived projects → Restore & open**. Finish or release all In progress tasks before archiving, including individually archived cards. Open an In progress card and use **Release claim…** (or **Return to Backlog…** if no assignee is recorded), including archived cards. Confirm the exact holder and task; this returns board tracking to Backlog without stopping a worker process or changing scope permission. Restoring visibility does not authorize new work. Archiving does not silently cancel workers or rewrite individual task archive flags. Data archived by older builds keeps its original per-task flags.
 
 ## Inbox
 

@@ -37,7 +37,7 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_board_tasks, commands::get_task, commands::create_task,
             commands::move_task, commands::list_members, commands::list_activity,
             commands::set_theme, commands::list_tasks, commands::update_task,
-            commands::archive_task, commands::unarchive_task, commands::add_comment,
+            commands::release_task, commands::archive_task, commands::unarchive_task, commands::add_comment,
             m5_commands::attach_file,m5_commands::pick_files,m5_commands::list_assets,m5_commands::create_asset,m5_commands::update_asset,m5_commands::link_asset,m5_commands::unlink_asset,m5_commands::asset_preview,m5_commands::create_member,m5_commands::update_member,m5_commands::get_settings,m5_commands::set_settings,m5_commands::reset_jam,m5_commands::export_jam_json,m5_commands::import_jam_json,m5_commands::pick_file,m5_commands::mcp_status,m5_commands::set_mcp_http_enabled,m5_commands::regenerate_mcp_token,m5_commands::reveal_mcp_token,m5_commands::mcp_config_snippets,commands::list_tags, commands::runtime_info $(, commands::$extra)*
         ] };
     }

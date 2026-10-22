@@ -47,6 +47,7 @@ import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
 import { ReadinessStrip } from "./Readiness";
+import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
 import type { TaskFields } from "./task-form";
 import {
@@ -362,6 +363,7 @@ export function TaskEditor({
         </span>
       </div>
       {!readonly && <TaskExecutionNotice task={task} />}
+      <ReleaseClaim task={task} hasUnsavedEdits={isDirty} />
       <form
         id="task-form"
         onSubmit={handleSubmit((value) => submit(value))}

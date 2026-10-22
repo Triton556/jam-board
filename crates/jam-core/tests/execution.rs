@@ -1061,3 +1061,263 @@ fn archived_claim_recovery_to_ready_preserves_readiness_validation() {
         assert!(!running(s, &scope));
     }
 }
+
+#[test]
+fn native_release_confirmation_cannot_clear_reassigned_reclaimed_or_reported_work() {
+    for changed in ["reassigned", "reclaimed", "reported"] {
+        let f = fixture();
+        let s = &f.store;
+        let scope = story(&f.story);
+        let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+        change(s, &f.human, scope.clone(), ExecutionAction::Start);
+        let claimed = s.claim_task(&f.worker.id, &task.task.key).unwrap();
+        let confirmed = ReleaseClaim {
+            key: task.task.key.clone(),
+            expected_updated_at: claimed.task.updated_at,
+        };
+        match changed {
+            "reassigned" => {
+                s.assign_task(&f.human.id, &task.task.key, Some(&f.brain.id))
+                    .unwrap();
+            }
+            "reclaimed" => {
+                s.release_task(&f.worker.id, &task.task.key, Some("ready"))
+                    .unwrap();
+                s.claim_task(&f.worker.id, &task.task.key).unwrap();
+            }
+            "reported" => {
+                s.submit_report(&f.worker.id, report(&task.task.key))
+                    .unwrap();
+            }
+            _ => unreachable!(),
+        }
+        change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+        let before = serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap();
+        let seq = s.latest_seq().unwrap();
+        assert!(matches!(
+            s.release_current_task(confirmed),
+            Err(Error::Conflict)
+        ));
+        assert_eq!(s.latest_seq().unwrap(), seq);
+        assert_eq!(
+            serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap(),
+            before
+        );
+        let current = s.get_task(&task.task.key).unwrap().task;
+        let released = s
+            .release_current_task(ReleaseClaim {
+                key: current.key.clone(),
+                expected_updated_at: current.updated_at,
+            })
+            .unwrap();
+        assert_eq!(released.status, "backlog");
+        assert!(released.assignee_id.is_none());
+        assert_eq!(released.updated_by, f.human.id);
+        assert!(!running(s, &scope));
+        assert!(
+            s.submit_report(&f.worker.id, report(&task.task.key))
+                .is_err(),
+            "late report cannot attach to a released claim"
+        );
+        assert!(matches!(
+            s.release_current_task(ReleaseClaim {
+                key: released.key,
+                expected_updated_at: released.updated_at
+            }),
+            Err(Error::WrongStatus(_))
+        ));
+    }
+}
+
+#[test]
+fn native_release_is_project_pinned_and_preserves_archived_work_evidence() {
+    let f = fixture();
+    let s = &f.store;
+    let project = s.active_jam().unwrap();
+    let captured = s.selected_snapshot().unwrap();
+    let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    let scope = story(&f.story);
+    change(s, &f.human, scope.clone(), ExecutionAction::Start);
+    s.claim_task(&f.worker.id, &task.task.key).unwrap();
+    s.submit_report(&f.worker.id, report(&task.task.key))
+        .unwrap();
+    s.review_task(
+        &f.brain.id,
+        ReviewTask {
+            key: task.task.key.clone(),
+            verdict: "changes_requested".into(),
+            comments_md: "Another round".into(),
+            failed_tests: None,
+        },
+    )
+    .unwrap();
+    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
+    s.set_epic_status(&f.human.id, &f.epic.key, "archived", None)
+        .unwrap();
+    let revision = s.get_execution(&scope).unwrap().revision;
+    let input = ReleaseClaim {
+        key: current.key,
+        expected_updated_at: current.updated_at,
+    };
+    let (other, _) = s
+        .create_jam(
+            "Other visible project",
+            None,
+            None,
+            None,
+            "UTC",
+            "Other human",
+        )
+        .unwrap();
+    assert!(
+        s.selected_snapshot()
+            .unwrap()
+            .release_current_task(input.clone())
+            .is_err(),
+        "a new visible project cannot act on a foreign task"
+    );
+    let released = captured.release_current_task(input).unwrap();
+    assert_eq!(released.jam_id, project.id);
+    assert_eq!(
+        released.updated_by, f.human.id,
+        "captured project's human, not the later selected project's human"
+    );
+    assert_eq!(released.status, "backlog");
+    assert!(released.assignee_id.is_none());
+    assert_eq!(s.active_jam().unwrap().id, other.id);
+    let detail = captured.get_task(&task.task.key).unwrap();
+    assert_eq!(detail.reports.len(), 1);
+    assert_eq!(detail.reviews.len(), 1);
+    assert_eq!(detail.task.review_round, 1);
+    assert_eq!(detail.epic.status, "archived");
+    assert_eq!(captured.get_execution(&scope).unwrap().revision, revision);
+    assert!(!running(&captured, &scope));
+    assert!(
+        captured
+            .submit_report(&f.worker.id, report(&task.task.key))
+            .is_err()
+    );
+}
+
+#[test]
+fn only_native_human_can_cancel_unassigned_in_progress_after_archival() {
+    for archived in ["none", "task", "story", "epic"] {
+        let f = fixture();
+        let s = &f.store;
+        let scope = story(&f.story);
+        let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+        change(s, &f.human, scope.clone(), ExecutionAction::Start);
+        s.move_task(&f.human.id, &task.task.key, "in_progress", None, None)
+            .unwrap();
+        change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+        match archived {
+            "task" => {
+                s.archive_task(&f.human.id, &task.task.key, None).unwrap();
+            }
+            "story" => {
+                s.set_story_status(&f.human.id, &f.story.key, "archived", None)
+                    .unwrap();
+            }
+            "epic" => {
+                s.set_epic_status(&f.human.id, &f.epic.key, "archived", None)
+                    .unwrap();
+            }
+            _ => {}
+        }
+        let current = s.get_task(&task.task.key).unwrap().task;
+        assert!(current.assignee_id.is_none());
+        assert!(s.release_task(&f.brain.id, &task.task.key, None).is_err());
+        let confirmed = ReleaseClaim {
+            key: current.key.clone(),
+            expected_updated_at: current.updated_at.clone(),
+        };
+        s.set_setting("current_member_id", &f.brain.id).unwrap();
+        assert!(
+            s.release_current_task(confirmed.clone()).is_err(),
+            "native identity cannot be an agent"
+        );
+        s.set_setting("current_member_id", &f.human.id).unwrap();
+        let released = s.release_current_task(confirmed).unwrap();
+        assert_eq!(released.status, "backlog");
+        assert!(released.assignee_id.is_none());
+        assert_eq!(released.archived_at, current.archived_at);
+        assert!(!running(s, &scope));
+        assert!(s.get_task(&task.task.key).unwrap().reports.is_empty());
+        let project = s.active_jam().unwrap();
+        s.reset_jam(&f.human.id, &project.name).unwrap();
+    }
+}
+
+#[test]
+fn concurrent_native_release_and_report_serialize_without_losing_evidence() {
+    use std::sync::{Arc, Barrier};
+    let f = fixture();
+    let s = &f.store;
+    let scope = story(&f.story);
+    let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Start);
+    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
+    change(s, &f.human, scope.clone(), ExecutionAction::Pause);
+    let worker_store = Store::open(&s.path).unwrap().selected_snapshot().unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let sync = barrier.clone();
+    let worker = f.worker.id.clone();
+    let key = task.task.key.clone();
+    let reported = std::thread::spawn(move || {
+        sync.wait();
+        worker_store.submit_report(&worker, report(&key))
+    });
+    barrier.wait();
+    let released = s.release_current_task(ReleaseClaim {
+        key: current.key,
+        expected_updated_at: current.updated_at,
+    });
+    let reported = reported.join().unwrap();
+    let detail = s.get_task(&task.task.key).unwrap();
+    match (released, reported) {
+        (Ok(_), Err(Error::Forbidden(_))) => {
+            assert_eq!(detail.task.status, "backlog");
+            assert!(detail.reports.is_empty());
+            assert!(detail.task.assignee_id.is_none());
+        }
+        (Err(Error::Conflict), Ok(_)) => {
+            assert_eq!(detail.task.status, "review");
+            assert_eq!(detail.reports.len(), 1);
+            assert_eq!(
+                detail.task.assignee_id.as_deref(),
+                Some(f.worker.id.as_str())
+            );
+        }
+        result => panic!("release/report did not serialize safely: {result:?}"),
+    }
+    assert!(!running(s, &scope));
+}
+
+#[test]
+fn report_contract_has_no_claim_token_so_callers_must_reread_after_reclaim() {
+    let f = fixture();
+    let s = &f.store;
+    let scope = story(&f.story);
+    let task = s.create_task(&f.human.id, input(&f.story)).unwrap();
+    change(s, &f.human, scope.clone(), ExecutionAction::Start);
+    let current = s.claim_task(&f.worker.id, &task.task.key).unwrap().task;
+    let payload = report(&task.task.key);
+    s.release_current_task(ReleaseClaim {
+        key: current.key,
+        expected_updated_at: current.updated_at,
+    })
+    .unwrap();
+    assert!(matches!(
+        s.submit_report(&f.worker.id, payload.clone()),
+        Err(Error::Forbidden(_))
+    ));
+    s.mark_ready(&f.human.id, &task.task.key, None).unwrap();
+    s.claim_task(&f.worker.id, &task.task.key).unwrap();
+    // Current API authenticates the holder and status/round, not an individual
+    // claim epoch. After this same identity legitimately reclaims, it cannot
+    // distinguish an old payload from new evidence. This documents the boundary,
+    // not a freshness guarantee: callers must reread their current claim/context.
+    let accepted = s.submit_report(&f.worker.id, payload).unwrap();
+    assert_eq!(accepted.round, 0);
+    assert_eq!(s.get_task(&task.task.key).unwrap().task.status, "review");
+}

@@ -120,3 +120,37 @@ it("a pending review cannot be submitted twice or dismissed before its outcome",
   await act(async () => release?.());
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
+
+it("latest report appears first and earlier rounds are collapsed without losing evidence", async () => {
+  const task = await mockApi.getTask("JB-9"),
+    report = task.reports.at(-1);
+  if (!report) throw new Error("Missing report");
+  const latest = {
+    ...report,
+    id: "newest-report",
+    round: report.round + 1,
+    summaryMd: "Latest evidence to inspect",
+  };
+  view(
+    <Rounds
+      task={{ ...task, reviewRound: latest.round, reports: [report, latest] }}
+      members={await mockApi.listMembers()}
+    />,
+  );
+  const details = Array.from(
+    document.querySelectorAll<HTMLDetailsElement>(".round"),
+  );
+  expect(details[0]?.open).toBe(true);
+  expect(details[0]?.querySelector("summary")).toHaveTextContent(
+    `Round ${latest.round} · Latest`,
+  );
+  expect(details[1]?.open).toBe(false);
+  expect(
+    screen.getByRole("region", { name: "Latest report" }),
+  ).toHaveTextContent("Latest evidence");
+  expect(
+    within(details[0] as HTMLElement).getByRole("button", {
+      name: "Accept result",
+    }),
+  ).toBeVisible();
+});

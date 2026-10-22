@@ -118,7 +118,35 @@ export function Rounds({
       ...task.reports.map((r) => r.round),
       ...task.reviews.map((r) => r.round),
     ]),
-  ].sort((a, b) => a - b);
+  ].sort((a, b) => b - a);
+  const reviewActions = task.status === "review" && latest && (
+    <div className="button-row">
+      <Button
+        variant="primary"
+        disabled={review.isPending}
+        onClick={() =>
+          review.mutate({
+            key: task.key,
+            verdict: "accept",
+            commentsMd: "Accepted after checking the report and acceptance.",
+            failedTests: [],
+          })
+        }
+      >
+        Accept result
+      </Button>
+      <Button
+        disabled={review.isPending}
+        onClick={() => {
+          review.reset();
+          setNotice("");
+          setRequest(true);
+        }}
+      >
+        Request changes…
+      </Button>
+    </div>
+  );
   return (
     <section className="task-section rounds">
       <h2 ref={heading} tabIndex={-1}>
@@ -138,13 +166,17 @@ export function Rounds({
         const report = task.reports.find((r) => r.round === round),
           verdict = task.reviews.find((r) => r.round === round);
         return (
-          <div className="round" key={round}>
-            <h3>Round {round}</h3>
+          <details className="round" key={round} open={round === rounds[0]}>
+            <summary>
+              Round {round}
+              {round === rounds[0] ? " · Latest" : " · Earlier evidence"}
+            </summary>
             {report && (
               <section
                 className="report-card"
                 aria-label={
-                  report === task.reports.at(-1)
+                  report.round ===
+                  Math.max(...task.reports.map((item) => item.round))
                     ? "Latest report"
                     : `Report round ${round}`
                 }
@@ -213,7 +245,8 @@ export function Rounds({
               <section
                 className={`review-card ${verdict.verdict}`}
                 aria-label={
-                  verdict === task.reviews.at(-1)
+                  verdict.round ===
+                  Math.max(...task.reviews.map((item) => item.round))
                     ? "Latest review"
                     : `Review round ${round}`
                 }
@@ -235,38 +268,10 @@ export function Rounds({
                 )}
               </section>
             )}
-          </div>
+            {round === task.reviewRound && reviewActions}
+          </details>
         );
       })}
-      {task.status === "review" && latest && (
-        <div className="button-row">
-          <Button
-            variant="primary"
-            disabled={review.isPending}
-            onClick={() =>
-              review.mutate({
-                key: task.key,
-                verdict: "accept",
-                commentsMd:
-                  "Accepted after checking the report and acceptance.",
-                failedTests: [],
-              })
-            }
-          >
-            Accept
-          </Button>
-          <Button
-            disabled={review.isPending}
-            onClick={() => {
-              review.reset();
-              setNotice("");
-              setRequest(true);
-            }}
-          >
-            Request changes…
-          </Button>
-        </div>
-      )}
       {request && latest && (
         <ReviewDialog
           report={latest}

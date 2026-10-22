@@ -331,6 +331,14 @@ pub struct TaskEditInput {
     #[serde(flatten)]
     pub patch: TaskPatch,
 }
+/// Human confirmation of a captured claim; neither actor nor destination is caller-controlled.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReleaseClaim {
+    pub key: String,
+    pub expected_updated_at: String,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskQuery {
