@@ -19,11 +19,11 @@ for (const theme of ["light", "dark"] as const) {
         status: "backlog",
       }),
     );
-    await expect(
-      page
-        .locator(".toast")
-        .filter({ hasText: "Notification history fictional target" }),
-    ).toBeHidden({ timeout: 10000 });
+    const toast = page
+      .locator(".toast")
+      .filter({ hasText: "Notification history fictional target" });
+    await expect(toast).toBeVisible();
+    await expect(toast).toBeHidden({ timeout: 10000 });
     const bell = page.getByRole("button", { name: /^Project notifications/ });
     await bell.focus();
     await page.keyboard.press("Enter");
