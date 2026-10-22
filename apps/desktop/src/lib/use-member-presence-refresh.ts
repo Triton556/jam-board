@@ -1,7 +1,7 @@
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "./api";
-import type { AppState, Member } from "./types";
+import type { AppState } from "./types";
 
 export const MEMBER_PRESENCE_INTERVAL = 30000;
 
@@ -16,6 +16,7 @@ export function startMemberPresenceRefresh(client: QueryClient) {
   };
   let project = selection();
   let epoch = 0;
+  let memberLifecycle = 0;
   let mounted = true;
   let pending = false;
   let retryCurrent = false;
@@ -31,13 +32,19 @@ export function startMemberPresenceRefresh(client: QueryClient) {
     if (client.isFetching({ queryKey: ["members"] })) return;
     const capturedProject = project;
     const capturedEpoch = epoch;
-    const before = client.getQueryState<Member[]>(["members"]);
-    const beforeData = before?.data;
-    const beforeUpdated = before?.dataUpdatedAt;
+    const beforeQuery = client
+      .getQueryCache()
+      .find({ queryKey: ["members"], exact: true });
+    const before = beforeQuery?.state;
+    const beforeCount = before?.dataUpdateCount;
+    const beforeLifecycle = memberLifecycle;
     pending = true;
     try {
       const members = await api.listMembers();
-      const current = client.getQueryState<Member[]>(["members"]);
+      const currentQuery = client
+        .getQueryCache()
+        .find({ queryKey: ["members"], exact: true });
+      const current = currentQuery?.state;
       if (
         mounted &&
         visible() &&
@@ -45,8 +52,10 @@ export function startMemberPresenceRefresh(client: QueryClient) {
         project === capturedProject &&
         selection() === capturedProject &&
         !client.isFetching({ queryKey: ["members"] }) &&
-        current?.data === beforeData &&
-        current?.dataUpdatedAt === beforeUpdated
+        memberLifecycle === beforeLifecycle &&
+        currentQuery === beforeQuery &&
+        current === before &&
+        current?.dataUpdateCount === beforeCount
       )
         client.setQueryData(["members"], members);
     } catch {
@@ -67,7 +76,16 @@ export function startMemberPresenceRefresh(client: QueryClient) {
       void refresh();
     }
   };
-  const stopCache = client.getQueryCache().subscribe(() => {
+  const stopCache = client.getQueryCache().subscribe((event) => {
+    // Object identity catches replacement; this generation also catches an
+    // absent→created→removed cache lifecycle while a read is pending.
+    if (
+      (event.type === "added" || event.type === "removed") &&
+      event.query.queryKey.length === 1 &&
+      event.query.queryKey[0] === "members"
+    ) {
+      memberLifecycle++;
+    }
     const next = selection();
     if (next === project) return;
     project = next;
