@@ -329,6 +329,18 @@
 .execution-help p {
   margin-bottom: 0;
 }
+/* The Story drawer stays narrow even in a wide desktop window. */
+.story-editor .execution-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+.story-editor .execution-controls > .execution-actions {
+  grid-column: 1;
+  grid-row: auto;
+  justify-content: flex-start;
+}
+.story-editor .execution-heading > .small {
+  white-space: nowrap;
+}
 @media (width < 700px) {
   .execution-controls {
     grid-template-columns: minmax(0, 1fr);

@@ -315,3 +315,83 @@ it("Retry task list retains filters and distinguishes failed reads from an empty
     "task",
   );
 });
+
+it.each([1, 22, 43, 44, 44001, 44022, 44043])(
+  "sub-row offset %s chooses a fully readable row below the sticky header",
+  async (offset) => {
+    await mockApi.createJam(blank("Partly hidden entry"));
+    await mockApi.seedBulk(2000);
+    const h = mount();
+    await screen.findByText("2000 tasks", { exact: true });
+    act(() => entry()?.focus());
+    moveScroll(offset);
+    const target = entry();
+    expect(target).toHaveFocus();
+    expect(target?.dataset.taskKey).toMatch(
+      new RegExp(`-${Math.ceil(offset / 44) + 1}$`),
+    );
+    const index = Number(target?.dataset.taskKey?.split("-").at(-1)) - 1;
+    // Synthetic CSS geometry, not a rendered viewport measurement.
+    expect(84 + index * 44 - offset).toBeGreaterThanOrEqual(84);
+    expect(84 + (index + 1) * 44 - offset).toBeLessThanOrEqual(623);
+    expect(screen.getByTestId("table-scroll").scrollTop).toBe(offset);
+    fireEvent.keyDown(target as HTMLElement, { key: "Enter" });
+    expect(h.open).toHaveBeenCalledExactlyOnceWith(target?.dataset.taskKey);
+    expect(screen.getAllByTestId("table-row").length).toBeLessThanOrEqual(60);
+  },
+);
+it("a remembered bottom sliver is not a readable row and filter focus stays put", async () => {
+  const project = await mockApi.createJam(blank("Bottom sliver"));
+  await mockApi.seedBulk(2000);
+  mount();
+  await screen.findByText("2000 tasks", { exact: true });
+  const row = document.querySelector<HTMLElement>(
+    `[data-task-key="${project.jam?.keyPrefix}-13"]`,
+  );
+  act(() => row?.focus());
+  const filter = screen.getByRole("textbox", { name: "Search tasks" });
+  act(() => filter.focus());
+  // Row13 has only11px at the bottom; twelve full rows are available above it.
+  moveScroll(0);
+  expect(row).toHaveAttribute("tabindex", "-1");
+  expect(entry()?.dataset.taskKey).toMatch(/-1$/);
+  expect(filter).toHaveFocus();
+});
+it("the last row remains reachable at the final scroll offset", async () => {
+  await mockApi.createJam(blank("Final visible row"));
+  await mockApi.seedBulk(2000);
+  const h = mount();
+  await screen.findByText("2000 tasks", { exact: true });
+  moveScroll(2000 * 44 + 84 - 623);
+  const last = document.querySelector<HTMLElement>('[data-task-key$="-2000"]');
+  act(() => last?.focus());
+  moveScroll(2000 * 44 + 84 - 623);
+  expect(entry()).toBe(last);
+  expect(last).toHaveFocus();
+  fireEvent.keyDown(last as HTMLElement, { key: "Enter" });
+  expect(h.open).toHaveBeenCalledExactlyOnceWith(last?.dataset.taskKey);
+});
+it.each([43, 44, 65])(
+  "a viewport shorter than one row retains a usable intersecting entry at %s",
+  async (offset) => {
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.classList.contains("table-scroll") ? 106 : 0;
+      },
+    );
+    await mockApi.createJam(blank("Tiny viewport"));
+    await mockApi.seedBulk(2000);
+    const h = mount();
+    await screen.findByText("2000 tasks", { exact: true });
+    moveScroll(offset);
+    const target = entry();
+    const index = Number(target?.dataset.taskKey?.split("-").at(-1)) - 1;
+    const shown =
+      Math.min((index + 1) * 44, offset + 22) - Math.max(index * 44, offset);
+    expect(shown).toBeGreaterThan(0);
+    expect(index).toBe(Math.floor((offset + 11) / 44));
+    act(() => target?.focus());
+    fireEvent.keyDown(target as HTMLElement, { key: "Enter" });
+    expect(h.open).toHaveBeenCalledExactlyOnceWith(target?.dataset.taskKey);
+  },
+);

@@ -3,6 +3,28 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.19] - 2026-10-21
+
+### Fixed
+
+- Table keyboard entry prefers a fully readable row below the sticky headers,
+  rather than a one-pixel sliver at either edge. A viewport too short for a full
+  row uses the greatest visible overlap; remembered row identity is retained
+  when readable, without taking focus from filters or changing virtualization.
+- Story permission summary and actions use separate full-width rows in the narrow
+  drawer, including when the outer desktop window is wide. Permission consequences
+  and counts remain present; no execution policy changed.
+
+### Changed
+
+- The table's 84px sticky-header allowance now uses body-row scroll margins rather
+  than a scroll-container inset that also excludes the sticky sort controls.
+  This is a source-backed candidate for the observed native header-focus jump;
+  native geometry still needs independent verification, not a claimed closure.
+
+See [verification notes](docs/verification/0.3.0-alpha.19.md) for synthetic viewport
+coverage, preserved native observations and exact-version checks.
+
 ## [0.3.0-alpha.18] - 2026-10-21
 
 ### Fixed
