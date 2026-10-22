@@ -15,13 +15,15 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 ![Snowball dogfood recording: Inbox answers, planning and the epic journal](docs/media/demo.gif)
 
-Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
+Historical Snowball dogfood recording in the real desktop app (not current-prerelease acceptance): a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.16**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.17**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.16.md).
+> Alpha15 adds `latestActivityCursor` to session context; strict/cached output
+> schemas also need updating. Missing on an older server does not mean zero.
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.17.md).
 
 ## Features
 
@@ -44,7 +46,7 @@ Snowball dogfood recording in the real desktop app: a brain agent asks questions
 | Inbox | References |
 | ![An agent question with a recommended option](docs/media/readme-inbox.jpg) | ![Local references linked to project work](docs/media/readme-canvas.jpg) |
 
-Plan shows the Snowball run. Board, Inbox and References show the bundled demo in the real desktop window. [Dark paper theme](docs/media/readme-board-dark.jpg).
+These historical screenshots show the earlier Snowball run (Plan) and bundled demo (Board, Inbox and References) in a real desktop window. They are not screenshots of every current control or proof of current-prerelease acceptance. [Dark paper theme](docs/media/readme-board-dark.jpg).
 
 ## Plan with a brain agent
 
@@ -93,15 +95,22 @@ Drop local images, audio, video or other files onto the canvas, add captions, no
 
 Choose **Game jam** for a 48-hour countdown, **Gamedev** for a longer game project, **Web app** for product work, or **Custom** to start blank. Gamedev and Web app offer an optional milestone. Switching templates keeps existing tags and work.
 
-## Agent skill
+## Optional agent skill
 
-Open **Settings → Agents**: connect MCP first, then choose a local clone of [agent-playbook](https://github.com/Triton556/agent-playbook), a target project folder and Codex or Claude Code. **Jam Board skill** installs the `jam-board` profile with its procedures; **Whole agent-playbook** installs the full profile.
+MCP connection does not require installing a playbook. If you want its additional
+workflow guidance, open **Settings → Agents** after connecting MCP, then choose a local clone of [agent-playbook](https://github.com/Triton556/agent-playbook), a target project folder and Codex or Claude Code. **Jam Board skill** installs the `jam-board` profile with its procedures; **Whole agent-playbook** installs the full profile.
 
-The app shows the exact commands, runs a plan, asks before writing, then installs and verifies. Python 3.12+ is required. The harness records a receipt in the selected playbook folder's `.harness-state/`. Nothing is downloaded by the app and global agent configuration is left alone. Start a new session in that project and ask: *“Use the jam-board MCP server: plan an epic with me.”*
+The app shows the exact commands, runs a plan, asks before writing, then installs and verifies. Python 3.12+ is required. The harness records a receipt in the selected playbook folder's `.harness-state/`. Nothing is downloaded by the app and global agent configuration is left alone. Start a new session in that project and use the app’s current planning prompt.
+
+Older playbook examples do not include every current required MCP field. Live
+schemas and this version’s prompts are authoritative; installing files is not
+proof of live protocol compatibility, Brain appointment or execution permission.
+After upgrading, reconnect and refresh cached schemas rather than replaying old
+requests with replacement validators. See the [compatibility notes](docs/agent-playbook-compatibility.md).
 
 ## Install
 
-Download the Windows x64 `-setup.exe` from [Releases](https://github.com/Triton556/jam-board/releases). Installation is per-user and does not require administrator rights. Windows 11 with WebView2 is the tested platform.
+Download the Windows x64 `-setup.exe` from [Releases](https://github.com/Triton556/jam-board/releases). Check the version shown there: a published download may be older than this unreleased development candidate. The local prerelease commits and checks do not imply a public installer/tag/release. Installation is per-user and does not require administrator rights. Windows 11 with WebView2 is the tested platform.
 
 Jam Board is **Windows-first**. This development branch has controlled Linux native
 acceptance with explicitly provided runtime dependencies; see the versioned

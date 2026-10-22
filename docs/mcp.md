@@ -128,7 +128,7 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 
 ## Tool contract (44 tools)
 
-All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means the active project. Reference items/questions use their returned IDs.
+All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means this session’s pinned project, not the board currently displayed in the UI. Reference items/questions use their returned IDs.
 
 Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, stale_claim, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
 

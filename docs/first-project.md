@@ -78,9 +78,8 @@ Jam Board does not start a new chat session when you answer.
 Review the proposed Story acceptance and task **Goal / Context / Where / Changes /
 Tests / Boundaries / Result**. Use a field’s explicit **Edit** action; prose and
 reference links are reading surfaces, not edit buttons. Edit the brief or Notes,
-save, then ask the brain to
-reconcile your changes with the current version. It should explain what changed
-and what remains unclear instead of overwriting your edits.
+save, then ask the brain to reconcile your changes with the current version. It
+should explain what changed and what remains unclear instead of overwriting your edits.
 
 If your save conflicts with another edit, inspect the comparison. **Read latest**
 updates the comparison while retaining your draft; it does not replay the save.
@@ -91,7 +90,7 @@ not individual rows. You can close the comparison and keep working on the draft.
 
 Mark a sufficiently specified task **Ready**. This means its brief is usable, not
 that workers may execute it. The Story's **Planning status** also describes planning;
-it is distinct from **Worker permission**, shown as **New work allowed / Paused**.
+it is distinct from **Worker permission**, shown as **New work allowed / New work paused**.
 
 When you want implementation to begin, **Start the story or epic** in Plan and
 confirm the exact scope. Or ask in brain chat; the brain creates a typed Start

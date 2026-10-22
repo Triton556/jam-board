@@ -485,8 +485,8 @@ function EpicDetail({
               />
             </div>
             <aside className="epic-process">
-              <label htmlFor="participation">
-                Participation
+              <div className="epic-process-choice">
+                <label htmlFor="participation">Participation</label>
                 <Select
                   id="participation"
                   aria-label="Participation"
@@ -509,9 +509,9 @@ function EpicDetail({
                     ]
                   }
                 </small>
-              </label>
-              <label htmlFor="separate-reviewer">
-                Separate reviewer
+              </div>
+              <div className="epic-process-choice">
+                <label htmlFor="separate-reviewer">Separate reviewer</label>
                 <Select
                   id="separate-reviewer"
                   aria-label="Separate reviewer"
@@ -525,7 +525,7 @@ function EpicDetail({
                     </option>
                   ))}
                 </Select>
-              </label>
+              </div>
               <div className="field">
                 Worker model
                 <PlanningInput

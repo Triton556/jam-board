@@ -434,3 +434,19 @@ prepared handoff therefore names paginated `list_tasks` inventory plus relevant
 This addresses a source-level instruction ambiguity in the requested workflow, not
 an observed model failure or a new tool/permission. The first-project walkthrough
 states the same boundary and does not promise that an external model will follow it.
+
+## 19. Label the trigger, not every option
+
+A follow-on real-PlanPage DOM probe found two remaining wrapped labels: all
+Participation choices inherited the field title plus its help text, and every
+Separate reviewer choice was named after the field. Their visible values differed.
+The [HTML label model](https://html.spec.whatwg.org/multipage/forms.html#the-label-element)
+associates a label with one control, not a collection of nested option buttons.
+A sibling label now targets each existing trigger; the shared selector, values,
+keyboard handling and layout spacing remain unchanged. Tests cover each option's
+name, exact keyed update, focus after selection and Escape without a second write.
+This is source/DOM evidence, not native accessibility certification.
+
+Documentation uses the same worker-permission and pinned-project vocabulary as
+the UI and protocol. Historical screenshots and optional skill installation are
+not substitutes for exact-current-build or live-protocol verification.
