@@ -109,3 +109,21 @@ async fn snippets_and_recent_calls_follow_selected_project_but_never_retarget_se
     // A previously copied connection string retains A's immutable id.
     assert!(a_snippets.codex_stdio.contains(&a.id));
 }
+
+#[test]
+fn codex_http_snippets_name_the_agent_with_and_without_project_binding() {
+    for project in [None, Some("synthetic-project-A")] {
+        let snippets =
+            jam_mcp::project_config_snippets("sidecar", "data", 47321, "synthetic-token", project);
+        assert!(snippets.codex_http.contains("\"X-Jam-Agent\" = \"Codex\""));
+        if let Some(project) = project {
+            assert!(
+                snippets
+                    .codex_http
+                    .contains(&format!("\"X-Jam-Project\" = {project:?}"))
+            );
+        } else {
+            assert!(!snippets.codex_http.contains("X-Jam-Project"));
+        }
+    }
+}

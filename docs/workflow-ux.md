@@ -500,3 +500,25 @@ and from filters with no matches. Omitting zero-item groups in the All view brin
 real non-game assets forward without changing drop targets, import classification,
 kind filters or saved collapse preferences. Unit/DOM tests do not establish native
 screen-reader behavior or the rendered height of a large receipt.
+
+## 22. One connection setup and readable enabled controls
+
+The palette had a separate unpinned TOML builder whose apostrophe doubling was
+invalid in literal TOML strings. It now navigates to the existing project-captured
+Settings → Agents setup, with MCP/config/client search aliases. Both current Codex
+HTTP builders explicitly name the agent, matching their stdio default; no client
+configuration is installed. The visible identity explanation exposes an existing
+server contract rather than adding a process manager: normalized shared names
+resolve one member, inherited connections share that identity, and independent
+tracking needs independently configured names/reconnection. This avoids requiring
+users to recall hidden configuration behavior, consistent with
+[NN/g recognition over recall](https://www.nngroup.com/articles/recognition-and-recall/).
+
+Enabled table status filters and archived/openable rows no longer fade all their
+text to 55% opacity. Selection retains its ring/pressed state; archived rows retain
+the explicit stamp. The existing Ready→Todo→butter token alias is merely colocated
+with status tokens, not a new color fix. Tests calculate resolved source-token
+contrast in both themes and preserve semantic cues, following
+[W3C normal-text contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
+These calculations exclude grain/antialiasing and are not whole-app rendered WCAG
+certification. Paper colors and decorative animation remain unchanged.

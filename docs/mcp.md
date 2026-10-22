@@ -112,7 +112,13 @@ Agent identity profiles (name, handle and color) remain shared for compatibility
 
 ## Identity and presence
 
-The initialized `clientInfo.name` determines the client kind: names containing `codex` map to `codex`, containing `claude` to `claude-code`, otherwise `other` (case-insensitive). Stdio `JAM_AGENT_NAME` or HTTP `X-Jam-Agent` overrides the display name. Defaults are `Codex`, `Claude`, or `clientInfo.name`.
+The initialized `clientInfo.name` determines the client kind: names containing `codex` map to `codex`, containing `claude` to `claude-code`, otherwise `other` (case-insensitive). Stdio `JAM_AGENT_NAME` or HTTP `X-Jam-Agent` supplies the name used to resolve the board identity. Defaults are `Codex`, `Claude`, or `clientInfo.name`; both Codex HTTP configuration builders now explicitly send `X-Jam-Agent: Codex`.
+
+Choose distinct stable names for independently configured brains and workers (for example `Planner` and `Worker-1`), replace the example name before applying the configuration, and reconnect. Names are normalized to lowercase, non-alphanumeric characters become hyphens, and leading/trailing hyphens are removed. Different capitalization or punctuation can therefore resolve to the same handle. The handle is global across projects, sessions and client kinds: it is not a per-process identifier or a new authentication credential.
+
+Connections sharing that handle share one member. Their tasks/presence/status are not independent worker sessions; `excludeSelf=true` filters events from that member, including peers sharing it. Use the documented `excludeSelf=false` coordination policy. A brain cannot independently review a report authored under its own identity. Native subagents that inherit one MCP connection also inherit its identity; separate tracking needs independently configured connections with distinct names, not merely a new chat. This app does not launch them or install their configuration. `get_session_context` reports project binding and cursor, not a caller-identity field; do not invent such a field when checking the connection.
+
+The command palette's **Set up agent connection (MCP)…** opens Settings → Agents rather than emitting a second unpinned configuration. The existing guarded setup flow captures the displayed project; switching boards still does not retarget an initialized session. Claude CLI snippets are PowerShell-quoted, as labelled in the UI; adapt deliberately for another shell instead of treating apostrophe doubling as portable shell syntax.
 
 An unknown agent handle is registered with `member.joined`, taking the first unused member color. Each call refreshes `lastSeenAt`. Agents are online for 120 seconds after their latest call. Handles are stable across sessions; a human handle cannot be impersonated by registering an agent with the same name. See [architecture](architecture.md#local-security-and-retained-data) for the local security model.
 

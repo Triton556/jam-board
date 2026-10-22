@@ -404,11 +404,48 @@ export function SettingsPage({
                   </details>
                 </SettingsRow>
                 <SettingsRow
+                  label="Agent identity"
+                  hint="A stable board identity, not a process ID or an authorization credential."
+                >
+                  <p>
+                    Before applying a snippet, replace its default Codex or
+                    Claude name with a distinct stable name for each
+                    independently configured brain or worker, for example
+                    Planner and Worker-1. Use <code>JAM_AGENT_NAME</code> for
+                    stdio or <code>X-Jam-Agent</code> for HTTP, then reconnect
+                    the client.
+                  </p>
+                  <details className="connection-help">
+                    <summary>Several workers or inherited subagents?</summary>
+                    <p>
+                      Connections using the same normalized name share one board
+                      member: tasks and activity are aggregated, not separate
+                      process sessions. Names that differ only in capitalization
+                      or punctuation can match. A new chat does not create a new
+                      board identity.
+                    </p>
+                    <p>
+                      Subagents inheriting the same MCP connection also inherit
+                      its identity. Separately tracked workers need separately
+                      configured connections with distinct names; Jam Board does
+                      not launch or reconfigure them. An agent cannot
+                      independently review its own report under the same
+                      identity.
+                    </p>
+                    <p>
+                      With shared identities, <code>excludeSelf=true</code> also
+                      hides those peers' events. Coordination should use the
+                      documented <code>excludeSelf=false</code> observation
+                      policy. Project pinning still applies to every connection.
+                    </p>
+                  </details>
+                </SettingsRow>
+                <SettingsRow
                   label="Configuration"
                   hint={
                     tab.startsWith("Codex")
                       ? "Paste into ~/.codex/config.toml. HTTP uses JAM_BOARD_TOKEN."
-                      : "Run this command in your terminal."
+                      : "Run this PowerShell command, or adapt it for your shell before applying."
                   }
                 >
                   <Tabs

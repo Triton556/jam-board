@@ -26,6 +26,7 @@
   --danger-ink: #ab3e31;
   --st-backlog: var(--lilac);
   --st-todo: var(--butter);
+  --st-ready: var(--st-todo);
   --st-in_progress: var(--sky);
   --st-review: var(--rose);
   --st-done: var(--mint);
