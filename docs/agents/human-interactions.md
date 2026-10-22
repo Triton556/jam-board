@@ -105,3 +105,14 @@ grip and selected/focus cues; the interior remains pointer-transparent. Duplicat
 raster frame/title output is removed, while cards/edges and all inline-draft
 safeguards remain unchanged. See the [alpha32 record](../verification/0.3.0-alpha.32.md)
 for exact source and observed versus pending evidence.
+
+## Alpha33 candidate: H-G01 / H-D04 / H-M01 / H-R06
+
+Search and commands has an actual loading/error dialog with top-layer Escape and
+Close; cached chunk failure offers explicit Reload app with draft-loss warning.
+Task actions consume Escape before the drawer; Archive and Unarchive confirmations
+lock duplicate dispatch/dismissal while pending, and do not submit the underlying
+form via Ctrl/Cmd+S. Teammate and edge-label writes preserve captured fields/error
+recovery and cannot close a newer scope; retained text is readable/copyable.
+Unconfirmed writes are not replayed; confirmed writes with failed refresh are
+labelled separately. Edge editor returns to its real opener after dismissal.

@@ -26,11 +26,11 @@
 | F04 | Alpha31 persisted agent-history implementation; native pending | `lib/ui-store.ts:10–20,112–173`: no durable history; last three toasts; five-second expiry; `lib/project-selection.ts` clears toasts. `app.tsx:734+` current View opens Inbox or Board task. | Bell → empty/recent/read states → View exact item; eligible persisted agent updates remain available independently of toast expiry; file receipts are not this history; new event while panel open; long list; current project vs old project explicit. Do not merely preserve old task-key URLs across project switches. |
 | F05 | Alpha30 source spacing correction; revealed-state visual acceptance pending | `references/dialogs.tsx` plain forms; field wrappers nested inside form. `styles/v22.css:508` spacing applies only `.dialog > .field`; `styles/m5.css:57` `.m5-form` has grid gap 16px, absent here. `styles/app.css:1637` label gap separates label/input, not adjacent fields. | New frame, edit frame, add link, edit caption/tags/link: consistent heading→body→field→feedback→footer gaps, especially error and pending variants. Compare Asset/Member dialogs, not only screenshots of closed page. |
 | F06 | Corrected alpha29 behavior; native hierarchy read-only observed | `task/TaskDrawer.tsx:675+` renders full BriefEditor then Notes, Rounds, assets, Comments. `task/BriefEditor.tsx:215+` exposes Goal/Context/Where/Changes/Tests/Boundaries/Result/User quotes. | Default task view exposes human description, comments, planning/regenerate entry; technical structure separately disclosed. Existing agent fields survive human edits exactly; readiness errors offer clear route into required detail. |
-| F07 | P1 likely interaction gap, not executed | Task actions is local `menu` div in `TaskDrawer.tsx:430+`; `useModal` specially defers Escape only for open `.custom-select`. Reference native `<details>` menu also has no analogous integration. | Task → actions menu → Escape closes menu first rather than entire drawer; reference action details Escape/outside click contract explicit; focus returns to opener. Confirm baseline before repair. |
-| F08 | P1 inconsistent pending protection, source verified | Task archive dialog at `TaskDrawer.tsx:926+` lacks `busy` and archive action pending disable. MemberDialog `TeamPage.tsx:50+` lacks busy; submit checks valid but not pending (button alone disables). Edge label `ReferencesPage.tsx:1290+` raw async submit lacks pending lock and reports through global error toast. | Double click/Enter, close during pending, then late failure: one mutation, accurate outcome, errors inside active surface, no stale close of newer editor. Treat lost response as unconfirmed, not auto-retry. |
+| F07 | Reproduced alpha31; alpha33 task-menu Escape repair | Task actions is local `menu` div in `TaskDrawer.tsx:430+`; `useModal` specially defers Escape only for open `.custom-select`. Reference native `<details>` menu also has no analogous integration. | Task → actions menu → Escape closes menu first rather than entire drawer; reference action details Escape/outside click contract explicit; focus returns to opener. Confirm baseline before repair. |
+| F08 | Reproduced alpha31; alpha33 captured pending/recovery repair | Task archive dialog at `TaskDrawer.tsx:926+` lacks `busy` and archive action pending disable. MemberDialog `TeamPage.tsx:50+` lacks busy; submit checks valid but not pending (button alone disables). Edge label `ReferencesPage.tsx:1290+` raw async submit lacks pending lock and reports through global error toast. | Double click/Enter, close during pending, then late failure: one mutation, accurate outcome, errors inside active surface, no stale close of newer editor. Treat lost response as unconfirmed, not auto-retry. |
 | F09 | Native29 clipping observed; alpha31 bounded placement repair pending native | `CustomSelect.tsx` renders absolute popup inline, not portal; `.dialog` overflow auto and viewport height cap (`app.css:1601+`); popup is top:100%, min-width 200px. | Open dropdown at bottom of tall modal, narrow window and 200% text: search and last option reachable without clipping/moving page unexpectedly; dropdown Escape followed by modal Escape; no horizontal overflow from long labels. |
 | F10 | P2 native boundary unverified | `controls.tsx` DateTimeInput invokes native showPicker; useModal Escape special case knows CustomSelect only. Native datalist and file pickers add OS-level surfaces. | On exact Windows build, picker Escape cancels picker without discarding task; cancel file selection returns focus; native picker not claimed proven by DOM/browser mock. |
-| F11 | P2 hidden loading gap | `command/CommandCenter.tsx:44+` lazy palette uses Suspense fallback null, unlike route/task LazyBoundary paths. | Cold Ctrl+K, repeated hotkey, chunk rejection and Escape while loading: visible acknowledgment/recoverability; no late unexpected popup after dismissal. |
+| F11 | Reproduced alpha31; alpha33 local loading/error recovery | `command/CommandCenter.tsx:44+` lazy palette uses Suspense fallback null, unlike route/task LazyBoundary paths. | Cold Ctrl+K, repeated hotkey, chunk rejection and Escape while loading: visible acknowledgment/recoverability; no late unexpected popup after dismissal. |
 
 
 ## Decisions before the next feature
@@ -80,3 +80,21 @@ The empty-column copy is reduced to “No tasks yet” or “No matching tasks�
 retain the Ready/Start/claim explanation; no authority state or handler changes.
 The frame treatment is a separate visual candidate, not evidence that alpha30
 canvas geometry, gestures or whole-board blur already passed native acceptance.
+
+## Alpha33 hidden-surface closure scope
+
+F07 task-action Escape, F08 archive/member/edge pending lifetime, and F11 cold or
+rejected command loading were reproduced with reachable user-event probes before
+repair. Archive duplicate calls, underlying Ctrl+S save, late edge close and lost
+recovery are not dismissed as style issues. Alpha33 adds guarded pending/recovery
+using existing project ownership and deliberate Close/reopen inspection after an
+uncertain write, not idempotency or cancellation. Confirmed follow-up read failure
+is kept separate. Task Unarchive now has a confirmation surface. Owner actual-router
+probes additionally found and corrected edge-opener focus lost through native
+autoFocus timing. See [verification](../verification/0.3.0-alpha.33.md) for exact gates;
+these DOM results do not establish native picker behavior or every other menu.
+
+Alpha33 review also distinguished known pre-dispatch refusal from an unconfirmed
+dispatched outcome. Each repaired dialog records whether its API call began;
+read-only retained drafts and no automatic replay remain unchanged. The shared
+project-write hook and backend contracts are not broadened.

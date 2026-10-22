@@ -154,3 +154,11 @@ H-B01 empty-column wording and H-R02 frame styling do not alter AG05–AG07 Read
 Start or claim semantics. Agent-created reference cards/results, parent/frame
 coordinates, permissions and persisted data are unchanged. The overview no longer
 paints a duplicate frame/title; its cards/edges remain rasterized as before.
+
+## Alpha33 non-authorizing recovery
+
+Archive/unarchive, teammate edit and edge label remain human UI operations with
+unchanged server contracts. Unarchive makes a task visible, not executable. Pending
+locks prevent duplicate UI dispatch, not server idempotency; a returned error may
+follow persistence. Inspect current data before an intentional retry. Command
+loading/reload never starts an agent or grants a scope.
