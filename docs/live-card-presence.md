@@ -37,3 +37,23 @@ The initial `17e978d` hook had a confirmed cache overwrite race: a newer member 
 The corrected publication guard captures the exact query object, QueryState object and monotonic `dataUpdateCount`, plus a cache lifecycle generation for member-query add/remove events. All must still match before publication, in addition to the original project/ABA/visibility/mount/query-in-flight checks. The lifecycle generation also rejects an absent→created→removed cache cycle, where both endpoint query identities would otherwise be absent.
 
 Deterministic same-millisecond regression: **RED against 17e978d**, **GREEN against corrected source**. Added query removal/recreation, initially absent query with/without intervening lifecycle, and project ABA with an absent query. Final focused run: **46 PASS / 3 files**, including **15 hook tests**, `--maxWorkers=1`, 1.99 seconds. Scoped Biome and diff checks pass. Earlier 10-hook-test result did not cover this race. Integrated typecheck/full suite and native visible/restore/reduced-motion acceptance remain pending with the integration owner.
+
+## Alpha35: live card-tooltip content
+
+The exact alpha34 native Linux fixture observed the intended 30-second heartbeat
+refresh and later 120-second activity expiry without navigation. However, a
+stationary pointer kept WebKit's already-open native `title` popup showing the old
+state in both directions. Moving away and hovering again showed the correct text.
+This is tooltip freshness, not stale task data or proof of the user's earlier
+Windows incident.
+
+The Board `WorkingLine` now uses the existing React-rendered Tooltip. Its open
+content follows the same current state as the visible label, and changed text
+recomputes the tooltip position. The outer line dimensions, card identity and
+activation remain unchanged; no timers, claims, reads or writes were added. This
+repair is scoped to the Board label, not a redesign of all native-title tooltips.
+
+Four new DOM probes cover stationary-hover updates/expiry, card focus/activation,
+unmount cleanup and synthetic longer-text positioning; **23 focused tests pass**
+including existing activity behavior. Synthetic coordinates are not native layout
+proof. Exact alpha35 hover/geometry acceptance remains pending.

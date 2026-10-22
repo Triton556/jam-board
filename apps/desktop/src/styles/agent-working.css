@@ -87,6 +87,13 @@
   color: var(--ink);
   min-width: 0;
 }
+.working-line > .tooltip-wrap {
+  display: flex;
+  align-items: center;
+  gap: inherit;
+  width: 100%;
+  min-width: 0;
+}
 .working-pencil {
   display: inline-flex;
   width: 14px;

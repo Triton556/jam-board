@@ -125,3 +125,10 @@ clipboard failure retains selectable text, repeated pending copy is single-fligh
 and project ABA/unmount suppresses stale feedback. The answer remains persisted on
 the board. This is not a launched chat or automatic brain wake. See the
 [contract](answer-continuation.md) and release-specific acceptance evidence.
+
+## Alpha35 candidate: live H-B01 activity tooltip
+
+The Board activity label keeps its current description while a tooltip is already
+open, including heartbeat refresh and expiry. The existing card remains the focus
+and activation target; no new tab stop, action, claim or permission is introduced.
+See [native finding and bounded correction](../live-card-presence.md#alpha35-live-card-tooltip-content).
