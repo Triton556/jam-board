@@ -18,12 +18,12 @@ function mount(save: (value: string) => Promise<unknown>) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData(["app"], { jam: { id: "project-a" } });
-  const view = (identity = "epic-a:title") => (
+  const view = (identity = "epic-a:title", value = "Original") => (
     <QueryClientProvider client={client}>
       <PlanningInput
         identity={identity}
         label="Epic title"
-        value="Original"
+        value={value}
         save={save}
       />
       <button type="button">Next field</button>
@@ -33,7 +33,7 @@ function mount(save: (value: string) => Promise<unknown>) {
   return {
     ...rendered,
     client,
-    scope: (id: string) => rendered.rerender(view(id)),
+    scope: (id: string, value?: string) => rendered.rerender(view(id, value)),
   };
 }
 async function edit(value: string) {
@@ -165,3 +165,109 @@ it("P02: missing project at dispatch refuses save and keeps the draft with not-s
   expect(input).toHaveValue("Local draft without project");
   expect(screen.queryByText("Epic title saved.")).toBeNull();
 });
+
+it("P02: confirmed departed field advances only its baseline so newer retained typing can be intentionally saved", async () => {
+  const gate = deferred();
+  const save = vi
+    .fn()
+    .mockReturnValueOnce(gate.promise)
+    .mockResolvedValue(undefined);
+  const h = mount(save);
+  const { user, input } = await edit("First acknowledged");
+  await user.click(input);
+  await user.clear(input);
+  await user.type(input, "Newer retained typing");
+  h.scope("epic-b:title");
+  await act(async () => gate.resolve());
+  expect(
+    h.client.getQueryData(["planning-draft", "epic-a:title"]),
+  ).toMatchObject({
+    baseline: "First acknowledged",
+    draft: "Newer retained typing",
+    dirty: true,
+  });
+  expect(screen.queryByText("Epic title saved.")).toBeNull();
+  h.scope("epic-a:title", "First acknowledged");
+  const returned = screen.getByRole("textbox", { name: "Epic title" });
+  expect(returned).toHaveValue("Newer retained typing");
+  expect(screen.queryByRole("alert")).toBeNull();
+  await user.click(returned);
+  await user.tab();
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  expect(save).toHaveBeenLastCalledWith("Newer retained typing");
+});
+it.each([
+  "project ABA",
+  "unmounted project ABA",
+  "recreated cache",
+  "new remote source",
+] as const)(
+  "P02/AS03: departed completion cannot acknowledge %s",
+  async (reason) => {
+    const gate = deferred();
+    const h = mount(vi.fn(() => gate.promise));
+    const { user, input } = await edit("First acknowledged");
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, "Newer kept");
+    if (reason === "unmounted project ABA") h.unmount();
+    else h.scope("epic-b:title");
+    const key = ["planning-draft", "epic-a:title"];
+    const retained = h.client.getQueryData<{
+      source: string;
+      baseline: string;
+      draft: string;
+      dirty: boolean;
+    }>(key);
+    if (!retained) throw new Error("Missing retained fixture draft");
+    act(() => {
+      if (reason === "project ABA" || reason === "unmounted project ABA") {
+        h.client.setQueryData(["app"], { jam: { id: "project-b" } });
+        h.client.setQueryData(["app"], { jam: { id: "project-a" } });
+      } else if (reason === "recreated cache") {
+        h.client.removeQueries({ queryKey: key, exact: true });
+        h.client.setQueryData(key, { ...retained, draft: "Recreated draft" });
+      } else
+        h.client.setQueryData(key, {
+          ...retained,
+          source: "Other author's saved value",
+        });
+    });
+    const before = h.client.getQueryData(key);
+    await act(async () => gate.resolve());
+    expect(h.client.getQueryData(key)).toEqual(before);
+    expect(screen.queryByText("Epic title saved.")).toBeNull();
+  },
+);
+
+it.each(["success", "failure", "not sent"] as const)(
+  "P02: attempt project watcher is released after %s",
+  async (outcome) => {
+    const gate = deferred();
+    const h = mount(vi.fn(() => gate.promise));
+    const cache = h.client.getQueryCache();
+    const originalSubscribe = cache.subscribe.bind(cache);
+    let active = 0;
+    const spy = vi.spyOn(cache, "subscribe").mockImplementation((listener) => {
+      active++;
+      const stop = originalSubscribe(listener);
+      return () => {
+        active--;
+        stop();
+      };
+    });
+    if (outcome === "not sent")
+      act(() => h.client.removeQueries({ queryKey: ["app"] }));
+    await edit("Watcher cleanup draft");
+    if (outcome !== "not sent") {
+      expect(active).toBe(1);
+      await act(async () => {
+        if (outcome === "success") gate.resolve();
+        else gate.reject(new Error("Fictional failure"));
+      });
+    }
+    await waitFor(() => expect(h.client.isMutating()).toBe(0));
+    expect(active).toBe(0);
+    spy.mockRestore();
+  },
+);
