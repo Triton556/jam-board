@@ -12,6 +12,14 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Load demo jam" }).click();
     await page.goto("/references");
+    await expect(
+      page.getByRole("heading", { name: "References", exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => Boolean(window.__jamMock && window.__jamCanvas)),
+      )
+      .toBe(true);
     await page.evaluate(async (value) => {
       document.documentElement.setAttribute("data-theme", value);
       await document.fonts.ready;

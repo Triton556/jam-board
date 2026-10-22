@@ -369,10 +369,10 @@ impl Store {
                 return Err(Error::Conflict);
             }
             let mut patch = serde_json::to_value(input)?;
-            if let Some(title) = patch["title"].as_str() {
-                if !(expected.is_some() && item.kind == "note" && title.is_empty()) {
-                    crate::m5::validate_name("title", title, 140)?;
-                }
+            if let Some(title) = patch["title"].as_str()
+                && !(expected.is_some() && item.kind == "note" && title.is_empty())
+            {
+                crate::m5::validate_name("title", title, 140)?;
             }
             if let Some(tags) = patch.get("tags") {
                 patch["tags"] = json!(normalize_tags(&serde_json::from_value::<Vec<String>>(
