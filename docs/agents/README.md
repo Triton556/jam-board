@@ -41,3 +41,10 @@ Implementation owner reports **539 DOM tests passed**, including 30 new behavior
 `node --test scripts/check-interaction-map.test.mjs` checks canonical table
 definitions for duplicate stable IDs. It is documentation integrity, not usability
 acceptance, and does not validate every possible state or model response.
+
+## Saved-answer continuation (alpha34)
+
+[Continue in brain chat](answer-continuation.md) is an explicit copy aid on confirmed
+answers and persisted Answered cards. It does not wake a finished client session,
+launch a worker, send a chat message or grant execution. CLI/API workspace ideas
+remain separate concepts, not implemented connection surfaces.

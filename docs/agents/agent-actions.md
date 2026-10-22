@@ -162,3 +162,11 @@ unchanged server contracts. Unarchive makes a task visible, not executable. Pend
 locks prevent duplicate UI dispatch, not server idempotency; a returned error may
 follow persistence. Inspect current data before an intentional retry. Command
 loading/reload never starts an agent or grants a scope.
+
+## Alpha34 answer observation and continuation
+
+AG04 / AG10: an active wait_for_answer or wait_for_changes call can observe a saved
+answer using existing scope/cursor rules. It does not restart a finished chat.
+The human copy aid names exact IDs and requests fresh project/question/appointment
+and phase checks. An answer supplies information, not Start permission or worker
+launch. No new MCP tool, subscription, session binding or adapter is introduced.
