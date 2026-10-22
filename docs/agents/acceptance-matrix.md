@@ -48,6 +48,7 @@
 | AC10 | AG10 reconnect with checkpoint → bounded events incl relevant filters | No checkpoint reset/lost unprocessed events; cursor advanced only after handling; no endless unauthorized wait |
 | AC11 | AG11 replacement brain read-only recovery | Includes relevant Done/archive reports, rejected rounds and answered questions; tails/resource omissions disclosed; no appointment/claim mutation |
 | AC12 | AG12 references across project/frame/file cases | Same-project binding enforced; no implicit preview network fetch/file copy; unreadable input produces useful failure |
+| AC13 | AG02 new/refined task → human reads Description | Concise user-language outcome in an empty description; existing wishes preserved, technical detail secondary; prompt strings alone do not establish model compliance |
 
 ## Test mapping and evidence levels
 
@@ -121,3 +122,19 @@ closing the parent. `components/ui/select-placement.test.tsx` uses synthetic
 geometry plus real DOM keyboard behavior; `e2e/overlay-placement.spec.ts` adds
 real layout/both-theme checks (not yet run). Agent plan uses monochrome CSS ink;
 archived help and singular counts do not imply edit permission.
+
+## Alpha31 presence and history candidate
+
+| ID | Sequence | Required functional result | Evidence boundary |
+|---|---|---|---|
+| CP01 | H-B01 / AG10: missing, expired, human or unavailable holder | Explicit quiet state, no invented actor/claim | Pure/DOM; native pending |
+| CP02 | Review retaining worker; generic other-actor scoped status | Awaiting review, no old-worker animation; optional timestamped last report, no reviewer assertion | Pure/DOM; native pending |
+| CP03 | Heartbeat-only update without domain event | One visible Root cadence refreshes member cache, not fake activity | QueryClient/fake timer; integrated/native pending |
+| CP04 | Hidden/visible, pending ABA/unmount, newer identical same-ms data, removed/recreated query, errors | No old publication, one read, no overwritten newer observation, retained cache on failure | QueryClient regression; native pending |
+| CP05 | Long status and reduced motion | Legible static text, no false activity animation | Final visual/native pending |
+
+NT01 now exercises the persisted Project notifications dialog, bounded pagination,
+newer-update reveal and explicit read watermark, exact View validation/question
+focus, cancelled scopes and recoverable reads/navigation. Candidate independent
+review closed latest/older overlap and suppressed navigation-failure feedback;
+this does not establish toast delivery or human approval.

@@ -60,6 +60,7 @@ import { NotificationBell } from "./features/notifications/NotificationBell";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
 import { executionRequestsQuery } from "./lib/execution-queries";
+import { useMemberPresenceRefresh } from "./lib/use-member-presence-refresh";
 
 const PlanPage = lazy(() =>
   import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage })),
@@ -213,6 +214,7 @@ function applyTheme(theme: string) {
     document.documentElement.dataset.theme;
 }
 function Root() {
+  useMemberPresenceRefresh();
   const app = useQuery(appQuery);
   const allMembers = useQuery({ ...membersQuery, enabled: !!app.data?.hasJam });
   const boardTasks = useQuery({ ...tasksQuery, enabled: !!app.data?.hasJam });

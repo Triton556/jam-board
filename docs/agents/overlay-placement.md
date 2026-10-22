@@ -27,3 +27,11 @@ check real popup bounds, Done visibility, unchanged task state and computed mark
 styles in both themes at800×600; they are added/typechecked but NOT RUN locally.
 Final native checks should repeat the observed lower-edge case and inspect narrow/
 scaled windows and long/searchable options. Source tests do not prove final pixels.
+
+Geometry rationale: element rectangles are viewport-relative and reflect scrolling;
+visual-viewport offsets are CSS pixels. The implementation observes/recomputes
+these values rather than assuming the layout viewport or multiplying DPR.
+[MDN getBoundingClientRect](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect),
+[MDN VisualViewport](https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport).
+These API facts support the mechanism, not a claim that every native placement
+has been visually accepted.

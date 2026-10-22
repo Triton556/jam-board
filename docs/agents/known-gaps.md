@@ -6,7 +6,7 @@
 
 | Work | Status on 2026-10-22 | Completion evidence required |
 |---|---|---|
-| Human-first Task/Story | Alpha29 working-tree implementation present; final gates pending | HF01–HF06 functional + open-state visual evidence; preserve reports, readiness and drafts |
+| Human-first Task/Story | Corrected alpha29 DOM closure and bounded native read-only evidence; native text entry blocked | HF01–HF06 functional + open-state visual evidence; preserve reports, readiness and drafts |
 | Reference frame grip/empty state | Proposed; source causes identified | RF01, RF02 |
 | Create/edit notes inline | Proposed; no new schema or implementation asserted | RF03 including create ambiguity and duplicate guard |
 | Notification bell/history | Proposed | NT01 including retention, identity, accessible View and stale destination |
@@ -24,7 +24,7 @@
 | F02 | P1 confirmed affordance restriction | `ReferencesPage.tsx:442` dragHandle `.reference-frame-tab`; `Nodes.tsx:281+` tab controls are nodrag; `references.css:342–405` frame/outline pointer-events none, tab auto, overview tab opacity 0. | Drag obvious title/grip at 100%, 75%, 40%, 39% zoom; border vs interior behavior understandable; collapse/edit/archive never start drag; interior still allows node selection/pan. Resize remains reachable. |
 | F03 | P1 confirmed mismatch | `ReferencesPage.tsx:1066,1213+`, `references/dialogs.tsx:8+` create note in AddReferenceDialog. `Nodes.tsx:226–279` inline body editing only, double-click/Enter. | Add note → immediate positioned editable card; title and body writable inline; one activation does not require guessing double-click; keyboard start/save/cancel; failed create/save retains text; no duplicate after repeated Add/Save. |
 | F04 | P1 confirmed missing capability | `lib/ui-store.ts:10–20,112–173`: no durable history; last three toasts; five-second expiry; `lib/project-selection.ts` clears toasts. `app.tsx:734+` current View opens Inbox or Board task. | Bell → empty/recent/read states → View exact item; expired toast retained in history per declared retention; new event while panel open; long list; current project vs old project explicit. Do not merely preserve old task-key URLs across project switches. |
-| F05 | P1 confirmed structural mismatch; visual effect needs render | `references/dialogs.tsx` plain forms; field wrappers nested inside form. `styles/v22.css:508` spacing applies only `.dialog > .field`; `styles/m5.css:57` `.m5-form` has grid gap 16px, absent here. `styles/app.css:1637` label gap separates label/input, not adjacent fields. | New frame, edit frame, add link, edit caption/tags/link: consistent heading→body→field→feedback→footer gaps, especially error and pending variants. Compare Asset/Member dialogs, not only screenshots of closed page. |
+| F05 | Alpha30 source spacing correction; revealed-state visual acceptance pending | `references/dialogs.tsx` plain forms; field wrappers nested inside form. `styles/v22.css:508` spacing applies only `.dialog > .field`; `styles/m5.css:57` `.m5-form` has grid gap 16px, absent here. `styles/app.css:1637` label gap separates label/input, not adjacent fields. | New frame, edit frame, add link, edit caption/tags/link: consistent heading→body→field→feedback→footer gaps, especially error and pending variants. Compare Asset/Member dialogs, not only screenshots of closed page. |
 | F06 | P1 confirmed cognitive load | `task/TaskDrawer.tsx:675+` renders full BriefEditor then Notes, Rounds, assets, Comments. `task/BriefEditor.tsx:215+` exposes Goal/Context/Where/Changes/Tests/Boundaries/Result/User quotes. | Default task view exposes human description, comments, planning/regenerate entry; technical structure separately disclosed. Existing agent fields survive human edits exactly; readiness errors offer clear route into required detail. |
 | F07 | P1 likely interaction gap, not executed | Task actions is local `menu` div in `TaskDrawer.tsx:430+`; `useModal` specially defers Escape only for open `.custom-select`. Reference native `<details>` menu also has no analogous integration. | Task → actions menu → Escape closes menu first rather than entire drawer; reference action details Escape/outside click contract explicit; focus returns to opener. Confirm baseline before repair. |
 | F08 | P1 inconsistent pending protection, source verified | Task archive dialog at `TaskDrawer.tsx:926+` lacks `busy` and archive action pending disable. MemberDialog `TeamPage.tsx:50+` lacks busy; submit checks valid but not pending (button alone disables). Edge label `ReferencesPage.tsx:1290+` raw async submit lacks pending lock and reports through global error toast. | Double click/Enter, close during pending, then late failure: one mutation, accurate outcome, errors inside active surface, no stale close of newer editor. Treat lost response as unconfirmed, not auto-retry. |
@@ -40,7 +40,7 @@
 - Frame interaction: visible grip/selection area should not steal child-node manipulation or interior canvas pan. Low zoom must not leave only invisible controls.
 - Form spacing: adopt one reusable form rhythm, not isolated pixel patches; test field errors and nested dropdowns as well as default states.
 - Human-first: technical plan is still editable and operationally authoritative; do not let hidden invalid fields silently disable Save without explanation.
-- Refine: full setup vs explicit continuation is a future choice, not inferred from a prior copy click or online heartbeat. Board questions and client approval questions are different.
+- Refine: alpha31 candidate has explicit setup/continuation; never inferred from a prior copy click or online heartbeat. Board questions and client approval questions are different.
 - Handover: role transfer is explicit and per epic; reading history alone does not take authority or reassign workers.
 
 ## Closing a gap
@@ -61,3 +61,14 @@ Frames/empty art/inline notes and image source resolution are implemented in the
 alpha30 candidate. Their focused behavior evidence does not close native gesture,
 small-window layout or entire-board/text zoom blur. Permanent compositing hints
 remain unchanged pending actual visual/performance evidence.
+
+## Alpha31 candidate limits
+
+Notification history/presence/Refine are implemented candidates, not unconditionally
+closed human usability findings. Review-entry timestamp and structured reviewer
+activity remain absent. The heartbeat cache gap is source/repro-supported but not
+a diagnosis of the user's minimize/restore incident. Table/detail presence wording
+is unchanged. Native write sequences remain unrun after the alpha29 input-tool
+capability error; DOM and hosted browser evidence must stay distinct. Status-menu
+clipping and disclosure ink have a narrow source repair awaiting exact native31.
+Raw session streaming and Story-level comments remain separate future/model work.

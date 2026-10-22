@@ -15,7 +15,7 @@ This is the maintained map of **what people and agents can do**, how nested inte
 
 - Baseline inspected: alpha28, source `2b263795b31767da29db0b62dc81f4da19dfc4d1`, 2026-10-22. Canonical transport and permissions: [MCP contract](../mcp.md). Architecture: [architecture](../architecture.md); decision history: [workflow UX](../workflow-ux.md).
 - Alpha29 source candidate: Task Description and true Comments primary; Story Description maps `outcomeMd`; collapsed Agent plan retains mounted editors; scoped in-session drafts. Implementation is present; see the [alpha29 verification record](../verification/0.3.0-alpha.29.md) for actual behavioral checks and pending browser/native evidence.
-- Alpha30 source adds inline reference notes, visible frame controls and image pixel-resolution selection; see its verification. Notification history/Refine modes are separate candidates. Session streaming is not implemented.
+- Alpha30 source adds inline reference notes, visible frame controls and image pixel-resolution selection; see its verification. Alpha31 integrates notification history, explicit Refine modes, presence freshness and nested select placement as a separate candidate. Session streaming is not implemented.
 - This documentation audit ran **source inspection and web research**, not new application acceptance tests. Prior exact-version results remain in [verification](../verification/0.3.0-alpha.28.md); do not transfer their pass status to another version/platform.
 - Build/type/lint/hash checks establish engineering integrity or artifact identity, not ease of use. A quality claim needs observed behavior and an inspected open-state layout. Browser/mock, DOM, native package and actual-human observations are different evidence classes.
 
@@ -30,3 +30,14 @@ Human description is not the agent's entire implementation schema. A prepared pr
 ## Alpha29 validation handoff (2026-10-22)
 
 Implementation owner reports **539 DOM tests passed**, including 30 new behavior probes. Four new functional-browser scenarios were added/typechecked but **not executed** at this checkpoint. This documentation author did not rerun those tests; the release verification record must supply final source/version and exact terminal evidence. DOM success does not establish native pixel geometry, Windows GUI behavior or browser visual acceptance. These results apply to human-first Task/Story work, not proposed frames/notes/bell/zoom/prompt features.
+
+## Feature contracts
+
+- [Refine modes and local request](refinement-modes.md)
+- [Persisted project notifications](notification-history.md)
+- [Card presence and cache freshness](../live-card-presence.md)
+- [Nested select placement and disclosure ink](overlay-placement.md)
+
+`node --test scripts/check-interaction-map.test.mjs` checks canonical table
+definitions for duplicate stable IDs. It is documentation integrity, not usability
+acceptance, and does not validate every possible state or model response.

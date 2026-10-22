@@ -39,8 +39,8 @@ Setup preserves unfinished checkpoints; a fresh high-water cursor is captured
 before baseline reads, never substituted for unprocessed progress. The server's
 current recovery contract remains authoritative.
 
-For new/refined tasks the guidance asks for a concise outcome in the user's
-language only when human Description is empty; existing wishes stay intact.
+For new/refined tasks the guidance asks for a concise outcome in the language of the original human notes/latest request (ask if unclear)
+only when human Description is empty; existing wishes stay intact.
 Technical detail belongs in the agent plan. This is guidance, not automatic
 translation, a new Ready gate or a guaranteed generated summary.
 
@@ -74,3 +74,8 @@ to detect a conversation. [MCP prompts specification](https://modelcontextprotoc
 The shared radio-group control retains one selected choice and arrow/Space
 activation, rather than mixing manual-tab behavior with mutually exclusive options.
 [WAI-ARIA radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/).
+
+Canonical MCP `plan_epic` guidance uses the same empty-description/preserve-human
+contract. `update_task_brief` help names human description/wishes separately from
+structure. These text changes add no tool argument or Ready/authority condition;
+Rust assertions verify wording, not model compliance.
