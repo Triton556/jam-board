@@ -48,6 +48,10 @@ import {
   Stamp,
   Tooltip,
 } from "./components/ui";
+import {
+  LazyDrawerBoundary,
+  LazyPageBoundary,
+} from "./components/ui/LazyBoundary";
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
@@ -154,9 +158,9 @@ const LazyTaskDrawer = lazy(() =>
 
 function TaskDrawer(props: { taskKey: string; close(): void }) {
   return (
-    <Suspense fallback={null}>
+    <LazyDrawerBoundary title={props.taskKey} kind="task" close={props.close}>
       <LazyTaskDrawer {...props} />
-    </Suspense>
+    </LazyDrawerBoundary>
   );
 }
 const TeamPage = lazy(() =>
@@ -547,15 +551,17 @@ function TableRoute() {
   const navigate = useNavigate();
   return (
     <>
-      <TaskTable
-        search={search}
-        change={(value) => {
-          void navigate({ to: "/table", search: value });
-        }}
-        open={(task) => {
-          void navigate({ to: "/table", search: { ...search, task } });
-        }}
-      />
+      <LazyPageBoundary label="Table">
+        <TaskTable
+          search={search}
+          change={(value) => {
+            void navigate({ to: "/table", search: value });
+          }}
+          open={(task) => {
+            void navigate({ to: "/table", search: { ...search, task } });
+          }}
+        />
+      </LazyPageBoundary>
       {search.task && (
         <TaskDrawer
           taskKey={search.task}
@@ -587,27 +593,29 @@ function FeatureRoute({ name }: { name: string }) {
     void navigate({ to: path, search: { section: search.section, task } });
   return (
     <>
-      {name === "References" ? (
-        <ReferencesPage />
-      ) : name === "Inbox" ? (
-        <InboxPage />
-      ) : name === "Assets" ? (
-        <AssetsPage openTask={openTask} />
-      ) : name === "Team" ? (
-        <TeamPage
-          openTask={openTask}
-          connect={() =>
-            void navigate({
-              to: "/settings",
-              search: { section: "MCP", task: undefined },
-            })
-          }
-        />
-      ) : name === "Activity" ? (
-        <ActivityPage openTask={openTask} />
-      ) : (
-        <SettingsPage initialSection={search.section} />
-      )}
+      <LazyPageBoundary label={name}>
+        {name === "References" ? (
+          <ReferencesPage />
+        ) : name === "Inbox" ? (
+          <InboxPage />
+        ) : name === "Assets" ? (
+          <AssetsPage openTask={openTask} />
+        ) : name === "Team" ? (
+          <TeamPage
+            openTask={openTask}
+            connect={() =>
+              void navigate({
+                to: "/settings",
+                search: { section: "MCP", task: undefined },
+              })
+            }
+          />
+        ) : name === "Activity" ? (
+          <ActivityPage openTask={openTask} />
+        ) : (
+          <SettingsPage initialSection={search.section} />
+        )}
+      </LazyPageBoundary>
       {search.task && (
         <TaskDrawer
           taskKey={search.task}
@@ -688,10 +696,17 @@ const welcomeRoute = createRoute({
   path: "/welcome",
   component: Welcome,
 });
+function ProjectsRoute() {
+  return (
+    <LazyPageBoundary label="Projects">
+      <ProjectsPage />
+    </LazyPageBoundary>
+  );
+}
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects",
-  component: ProjectsPage,
+  component: ProjectsRoute,
 });
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -750,18 +765,26 @@ function PlanRoute() {
   };
   return (
     <>
-      <PlanPage
-        epicKey={epicKey}
-        search={search}
-        openTask={(task) => update({ task })}
-        openStory={(story) => update({ story })}
-      />
-      {search.story && (
-        <StoryDrawer
-          storyKey={search.story}
-          close={() => update({ story: undefined })}
+      <LazyPageBoundary label="Plan">
+        <PlanPage
+          epicKey={epicKey}
+          search={search}
           openTask={(task) => update({ task })}
+          openStory={(story) => update({ story })}
         />
+      </LazyPageBoundary>
+      {search.story && (
+        <LazyDrawerBoundary
+          title={search.story}
+          kind="story"
+          close={() => update({ story: undefined })}
+        >
+          <StoryDrawer
+            storyKey={search.story}
+            close={() => update({ story: undefined })}
+            openTask={(task) => update({ task })}
+          />
+        </LazyDrawerBoundary>
       )}{" "}
       {search.task && (
         <TaskDrawer

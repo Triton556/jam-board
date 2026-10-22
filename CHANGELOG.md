@@ -3,6 +3,28 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.18] - 2026-10-21
+
+### Fixed
+
+- Lazy page modules now have local visible loading and error states. A slow or
+  failed Table/Settings/other feature import no longer hides the surrounding
+  navigation; Projects also offers an explicit route back to Board.
+- Task and Story module loading/failure has a normal focused, closable drawer.
+  Escape/Close removes the pending intent, and a late resolution or rejection
+  cannot reopen it. Loaded editor drafts and the existing data-query retries are
+  unchanged. Story's eager Plan dependency is retained, not silently rearchitected.
+- Recovery offers a user-initiated **Reload app** with an unsaved-draft warning,
+  not an automatic reload or a Retry that reuses a cached lazy rejection. Named
+  recovery components retain control identity/focus across clock updates.
+
+### Verification
+
+- [Exact checks and limits](docs/verification/0.3.0-alpha.18.md). Real-App controlled
+  import probes cover pending, rejected, superseded and warm states; no actual
+  network-delay, native timing, screen-reader or production reload claim is made.
+  No backend, schema, dependency or execution-permission change.
+
 ## [0.3.0-alpha.17] - 2026-10-21
 
 ### Fixed
