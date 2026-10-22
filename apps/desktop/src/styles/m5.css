@@ -52,7 +52,8 @@
   text-transform: capitalize;
 }
 .small {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.55;
 }
 .m5-form {
   display: grid;
@@ -669,7 +670,8 @@
 }
 .settings-row-label small {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.55;
   font-weight: 400;
   color: var(--ink-2);
   margin-top: 6px;

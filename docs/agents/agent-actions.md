@@ -205,3 +205,11 @@ expectation checked in the same write transaction. Existing MCP updates remain
 unguarded and can still replace content; do not claim all clients now have CAS,
 revision history, idempotency or automatic conflict merging. No note operation
 creates an execution grant, takes a claim or starts a session.
+
+## Alpha40 human copy and visual feedback
+
+No MCP tool, schema, backend write, claim/review/Start permission or presence
+predicate changes. Human guidance explains taking a Ready task versus starting
+an external session; no-message agent status no longer promises availability.
+Kanban lift is pointer feedback, not a worker-execution signal. Existing
+structured plans, complete prompts and captured validators remain unchanged.

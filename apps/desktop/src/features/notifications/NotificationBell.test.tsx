@@ -78,7 +78,7 @@ it("NT01 opens keyboard dialog, reconstructs history, marks older updates too, l
   await mount();
   expect(readBaseline(projectId, "human")).toBeNull();
   fireEvent.click(
-    screen.getByRole("button", { name: "Mark current updates as read" }),
+    screen.getByRole("button", { name: "Mark these and older as read" }),
   );
   expect(readBaseline(projectId, "human")).toBe(10);
   rows = [event(11), event(10)];
@@ -104,7 +104,7 @@ it("NT01 local read metadata failures do not break history", async () => {
     },
   });
   fireEvent.click(
-    screen.getByRole("button", { name: "Mark current updates as read" }),
+    screen.getByRole("button", { name: "Mark these and older as read" }),
   );
   expect(
     screen.getByText(/Read position could not be saved/),
@@ -187,11 +187,11 @@ it("NT01 bulk read watermark covers older pages but not new arrivals withheld fr
   await screen.findByText("Update 200");
   await waitFor(() =>
     expect(
-      screen.getByRole("button", { name: "Mark current updates as read" }),
+      screen.getByRole("button", { name: "Mark these and older as read" }),
     ).toBeEnabled(),
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Mark current updates as read" }),
+    screen.getByRole("button", { name: "Mark these and older as read" }),
   );
   expect(readBaseline(projectId, "human")).toBe(200);
   rows = [event(100)];
@@ -202,7 +202,7 @@ it("NT01 bulk read watermark covers older pages but not new arrivals withheld fr
   act(() => signal([]));
   await screen.findByRole("button", { name: "Show 1 new notifications" });
   fireEvent.click(
-    screen.getByRole("button", { name: "Mark current updates as read" }),
+    screen.getByRole("button", { name: "Mark these and older as read" }),
   );
   expect(readBaseline(projectId, "human")).toBe(200);
 });

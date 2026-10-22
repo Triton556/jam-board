@@ -16,6 +16,7 @@ import {
 import { useCardPresence } from "../../lib/agent-working";
 import type { ColorBy, Member, TaskSummary } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { cardMotion } from "./card-motion";
 
 const icons = {
   low: ChevronDown,
@@ -74,15 +75,8 @@ export function TaskCard({
       data-color-by={paint ? colorBy : "none"}
       data-highlighted={highlight ? "true" : "false"}
       style={style}
-      layout={!reduced && !overlay}
+      {...cardMotion(!!reduced, overlay, highlight?.action === "task.created")}
       layoutId={overlay || reduced ? undefined : task.key}
-      initial={
-        highlight?.action === "task.created" && !reduced
-          ? { y: -12, scale: 0.94 }
-          : false
-      }
-      animate={{ y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 380, damping: 26 }}
     >
       <div className="task-card">
         <div className="card-key">

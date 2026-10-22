@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { expectPoliteNotice } from "./assertions";
 
@@ -345,5 +347,128 @@ for (const theme of ["light", "dark"] as const) {
       ),
     );
     expect(mutations).toEqual([]);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  for (const reduced of [false, true]) {
+    test(`real pointer pickup has a quiet lift and cancellation never moves a task (${theme}, reduced=${reduced})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({
+        reducedMotion: reduced ? "reduce" : "no-preference",
+      });
+      await page.setViewportSize({ width: 1180, height: 812 });
+      await demo(page);
+      await page
+        .getByRole("combobox", { name: "Theme", exact: true })
+        .selectOption(theme);
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await page.evaluate(() => document.fonts.ready);
+      const before = await page.evaluate(() =>
+        window.__jamMock.getTask("JB-2"),
+      );
+      const card = page.getByRole("button", { name: /Open JB-2:/ });
+      const box = await card.boundingBox();
+      if (!box) throw new Error("Missing card geometry");
+      await page.mouse.move(box.x + 80, box.y + 60);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 100, box.y + 70, { steps: 4 });
+      const lifted = page.locator('.sticker-wrap.lifted[data-key="JB-2"]');
+      await expect(lifted).toBeVisible();
+      await expect
+        .poll(() =>
+          lifted.evaluate((element) => {
+            const matrix = new DOMMatrixReadOnly(
+              getComputedStyle(element).transform,
+            );
+            return Math.hypot(matrix.a, matrix.b);
+          }),
+        )
+        .toBeCloseTo(reduced ? 1 : 1.015, 3);
+      await expect
+        .poll(() =>
+          lifted.evaluate((element) => {
+            const matrix = new DOMMatrixReadOnly(
+              getComputedStyle(element).transform,
+            );
+            return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+          }),
+        )
+        .toBeCloseTo(reduced ? 0 : -0.65, 2);
+      const directory = resolve(process.cwd(), "../../test-visuals");
+      await mkdir(directory, { recursive: true });
+      await page.screenshot({
+        path: resolve(
+          directory,
+          `readability-card-lift-${theme}${reduced ? "-reduced" : ""}.png`,
+        ),
+      });
+      await page.keyboard.press("Escape");
+      await page.mouse.up();
+      await expect(lifted).toHaveCount(0);
+      expect(
+        await page.evaluate(() => window.__jamMock.getTask("JB-2")),
+      ).toEqual(before);
+      expect(
+        await page.evaluate(() =>
+          window.__jamMock.calls.filter((call) => call.command === "move_task"),
+        ),
+      ).toHaveLength(0);
+    });
+  }
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`short execution instructions stay readable without granting work (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    await demo(page);
+    await page
+      .getByRole("combobox", { name: "Theme", exact: true })
+      .selectOption(theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.goto("/plan/JB-E1");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const controls = page.getByRole("region", { name: "Epic execution" });
+    await controls.getByText("How starting works", { exact: true }).click();
+    const help = controls.locator(".execution-help-points");
+    await expect(help).toBeVisible();
+    await expect(help).toContainText(
+      "It does not launch a program or wake a chat",
+    );
+    await expect(help).toContainText(
+      "Work already taken may continue and submit reports",
+    );
+    await expect(help).toContainText(
+      "Opening another project does not pause any work",
+    );
+    expect(
+      await help.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          font: parseFloat(style.fontSize),
+          line: parseFloat(style.lineHeight),
+          fits: element.scrollWidth <= element.clientWidth,
+        };
+      }),
+    ).toMatchObject({ font: 13, fits: true });
+    await help.scrollIntoViewIfNeeded();
+    const directory = resolve(process.cwd(), "../../test-visuals");
+    await mkdir(directory, { recursive: true });
+    await page.screenshot({
+      path: resolve(directory, `readability-instructions-${theme}.png`),
+    });
+    await expect(
+      controls.getByRole("button", { name: "Start epic", exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() =>
+        window.__jamMock.calls.filter((call) =>
+          ["set_execution", "claim_task", "move_task"].includes(call.command),
+        ),
+      ),
+    ).toHaveLength(0);
   });
 }

@@ -303,7 +303,7 @@ export function NotificationBell({
                 setStorageWarning(!saved);
               }}
             >
-              Mark current updates as read
+              Mark these and older as read
             </Button>
             <Button
               variant="ghost"

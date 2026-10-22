@@ -105,6 +105,22 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("textbox", { name: "Optional note heading" })
       .fill("Lantern idea");
     await expect(persisted.getByRole("status")).toHaveText("Saved");
+    const content = persisted.locator(".reference-content");
+    expect(
+      await content.evaluate((element) => ({
+        left: parseFloat(getComputedStyle(element).paddingLeft),
+        right: parseFloat(getComputedStyle(element).paddingRight),
+        scrollable: getComputedStyle(element).overflowY,
+      })),
+    ).toEqual({ left: 12, right: 12, scrollable: "auto" });
+    const contentBox = await content.boundingBox(),
+      bodyBox = await reopenedBody.boundingBox();
+    if (!contentBox || !bodyBox)
+      throw Error("Saved note editor has no geometry");
+    expect(bodyBox.x - contentBox.x).toBeGreaterThanOrEqual(11.5);
+    expect(
+      contentBox.x + contentBox.width - bodyBox.x - bodyBox.width,
+    ).toBeGreaterThanOrEqual(11.5);
     await page.screenshot({
       path: resolve(directory, `sticky-note-heading-${theme}.png`),
     });

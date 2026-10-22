@@ -106,7 +106,7 @@ it("F08 edge: real label button opens editor; repeated Enter writes once; Escape
   await act(async () =>
     reject(new Error("Synthetic unconfirmed edge outcome")),
   );
-  await screen.findByText(/save outcome is unconfirmed/);
+  await screen.findByText(/Could not confirm whether the label was saved/);
   expect(screen.getByRole("textbox", { name: "Label" })).toHaveValue(
     "Probe edge changed",
   );

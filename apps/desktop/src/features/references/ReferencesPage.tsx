@@ -1466,7 +1466,8 @@ function Canvas() {
         )}
         {connect && (
           <div className="reference-connect-hint">
-            Drag from a node handle to connect · right-click an edge to archive
+            Drag between card handles to connect · right-click a connection to
+            archive
           </div>
         )}
         {add === "link" && (

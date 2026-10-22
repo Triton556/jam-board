@@ -284,3 +284,18 @@ update marker, and reverting old text with a new marker, still stop saving and
 retain the draft. Three new DOM regressions pass; the original hosted96-case
 suite and six sticky PNG states must rerun unchanged. Alpha38 body-only PNGs are
 partial visual evidence, not successful heading/reopen or native acceptance.
+
+## Alpha40 source and behavior requirements
+
+AS02/H-H01: loading/error must not claim empty or completed history; older-page
+retry preserves its cursor and loaded rows, and cannot auto-loop while errored.
+H-T01 distinguishes genuine empty display from filter mismatch. H-M02 missing
+status text never proves online/ready. H-G03 mark-read wording includes older
+updates. Existing uncertainty and not-sent tests retain their write-count/draft
+assertions with clearer copy.
+
+VS01/VS02/H-P08: short authority bullets wrap at800browserpx in both themes,
+13px helper text remains readable; opening guidance grants nothing. H-B01 motion
+requires an actual pointer pickup, computed transform and cancellation with zero
+move calls. Reduced-motion transform is identity; existing real move/CAS tests
+remain. Static PNGs alone cannot prove animation or permission behavior.

@@ -139,3 +139,71 @@ test("AS02 cached question failure preserves the real answer editor; explicit ch
     ),
   ).toEqual([]);
 });
+
+test("H01 failed activity read never reports empty or caught-up; explicit recovery is read-only", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Load demo jam", exact: true })
+    .click();
+  await page.evaluate(() => {
+    window.__jamMock.listActivity = async () => {
+      throw new Error("Synthetic activity load failure");
+    };
+  });
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
+  const main = page.locator(".activity-page");
+  await expect(main.getByRole("alert")).toContainText(
+    "Synthetic activity load failure",
+  );
+  await expect(main.getByText("No activity yet", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    main.getByText("End of loaded activity", { exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() => {
+    Reflect.set(window, "explicitActivityReads", 0);
+    window.__jamMock.listActivity = () => {
+      Reflect.set(
+        window,
+        "explicitActivityReads",
+        Reflect.get(window, "explicitActivityReads") + 1,
+      );
+      return new Promise((resolve) =>
+        Reflect.set(window, "finishActivityRead", resolve),
+      );
+    };
+  });
+  await main.getByRole("button", { name: "Try again", exact: true }).dblclick();
+  await expect(
+    main.getByRole("status", { name: "Loading activity" }),
+  ).toBeVisible();
+  await expect(
+    main.getByText("End of loaded activity", { exact: true }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => Reflect.get(window, "explicitActivityReads")),
+  ).toBe(1);
+  await page.evaluate(() => {
+    const finish = Reflect.get(window, "finishActivityRead");
+    if (typeof finish !== "function")
+      throw new Error("No explicit activity read in flight");
+    finish([]);
+  });
+  await expect(
+    main.getByText("No activity yet", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    main.getByText("End of loaded activity", { exact: true }),
+  ).toBeVisible();
+  await expect(main.getByRole("alert")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      window.__jamMock.calls.filter((call) =>
+        /claim_task|move_task|set_execution|update_task/.test(call.command),
+      ),
+    ),
+  ).toHaveLength(0);
+});

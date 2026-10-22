@@ -134,8 +134,8 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
         </p>
       )}
       <p className="small muted">
-        A task’s Story cannot be changed after creation. Refine its brief before
-        Ready.
+        Choose the Story carefully: it cannot be changed later. Prepare the task
+        details before moving it to Ready.
       </p>
       {create.error && <p role="alert">{create.error.message}</p>}
       <div className="quick-create-actions">
@@ -388,7 +388,7 @@ export function Board({
   };
   const backgroundError = tasks.error ?? members.error;
   if (tasks.isPending || members.isPending)
-    return <div className="loading">Opening your sketchbook…</div>;
+    return <div className="loading">Loading board…</div>;
   if ((tasks.error && !tasks.data) || (members.error && !members.data))
     return (
       <div role="alert" className="page-error">

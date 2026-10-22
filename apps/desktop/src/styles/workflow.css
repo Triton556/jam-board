@@ -322,7 +322,7 @@
   margin: 0;
 }
 .execution-help summary {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-2);
   cursor: pointer;
   width: fit-content;
@@ -855,4 +855,16 @@
 }
 .handoff-identity summary {
   cursor: pointer;
+}
+
+/* Short, scannable explanations at the point where authority is chosen. */
+.execution-help-points,
+.connection-help-points {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  line-height: 1.6;
+}
+.execution-help-points li + li,
+.connection-help-points li + li {
+  margin-top: 8px;
 }

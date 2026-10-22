@@ -153,7 +153,8 @@ export function NewPlanningDialog({
               />
             </div>
             <p className="muted">
-              Start in Backlog, then write its brief and check readiness.
+              New tasks are saved in Backlog. Add their details before checking
+              Ready.
             </p>
           </>
         )}

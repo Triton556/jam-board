@@ -28,9 +28,9 @@ export function AgentPlan({
         </summary>
         <div className="agent-plan-content">
           <p className="agent-plan-explanation small muted">
-            The structured plan used by agents and readiness checks. Inspect it,
-            or edit it when editing is available; describing your idea above
-            does not require filling every field yourself.
+            Agents use these details to plan and check work. You can inspect the
+            plan here; editing may be disabled. You do not need to fill every
+            field to describe your idea above.
           </p>
           {children}
         </div>

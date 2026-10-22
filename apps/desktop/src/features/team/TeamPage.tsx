@@ -104,9 +104,9 @@ export function MemberDialog({
         />
         {write.error && dispatched.current && (
           <p role="alert">
-            The save outcome is unconfirmed. Your draft is retained. Close and
-            inspect the team before submitting again; this request will not be
-            replayed.
+            Could not confirm whether the teammate was saved. Your text is kept.
+            Close and check the team before submitting again; this request will
+            not be sent again automatically.
           </p>
         )}
         <div className="dialog-actions">

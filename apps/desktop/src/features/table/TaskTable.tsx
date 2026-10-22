@@ -486,8 +486,10 @@ export function TaskTable({
         }
       />
       {!tasks.isPending && !tasks.error && !rows.length && (
-        <EmptyState text="No tasks match these filters">
-          <Button onClick={clear}>Clear filters</Button>
+        <EmptyState
+          text={filtered ? "No tasks match these filters" : "No tasks to show"}
+        >
+          {filtered && <Button onClick={clear}>Clear filters</Button>}
         </EmptyState>
       )}
     </main>

@@ -77,7 +77,9 @@ it("F08 archive: double click sends one pending write; Escape retains reason and
   await act(async () =>
     gate.reject(new Error("Synthetic unresolved archive outcome")),
   );
-  await screen.findByText(/archive outcome is unconfirmed/);
+  await screen.findByText(
+    /Could not confirm whether the archive change was saved/,
+  );
   expect(screen.getByRole("textbox", { name: "Archive reason" })).toHaveValue(
     "Retain reason",
   );
@@ -111,7 +113,7 @@ it("F08 member: repeated Enter and pending Escape retain one request, draft and 
   await act(async () =>
     gate.reject(new Error("Synthetic unresolved member outcome")),
   );
-  await screen.findByText(/save outcome is unconfirmed/);
+  await screen.findByText(/Could not confirm whether the teammate was saved/);
   expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
     "Test human",
   );
@@ -174,7 +176,11 @@ it("F08 archive confirmed write plus failed read is not offered as an unconfirme
   await user.click(screen.getByRole("button", { name: "Archive" }));
   await user.click(screen.getByRole("button", { name: "Archive" }));
   await screen.findByText(/Saved, but could not refresh/);
-  expect(screen.queryByText(/archive outcome is unconfirmed/)).toBeNull();
+  expect(
+    screen.queryByText(
+      /Could not confirm whether the archive change was saved/,
+    ),
+  ).toBeNull();
   expect(
     within(screen.getByRole("dialog", { name: "Archive task" })).getByRole(
       "button",
@@ -203,7 +209,9 @@ it("F08 pending archive blocks parent Ctrl S without saving underlying dirty tit
   await user.keyboard("{Control>}s{/Control}");
   expect(update).not.toHaveBeenCalled();
   await act(async () => gate.reject(new Error("Synthetic unresolved archive")));
-  await screen.findByText(/archive outcome is unconfirmed/);
+  await screen.findByText(
+    /Could not confirm whether the archive change was saved/,
+  );
   expect(update).not.toHaveBeenCalled();
 });
 it("F08 archive project ABA prevents late follow-up read and cache writes", async () => {
@@ -271,7 +279,7 @@ it("F08 member lost response after persistence retains copyable draft without du
     screen.getByRole("textbox", { name: "Name" }),
     "Already persisted{Enter}",
   );
-  await screen.findByText(/save outcome is unconfirmed/);
+  await screen.findByText(/Could not confirm whether the teammate was saved/);
   expect(
     (await mockApi.listMembers()).filter((m) => m.name === "Already persisted"),
   ).toHaveLength(1);

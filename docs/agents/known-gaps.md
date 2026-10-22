@@ -181,3 +181,11 @@ the server equality guard. Full lifecycle/heading PNG acceptance awaits its host
 run; the conflict screenshot is retained as failure evidence. No native38/39 note
 input or rendering claim is made. Exact content+marker ABA remains indistinguishable
 without revision history; no stronger concurrency guarantee is claimed.
+
+## Alpha40 readability boundary
+
+The46-family source pass is not a blanket visual or accessibility pass. The AST
+index excludes dynamic/backend/native copy and all data permutations; user text
+is neither translated nor rewritten. Hosted synthetic state/PNG checks and
+native unavailable transport stay distinct. Source/DOM evidence cannot close
+minimum-native-width, fractional-DPI or all hidden error-layout cases.

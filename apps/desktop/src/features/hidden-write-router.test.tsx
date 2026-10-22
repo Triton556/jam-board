@@ -130,7 +130,7 @@ it.each(["archive", "member", "edge"] as const)(
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("status")).toHaveFocus();
     await act(async () => reject(new Error("Synthetic uncertain result")));
-    await within(dialog).findByText(/outcome is unconfirmed/);
+    await within(dialog).findByText(/Could not confirm whether/);
     expect(input).toHaveValue("Retained draft");
     expect(input).toHaveAttribute("readonly");
     expect(input).toHaveFocus();

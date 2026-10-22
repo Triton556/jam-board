@@ -121,9 +121,7 @@ it("the workflow guide explains stories as the feature-sized intermediate level"
   await user.click(screen.getByText("How the board and brain work together"));
   expect(screen.getByText(/is a feature or outcome/)).toBeVisible();
   expect(screen.getAllByRole("listitem")).toHaveLength(5);
-  expect(
-    screen.getByText(/Authorize the scope, not each worker/),
-  ).toBeVisible();
+  expect(screen.getByText(/Allow work to begin/)).toBeVisible();
 });
 
 it("an unknown project asks for its exact identity before any board read", () => {

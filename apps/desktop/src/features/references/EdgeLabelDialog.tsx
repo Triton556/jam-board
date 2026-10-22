@@ -112,9 +112,9 @@ export function EdgeLabelDialog({
         />
         {write.error && dispatched.current && (
           <p role="alert">
-            The save outcome is unconfirmed. Your label is retained. Close and
-            inspect the canvas before trying again; this request will not be
-            replayed.
+            Could not confirm whether the label was saved. Your text is kept.
+            Close and check the canvas before trying again; this request will
+            not be sent again automatically.
           </p>
         )}
         {refreshError && <p role="alert">{refreshError}</p>}

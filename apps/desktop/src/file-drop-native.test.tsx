@@ -896,7 +896,7 @@ it("keeps a References initial read failure distinct and recoverable without cac
   expect(
     screen.queryByRole("region", { name: "References canvas" }),
   ).toBeNull();
-  expect(screen.getByText("This page needs another try")).toBeVisible();
+  expect(screen.getByText("Could not load this view")).toBeVisible();
   referenceReadError = false;
   await user.click(screen.getByRole("button", { name: "Try again" }));
   expect(
