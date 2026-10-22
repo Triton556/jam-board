@@ -795,7 +795,7 @@ export function TaskEditor({
           </div>
         </fieldset>
         <AgentPlan
-          summary={`${values.brief.changes.length} changes · ${values.brief.tests.length} checks`}
+          summary={`${values.brief.changes.length} ${values.brief.changes.length === 1 ? "change" : "changes"} · ${values.brief.tests.length} ${values.brief.tests.length === 1 ? "check" : "checks"}`}
         >
           <fieldset disabled={readonly || save.isPending || markPending}>
             <Controller

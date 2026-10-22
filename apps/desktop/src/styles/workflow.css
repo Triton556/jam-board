@@ -640,15 +640,32 @@
   margin-bottom: 10px;
 }
 /* Draw disclosure ink in CSS rather than relying on platform emoji markers. */
-:is(.workflow-guide, .execution-help, .connection-help, .ink-disclosure)
-> summary {
+:is(
+  .workflow-guide,
+  .execution-help,
+  .connection-help,
+  .ink-disclosure,
+  .agent-plan
+) > summary {
   list-style: none;
 }
-:is(.workflow-guide, .execution-help, .connection-help, .ink-disclosure)
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )
   > summary::-webkit-details-marker {
   display: none;
 }
-:is(.workflow-guide, .execution-help, .connection-help, .ink-disclosure)
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )
   > summary::before {
   content: "";
   display: inline-block;
@@ -660,7 +677,13 @@
   margin-right: 10px;
   margin-bottom: 1px;
 }
-:is(.workflow-guide, .execution-help, .connection-help, .ink-disclosure)[open]
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )[open]
   > summary::before {
   transform: rotate(45deg);
   margin-bottom: 3px;
