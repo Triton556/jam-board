@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { Question } from "../../bindings";
+import type { AppState, Question } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import {
   Avatar,
@@ -21,8 +21,9 @@ import {
   questionsQuery,
   storiesQuery,
 } from "../../lib/planning-queries";
-import { membersQuery, tasksQuery } from "../../lib/queries";
+import { appQuery, membersQuery, tasksQuery } from "../../lib/queries";
 import { ExecutionRequests } from "../execution/ExecutionRequests";
+import { AnswerContinuation } from "./AnswerContinuation";
 export function QuestionCard({
   question: q,
   onDecision,
@@ -39,16 +40,35 @@ export function QuestionCard({
     [text, setText] = useState(""),
     [menu, setMenu] = useState(false);
   const client = useQueryClient();
+  const epoch = useRef(0);
+  const answerEpoch = useRef(0);
+  useEffect(() => {
+    let project = client.getQueryData<AppState>(["app"])?.jam?.id;
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.query.queryKey[0] !== "app") return;
+      const next = client.getQueryData<AppState>(["app"])?.jam?.id;
+      if (next !== project) {
+        project = next;
+        epoch.current++;
+      }
+    });
+    return () => {
+      epoch.current++;
+      unsubscribe();
+    };
+  }, [client]);
   const actor = members.data?.find((m) => m.id === q.askedBy);
   const answer = useMutation({
-    mutationFn: () =>
-      api.answerQuestion({
+    mutationFn: () => {
+      answerEpoch.current = epoch.current;
+      return api.answerQuestion({
         id: q.id,
         answerIndex: selected,
         answerText: text.trim() || null,
-      }),
+      });
+    },
     onSuccess: (question) => {
-      onDecision?.(question);
+      if (answerEpoch.current === epoch.current) onDecision?.(question);
       invalidatePlanning(client);
     },
   });
@@ -180,6 +200,7 @@ export function QuestionCard({
           {q.answerText && <Markdown>{q.answerText}</Markdown>}
         </div>
       )}
+      <AnswerContinuation key={`${q.jamId}:${q.id}`} question={q} />
       {(answer.error || withdraw.error) && (
         <p role="alert">{(answer.error ?? withdraw.error)?.message}</p>
       )}
@@ -188,6 +209,7 @@ export function QuestionCard({
 }
 type QuestionListProps = { epicId?: string; status?: string };
 export function QuestionList(props: QuestionListProps) {
+  const app = useQuery(appQuery);
   const heading = useRef<HTMLHeadingElement>(null);
   const [decision, setDecision] = useState<Question | null>(null);
   useEffect(() => {
@@ -198,13 +220,21 @@ export function QuestionList(props: QuestionListProps) {
       <h2 ref={heading} tabIndex={-1}>
         Questions
       </h2>
-      {decision && (
+      {decision && decision.jamId === app.data?.jam?.id && (
         <p role="status" className="execution-feedback">
           {decision.status === "answered"
             ? `Answer saved for “${decision.title}”. The connected brain can read it and update the plan; this does not start work.`
             : `“${decision.title}” was withdrawn. No work was started.`}
         </p>
       )}
+      {(props.status ?? "open") === "open" &&
+        decision?.status === "answered" &&
+        decision.jamId === app.data?.jam?.id && (
+          <AnswerContinuation
+            key={`${decision.jamId}:${decision.id}`}
+            question={decision}
+          />
+        )}
       <QuestionListContent {...props} onDecision={setDecision} />
     </section>
   );
