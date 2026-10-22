@@ -25,3 +25,20 @@ The cross-app audit has23 action rows; these core repairs do NOT close all rows.
 ## Public UX rationale
 
 [Visibility of system status](https://www.nngroup.com/articles/visibility-system-status/) and [WCAG status messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html): understandable timely feedback without focus theft; local accessible state, honest result and retained input for recovery. Technical, visual and human evidence remain separate.
+
+## Integrated departed-field correction
+
+The full candidate regression gate exposed a return-after-save problem: a
+confirmed save after leaving the entity did not acknowledge its retained draft
+baseline, so the saved value looked like a conflicting remote edit. The correction
+reconciles only the captured existing draft under uninterrupted project binding,
+query identity and source/baseline ownership. It never restores removed caches,
+announces in a different view, refetches or moves focus. Newer text remains dirty;
+text equal to the confirmed submission returns clean and blur sends nothing.
+
+Seventeen focused PlanningInput cases plus the unchanged thirteen release-draft
+cases pass (30 total), including unmount→project ABA, cache recreation, true remote
+conflict, no-newer-text return, later intentional save and subscription cleanup.
+Independent pinned review reran four focused ownership/return cases. Aggregate
+results and native limits belong to the [alpha35 verification](../../verification/0.3.0-alpha.35.md),
+not this lane's earlier counts.

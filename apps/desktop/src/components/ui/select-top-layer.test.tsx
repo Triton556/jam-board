@@ -242,3 +242,24 @@ it("backdrop dismissal does not activate the canvas below the modal", async () =
   expect(closed).toHaveBeenCalledTimes(1);
   expect(canvas).not.toHaveBeenCalled();
 });
+
+it("removes its top-layer entry and measurement listeners when the owning modal unmounts", async () => {
+  geometry();
+  const native = popover(),
+    user = userEvent.setup();
+  render(<button type="button">Original opener</button>);
+  screen.getByRole("button", { name: "Original opener" }).focus();
+  const view = render(<Example change={vi.fn()} closed={vi.fn()} />);
+  clipDialog();
+  await user.click(screen.getByRole("combobox"));
+  view.unmount();
+  expect(native.hide).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("listbox")).toBeNull();
+  expect(screen.getByRole("button", { name: "Original opener" })).toHaveFocus();
+  act(() => {
+    fireEvent.resize(window);
+    fireEvent.scroll(document);
+  });
+  expect(native.show).toHaveBeenCalledTimes(1);
+  expect(native.hide).toHaveBeenCalledTimes(1);
+});
