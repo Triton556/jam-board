@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
 	readFile,
+	realpath,
 	mkdtemp,
 	mkdir,
 	writeFile,
@@ -162,7 +163,12 @@ test("installed child receipt is exact, fresh and bound to its owning parent", (
 });
 
 test("fresh installed target refuses existing state, wrong identity/path, links and replaced binaries", async () => {
-	const dir = await mkdtemp(path.join(tmpdir(), "jam-smoke-preflight-"));
+	// TEMP may itself use an alias (for example an 8.3 Windows ancestor).
+	// The receipt must name our newly created fixture's canonical path; the
+	// production guard deliberately continues to reject redirected input paths.
+	const dir = await realpath(
+		await mkdtemp(path.join(tmpdir(), "jam-smoke-preflight-")),
+	);
 	try {
 		const dataDir = path.join(dir, "data"),
 			sidecar = path.join(dir, "sidecar");
@@ -209,6 +215,44 @@ test("fresh installed target refuses existing state, wrong identity/path, links 
 		);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("fresh target rejects an aliased parent and accepts the canonical owned fixture", async () => {
+	const outer = await realpath(
+		await mkdtemp(path.join(tmpdir(), "jam-smoke-parent-")),
+	);
+	try {
+		const actual = path.join(outer, "actual"),
+			alias = path.join(outer, "alias");
+		await mkdir(actual);
+		await symlink(actual, alias, "junction");
+		const fixture = await mkdtemp(path.join(alias, "fixture-"));
+		await mkdir(path.join(fixture, "data"));
+		await writeFile(path.join(fixture, "sidecar"), "fixture bytes");
+		const input = (root) => ({
+			receipt: {
+				dataDir: path.join(root, "data"),
+				sidecar: path.join(root, "sidecar"),
+				startedAt: Date.now() - 1000,
+				sidecarSha256: createHash("sha256")
+					.update("fixture bytes")
+					.digest("hex"),
+			},
+			runtime: {
+				dataDir: path.join(root, "data"),
+				sidecarPath: path.join(root, "sidecar"),
+			},
+			state: { hasJam: false, currentMember: null },
+			projects: [],
+		});
+		await assert.rejects(
+			() => assertFreshInstalledTarget(input(fixture)),
+			/Fixture data path is redirected/,
+		);
+		await assertFreshInstalledTarget(input(await realpath(fixture)));
+	} finally {
+		await rm(outer, { recursive: true, force: true });
 	}
 });
 

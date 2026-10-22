@@ -19,6 +19,11 @@ All notable changes to Jam Board are documented here. The format follows
   persistence. A bounded persistent notice explains read recovery; failed reads
   retain observed data and the existing Try again action retries only that read.
 
+- The installed-smoke **test fixture** now canonicalizes its newly owned temporary
+  root before building a receipt, covering aliased Windows TEMP paths. Production
+  anti-redirection checks are unchanged; an ancestor-junction regression still
+  requires redirected input to be refused. No app/runtime version change.
+
 ### Verification
 
 - [Verification and limits](docs/verification/0.3.0-alpha.26.md). Earlier native
