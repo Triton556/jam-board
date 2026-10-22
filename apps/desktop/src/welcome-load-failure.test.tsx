@@ -23,6 +23,7 @@ vi.mock("./features/onboarding/Welcome", async (original) => {
 
 import { App, router } from "./app";
 import { api } from "./lib/api";
+import { useUiStore } from "./lib/ui-store";
 
 it("a rejected Welcome chunk offers explicit app reload or Projects, never an automatic or cached fake retry", async () => {
   const log = vi.spyOn(console, "error").mockImplementation(() => {}),
@@ -43,7 +44,18 @@ it("a rejected Welcome chunk offers explicit app reload or Projects, never an au
     ).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent("Unsaved fields");
     expect(reload).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Reload app" }));
+    // The empty-project Shell also renders Welcome and updates its clock each second.
+    await act(async () => {
+      await router.navigate({ to: "/board" });
+    });
+    const reloadButton = screen.getByRole("button", { name: "Reload app" });
+    reloadButton.focus();
+    act(() => useUiStore.getState().tick(useUiStore.getState().now + 1000));
+    expect(screen.getByRole("button", { name: "Reload app" })).toBe(
+      reloadButton,
+    );
+    expect(reloadButton).toHaveFocus();
+    await user.keyboard("{Enter}");
     expect(reload).toHaveBeenCalledOnce();
     expect(load.requested).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("link", { name: "Open Projects" }));

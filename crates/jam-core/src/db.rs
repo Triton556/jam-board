@@ -142,6 +142,13 @@ impl Store {
     pub fn activity_count(&self) -> Result<i64> {
         self.read(|c| Ok(c.query_row("SELECT count(*) FROM activity", [], |r| r.get(0))?))
     }
+    /// Project identity and its activity high-water from one read snapshot.
+    /// The cursor is a global sequence value filtered to this exact project, not
+    /// a per-project counter or database-generation identifier. A saved wait
+    /// cursor may legitimately be larger after scanning foreign events.
+    pub fn project_activity_context(&self) -> Result<(Jam, i64)> {
+        self.read(project_activity_context)
+    }
     pub fn latest_seq(&self) -> Result<i64> {
         self.read(|c| {
             Ok(
@@ -236,4 +243,43 @@ pub(crate) fn activity_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEv
         epic_id: r.get(10)?,
         sentence,
     })
+}
+
+fn project_activity_context(c: &Connection) -> Result<(Jam, i64)> {
+    let project = crate::projects::selected_jam(c)?;
+    let cursor = c.query_row(
+        "SELECT coalesce(max(seq),0) FROM activity WHERE jam_id=?",
+        [&project.id],
+        |row| row.get(0),
+    )?;
+    Ok((project, cursor))
+}
+
+#[cfg(test)]
+mod context_snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn identity_and_cursor_share_the_read_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path().join("fictional.db")).unwrap();
+        let (project, human) = store
+            .create_jam("Fictional snapshot", None, None, None, "UTC", "Human")
+            .unwrap();
+        let pinned = store.for_project(&project.id).unwrap();
+        let before = pinned.project_activity_context().unwrap().1;
+        pinned
+            .read(|c| {
+                // Establish identity in this WAL snapshot, then commit a concurrent
+                // writer before the cursor query. Both reads must stay on the old snapshot.
+                assert_eq!(crate::projects::selected_jam(c)?.id, project.id);
+                pinned.set_status(&human.id, "Committed during snapshot", None)?;
+                let (identity, cursor) = project_activity_context(c)?;
+                assert_eq!(identity.id, project.id);
+                assert_eq!(cursor, before);
+                Ok(())
+            })
+            .unwrap();
+        assert!(pinned.project_activity_context().unwrap().1 > before);
+    }
 }

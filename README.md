@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.14**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.15**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.14.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.15.md).
 
 ## Features
 
@@ -152,7 +152,7 @@ Replace `JB` with your project's key prefix from Settings. Without an explicit p
 
 Try a read-only check first: *“Use the jam-board MCP server: call get_session_context, get_project and get_board. Tell me which project this connection belongs to and summarize its plan. Do not change the board, claim tasks or start workers.”*
 
-The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. Agents can recover activity with `list_changes_since`, then use `wait_for_changes` for reports, answers and edits; keep the returned `nextCursor`, including on timeout. See the [full MCP contract](docs/mcp.md) and [v0.2 integration changes](docs/mcp.md#breaking-changes-in-v02).
+The installed sidecar finds the same default database automatically. For development, also set `JAM_BOARD_DATA_DIR` to `<checkout>/.dev-data`. Agents recover from their saved project/scope/filter checkpoint using bounded `wait_for_changes` with `excludeSelf=false` and `timeoutSeconds=1`; handle each page before saving `nextCursor`, including on timeout, then use `timeoutSeconds=60` only when continued observation is assigned. Finish/report at the assigned stopping condition. Never replace an unprocessed checkpoint with a fresh cursor. For fresh bootstrap only, verify the exact project and capture `get_session_context.latestActivityCursor` before reading current state; follow the [bootstrap and recovery policy](docs/mcp.md#waiting-as-a-brain). `list_changes_since` remains available for deliberate historical audit. See the [full MCP contract](docs/mcp.md) and [v0.2 integration changes](docs/mcp.md#breaking-changes-in-v02).
 
 ## How it works
 

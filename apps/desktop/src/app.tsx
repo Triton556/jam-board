@@ -95,25 +95,29 @@ const WelcomeModule = lazy(() =>
   })),
 );
 
+function WelcomeLoadError() {
+  return (
+    <main className="loading">
+      <h1>Could not open project setup</h1>
+      <p role="alert">
+        Reload the app to retry loading this screen, or open Projects. Unsaved
+        fields on this screen will be lost on reload.
+      </p>
+      <div className="button-row">
+        <Button onClick={() => window.location.reload()}>Reload app</Button>
+        <Link to="/projects" className="button secondary">
+          Open Projects
+        </Link>
+      </div>
+    </main>
+  );
+}
+
 function Welcome() {
   return (
     <CatchBoundary
       getResetKey={() => "welcome-module"}
-      errorComponent={() => (
-        <main className="loading">
-          <h1>Could not open project setup</h1>
-          <p role="alert">
-            Reload the app to retry loading this screen, or open Projects.
-            Unsaved fields on this screen will be lost on reload.
-          </p>
-          <div className="button-row">
-            <Button onClick={() => window.location.reload()}>Reload app</Button>
-            <Link to="/projects" className="button secondary">
-              Open Projects
-            </Link>
-          </div>
-        </main>
-      )}
+      errorComponent={WelcomeLoadError}
     >
       <Suspense
         fallback={

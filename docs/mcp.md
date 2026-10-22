@@ -134,7 +134,7 @@ Success contains structuredContent plus a one-line content summary. Failures are
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
-| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false } |
+| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor } |
 | get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
 | list_execution | {} | ExecutionState[] for the pinned project |
 | request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
@@ -261,11 +261,27 @@ Example `structuredContent` (seq 121–123 were inspected but did not match):
 
 ### Waiting as a brain
 
-At turn start, recover with `list_changes_since` from the last persisted cursor, handle the returned changes and advance to the last seq. Then loop:
+First verify `get_session_context.projectId` against the intended exact project ID. Matching names/prefixes are insufficient. Communicate with the human in their established language; English tool prompts and event sentences do not require English replies.
 
-1. Call `wait_for_changes` with that cursor, `epicKey`, `includeProject: true`, `timeoutSeconds: 60` and actions for execution changes, reports, answers and human edits (for example `["execution.started","execution.paused","execution.request_resolved","report.submitted","question.answered","task.brief_updated","task.updated","epic.updated","story.updated","project.updated","reference.added","reference.linked","reference.updated"]`). Omit `actorKind` to receive both worker reports and human edits. Action filters do not distinguish human edits from agent edits; `excludeSelf` skips only this brain's events.
-2. Handle each returned event, fetching current task/question/epic detail as needed, and persist `nextCursor`.
-3. Repeat, including after `timedOut: true`. Do not add a client busy loop or repeatedly poll `list_changes_since` while idle.
+**Existing recovery:** keep the unprocessed saved cursor; never replace it with a new bootstrap cursor or reset to zero each turn. Persist its project, epic and filter identity. Call `wait_for_changes` with that cursor, `epicKey` when scoped, `includeProject: true`, **`excludeSelf: false`**, and `timeoutSeconds: 1`. Omit `actions` and `actorKind` unless deliberately narrowing observation. This retains inclusive recovery rather than silently adopting the wait tool's self-excluding default. With an epic, `includeProject: true` adds only project-wide human events, not every epic or project-wide agent event; without an epic it has no narrowing effect.
+
+Handle each returned page before checkpointing `nextCursor`, even on timeout. Fetch affected task/question/epic details needed for the decision, not the entire board. Repeat until `timedOut: true`; fewer than 100 events does not prove catch-up is complete. Continue live waits with the same policy and `timeoutSeconds: 60` only when continued observation is part of the assigned role/request, persisting handled checkpoints even on timeout. Finish and report at the assigned stopping condition; recovery does not create a new monitoring assignment or postpone a completed worker’s handoff. Changing to `excludeSelf: true` is an explicit choice only when successful own writes are retained; do not reuse that filtered checkpoint for inclusive recovery. All filters consume excluded events: widening them needs an explicit earlier-checkpoint policy. No busy loop or idle `list_changes_since` polling is necessary.
+
+The cap is **100 matching events, not bytes**. Pagination controls individual responses; reading all pages still reads the full history and does not promise lower total history tokens. Continuously arriving events can prevent catch-up from terminating. Before context limits, checkpoint handled pages and preserve a concise, honest summary of what remains; never declare incomplete recovery complete.
+
+### Fresh bootstrap and cursor compatibility (0.3.0-alpha.15)
+
+`get_session_context.latestActivityCursor` is the maximum committed global `activity.seq` belonging to the exact pinned project, or `0` for a project with no activity. Identity and this cursor are read in one transaction. The field is read-only and does not grant execution, create an OS session, or switch projects. Global sequence gaps are normal.
+
+For a **fresh bootstrap with no unprocessed saved checkpoint**, capture this cursor **before** reading the requested current state. Inspect the requested epic/story/tasks, questions, comments and linked sources, paging fully where required. Then process newer events with the bounded recovery policy above and checkpoint only once the baseline and returned events have been handled. A change seen in the baseline may also appear in replay: use stable entity/event IDs and reread affected state instead of double-applying actions. Capture after current-state reads is unsafe because changes in between could be missed.
+
+This baseline plus replay is not a coherent multi-call atomic snapshot, not historical audit, and not proof that the baseline included every required detail. Preserve full task/report/review evidence and captured validators for decisions; do not silently clip evidence. Prefer targeted `list_tasks` and selected `get_task` reads. Do not require both `get_task` and `jam://task/{key}` unless the resource supplies additional required content. `list_changes_since` remains unchanged and available for deliberate audit; never bypass a requested historical review with a bootstrap shortcut.
+
+**Do not infer database rewind from cursor comparison.** `wait_for_changes.nextCursor` advances through inspected foreign-project and nonmatching global sequences. Therefore a valid saved cursor can exceed the project-filtered `latestActivityCursor`. Neither cursor includes a database-generation identity; restore, replacement or suspected rewind is ambiguous and requires explicit reconciliation/reinitialization policy, not invented automatic recovery.
+
+Clients supporting older servers must feature-detect the field: missing is not a returned zero. If absent, recover conservatively from an existing known checkpoint; a genuinely new history may require cursor-zero catch-up. Never guess a high-water value from time or overwrite an unprocessed checkpoint. Updated servers always supply the field and their generated output schema includes it. Tolerant older JSON readers can ignore the added field, but deny-unknown-fields consumers, exact-output fixtures and cached output schemas need coordinated updates/version awareness; additive does not mean universally byte-compatible.
+
+The targeted-retrieval rationale follows [Anthropic's tool-design guidance](https://www.anthropic.com/research/writing-tools-for-agents). [OpenAI tool search](https://developers.openai.com/api/docs/guides/tools-tool-search) concerns client-side tool discovery, not history payloads; this change makes no claim of automatic tool-search support or measured token/latency savings.
 
 ### Project and planning fields
 
@@ -329,7 +345,7 @@ resources/list exposes jam://board as Markdown. Resource templates are jam://epi
 
 Three prompts are available:
 
-- plan_epic: interview rounds with ask_user/wait_for_answer, playback summary/confirmation, epic/story/task planning, complete briefs, mark_ready and scoped status; wait_for_changes for reports, answers and human edits, with list_changes_since for turn-start recovery. Optional requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md are workflow guidance, not protocol prerequisites. Live tool schemas and captured validators take precedence; no automatic playbook installation is implied. All three prompts verify the intended exact project ID before board/task reads, not just a matching name or prefix.
+- plan_epic: interview rounds with ask_user/wait_for_answer, playback summary/confirmation, epic/story/task planning, complete briefs, mark_ready and scoped status; wait_for_changes for reports, answers and human edits, with bounded inclusive wait_for_changes for saved-cursor recovery and a pre-read latestActivityCursor only for fresh bootstrap. Optional requirements-interview.md, task-brief-and-acceptance.md and brief-writing.md are workflow guidance, not protocol prerequisites. Live tool schemas and captured validators take precedence; no automatic playbook installation is implied. All three prompts verify the intended exact project ID before board/task reads, not just a matching name or prefix.
 - work_on_next_task (optional tag): verify the pinned project and running story permission, pick Ready work, prefer own changes-requested tasks, read the full brief/context, claim, work and submit_report with evidence. Names brief-writing.md.
 - review_task: compare report evidence against brief tests, story acceptance and epic scope; accept or request changes, then publish status. Names task-brief-and-acceptance.md.
 
