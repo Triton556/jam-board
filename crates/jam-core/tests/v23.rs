@@ -222,9 +222,10 @@ fn link_add_is_offline_and_explicit_preview_stores_only_two_fields() {
     );
 }
 #[test]
-fn preview_has_a_five_second_deadline() {
+fn preview_cancels_a_stalled_transfer_after_five_seconds() {
     let (_d, s, h) = setup();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
     let item = s
         .add_reference(
             &h,
@@ -235,22 +236,73 @@ fn preview_has_a_five_second_deadline() {
             },
         )
         .unwrap();
+    let before = serde_json::to_value(s.reference_canvas().unwrap()).unwrap();
+    let (stop, stopped) = std::sync::mpsc::channel();
     let server = std::thread::spawn(move || {
-        let (_socket, _) = listener.accept().unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(5400));
+        let (mut socket, accepted) = loop {
+            match listener.accept() {
+                Ok((socket, _)) => break (socket, std::time::Instant::now()),
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    // A failed client startup must not leave accept/join hanging.
+                    match stopped.recv_timeout(std::time::Duration::from_millis(10)) {
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                        _ => return Ok(None),
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+        };
+        socket.set_nonblocking(false)?;
+        socket.set_read_timeout(Some(std::time::Duration::from_millis(5400)))?;
+        let mut request = Vec::new();
+        // Never send a response or close at a prearranged deadline. Only client
+        // EOF is success; the 5.4s watchdog is bounded failure cleanup.
+        let end = socket.read_to_end(&mut request);
+        Ok(Some((accepted.elapsed(), request, end)))
     });
     let start = std::time::Instant::now();
+    let result = s.fetch_reference_preview(&h, &item.audit.id);
+    let call_elapsed = start.elapsed();
+    let _ = stop.send(());
+    let peer = server.join().unwrap();
+    let error = result.as_ref().err().map(ToString::to_string);
     assert!(
-        s.fetch_reference_preview(&h, &item.audit.id)
-            .unwrap_err()
-            .to_string()
-            .contains("5 second")
+        peer.is_ok(),
+        "call={call_elapsed:?}, peer={peer:?}, error={error:?}"
     );
-    assert!(start.elapsed().as_secs_f64() >= 4.8 && start.elapsed().as_secs_f64() < 5.4);
+    let Some((transfer_elapsed, request, end)) = peer.unwrap() else {
+        panic!("No loopback connection: call={call_elapsed:?}, error={error:?}");
+    };
+    let diagnostic = format!(
+        "call={call_elapsed:?}, transfer={transfer_elapsed:?}, peer_end={end:?}, error={error:?}"
+    );
+    assert!(
+        end.is_ok(),
+        "Watchdog/read failure, not client EOF: {diagnostic}"
+    );
+    assert!(
+        request.starts_with(b"GET /slow HTTP/1.1\r\n"),
+        "No expected HTTP request: {diagnostic}"
+    );
+    assert!(
+        error
+            .as_deref()
+            .is_some_and(|message| message.contains("5 second")),
+        "{diagnostic}"
+    );
+    // Curl's transfer clock does not include process startup/reaping. Keep the
+    // existing acceptance bounds, and sample each interval once for diagnosis.
+    assert!(
+        (4.8..5.4).contains(&transfer_elapsed.as_secs_f64()),
+        "{diagnostic}"
+    );
     assert!(
         s.reference_canvas().unwrap().items[0]
             .link_preview
             .is_none()
     );
-    server.join().unwrap();
+    assert_eq!(
+        serde_json::to_value(s.reference_canvas().unwrap()).unwrap(),
+        before
+    );
 }

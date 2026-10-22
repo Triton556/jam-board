@@ -18,6 +18,11 @@ All notable changes to Jam Board are documented here. The format follows
 
 ### Verification
 
+- Corrected the preview-deadline test fixture after a Windows CI timing failure.
+  It now measures the accepted connection through observed client EOF, keeps the
+  same 4.8–5.4-second bounds, and reports transfer/whole-call diagnostics. The
+  silent peer no longer closes on a competing schedule; watchdog errors fail.
+  Production `curl --max-time 5`, application version and dependencies are unchanged.
 - Added real-App save/close and delayed-list-read regressions, selection/ABA,
   missing-card, route-unmount and layered-dialog checks. Added light/dark Chromium
   computed-color scenarios, not just class-name assertions.
