@@ -289,6 +289,14 @@ pub struct AddReference {
     pub y: Option<f64>,
 }
 patch!(ReferencePatch {caption:String,tags:Vec<String>,title:String});
+/// Optional human-editor compare-and-set boundary. Kept separate from the MCP
+/// ReferenceEditInput contract so existing agent clients remain unchanged.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReferenceContentExpectation {
+    pub title: String,
+    pub caption: String,
+}
 record!(ReferenceCanvas {items:Vec<RefItem>,frames:Vec<RefFrame>,edges:Vec<RefEdge>,links:Vec<RefLink>});
 record!(CanvasGeometry {id:String,x:f64,y:f64,w:f64,h:f64,z:f64,frame_id:Option<String>});
 record!(CanvasArchive {

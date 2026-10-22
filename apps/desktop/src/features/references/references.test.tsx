@@ -14,6 +14,13 @@ import {
 import { type ItemData, ReferenceNode } from "./Nodes";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
 
+// This file renders static node fixtures. Actual navigation/draft guards are
+// exercised with a real memory router in inline-note-router.test.tsx.
+vi.mock("@tanstack/react-router", async (original) => ({
+  ...(await original<typeof import("@tanstack/react-router")>()),
+  useBlocker: () => ({}),
+}));
+
 const item: RefItem = {
   id: "i",
   jamId: "j",

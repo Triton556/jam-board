@@ -9,6 +9,7 @@ import { appQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useProjectWrite } from "../../lib/use-project-write";
 import { AddReferenceDialog } from "./dialogs";
+import { referenceLabel } from "./model";
 import "./section.css";
 
 function Thumb({ assetId, title }: { assetId: string | null; title: string }) {
@@ -122,8 +123,8 @@ function ReferenceTargetSection({
               void navigate({ to: "/references", search: { section: item.id } })
             }
           >
-            <Thumb assetId={item.assetId} title={item.title} />
-            <span>{item.title}</span>
+            <Thumb assetId={item.assetId} title={referenceLabel(item)} />
+            <span>{referenceLabel(item)}</span>
           </button>
         ))}
       </div>
@@ -180,7 +181,9 @@ function ReferenceTargetSection({
             <div className="reference-picker-grid">
               {data.data?.items
                 .filter((i) =>
-                  i.title.toLowerCase().includes(search.toLowerCase()),
+                  (i.title + (i.kind === "note" ? `\n${i.captionMd}` : ""))
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
                 )
                 .map((i) => (
                   <Button
@@ -197,8 +200,8 @@ function ReferenceTargetSection({
                       )
                     }
                   >
-                    <Thumb assetId={i.assetId} title={i.title} />
-                    {i.title}
+                    <Thumb assetId={i.assetId} title={referenceLabel(i)} />
+                    {referenceLabel(i)}
                   </Button>
                 ))}
             </div>

@@ -197,7 +197,8 @@ pub(crate) fn validate(s: &JamExport) -> Result<()> {
                 .url
                 .as_ref()
                 .is_some_and(|u| u.starts_with("https://") || u.starts_with("http://")),
-            "note" => !i.caption_md.trim().is_empty(),
+            // Existing notes may deliberately be cleared without deleting the record.
+            "note" => true,
             _ => false,
         };
         if !audit(&i.audit)

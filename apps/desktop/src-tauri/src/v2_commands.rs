@@ -348,11 +348,17 @@ pub async fn epic_journal(
 #[specta::specta]
 pub async fn add_reference(
     input: AddReference,
+    untitled: Option<bool>,
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<RefItem, ApiError> {
     execute(&state, app, true, move |s| {
-        s.add_reference(&s.current_member()?.id, input)
+        let actor = s.current_member()?.id;
+        if untitled.unwrap_or(false) {
+            s.add_reference_untitled(&actor, input)
+        } else {
+            s.add_reference(&actor, input)
+        }
     })
     .await
 }
@@ -378,11 +384,18 @@ pub async fn list_references(
 #[specta::specta]
 pub async fn update_reference(
     input: ReferenceEditInput,
+    expected: Option<ReferenceContentExpectation>,
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<RefItem, ApiError> {
     execute(&state, app, true, move |s| {
-        s.update_reference(&s.current_member()?.id, &input.item_id, input.patch)
+        let actor = s.current_member()?.id;
+        match expected {
+            Some(expected) => {
+                s.update_reference_checked(&actor, &input.item_id, input.patch, expected)
+            }
+            None => s.update_reference(&actor, &input.item_id, input.patch),
+        }
     })
     .await
 }

@@ -138,17 +138,24 @@ for (const theme of ["light", "dark"] as const) {
 
       await toolbar.getByRole("button", { name: "Add", exact: true }).click();
       await page.getByRole("button", { name: "Note", exact: true }).click();
-      const draft = page.getByRole("form", { name: "New note draft" });
+      await expect(
+        page.getByRole("region", { name: "References canvas" }),
+      ).toBeFocused();
+      await page.keyboard.press("Enter");
+      const draft = page.getByRole("article", { name: "New note paper" });
       const paper = await draft.boundingBox();
       const stack = await page
         .locator(".reference-control-stack")
         .boundingBox();
       if (!paper || !stack) throw Error("Missing draft/stack geometry");
       expect(paper.y).toBeGreaterThanOrEqual(stack.y + stack.height + 15.5);
-      const title = draft.getByRole("textbox", { name: "Title", exact: true });
-      await expect(title).toBeFocused();
+      const body = draft.getByRole("textbox", {
+        name: "Note text",
+        exact: true,
+      });
+      await expect(body).toBeFocused();
       expect(
-        await title.evaluate((element) => {
+        await body.evaluate((element) => {
           const box = element.getBoundingClientRect();
           return (
             document.elementFromPoint(
@@ -158,7 +165,8 @@ for (const theme of ["light", "dark"] as const) {
           );
         }),
       ).toBe(true);
-      await draft.getByRole("button", { name: "Cancel", exact: true }).click();
+      await page.keyboard.press("Escape");
+      await expect(draft).toHaveCount(0);
       expect(
         await page.evaluate(() => window.__jamMock.referenceCanvas()),
       ).toEqual(before);

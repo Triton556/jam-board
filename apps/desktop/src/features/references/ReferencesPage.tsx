@@ -63,6 +63,7 @@ import {
   readingOrder,
   referenceKind,
   referenceKindColors,
+  referenceLabel,
   worldPosition,
 } from "./model";
 import {
@@ -71,9 +72,10 @@ import {
   ReferenceFrame,
   ReferenceNode,
 } from "./Nodes";
-import { noteDraftLayout } from "./note-draft-layout";
+import { placedNoteLayout } from "./note-draft-layout";
 import { OverviewScene } from "./OverviewScene";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
+import { editedNoteTarget, retainNoteEditors } from "./sticky-node-ownership";
 import "@xyflow/react/dist/style.css";
 import "./references.css";
 
@@ -125,8 +127,10 @@ function Canvas() {
       projectId: string;
       x: number;
       y: number;
+      createdId?: string;
       maxHeight: number;
     } | null>(null),
+    [placingNote, setPlacingNote] = useState<string | null>(null),
     [menu, setMenu] = useState(false),
     [frameEdit, setFrameEdit] = useState<RefFrame | null>(null),
     [edit, setEdit] = useState<{
@@ -143,6 +147,33 @@ function Canvas() {
     [revision, setRevision] = useState(0),
     dragging = useRef(false),
     selectNext = useRef<string | undefined>(undefined);
+  const activeNotes = useRef(new Set<string>());
+  const [editingNotes, setEditingNotes] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const draftRef = useRef(noteDraft);
+  draftRef.current = noteDraft;
+  const noteEditing = useCallback((id: string, active: boolean) => {
+    if (active === activeNotes.current.has(id)) return;
+    if (active) activeNotes.current.add(id);
+    else activeNotes.current.delete(id);
+    setEditingNotes(new Set(activeNotes.current));
+  }, []);
+  const noteOwnsTarget = useCallback(
+    (kind: "item" | "frame" | "edge", id: string) =>
+      (kind === "item" && draftRef.current?.createdId === id) ||
+      editedNoteTarget(kind, id, flow.getNodes(), activeNotes.current),
+    [flow],
+  );
+  const requireFinishedNote = useCallback(
+    (kind: "item" | "frame" | "edge", id: string) => {
+      if (noteOwnsTarget(kind, id))
+        throw Error(
+          "Finish editing or deliberately discard the retained note edits before changing this note or its frame.",
+        );
+    },
+    [noteOwnsTarget],
+  );
   const selectedReference = useRouterState({
       select: (s) => (s.location.search as { section?: string }).section,
     }),
@@ -172,6 +203,7 @@ function Canvas() {
         (n.parentId && selectedFrames.split(",").includes(n.parentId)),
     )
     .map((n) => n.id)
+    .concat(noteDraft?.createdId ?? [], [...editingNotes])
     .join(",");
   const edges = useMemo(
     () =>
@@ -284,6 +316,36 @@ function Canvas() {
       y: (rect?.top ?? 0) + (rect?.height ?? 600) / 2,
     });
   }, [flow]);
+  const placeNote = (clientPoint?: { x: number; y: number }) => {
+    if (!placingNote || placingNote !== app.data?.jam?.id || noteDraft) return;
+    const bounds = container.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const screen = clientPoint ?? {
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+    };
+    const world = flow.screenToFlowPosition(screen);
+    const layout = placedNoteLayout(
+      world,
+      { x: screen.x - bounds.left, y: screen.y - bounds.top },
+      {
+        width: bounds.width,
+        height: bounds.height,
+        toolsBottom: referenceControlsBottom(container.current),
+      },
+    );
+    setPlacingNote(null);
+    setNoteDraft({
+      projectId: placingNote,
+      x: layout.x,
+      y: layout.y,
+      maxHeight: layout.maxHeight,
+    });
+    void flow.setViewport(layout.viewport, { duration: 0 });
+  };
+  useEffect(() => {
+    if (placingNote && placingNote !== app.data?.jam?.id) setPlacingNote(null);
+  }, [placingNote, app.data?.jam?.id]);
   const saveGeometry = useRef(
     new Map<string, ReturnType<typeof debounceSave<CanvasGeometry>>>(),
   );
@@ -378,13 +440,22 @@ function Canvas() {
   );
   const archive = useCallback(
     (kind: "item" | "frame" | "edge", id: string) => {
+      try {
+        requireFinishedNote(kind, id);
+      } catch (reason) {
+        error(reason);
+        return;
+      }
       void api
         .canvasArchive({ kind, id, archived: true })
         .then(async () => {
           history.record({
             label: "Archive reference",
             undo: () => api.canvasArchive({ kind, id, archived: false }),
-            redo: () => api.canvasArchive({ kind, id, archived: true }),
+            redo: () => {
+              requireFinishedNote(kind, id);
+              return api.canvasArchive({ kind, id, archived: true });
+            },
           });
           setRevision((r) => r + 1);
           announce("Archived reference");
@@ -392,7 +463,7 @@ function Canvas() {
         })
         .catch(error);
     },
-    [history, refresh, error, announce],
+    [history, refresh, error, announce, requireFinishedNote],
   );
   const open = useCallback(
     (key: string) => {
@@ -418,6 +489,31 @@ function Canvas() {
       open,
       lightbox: (url, title) => setLightbox({ url, title }),
       edgeLabel: (id, label) => setEdgeEdit({ id, label }),
+      noteEditing,
+      noteSaved: (item, previous) => {
+        if (previous)
+          history.record({
+            label: "Edit note",
+            undo: () => {
+              requireFinishedNote("item", item.id);
+              return api.updateReference(
+                item.id,
+                { title: previous.title, caption: previous.captionMd },
+                { title: item.title, caption: item.captionMd },
+              );
+            },
+            redo: () => {
+              requireFinishedNote("item", item.id);
+              return api.updateReference(
+                item.id,
+                { title: item.title, caption: item.captionMd },
+                { title: previous.title, caption: previous.captionMd },
+              );
+            },
+          });
+        setRevision((r) => r + 1);
+        void refresh().catch(error);
+      },
       caption: async (item, value) => {
         await api.updateReference(item.id, { caption: value });
         history.record({
@@ -441,13 +537,31 @@ function Canvas() {
       resizeFrame: (frame, w, h) => queueFrame(frame, { w, h }),
       editFrame: setFrameEdit,
       collapse: (frame) => {
+        if (!frame.collapsed) {
+          try {
+            requireFinishedNote("frame", frame.id);
+          } catch (reason) {
+            error(reason);
+            return;
+          }
+        }
         void api
           .updateRefFrame(frame.id, { collapsed: !frame.collapsed })
           .then(refresh)
           .catch(error);
       },
     }),
-    [archive, open, queueGeometry, queueFrame, history, refresh, error],
+    [
+      archive,
+      open,
+      queueGeometry,
+      queueFrame,
+      history,
+      refresh,
+      error,
+      noteEditing,
+      requireFinishedNote,
+    ],
   );
   useEffect(() => {
     if (!data || dragging.current) return;
@@ -537,7 +651,9 @@ function Canvas() {
             ? { x: item.x ?? 0, y: item.y ?? 0 }
             : worldPosition(item, effectiveFrames),
           parentId: activeFrame ? frame.id : undefined,
-          hidden: !!(activeFrame && frame.collapsed),
+          hidden:
+            item.id === noteDraft?.createdId ||
+            !!(activeFrame && frame.collapsed),
           style: contentSized
             ? {
                 width: Math.max(240, item.w ?? 240),
@@ -566,7 +682,7 @@ function Canvas() {
             },
           ],
           zIndex: item.z ?? 0,
-          ariaLabel: `${kind} reference: ${item.title}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`,
+          ariaLabel: `${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`,
         };
       });
     const requested = selectNext.current;
@@ -576,13 +692,22 @@ function Canvas() {
       const selected = requested
         ? new Set([requested])
         : new Set(previous.filter((n) => n.selected).map((n) => n.id));
-      return readingOrder<CanvasNode>([...frames, ...items]).map((n) => ({
+      return readingOrder<CanvasNode>(
+        retainNoteEditors(
+          [...frames, ...items],
+          previous,
+          editingNotes,
+          app.data?.jam?.id,
+        ),
+      ).map((n) => ({
         ...n,
         selected: selected.has(n.id),
       }));
     });
   }, [
     data,
+    app.data?.jam?.id,
+    editingNotes,
     targets,
     assets.data,
     filter,
@@ -592,6 +717,7 @@ function Canvas() {
     selectedFrames,
     selectedItems,
     overview,
+    noteDraft?.createdId,
   ]);
   const hasRequestedNode =
     !!selectedReference && nodes.some((n) => n.id === selectedReference);
@@ -799,7 +925,7 @@ function Canvas() {
   return (
     <CanvasContext.Provider value={runtime}>
       <section
-        className="references-page"
+        className={`references-page ${placingNote ? "reference-placing-note" : ""}`}
         ref={container}
         tabIndex={-1}
         aria-label="References canvas"
@@ -829,6 +955,13 @@ function Canvas() {
           })().catch(error);
         }}
         onKeyDownCapture={(e) => {
+          if (placingNote && (e.key === "Escape" || e.key === "Enter")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.key === "Escape") setPlacingNote(null);
+            else placeNote();
+            return;
+          }
           if ((e.target as HTMLElement).closest(".reference-note-draft"))
             return;
           if (
@@ -938,7 +1071,9 @@ function Canvas() {
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          onlyRenderVisibleElements
+          // An active editor owns an unsaved draft even when panned offscreen.
+          // Restore normal viewport virtualization as soon as editing ends.
+          onlyRenderVisibleElements={editingNotes.size === 0}
           minZoom={0.1}
           maxZoom={4}
           nodeDragThreshold={4}
@@ -1023,7 +1158,11 @@ function Canvas() {
           }}
           proOptions={{ hideAttribution: false }}
           edgesFocusable={false}
-          onPaneClick={() => {
+          onPaneClick={(event) => {
+            if (placingNote) {
+              placeNote({ x: event.clientX, y: event.clientY });
+              return;
+            }
             setSelectedEdges([]);
             container.current?.focus({ preventScroll: true });
           }}
@@ -1054,29 +1193,37 @@ function Canvas() {
               targets={targets}
             />
           )}
-          {noteDraft && (
+          {noteDraft && noteDraft.projectId === app.data?.jam?.id && (
             <ViewportPortal>
               <DraftNote
                 {...noteDraft}
-                close={() => {
-                  setNoteDraft(null);
-                  container.current
-                    ?.querySelector<HTMLButtonElement>("[data-reference-add]")
-                    ?.focus();
+                item={data?.items.find(
+                  (item) => item.id === noteDraft.createdId,
+                )}
+                zoom={flow.getZoom()}
+                confirmed={(item, previous) => {
+                  setNoteDraft((current) =>
+                    current ? { ...current, createdId: item.id } : null,
+                  );
+                  runtime.noteSaved?.(item, previous);
                 }}
-                saved={(item) => {
+                close={(restoreFocus) => {
+                  setNoteDraft(null);
+                  if (restoreFocus)
+                    container.current
+                      ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                      ?.focus();
+                }}
+                saved={(item, restoreFocus) => {
                   selectNext.current = item.id;
                   setNoteDraft(null);
                   announce("Note created");
-                  container.current
-                    ?.querySelector<HTMLButtonElement>("[data-reference-add]")
-                    ?.focus();
+                  if (restoreFocus)
+                    container.current
+                      ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                      ?.focus();
                   // Creation is already confirmed; a failed reread must not offer create again.
                   void refresh().catch(error);
-                }}
-                refresh={async () => {
-                  const result = await query.refetch();
-                  if (result.error) throw result.error;
                 }}
               />
             </ViewportPortal>
@@ -1096,6 +1243,12 @@ function Canvas() {
             />
           )}
         </ReactFlow>
+        {placingNote && (
+          <div className="reference-note-placement" role="status">
+            Click the canvas to place a note · Enter places it in view · Escape
+            cancels
+          </div>
+        )}
         <FileDropProgress progress={batch.progress} />
         <div className="reference-control-stack">
           <div
@@ -1137,28 +1290,10 @@ function Canvas() {
                     onClick={() => {
                       setMenu(false);
                       if (noteDraft || !app.data?.jam) return;
-                      const point = center();
-                      const bounds = container.current?.getBoundingClientRect();
-                      const toolsBottom = referenceControlsBottom(
-                        container.current,
-                      );
-                      const layout = noteDraftLayout(point, {
-                        width: bounds?.width || 800,
-                        height: bounds?.height || 600,
-                        toolsBottom,
-                      });
-                      setNoteDraft({
-                        projectId: app.data.jam.id,
-                        x: layout.x,
-                        y: layout.y,
-                        maxHeight: layout.maxHeight,
-                      });
-                      void flow.setCenter(point.x, point.y, {
-                        zoom: layout.zoom,
-                        duration: 0,
-                      });
+                      setPlacingNote(app.data.jam.id);
+                      container.current?.focus({ preventScroll: true });
                     }}
-                    disabled={!!noteDraft || !app.data?.jam}
+                    disabled={!!noteDraft || !!placingNote || !app.data?.jam}
                   >
                     Note
                   </Button>
@@ -1296,7 +1431,8 @@ function Canvas() {
         </div>
         {!data?.items.some((item) => !item.archivedAt) &&
           !data?.frames.some((frame) => !frame.archivedAt) &&
-          !noteDraft && (
+          !noteDraft &&
+          !placingNote && (
             <div className="reference-empty">
               <EmptyState
                 image={paint}
@@ -1376,11 +1512,16 @@ function Canvas() {
               history.record({
                 label: "Edit reference",
                 undo: () =>
-                  api.updateReference(edit.id, {
-                    title: old.title,
-                    caption: old.captionMd,
-                    tags: old.tags,
-                  }),
+                  api.updateReference(
+                    edit.id,
+                    old.kind === "note" && edit.mode === "tags"
+                      ? { tags: old.tags }
+                      : {
+                          title: old.title,
+                          caption: old.captionMd,
+                          tags: old.tags,
+                        },
+                  ),
                 redo: () => api.updateReference(edit.id, patch),
               });
               setRevision((r) => r + 1);

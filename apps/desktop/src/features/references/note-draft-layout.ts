@@ -1,24 +1,28 @@
-export const noteDraftWidth = 340;
 const padding = 16;
 
-/** Initial placement only: entering edit deliberately uses readable, at-most-100% zoom. */
-export function noteDraftLayout(
-  center: { x: number; y: number },
+/** Places the clicked world-space paper at readable size without creating data.
+ * Only the camera shifts to keep the actual 240×180 paper below controls. */
+export function placedNoteLayout(
+  world: { x: number; y: number },
+  click: { x: number; y: number },
   canvas: { width: number; height: number; toolsBottom: number },
 ) {
-  const zoom = Math.min(
-    1,
-    Math.max(0.1, (canvas.width - padding * 2) / noteDraftWidth),
+  const width = 240,
+    height = 180;
+  const x = world.x - width / 2,
+    y = world.y - height / 2;
+  const left = Math.max(
+    padding,
+    Math.min(click.x - width / 2, canvas.width - width - padding),
   );
-  const top = Math.max(padding, canvas.toolsBottom + padding);
-  const maxHeight = Math.max(
-    1,
-    Math.min(480, (canvas.height - top - padding) / zoom),
+  const top = Math.max(
+    canvas.toolsBottom + padding,
+    Math.min(click.y - height / 2, canvas.height - height - padding),
   );
   return {
-    zoom,
-    x: center.x - noteDraftWidth / 2,
-    y: center.y + (top - canvas.height / 2) / zoom,
-    maxHeight,
+    x,
+    y,
+    maxHeight: Math.max(1, canvas.height - top - padding),
+    viewport: { x: left - x, y: top - y, zoom: 1 },
   };
 }
