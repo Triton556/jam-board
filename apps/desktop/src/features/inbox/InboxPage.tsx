@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Question } from "../../bindings";
@@ -275,7 +275,48 @@ function QuestionListContent({
   );
 }
 export function InboxPage() {
-  const [status, setStatus] = useState("open");
+  const search = useRouterState({
+    select: (state) => state.location.search,
+  }) as { question?: string; status?: string };
+  const [status, setStatus] = useState(
+    ["open", "answered", "withdrawn"].includes(search.status ?? "")
+      ? (search.status ?? "open")
+      : "open",
+  );
+  const questions = useQuery(questionsQuery);
+  const appliedQuestion = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!search.question) {
+      appliedQuestion.current = undefined;
+      return;
+    }
+    if (appliedQuestion.current === search.question) return;
+    const question = questions.data?.find((q) => q.id === search.question);
+    if (question) {
+      setStatus(question.status);
+      appliedQuestion.current = question.id;
+    }
+  }, [search.question, questions.data]);
+  const focusedQuestion = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!search.question) {
+      focusedQuestion.current = undefined;
+      return;
+    }
+    if (
+      focusedQuestion.current === search.question ||
+      !questions.data?.some(
+        (q) => q.id === search.question && q.status === status,
+      )
+    )
+      return;
+    const card = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-question-id]"),
+    ).find((node) => node.dataset.questionId === search.question);
+    card?.scrollIntoView({ block: "center" });
+    card?.focus();
+    if (card) focusedQuestion.current = search.question;
+  }, [search.question, questions.data, status]);
   return (
     <main className="feature-page inbox-page">
       <PageHeading title="Inbox" note="a good question is a useful next step">
@@ -290,6 +331,14 @@ export function InboxPage() {
           ]}
         />
       </PageHeading>
+      {search.question &&
+        questions.isSuccess &&
+        !questions.data.some((q) => q.id === search.question) && (
+          <p role="alert">
+            This question is no longer available in this project. Other Inbox
+            items are shown below.
+          </p>
+        )}
       <div className="inbox-scroll">
         <ExecutionRequests status={status} />
         <QuestionList status={status} />
