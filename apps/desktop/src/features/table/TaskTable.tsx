@@ -536,13 +536,25 @@ function VirtualTaskTable({
     [rows],
   );
   const visibleEntry = (offset: number, height: number) => {
-    // Rows begin after the sticky 84px header. An overscan item can be mounted
-    // while entirely outside the usable viewport, and is not a keyboard entry.
-    const first = Math.min(
+    if (!rows.length) return undefined;
+    // An intersecting sliver is not a readable entry: prefer complete rows below
+    // the sticky 84px header. Overscan presence alone says nothing about visibility.
+    const top = Math.max(0, offset);
+    const usableHeight = Math.max(0, height - 84);
+    let first = Math.ceil(top / 44);
+    let last = Math.min(
       rows.length - 1,
-      Math.max(0, Math.floor(offset / 44)),
+      Math.floor((top + usableHeight) / 44) - 1,
     );
-    const last = Math.max(first, Math.ceil((offset + height - 84) / 44) - 1);
+    if (first > last) {
+      // A very short viewport can fit no full row. Choose the row at its centre
+      // (the greatest available overlap), bounded during data/viewport changes.
+      first = Math.min(
+        rows.length - 1,
+        Math.floor((top + usableHeight / 2) / 44),
+      );
+      last = first;
+    }
     const prior = indexes.get(remembered.current ?? "") ?? -1;
     return prior >= first && prior <= last
       ? remembered.current

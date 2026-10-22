@@ -31,7 +31,6 @@ vi.mock("./features/task/TaskDrawer", async (original) => {
 });
 
 import { App, router } from "./app";
-import { useUiStore } from "./lib/ui-store";
 
 it("a rejected task import after dismissal stays local and does not reopen or reload", async () => {
   const user = userEvent.setup();

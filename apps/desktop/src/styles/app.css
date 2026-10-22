@@ -1060,7 +1060,6 @@ input[aria-invalid="true"] {
   accent-color: var(--coral);
 }
 .table-scroll {
-  scroll-padding-top: 84px;
   isolation: isolate;
   will-change: scroll-position;
   overflow-anchor: none;
@@ -1124,7 +1123,10 @@ input[aria-invalid="true"] {
   width: 100%;
   will-change: transform;
 }
+/* Only body rows need clearance from the sticky 40px + 44px header.
+   A container-wide inset also excludes the sticky sort controls themselves. */
 .task-table tbody tr {
+  scroll-margin-top: 84px;
   content-visibility: auto;
   contain-intrinsic-block-size: 44px;
   position: relative;
