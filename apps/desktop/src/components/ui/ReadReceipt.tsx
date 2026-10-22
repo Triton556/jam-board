@@ -9,7 +9,12 @@ export function ReadReceipt({
   checkedAt?: number;
 }) {
   return (
-    <p role="status" className="small muted" aria-atomic="true">
+    <p
+      role="status"
+      className="read-receipt small muted"
+      aria-atomic="true"
+      style={phase ? undefined : { margin: 0 }}
+    >
       {phase === "pending"
         ? `Checking ${resource}…`
         : phase === "checked"

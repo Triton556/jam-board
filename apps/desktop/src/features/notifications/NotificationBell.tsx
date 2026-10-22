@@ -4,8 +4,10 @@ import { Bell } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ActivityEvent, AppState } from "../../bindings";
 import { Button, Dialog } from "../../components/ui";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { eventText } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
 import {
   loadNotificationPage,
   notificationEvents,
@@ -27,6 +29,9 @@ export function NotificationBell({
   const client = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const read = useExplicitRead(
+    JSON.stringify(["notifications", projectId, memberId, open]),
+  );
   const [rows, setRows] = useState<ActivityEvent[]>([]);
   const [incoming, setIncoming] = useState<ActivityEvent[]>([]);
   const [cursor, setCursor] = useState<number>();
@@ -71,9 +76,11 @@ export function NotificationBell({
       selection === epoch.current &&
       latestFlight.current === flight;
     setLatestPending(true);
+    let failed = false;
     try {
       do {
         flight.again = false;
+        failed = false;
         setError("");
         try {
           const page = await loadNotificationPage(
@@ -99,6 +106,7 @@ export function NotificationBell({
           }
           setLoaded(true);
         } catch (cause) {
+          failed = true;
           if (current() && !(cause instanceof StaleNotificationScopeError))
             setError("Could not load project notifications. Try again.");
         }
@@ -109,7 +117,16 @@ export function NotificationBell({
         setLatestPending(false);
       }
     }
+    return { isError: failed, error: null };
   }, [projectId]);
+  const explicitRefresh = () => {
+    // A same-tick background flight already owns the read. Its existing loading
+    // status remains truthful; do not queue another explicit request or receipt.
+    if (latestFlight.current) return;
+    void read.run(
+      async () => (await refresh()) ?? { isError: true, error: null },
+    );
+  };
   const loadOlder = useCallback(
     async (before: number) => {
       const selection = epoch.current;
@@ -290,10 +307,11 @@ export function NotificationBell({
             </Button>
             <Button
               variant="ghost"
-              disabled={latestPending}
-              onClick={() => void refresh()}
+              disabled={read.pending || latestPending}
+              aria-busy={read.pending || latestPending}
+              onClick={explicitRefresh}
             >
-              Refresh
+              {read.pending ? "Checking notifications…" : "Refresh"}
             </Button>
           </div>
           <p className="muted">
@@ -327,13 +345,25 @@ export function NotificationBell({
                 : "Check newer updates"}
             </Button>
           )}
-          {latestPending && <p role="status">Loading notifications…</p>}
+          <ReadReceipt
+            checkedAt={read.checkedAt}
+            phase={read.phase}
+            resource="notifications"
+          />
+          {latestPending && !read.pending && (
+            <p role="status">Loading notifications…</p>
+          )}
           {olderPending && <p role="status">Loading older updates…</p>}
           {olderError && <p role="alert">{olderError}</p>}
           {error && (
             <div role="alert">
               <p>{error}</p>
-              <Button onClick={() => void refresh()}>Try again</Button>
+              <Button
+                disabled={read.pending || latestPending}
+                onClick={explicitRefresh}
+              >
+                Try again
+              </Button>
             </div>
           )}
           {viewError && <p role="alert">{viewError}</p>}

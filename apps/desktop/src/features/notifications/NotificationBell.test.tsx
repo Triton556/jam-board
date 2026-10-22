@@ -434,3 +434,60 @@ it("NT01 raw latest page of excluded events offers one bounded check of newer un
   expect(screen.queryByText("Update 400")).toBeNull();
   expect(screen.getAllByText("Update 200")).toHaveLength(1);
 });
+
+it("NT01 explicit Refresh has pending, unchanged timestamped completion and failure without persisted history changes", async () => {
+  const mounted = await mount();
+  const button = screen.getByRole("button", { name: "Refresh" });
+  await waitFor(() => expect(button).toBeEnabled());
+  const d = deferred<ActivityEvent[]>();
+  const read = vi.spyOn(mockApi, "listActivity").mockReturnValueOnce(d.promise);
+  read.mockClear();
+  const user = userEvent.setup();
+  await user.dblClick(button);
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(button).toBeDisabled();
+  expect(
+    screen.getByText("Checking notifications…", { selector: "p" }),
+  ).toBeInTheDocument();
+  await act(async () => d.resolve(rows));
+  await waitFor(() => expect(button).toBeEnabled());
+  expect(screen.getByText(/Checked notifications\./)).toHaveTextContent(
+    "Last checked:",
+  );
+  expect(screen.getAllByText("Update 10")).toHaveLength(1);
+  expect(readBaseline(projectId, "human")).toBeNull();
+  read.mockRejectedValueOnce(new Error("Fictional read failure"));
+  await user.click(button);
+  await screen.findByText(
+    "Could not check notifications. Try again when ready.",
+  );
+  expect(screen.queryByText(/Checked notifications\./)).toBeNull();
+  expect(screen.getByText("Update 10")).toBeInTheDocument();
+  expect(readBaseline(projectId, "human")).toBeNull();
+  mounted.unmount();
+});
+it("NT01 background arrivals never announce explicit success; close/reopen suppresses an old receipt", async () => {
+  await mount();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled(),
+  );
+  act(() => signal([]));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled(),
+  );
+  expect(screen.queryByText(/Checked notifications\./)).toBeNull();
+  const d = deferred<ActivityEvent[]>();
+  vi.spyOn(mockApi, "listActivity").mockReturnValueOnce(d.promise);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Refresh" }));
+  await user.keyboard("{Escape}");
+  await user.click(
+    screen.getByRole("button", { name: /Project notifications/ }),
+  );
+  await act(async () => d.resolve(rows));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled(),
+  );
+  expect(screen.queryByText(/Checked notifications\./)).toBeNull();
+  expect(screen.getByText("Update 10")).toBeInTheDocument();
+});
