@@ -1,7 +1,7 @@
 {
   "repository": "Triton556/jam-board",
   "branch": "rumi/project-workflow-ux",
-  "note": "Source and published commit metadata differ; each row identifies the same Git tree. This map covers development history through runtime alpha.26, not its later documentation-only commit. Branch publication and CI are verified separately.",
+  "note": "Source and published commit metadata differ; each row identifies the same Git tree. This map covers development history through the alpha28 test/docs correction, not the closing documentation commit containing this map. The map alone does not establish branch reachability, CI, installation or release; those outcomes are verified separately.",
   "commits": [
     {
       "source_commit": "b4910faf03be97792d9103f57cd7823e3098d738",
@@ -170,6 +170,36 @@
       "published_commit": "f450bf5468062ff5867ec4d72908be7b3286f3d0",
       "tree": "4d00e3f90b6393579545400bd11a44c67795bc6f",
       "subject": "fix: scope move recovery without speculative rollback (alpha.26)"
+    },
+    {
+      "source_commit": "fb4cd9ef6d141798c379bd8bb43b1252b6655d95",
+      "published_commit": "ba6b1dfd2c3d8d1d8cc5cc306bde9059b0c0a6ab",
+      "tree": "ad23fdd71cec9cbf02d58116061a3ab2487c64dc",
+      "subject": "docs: record alpha26 acceptance and source publication map"
+    },
+    {
+      "source_commit": "db1fcf5353a97f0598dbadec93262216a4b955ec",
+      "published_commit": "7172a047b1763674fea03330415fd35f23ed853c",
+      "tree": "88b88cef4fea4b299825cf0daefc28b1a450d141",
+      "subject": "test: canonicalize owned smoke fixture without weakening path guards"
+    },
+    {
+      "source_commit": "4cc0c567ba78f70ee3f287ab8cb301993b88e1f8",
+      "published_commit": "96f22e37450bd57c3ad15b70effa9f3ee5695f26",
+      "tree": "70acfd527a49b13a966843541fb03f97bae47f0b",
+      "subject": "feat(board): remove keyboard dragging and verify current browser contracts"
+    },
+    {
+      "source_commit": "2cdc51f4c0f0676242e4294d7fbe5263295f5d50",
+      "published_commit": "d899fc4f2fd4e2f684be4582ec0e1587ae85b191",
+      "tree": "b5eb04f65a33d488f97b10c6407e3cf99adc9b6c",
+      "subject": "fix: preserve moved-task focus and keyboard option feedback (alpha28)"
+    },
+    {
+      "source_commit": "4aafa4ae82373c37fd1586c6bf58dc7256a15fe3",
+      "published_commit": "9f9114a7d1cb715cc49f8abbab2196ee0b5a7dae",
+      "tree": "eabb536ab57435e3fc68b0488ae1d500e95d0626",
+      "subject": "test: measure preview cancellation at the transfer boundary"
     }
   ]
 }
