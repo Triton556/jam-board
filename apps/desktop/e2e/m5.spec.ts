@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { expectPoliteNotice } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -119,8 +118,12 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   );
   expect(configuration).toContain(token);
   expect(configuration).toContain(captured.jam?.id ?? "missing project");
-  await expectPoliteNotice(
-    page,
+  const receipt = page
+    .getByRole("status")
+    .and(page.locator(".settings-notice"));
+  await expect(receipt).toBeVisible();
+  // This page-local status has implicit polite live semantics, not a toast.
+  await expect(receipt).toHaveText(
     `Configuration copied for ${captured.jam?.name} · ${captured.jam?.keyPrefix} (includes your token; keep it private)`,
   );
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();

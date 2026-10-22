@@ -45,6 +45,7 @@ import {
   Button,
   EmptyState,
   IconButton,
+  type ModalFocusReturn,
   Stamp,
   Tooltip,
 } from "./components/ui";
@@ -54,6 +55,7 @@ import {
 } from "./components/ui/LazyBoundary";
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
+import { useBoardReturnFocus } from "./features/board/use-board-return-focus";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
 import { executionRequestsQuery } from "./lib/execution-queries";
@@ -156,9 +158,18 @@ const LazyTaskDrawer = lazy(() =>
   import("./features/task/TaskDrawer").then((m) => ({ default: m.TaskDrawer })),
 );
 
-function TaskDrawer(props: { taskKey: string; close(): void }) {
+function TaskDrawer(props: {
+  taskKey: string;
+  close(): void;
+  returnFocus?: ModalFocusReturn;
+}) {
   return (
-    <LazyDrawerBoundary title={props.taskKey} kind="task" close={props.close}>
+    <LazyDrawerBoundary
+      title={props.taskKey}
+      kind="task"
+      close={props.close}
+      returnFocus={props.returnFocus}
+    >
       <LazyTaskDrawer {...props} />
     </LazyDrawerBoundary>
   );
@@ -520,6 +531,7 @@ function Shell() {
 }
 function BoardRoute() {
   const search = boardRoute.useSearch();
+  const returnFocus = useBoardReturnFocus(search.task);
   const navigate = useNavigate();
   const open = useCallback(
     (task: string) => {
@@ -543,7 +555,13 @@ function BoardRoute() {
         }
       />
       <Board open={open} epicKeys={search.epics?.split(",") ?? []} />
-      {search.task && <TaskDrawer taskKey={search.task} close={close} />}
+      {search.task && (
+        <TaskDrawer
+          taskKey={search.task}
+          close={close}
+          returnFocus={returnFocus}
+        />
+      )}
     </>
   );
 }

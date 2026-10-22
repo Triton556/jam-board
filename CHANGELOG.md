@@ -3,6 +3,32 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.28] - 2026-10-22
+
+### Fixed
+
+- Closing a Board task drawer after a status save now returns focus to that task's
+  replacement card. If the card is filtered, archived, or its list is still
+  reconciling, focus returns to the stable Board entry instead. Expired project
+  selections, unmounted views and older dialog layers cannot pull focus back.
+  Nested dialogs retain their parent-control priority; there is no delayed retry.
+- Restored the intended keyboard-active option background in custom selects by
+  correcting CSS specificity. Active focus and the selected value remain distinct;
+  keyboard movement alone does not change the task status.
+
+### Verification
+
+- Added real-App save/close and delayed-list-read regressions, selection/ABA,
+  missing-card, route-unmount and layered-dialog checks. Added light/dark Chromium
+  computed-color scenarios, not just class-name assertions.
+- Corrected the two remaining alpha27 browser contracts: the configuration receipt
+  is a Settings-local status, and the Epic Stories view must be explicitly selected
+  after navigating to a URL without that tab. Clipboard contents, captured project,
+  persisted state and the full report/question workflow assertions remain intact.
+- Alpha27's actual Linux result was 58/60, and its native check was a partial pass
+  with the two focus/feedback defects above. Those results are not relabeled green.
+  Exact alpha28 gates and remaining platform limits are in its verification notes.
+
 ## [0.3.0-alpha.27] - 2026-10-22
 
 ### Changed

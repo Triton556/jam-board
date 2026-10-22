@@ -1968,7 +1968,7 @@ kbd {
   align-items: center;
   gap: 8px;
 }
-.active-option {
+.combo-popup [role="option"].active-option {
   background: var(--paper-2);
 }
 .table-filters .custom-select {
