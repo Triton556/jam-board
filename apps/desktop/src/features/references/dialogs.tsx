@@ -219,7 +219,6 @@ export function EditReferenceDialog({
               Title
               <input
                 disabled={!write.ready}
-                autoFocus
                 required
                 maxLength={140}
                 value={title}
