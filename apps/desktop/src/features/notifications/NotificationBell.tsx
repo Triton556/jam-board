@@ -31,9 +31,13 @@ export function NotificationBell({
   const [incoming, setIncoming] = useState<ActivityEvent[]>([]);
   const [cursor, setCursor] = useState<number>();
   const [incomingCursor, setIncomingCursor] = useState<number>();
+  const [incomingGap, setIncomingGap] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [latestPending, setLatestPending] = useState(false);
+  const [olderPending, setOlderPending] = useState(false);
+  const pending = latestPending || olderPending;
   const [error, setError] = useState("");
+  const [olderError, setOlderError] = useState("");
   const [viewError, setViewError] = useState("");
   const [viewing, setViewing] = useState<number>();
   const [baseline, setBaseline] = useState(() =>
@@ -42,43 +46,100 @@ export function NotificationBell({
   const [storageWarning, setStorageWarning] = useState(false);
   const live = useRef(true);
   const epoch = useRef(0);
-  const request = useRef(0);
+  const latestFlight = useRef<{ selection: number; again: boolean } | null>(
+    null,
+  );
+  const olderFlight = useRef<{ selection: number; cursor: number } | null>(
+    null,
+  );
+  const paginationEpoch = useRef(0);
   const viewRequest = useRef(0);
   const openRef = useRef(false);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   openRef.current = open;
-  const refresh = useCallback(
-    async (older?: number) => {
-      const token = ++request.current;
+  const refresh = useCallback(async () => {
+    const selection = epoch.current;
+    if (latestFlight.current?.selection === selection) {
+      latestFlight.current.again = true;
+      return;
+    }
+    const flight = { selection, again: false };
+    latestFlight.current = flight;
+    const current = () =>
+      live.current &&
+      selection === epoch.current &&
+      latestFlight.current === flight;
+    setLatestPending(true);
+    try {
+      do {
+        flight.again = false;
+        setError("");
+        try {
+          const page = await loadNotificationPage(
+            projectId,
+            undefined,
+            current,
+          );
+          if (!current()) return;
+          if (openRef.current && rowsRef.current.length) {
+            const known = new Set(rowsRef.current.map((e) => e.seq));
+            setIncoming(page.events.filter((e) => !known.has(e.seq)));
+            setIncomingCursor(page.beforeSeq);
+            setIncomingGap(
+              page.beforeSeq !== undefined &&
+                page.beforeSeq > (rowsRef.current[0]?.seq ?? 0),
+            );
+          } else {
+            setRows(page.events);
+            paginationEpoch.current++;
+            setCursor(page.beforeSeq);
+            setIncoming([]);
+            setIncomingGap(false);
+          }
+          setLoaded(true);
+        } catch (cause) {
+          if (current() && !(cause instanceof StaleNotificationScopeError))
+            setError("Could not load project notifications. Try again.");
+        }
+      } while (current() && flight.again);
+    } finally {
+      if (current()) {
+        latestFlight.current = null;
+        setLatestPending(false);
+      }
+    }
+  }, [projectId]);
+  const loadOlder = useCallback(
+    async (before: number) => {
       const selection = epoch.current;
+      // A synchronous guard also catches repeated clicks before React renders pending.
+      if (olderFlight.current?.selection === selection) return;
+      const flight = { selection, cursor: before };
+      olderFlight.current = flight;
+      const pageEpoch = paginationEpoch.current;
       const current = () =>
         live.current &&
         selection === epoch.current &&
-        token === request.current;
-      setPending(true);
-      setError("");
+        olderFlight.current === flight;
+      setOlderPending(true);
+      setOlderError("");
       try {
-        const page = await loadNotificationPage(projectId, older, current);
+        const page = await loadNotificationPage(projectId, before, current);
         if (!current()) return;
-        if (older !== undefined) {
-          setRows((old) => notificationEvents([...old, ...page.events]));
-          setCursor(page.beforeSeq);
-        } else if (openRef.current && rowsRef.current.length) {
-          const known = new Set(rowsRef.current.map((e) => e.seq));
-          setIncoming(page.events.filter((e) => !known.has(e.seq)));
-          setIncomingCursor(page.beforeSeq);
-        } else {
-          setRows(page.events);
-          setCursor(page.beforeSeq);
-          setIncoming([]);
-        }
-        setLoaded(true);
+        setRows((old) => notificationEvents([...old, ...page.events]));
+        // Revealing newer arrivals may rewind pagination to a gap. Do not skip it.
+        if (paginationEpoch.current === pageEpoch) setCursor(page.beforeSeq);
       } catch (cause) {
         if (current() && !(cause instanceof StaleNotificationScopeError))
-          setError("Could not load project notifications. Try again.");
+          setOlderError(
+            "Could not load older updates. Try loading older updates again.",
+          );
       } finally {
-        if (current()) setPending(false);
+        if (current()) {
+          olderFlight.current = null;
+          setOlderPending(false);
+        }
       }
     },
     [projectId],
@@ -91,10 +152,19 @@ export function NotificationBell({
       if (next !== selected) {
         selected = next;
         epoch.current++;
-        setPending(false);
+        latestFlight.current = null;
+        olderFlight.current = null;
+        paginationEpoch.current++;
+        setLatestPending(false);
+        setOlderPending(false);
+        setError("");
+        setOlderError("");
+        setViewError("");
+        setViewing(undefined);
         setOpen(false);
         setRows([]);
         setIncoming([]);
+        setIncomingGap(false);
         setLoaded(false);
         setCursor(undefined);
         if (next === projectId) void refresh();
@@ -140,7 +210,8 @@ export function NotificationBell({
         current,
       );
       if (!current()) return;
-      close();
+      // Dismiss for navigation without canceling the in-flight error handler.
+      setOpen(false);
       if (target.kind === "task")
         await navigate({ to: "/board", search: { task: target.key } });
       else
@@ -168,6 +239,8 @@ export function NotificationBell({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
+          viewRequest.current++;
+          setViewing(undefined);
           setOpen(true);
           void refresh();
         }}
@@ -179,6 +252,12 @@ export function NotificationBell({
           </span>
         )}
       </button>
+      {!open && viewError && (
+        <div role="alert" className="notification-navigation-error">
+          <p>{viewError}</p>
+          <Button onClick={() => setOpen(true)}>Reopen notifications</Button>
+        </div>
+      )}
       {open && (
         <Dialog
           title="Project notifications"
@@ -211,7 +290,7 @@ export function NotificationBell({
             </Button>
             <Button
               variant="ghost"
-              disabled={pending}
+              disabled={latestPending}
               onClick={() => void refresh()}
             >
               Refresh
@@ -230,18 +309,27 @@ export function NotificationBell({
               remains open in the app.
             </p>
           )}
-          {incoming.length > 0 && (
+          {(incoming.length > 0 || incomingGap) && (
             <Button
+              disabled={incoming.length === 0 && olderPending}
               onClick={() => {
                 setRows((old) => notificationEvents([...incoming, ...old]));
+                paginationEpoch.current++;
                 setCursor(incomingCursor);
                 setIncoming([]);
+                setIncomingGap(false);
+                if (incoming.length === 0 && incomingCursor !== undefined)
+                  void loadOlder(incomingCursor);
               }}
             >
-              Show {incoming.length} new notifications
+              {incoming.length
+                ? `Show ${incoming.length} new notifications`
+                : "Check newer updates"}
             </Button>
           )}
-          {pending && <p role="status">Loading notifications…</p>}
+          {latestPending && <p role="status">Loading notifications…</p>}
+          {olderPending && <p role="status">Loading older updates…</p>}
+          {olderError && <p role="alert">{olderError}</p>}
           {error && (
             <div role="alert">
               <p>{error}</p>
@@ -279,7 +367,10 @@ export function NotificationBell({
             ))}
           </ol>
           {cursor !== undefined && (
-            <Button disabled={pending} onClick={() => void refresh(cursor)}>
+            <Button
+              disabled={olderPending}
+              onClick={() => void loadOlder(cursor)}
+            >
               Load older updates
             </Button>
           )}

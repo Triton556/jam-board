@@ -44,3 +44,16 @@
   font-size: 12px;
   font-weight: 700;
 }
+.notification-navigation-error {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  z-index: 50;
+  max-width: min(400px, calc(100vw - 40px));
+  padding: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
