@@ -20,7 +20,7 @@ export const welcomeSchema = z
     name: z
       .string()
       .trim()
-      .min(1, "Give your jam a name")
+      .min(1, "Give your project a name")
       .max(60, "Use at most 60 characters"),
     theme: z.string(),
     startsAt: z.string(),

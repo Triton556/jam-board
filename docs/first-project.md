@@ -58,6 +58,13 @@ planning prompt into the connected brain's chat. For example, add:
 > material. Ask about missing decisions, then propose small task briefs. Keep
 > this planning-only; do not start implementation.
 
+For a whole-project capture review, the prepared prompt asks the brain to page
+`list_tasks` through `nextCursor`, including non-archived, unassigned Backlog cards.
+`get_board` is a summary, not the complete task inventory. The brain then inspects
+relevant task Notes, assets, questions and linked sources. Epic/Story/Task refinement
+stays within the requested scope; it does not scan every other project task or
+archived work by default. This is an instruction, not proof that a model obeyed it.
+
 The prompt is a message, not an automatic agent launch. The brain should preserve
 source intent and ask where project knowledge or repository instructions are
 located rather than assume it has access.
@@ -69,7 +76,9 @@ not permission to start work. The connected brain can read it and revise the pla
 Jam Board does not start a new chat session when you answer.
 
 Review the proposed Story acceptance and task **Goal / Context / Where / Changes /
-Tests / Boundaries / Result**. Edit the brief or Notes, save, then ask the brain to
+Tests / Boundaries / Result**. Use a field’s explicit **Edit** action; prose and
+reference links are reading surfaces, not edit buttons. Edit the brief or Notes,
+save, then ask the brain to
 reconcile your changes with the current version. It should explain what changed
 and what remains unclear instead of overwriting your edits.
 

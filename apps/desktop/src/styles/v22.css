@@ -156,7 +156,18 @@
   min-height: 100px;
   resize: vertical;
 }
-.markdown-field-view.button {
+.markdown-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.markdown-field-edit.button {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.markdown-field-view {
   display: block;
   width: 100%;
   height: auto;

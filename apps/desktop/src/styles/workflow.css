@@ -712,3 +712,9 @@
 .settings-draft-actions .button {
   white-space: normal;
 }
+
+/* A label names the trigger, not every button in its custom listbox. */
+.asset-kind-field {
+  display: grid;
+  gap: 6px;
+}

@@ -403,3 +403,34 @@ error screen offers a real user-initiated app reload, or navigation to Projects,
 not a retry button that merely remounts the same rejected lazy component. Reload
 explicitly warns about unsaved fields; there is no automatic reload or form write.
 Dialog tests and controlled module failures are not native layout/network acceptance.
+
+## 18. Separate reading from editing and keep project language general
+
+An independent actual-Markdown DOM audit showed that pointer/Enter on a reference
+also activated the containing Edit button. Its headings/lists/links were inside a
+button, contrary to the [HTML button content model](https://html.spec.whatwg.org/multipage/form-elements.html#the-button-element).
+The repair separates normal document content from a small, explicitly named Edit
+control. It does not substitute a role=button wrapper or merely stop propagation.
+The [WAI button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/) distinguishes
+an action from link navigation; the UI now reflects that distinction. Disabled
+editing leaves reading available and uses neutral empty-content wording. Keyboard
+save/cancel returns to Edit where available; ordinary blur does not steal focus.
+Normal save/cancel behavior had no reproduced duplicate-save defect and is retained.
+Native text selection, accessibility-tree behavior and layout are separate checks.
+
+General project capture must not imply that every asset is game art. The existing
+`other` kind is the default for an unspecified new asset; explicit/persisted kinds
+remain intact. [JSON is a general data interchange format](https://www.rfc-editor.org/info/rfc8259/),
+so `.json` by itself is insufficient evidence of a game level. Known existing map
+extension suggestions remain. This is a conservative classification/copy correction,
+not a new type system, migration, content parser or change to stored assets.
+The touched Kind form also separates its label from the custom option subtree,
+after a DOM probe found every option exposed as “Kind” rather than its own label.
+
+For project-wide rough capture review, `get_board` alone is insufficient: its task
+collections cover in-progress/assigned work, not every unassigned Backlog card. The
+prepared handoff therefore names paginated `list_tasks` inventory plus relevant
+`get_task` evidence. Narrower scopes stay narrow; archives are not scanned by default.
+This addresses a source-level instruction ambiguity in the requested workflow, not
+an observed model failure or a new tool/permission. The first-project walkthrough
+states the same boundary and does not promise that an external model will follow it.
