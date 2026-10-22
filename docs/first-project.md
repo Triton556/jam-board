@@ -177,3 +177,14 @@ Selected-Epic and Story Markdown editors likewise remain mounted when their cach
 background detail read fails. A background retry does not blur or save the field.
 Markdown's normal user-blur save is unchanged: moving focus away yourself, including
 to a read-retry button, can still save your edit. These are separate actions.
+
+## Pasting an image into References
+
+An image may need local decoding and encoding before it is sent. Leaving References
+or switching projects stops that preparation from becoming a new write, even if you
+later return. If the request was already sent, it is not cancelled. Read the receipt's
+captured project: **confirmed**, **unconfirmed request**, and **not attempted** mean
+different things. An unconfirmed request may already have saved the image. Open the
+captured project and use **Refresh references** before deciding whether to paste it
+again. No paste is automatically replayed; receipts use the same session-only bound
+as file-drop notices.

@@ -3,6 +3,20 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.24] - 2026-10-22
+
+### Fixed
+
+- References image paste captures its project and page lifetime before decoding.
+  Leaving the page or switching projects, including switching back, stops an
+  undispatched image after decode, encode or byte preparation. Decoded bitmap
+  resources are closed before asynchronous encoding. No old image is replayed.
+- An already dispatched clipboard request is not cancelled or assumed rolled back.
+  Captured-project receipts distinguish confirmed, unconfirmed and not-attempted
+  outcomes; late completions do not select items or refresh a different/new view.
+  Explicit Refresh references remains the read-only recovery path. Ordinary
+  confirmed receipts stay transient; problems use the existing bounded notices.
+
 ## [0.3.0-alpha.23] - 2026-10-21
 
 ### Fixed
