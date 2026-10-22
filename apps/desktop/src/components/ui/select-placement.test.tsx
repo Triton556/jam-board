@@ -141,6 +141,14 @@ it("mounted popup remeasures nested scroll and resize, without changing selectio
   act(() => fireEvent.resize(window));
   expect(popup).toHaveAttribute("data-placement", "above");
   expect(change).not.toHaveBeenCalled();
+  top = -100;
+  act(() => fireEvent.scroll(document));
+  expect(screen.queryByRole("listbox")).toBeNull();
+  expect(screen.getByRole("combobox")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  expect(change).not.toHaveBeenCalled();
 });
 it("searchable long options remain in the same modal scope and empty filtering is truthful", async () => {
   const user = userEvent.setup();
