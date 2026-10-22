@@ -22,7 +22,7 @@
 |---|---|---|---|
 | F01 | Alpha30 source/DOM correction; native pending | `features/references/ReferencesPage.tsx:1177`: `!data?.items.length` gates empty illustration; frames ignored. | Empty canvas → add only frame → illustration gone; archive last frame → illustration returns only if no active content; verify archived records/filter state separately. |
 | F02 | Alpha30 grip correction; alpha32 source visual revision; native pending | `ReferencesPage.tsx:442` dragHandle `.reference-frame-tab`; `Nodes.tsx:281+` tab controls are nodrag; `references.css:342–405` frame/outline pointer-events none, tab auto, overview tab opacity 0. | Drag obvious title/grip at 100%, 75%, 40%, 39% zoom; border vs interior behavior understandable; collapse/edit/archive never start drag; interior still allows node selection/pan. Resize remains reachable. |
-| F03 | Alpha30–36 canvas form rejected by user; alpha38 direct-paper candidate, visual gate pending | `references/DraftNote.tsx`, `StickyEditor.tsx`, `use-sticky-note.ts`; historical form is replaced, not visually accepted. | Place → direct body/optional heading → autosave → finish/reopen; no new blank records; retained newer typing/conflict/uncertain-create recovery; active editor survives overview/removal until explicit recovery/discard. |
+| F03 | Alpha30–36 canvas form rejected by user; corrected alpha39/40 hosted paper lifecycle and six PNG states pass, native input unrun | `references/DraftNote.tsx`, `StickyEditor.tsx`, `use-sticky-note.ts`; historical form is replaced, not visually accepted. | Place → direct body/optional heading → autosave → finish/reopen; no new blank records; retained newer typing/conflict/uncertain-create recovery; active editor survives overview/removal until explicit recovery/discard. |
 | F04 | Alpha31 persisted agent-history implementation; native pending | `lib/ui-store.ts:10–20,112–173`: no durable history; last three toasts; five-second expiry; `lib/project-selection.ts` clears toasts. `app.tsx:734+` current View opens Inbox or Board task. | Bell → empty/recent/read states → View exact item; eligible persisted agent updates remain available independently of toast expiry; file receipts are not this history; new event while panel open; long list; current project vs old project explicit. Do not merely preserve old task-key URLs across project switches. |
 | F05 | Alpha30 source spacing correction; revealed-state visual acceptance pending | `references/dialogs.tsx` plain forms; field wrappers nested inside form. `styles/v22.css:508` spacing applies only `.dialog > .field`; `styles/m5.css:57` `.m5-form` has grid gap 16px, absent here. `styles/app.css:1637` label gap separates label/input, not adjacent fields. | New frame, edit frame, add link, edit caption/tags/link: consistent heading→body→field→feedback→footer gaps, especially error and pending variants. Compare Asset/Member dialogs, not only screenshots of closed page. |
 | F06 | Corrected alpha29 behavior; native hierarchy read-only observed | `task/TaskDrawer.tsx:675+` renders full BriefEditor then Notes, Rounds, assets, Comments. `task/BriefEditor.tsx:215+` exposes Goal/Context/Where/Changes/Tests/Boundaries/Result/User quotes. | Default task view exposes human description, comments, planning/regenerate entry; technical structure separately disclosed. Existing agent fields survive human edits exactly; readiness errors offer clear route into required detail. |
@@ -177,15 +177,21 @@ The corrected alpha38 hosted run passed94/96; body-only paper creation/autosave
 was rendered in light/dark. Optional-heading/reopen failed because a canvas clone
 of an old query row was treated as a new remote edit after our own acknowledgement.
 Alpha39 distinguishes repeated observation from changed content without removing
-the server equality guard. Full lifecycle/heading PNG acceptance awaits its hosted
-run; the conflict screenshot is retained as failure evidence. No native38/39 note
+the server equality guard. Subsequent alpha39 and alpha40 hosted runs passed the full lifecycle/heading
+cases and six paper PNG states; the original conflict screenshot remains failure
+evidence. No native38/39 note
 input or rendering claim is made. Exact content+marker ABA remains indistinguishable
 without revision history; no stronger concurrency guarantee is claimed.
 
 ## Alpha40 readability boundary
 
-The46-family source pass is not a blanket visual or accessibility pass. The AST
+The 46-family source pass is not a blanket visual or accessibility pass. The AST
 index excludes dynamic/backend/native copy and all data permutations; user text
 is neither translated nor rewritten. Hosted synthetic state/PNG checks and
 native unavailable transport stay distinct. Source/DOM evidence cannot close
 minimum-native-width, fractional-DPI or all hidden error-layout cases.
+
+Exact alpha40 completed 103 hosted browser cases and 12 inspected synthetic
+PNGs. The named paper/pickup/guidance checks are observed; other families in the
+source ledger are not silently promoted to full visual acceptance. See the
+[terminal version record](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
