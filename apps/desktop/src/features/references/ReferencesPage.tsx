@@ -46,6 +46,7 @@ import {
   FrameDialog,
 } from "./dialogs";
 import { ReferenceEdge } from "./Edge";
+import { EdgeLabelDialog } from "./EdgeLabelDialog";
 import { stopReferenceAudio } from "./Media";
 import {
   CanvasHistory,
@@ -1361,41 +1362,24 @@ function Canvas() {
           </Dialog>
         )}
         {edgeEdit && (
-          <Dialog title="Edge label" onClose={() => setEdgeEdit(null)}>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void api
-                  .updateRefEdge(edgeEdit.id, edgeEdit.label)
-                  .then(refresh)
-                  .then(() => setEdgeEdit(null))
-                  .catch(error);
-              }}
-            >
-              <label className="field">
-                Label
-                <input
-                  autoFocus
-                  value={edgeEdit.label}
-                  onChange={(e) =>
-                    setEdgeEdit({ ...edgeEdit, label: e.target.value })
-                  }
-                />
-              </label>
-              <Button variant="primary" type="submit">
-                Save label
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  archive("edge", edgeEdit.id);
-                  setEdgeEdit(null);
-                }}
-              >
-                Archive edge
-              </Button>
-            </form>
-          </Dialog>
+          <EdgeLabelDialog
+            key={edgeEdit.id}
+            edge={edgeEdit}
+            close={() => setEdgeEdit(null)}
+            refresh={refresh}
+            archived={() => {
+              const id = edgeEdit.id;
+              history.record({
+                label: "Archive reference",
+                undo: () =>
+                  api.canvasArchive({ kind: "edge", id, archived: false }),
+                redo: () =>
+                  api.canvasArchive({ kind: "edge", id, archived: true }),
+              });
+              setRevision((r) => r + 1);
+              announce("Archived reference");
+            }}
+          />
         )}
       </section>
     </CanvasContext.Provider>

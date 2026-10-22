@@ -32,6 +32,7 @@ import {
 import { WorkingPill } from "../../components/ui/AgentWorking";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { Priority, priorities } from "../../components/ui/Priority";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { RoughLine } from "../../components/ui/RoughLine";
 import { useAgentWorking } from "../../lib/agent-working";
 import { api } from "../../lib/api";
@@ -41,6 +42,7 @@ import { relativeTime } from "../../lib/time";
 import type { TaskDetail, UpdateInput } from "../../lib/types";
 import { JamError, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
 import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
 import { AgentPlan } from "../plan/AgentPlan";
@@ -150,6 +152,7 @@ export function TaskEditor({
   const [reviewError, setReviewError] = useState<Error | null>(null);
   const [assetLink, setAssetLink] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuRoot = useRef<HTMLDivElement>(null);
   const [archive, setArchive] = useState(false);
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState("Write");
@@ -417,7 +420,8 @@ export function TaskEditor({
       !save.isPending &&
       !conflictRead.isPending &&
       !markLock.current &&
-      !review
+      !review &&
+      !archive
     )
       void handleSubmit((values) => submit(values))();
   };
@@ -431,21 +435,61 @@ export function TaskEditor({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, []);
-  const archiveMutation = useMutation({
-    mutationFn: () =>
-      task.archivedAt
-        ? api.unarchiveTask(task.key)
-        : api.archiveTask(task.key, reason.trim() || undefined),
-    onSuccess: async () => {
-      const fresh = await api.getTask(task.key);
-      client.setQueryData(["task", task.key], fresh);
-      resetTask(fresh);
-      setArchive(false);
-      setReason("");
-      invalidate();
-    },
-    onError: (error) => useUiStore.getState().error(error.message),
-  });
+  const archiveWrite = useProjectWrite(`archive-task:${task.id}`, task.jamId);
+  const archiveActions = useRef<HTMLDivElement>(null);
+  const [archiveRefreshError, setArchiveRefreshError] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (archiveRefreshError)
+      archiveActions.current
+        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+        ?.focus();
+  }, [archiveRefreshError]);
+  const submitArchive = () => {
+    if (archiveWrite.error || archiveRefreshError) return;
+    const key = task.key,
+      archiveReason = reason.trim() || undefined;
+    archiveWrite.run(
+      async () => {
+        if (task.archivedAt) await api.unarchiveTask(key);
+        else await api.archiveTask(key, archiveReason);
+        if (!ownsSave()) return { stale: true };
+        // The write is confirmed. A subsequent read failure is not a failed write.
+        try {
+          return { fresh: await api.getTask(key) };
+        } catch (error) {
+          return {
+            refreshError: `Saved, but could not refresh the task: ${String(error)}. Close the task drawer and reopen it to inspect the saved task; do not repeat the write.`,
+          };
+        }
+      },
+      (result) => {
+        if (result.stale) return;
+        if (result.fresh) {
+          client.setQueryData(["task", key], result.fresh);
+          resetTask(result.fresh);
+          setArchive(false);
+          setReason("");
+          invalidate();
+        } else
+          setArchiveRefreshError(
+            result.refreshError ??
+              "Saved; close the task drawer and reopen it to refresh.",
+          );
+      },
+    );
+  };
+
+  const dismissDrawer = () => {
+    if (archiveWrite.isLocked()) return;
+    if (menu) {
+      setMenu(false);
+      menuRoot.current
+        ?.querySelector<HTMLButtonElement>('[aria-label="Task actions"]')
+        ?.focus();
+    } else close();
+  };
   const attach = async (paths: string[]) => {
     for (const path of paths) await api.attachFile(task.key, path);
     invalidate();
@@ -489,7 +533,7 @@ export function TaskEditor({
   };
   return (
     <Drawer
-      onClose={close}
+      onClose={dismissDrawer}
       returnFocus={returnFocus}
       title={task.key}
       leading={
@@ -498,8 +542,12 @@ export function TaskEditor({
         </IconButton>
       }
       actions={
-        <div className="task-menu">
-          <IconButton label="Task actions" onClick={() => setMenu(!menu)}>
+        <div className="task-menu" ref={menuRoot}>
+          <IconButton
+            label="Task actions"
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+          >
             <MoreHorizontal />
           </IconButton>
           {menu && (
@@ -536,7 +584,7 @@ export function TaskEditor({
       {readonly && (
         <div className="notice">
           Archived ·{" "}
-          <Button variant="ghost" onClick={() => archiveMutation.mutate()}>
+          <Button variant="ghost" onClick={() => setArchive(true)}>
             Unarchive
           </Button>
           <p className="small">
@@ -985,37 +1033,69 @@ export function TaskEditor({
       {archive && (
         <Dialog
           title={readonly ? "Unarchive task" : "Archive task"}
-          onClose={() => setArchive(false)}
+          busy={archiveWrite.pending}
+          onClose={() => archiveWrite.dismiss(() => setArchive(false))}
         >
-          {!readonly && (
-            <>
-              <p>Keep this task in the archive. You can bring it back later.</p>
-              <label>
-                Reason (optional)
-                <textarea
-                  aria-label="Archive reason"
-                  maxLength={4000}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
-              {isDirty && (
-                <p className="notice">
-                  Unsaved edits will be discarded when archived.
+          <div className="m5-form" ref={archiveActions}>
+            {!readonly && (
+              <>
+                <p>
+                  Keep this task in the archive. You can bring it back later.
                 </p>
-              )}
-            </>
-          )}
-          <div className="dialog-actions">
-            <Button onClick={() => setArchive(false)}>Cancel</Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                archiveMutation.mutate();
-              }}
-            >
-              {readonly ? "Unarchive" : "Archive"}
-            </Button>
+                <label>
+                  Reason (optional)
+                  <textarea
+                    aria-label="Archive reason"
+                    disabled={archiveWrite.pending || archiveWrite.checking}
+                    readOnly={
+                      !archiveWrite.ready ||
+                      !!archiveWrite.error ||
+                      !!archiveRefreshError
+                    }
+                    maxLength={4000}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+                {isDirty && (
+                  <p className="notice">
+                    Unsaved edits will be discarded when archived.
+                  </p>
+                )}
+              </>
+            )}
+            <ProjectWriteFeedback
+              write={archiveWrite}
+              form={archiveActions}
+              action="Saving archive change"
+            />
+            {archiveWrite.error && (
+              <p role="alert">
+                The archive outcome is unconfirmed. Your reason is retained.
+                Close the task drawer and reopen it to inspect the task before
+                trying again; this request will not be replayed.
+              </p>
+            )}
+            {archiveRefreshError && <p role="alert">{archiveRefreshError}</p>}
+            <div className="dialog-actions">
+              <Button
+                disabled={archiveWrite.pending}
+                onClick={() => archiveWrite.dismiss(() => setArchive(false))}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={
+                  !archiveWrite.ready ||
+                  !!archiveWrite.error ||
+                  !!archiveRefreshError
+                }
+                onClick={submitArchive}
+              >
+                {readonly ? "Unarchive" : "Archive"}
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}

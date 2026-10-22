@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Button, Dialog, Kbd } from "../../components/ui";
 import { shortcutAction } from "../../lib/shortcuts";
+import { CommandLoadBoundary, CommandLoading } from "./CommandLoadBoundary";
 
 const CommandPalette = lazy(() =>
   import("./CommandPalette").then((m) => ({ default: m.CommandPalette })),
@@ -45,13 +46,15 @@ export function CommandCenter({
         <Kbd>Ctrl K</Kbd>
       </Button>
       {open && (
-        <Suspense fallback={null}>
-          <CommandPalette
-            close={() => setOpen(false)}
-            newTask={newTask}
-            toggleTheme={toggleTheme}
-          />
-        </Suspense>
+        <CommandLoadBoundary close={() => setOpen(false)}>
+          <Suspense fallback={<CommandLoading close={() => setOpen(false)} />}>
+            <CommandPalette
+              close={() => setOpen(false)}
+              newTask={newTask}
+              toggleTheme={toggleTheme}
+            />
+          </Suspense>
+        </CommandLoadBoundary>
       )}{" "}
       {help && (
         <Dialog title="Keyboard shortcuts" onClose={() => setHelp(false)}>
