@@ -13,7 +13,7 @@ import {
   WorkingRing,
   watchWorkingVisibility,
 } from "../../components/ui/AgentWorking";
-import { useAgentWorking } from "../../lib/agent-working";
+import { useCardPresence } from "../../lib/agent-working";
 import type { ColorBy, Member, TaskSummary } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 
@@ -42,7 +42,7 @@ export function TaskCard({
   const reduced = useReducedMotion();
 
   const member = members.find((m) => m.id === task.assigneeId);
-  const working = useAgentWorking(task, member);
+  const working = useCardPresence(task, members);
   const Icon = icons[task.priority as keyof typeof icons] ?? Equal;
   const paint =
     colorBy === "epic" && task.epicColor
@@ -142,7 +142,7 @@ export function TaskCard({
           )}
           {member && (
             <span className="card-assignee">
-              <WorkingRing state={working}>
+              <WorkingRing state={working?.mode === "active" ? working : null}>
                 <Avatar member={member} allMembers={members} size={26} />
               </WorkingRing>
             </span>
