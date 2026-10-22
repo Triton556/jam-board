@@ -11,6 +11,7 @@ import {
   useReactFlow,
   useStore,
   type Viewport,
+  ViewportPortal,
 } from "@xyflow/react";
 import {
   Focus,
@@ -38,6 +39,7 @@ import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useUiStore } from "../../lib/ui-store";
 import { useClipboardImagePaste } from "./clipboard-paste";
+import { DraftNote } from "./DraftNote";
 import {
   AddReferenceDialog,
   EditReferenceDialog,
@@ -112,7 +114,12 @@ function Canvas() {
     [filter, setFilter] = useState<string[]>([]),
     [connect, setConnect] = useState(false),
     [minimap, setMinimap] = useState(true),
-    [add, setAdd] = useState<"link" | "note" | "frame" | null>(null),
+    [add, setAdd] = useState<"link" | "frame" | null>(null),
+    [noteDraft, setNoteDraft] = useState<{
+      projectId: string;
+      x: number;
+      y: number;
+    } | null>(null),
     [menu, setMenu] = useState(false),
     [frameEdit, setFrameEdit] = useState<RefFrame | null>(null),
     [edit, setEdit] = useState<{
@@ -775,6 +782,8 @@ function Canvas() {
           })().catch(error);
         }}
         onKeyDownCapture={(e) => {
+          if ((e.target as HTMLElement).closest(".reference-note-draft"))
+            return;
           if (
             ["INPUT", "TEXTAREA", "SELECT"].includes(
               (e.target as HTMLElement).tagName,
@@ -998,6 +1007,33 @@ function Canvas() {
               targets={targets}
             />
           )}
+          {noteDraft && (
+            <ViewportPortal>
+              <DraftNote
+                {...noteDraft}
+                close={() => {
+                  setNoteDraft(null);
+                  container.current
+                    ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                    ?.focus();
+                }}
+                saved={(item) => {
+                  selectNext.current = item.id;
+                  setNoteDraft(null);
+                  announce("Note created");
+                  container.current
+                    ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                    ?.focus();
+                  // Creation is already confirmed; a failed reread must not offer create again.
+                  void refresh().catch(error);
+                }}
+                refresh={async () => {
+                  const result = await query.refetch();
+                  if (result.error) throw result.error;
+                }}
+              />
+            </ViewportPortal>
+          )}
           <Background color="var(--ink-3)" gap={24} size={0.7} />
           {minimap && (
             <MiniMap
@@ -1035,7 +1071,11 @@ function Canvas() {
           aria-label="Canvas tools"
         >
           <div className="reference-add">
-            <Button variant="primary" onClick={() => setMenu(!menu)}>
+            <Button
+              data-reference-add
+              variant="primary"
+              onClick={() => setMenu(!menu)}
+            >
               <Plus size={16} />
               Add
             </Button>
@@ -1063,8 +1103,19 @@ function Canvas() {
                 <Button
                   onClick={() => {
                     setMenu(false);
-                    setAdd("note");
+                    if (noteDraft || !app.data?.jam) return;
+                    const point = center();
+                    setNoteDraft({
+                      projectId: app.data.jam.id,
+                      x: point.x - 170,
+                      y: point.y - 160,
+                    });
+                    void flow.setCenter(point.x, point.y, {
+                      zoom: Math.max(0.85, flow.getZoom()),
+                      duration: 0,
+                    });
                   }}
+                  disabled={!!noteDraft || !app.data?.jam}
                 >
                   Note
                 </Button>
@@ -1174,26 +1225,28 @@ function Canvas() {
             Unlinked
           </button>
         </fieldset>
-        {!data?.items.length && (
-          <div className="reference-empty">
-            <EmptyState
-              image={paint}
-              text="Drop images, sounds, videos or links here"
-            >
-              <Button
-                variant="primary"
-                onClick={() =>
-                  void api
-                    .pickFiles()
-                    .then((paths) => addFiles(paths))
-                    .catch(error)
-                }
+        {!data?.items.some((item) => !item.archivedAt) &&
+          !data?.frames.some((frame) => !frame.archivedAt) &&
+          !noteDraft && (
+            <div className="reference-empty">
+              <EmptyState
+                image={paint}
+                text="Drop images, sounds, videos or links here"
               >
-                Add file…
-              </Button>
-            </EmptyState>
-          </div>
-        )}
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    void api
+                      .pickFiles()
+                      .then((paths) => addFiles(paths))
+                      .catch(error)
+                  }
+                >
+                  Add file…
+                </Button>
+              </EmptyState>
+            </div>
+          )}
         {notice && (
           <div className="reference-notice" role="status">
             {notice}
@@ -1211,7 +1264,7 @@ function Canvas() {
             Drag from a node handle to connect · right-click an edge to archive
           </div>
         )}
-        {(add === "link" || add === "note") && (
+        {add === "link" && (
           <AddReferenceDialog
             kind={add}
             close={() => setAdd(null)}
