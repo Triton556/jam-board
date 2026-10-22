@@ -14,7 +14,7 @@ export function assetKind(location: string) {
       ? "audio"
       : ["ttf", "otf", "woff2"].includes(ext ?? "")
         ? "font"
-        : ["tmx", "ldtk", "json"].includes(ext ?? "")
+        : ["tmx", "ldtk"].includes(ext ?? "")
           ? "level"
           : "other";
 }

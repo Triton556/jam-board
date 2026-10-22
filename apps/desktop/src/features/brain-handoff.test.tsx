@@ -237,3 +237,24 @@ it("a pending handoff copy cannot post an old receipt into a reopened scope", as
   ).toBeEnabled();
   expect(write).toHaveBeenCalledOnce();
 });
+
+it("project refinement explicitly inventories rough unassigned Backlog, not only the board summary", () => {
+  const prompt = brainHandoff({ type: "project" });
+  expect(prompt).toContain("Page list_tasks through nextCursor");
+  expect(prompt).toContain("non-archived tasks, including unassigned Backlog");
+  expect(prompt).toContain(
+    "get_board is only a summary, not a complete task inventory",
+  );
+  expect(prompt).toContain(
+    "get_task notes, assets, questions and linked sources",
+  );
+  expect(prompt).toContain("Planning only");
+});
+it.each(["epic", "story", "task"] as const)(
+  "%s refinement does not broaden into a full project inventory",
+  (type) => {
+    const prompt = brainHandoff({ type, key: "FIXTURE-1" });
+    expect(prompt).toContain(`Review ${type} FIXTURE-1`);
+    expect(prompt).not.toContain("Page list_tasks through nextCursor");
+  },
+);

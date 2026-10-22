@@ -3,6 +3,37 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.16] - 2026-10-21
+
+### Fixed
+
+- Markdown fields now render ordinary prose, headings, lists and links beside an
+  explicit **Edit** action, not inside that action's button. Reading a reference no
+  longer also opens the editor. Disabled editing does not disable reading; empty
+  disabled fields say **Not provided**. Escape and Ctrl/Meta+S return to Edit when
+  available; ordinary blur preserves the user's next focus target and existing save
+  behavior. No HTML rendering, opener policy or backend save semantics changed.
+- Asset Kind labels no longer wrap the custom select's entire option subtree.
+  Options retain their own accessible names instead of all being named “Kind”.
+
+### Improved
+
+- Assets/onboarding copy now describes general projects. New unspecified assets
+  default to `other`; `.json` alone no longer implies a game level. Existing
+  classified assets and explicit kind choices are preserved; known `.tmx`/`.ldtk`
+  suggestions and the current kind enum are unchanged.
+- A whole-project brain handoff explicitly pages the non-archived task inventory,
+  including unassigned Backlog captures, before targeted evidence reads. It no
+  longer leaves that inventory implicit in `get_board`, which is only a summary.
+  Epic/Story/Task handoffs remain scoped. This is guidance, not a claim of model
+  compliance or permission to execute.
+
+### Verification
+
+- [Exact checks and limits](docs/verification/0.3.0-alpha.16.md). No schema, tool,
+  dependency, grant or migration change; source-backed rationale is recorded in
+  [the workflow design notes](docs/workflow-ux.md#18-separate-reading-from-editing-and-keep-project-language-general).
+
 ## [0.3.0-alpha.15] - 2026-10-21
 
 ### Added

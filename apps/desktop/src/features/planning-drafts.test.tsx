@@ -102,9 +102,12 @@ it("a deferred Markdown save preserves newer typing, which can then be saved", a
   );
   await act(() => h.remote("A legitimate remote refresh"));
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Edit Goal" })).toHaveTextContent(
-      "A legitimate remote refresh",
-    ),
+    expect(
+      screen
+        .getByRole("button", { name: "Edit Goal" })
+        .closest(".markdown-field")
+        ?.querySelector(".markdown-field-view"),
+    ).toHaveTextContent("A legitimate remote refresh"),
   );
 });
 
@@ -174,9 +177,12 @@ it("Markdown errors preserve newer typing; Escape cancels only the open edit and
   fireEvent.keyDown(screen.getByRole("textbox", { name: "Goal" }), {
     key: "Escape",
   });
-  expect(screen.getByRole("button", { name: "Edit Goal" })).toHaveTextContent(
-    "Failed save",
-  );
+  expect(
+    screen
+      .getByRole("button", { name: "Edit Goal" })
+      .closest(".markdown-field")
+      ?.querySelector(".markdown-field-view"),
+  ).toHaveTextContent("Failed save");
   await user.click(screen.getByRole("button", { name: "Edit Goal" }));
   fireEvent.blur(screen.getByRole("textbox", { name: "Goal" }));
   await waitFor(() => expect(h.persisted()).toBe("Failed save"));
@@ -264,7 +270,10 @@ it.each(["acceptance", "outcomeMd"] as const)(
             screen.getByRole("textbox", { name: "Criterion 1" }),
           ).toHaveValue("Second save for Story 1")
         : expect(
-            screen.getByRole("button", { name: "Edit Outcome" }),
+            screen
+              .getByRole("button", { name: "Edit Outcome" })
+              .closest(".markdown-field")
+              ?.querySelector(".markdown-field-view"),
           ).toHaveTextContent("Second save for Story 1"),
     );
   },

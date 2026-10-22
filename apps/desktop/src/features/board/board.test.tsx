@@ -267,7 +267,7 @@ describe("onboarding validation", () => {
       name: "Create jam",
     });
     fireEvent.click(submit);
-    expect(await screen.findByText("Give your jam a name")).toBeVisible();
+    expect(await screen.findByText("Give your project a name")).toBeVisible();
     expect(screen.getByText("Tell us your name")).toBeVisible();
     fireEvent.change(screen.getByLabelText("Jam name"), {
       target: { value: "A tiny jam" },

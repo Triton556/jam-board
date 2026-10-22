@@ -67,12 +67,13 @@ export function AssetDialog({
       name: asset?.name ?? "",
       location: asset?.location ?? "",
       notes: asset?.notes ?? "",
-      kind: (asset?.kind as (typeof assetKinds)[number]) ?? "sprite",
+      kind: (asset?.kind as (typeof assetKinds)[number]) ?? "other",
     },
   });
   const mode = form.watch("mode");
   const write = useProjectWrite(`asset:${asset?.id ?? "new"}`);
-  const formElement = useRef<HTMLFormElement>(null);
+  const formElement = useRef<HTMLFormElement>(null),
+    manuallyChosenKind = useRef(false);
   const submit = () => {
     if (write.isLocked()) return;
     form.clearErrors();
@@ -117,7 +118,7 @@ export function AssetDialog({
     if (path) {
       form.setValue("location", path, { shouldValidate: true });
       form.setValue("name", assetName(path));
-      form.setValue("kind", assetKind(path));
+      if (!manuallyChosenKind.current) form.setValue("kind", assetKind(path));
     }
   };
   return (
@@ -172,20 +173,21 @@ export function AssetDialog({
             {...form.register("name")}
           />
         </label>
-        <label htmlFor="asset-kind">
-          Kind
+        <div className="asset-kind-field">
+          <label htmlFor="asset-kind">Kind</label>
           <Select
             id="asset-kind"
             disabled={!write.ready}
             aria-label="Kind"
             value={form.watch("kind")}
-            onChange={(e) =>
+            onChange={(e) => {
+              manuallyChosenKind.current = true;
               form.setValue(
                 "kind",
                 e.target.value as (typeof assetKinds)[number],
                 { shouldDirty: true, shouldValidate: true },
-              )
-            }
+              );
+            }}
           >
             {assetKinds.map((k) => (
               <option key={k} value={k}>
@@ -193,7 +195,7 @@ export function AssetDialog({
               </option>
             ))}
           </Select>
-        </label>
+        </div>
         <label>
           Notes
           <textarea disabled={!write.ready} {...form.register("notes")} />
@@ -406,7 +408,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
       ) ?? [];
   return (
     <main className="feature-page">
-      <PageHeading title="Assets" note="everything the game is made of">
+      <PageHeading title="Assets" note="files and references your project uses">
         <div className="button-row">
           <SegmentedControl
             label="Assets view"
@@ -533,7 +535,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
             </div>
           )
         ) : (
-          <EmptyState text="No assets yet — drop in your first sprite" />
+          <EmptyState text="No assets yet — add a file or URL for your project" />
         )}
       </FileDropZone>
       {edit && (
