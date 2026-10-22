@@ -35,3 +35,36 @@ these values rather than assuming the layout viewport or multiplying DPR.
 [MDN VisualViewport](https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport).
 These API facts support the mechanism, not a claim that every native placement
 has been visually accepted.
+
+## Alpha35 compact-modal correction
+
+Native alpha34 confirmed the long-drawer Status menu now flips upward, but the
+small **References → Actions → Link to… → Select** dialog leaves only its search
+and a group-heading sliver visible. Intersecting the dialog's overflow clip was
+insufficient: neither above nor below contained usable option space.
+
+The candidate uses feature-detected **manual Popover top-layer presentation**,
+keeping the popup a descendant of its select and modal. Positioning uses the
+visual viewport, while trigger visibility still uses ancestor clips. Escape,
+Tab, selection, focus and outside-click handling remain application-owned; opening
+another focused dialog dismisses the old popup. Unsupported or throwing Popover
+implementations use an in-flow, scrollable fallback when the anchor clip is too
+small, instead of presenting inaccessible choices. No dependency, data mutation,
+permission or browser security-setting change is involved.
+
+Seven new DOM cases cover native-method delegation (modeled, not real paint),
+unsupported/throwing fallback, nested Escape, search/selection, scroll-out/resize,
+new-dialog focus and backdrop isolation; combined with existing placement tests,
+14 pass. Four hosted-browser scenarios cover real option hit-testing and unchanged
+canvas/data/camera in light/dark and simulated unsupported/throwing engines,
+including a 400 CSS-pixel viewport. They are added/typechecked, **NOT RUN locally**.
+Exact native35 opening and lower-edge regression remain required. A narrow CSS
+viewport is not a measured 200% Windows scaling result.
+
+Compatibility basis, retrieved 2026-10-22:
+[Chromium's Popover introduction](https://developer.chrome.com/blog/introducing-popover-api/)
+identifies support from Chromium114;
+[WebKit's Safari17 release notes](https://webkit.org/blog/14445/webkit-features-in-safari-17-0/)
+include Popover. Those engine announcements do not establish the installed version
+or behavior of every Tauri WebKitGTK/WebView2 runtime, hence feature detection,
+throw recovery and exact-package native acceptance.

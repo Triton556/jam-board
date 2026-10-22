@@ -113,3 +113,13 @@ workflow observation is separate from DOM/clipboard checks.
   until re-hover. Alpha35 replaces that Board label popup with live React content;
   focused DOM checks pass, exact native closure remains pending. Other native-title
   tooltips are not claimed as redesigned or dynamically validated by this repair.
+
+### Alpha35 explicit feedback / compact select candidate
+
+Questions cached-error answer loss and Table cached-row loss were reproduced and
+repaired in scoped DOM tests. Explicit Questions/Journal/Assets/References/Bell
+reads now have local owned receipts; this does not cover all action families.
+See the [23-row inventory](deltas/feedback35-inventory.md) for remaining callers,
+autosave and Activity gaps. Native34 also exposed compact Link reference select
+clipping, distinct from the corrected lower-edge Task Status menu; alpha35's
+feature-detected top layer/in-flow fallback needs actual native closure.

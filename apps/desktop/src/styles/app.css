@@ -1971,6 +1971,21 @@ kbd {
 .combo-popup [role="option"].active-option {
   background: var(--paper-2);
 }
+.combo-popup[data-presentation="top-layer"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  color: var(--ink);
+}
+.combo-popup::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.combo-popup[data-presentation="inline"] {
+  position: relative;
+  inset: auto;
+  margin-top: 4px;
+}
 .table-filters .custom-select {
   min-width: 150px;
 }
