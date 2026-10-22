@@ -55,10 +55,13 @@ export function modalTabStops(root: HTMLElement) {
 }
 
 const layers: symbol[] = [];
-export function useModal(onClose: () => void) {
+export type ModalFocusReturn = () => HTMLElement | null;
+export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
   const ref = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
+  const close = useRef(onClose),
+    restore = useRef(returnFocus);
   close.current = onClose;
+  restore.current = returnFocus;
   useEffect(() => {
     const token = Symbol();
     layers.push(token);
@@ -106,8 +109,30 @@ export function useModal(onClose: () => void) {
     };
     document.addEventListener("keydown", key, true);
     return () => {
+      const wasTop = layers.at(-1) === token;
       layers.splice(layers.indexOf(token), 1);
       document.removeEventListener("keydown", key, true);
+      // An older closing layer must not steal focus from a newer dialog.
+      if (!wasTop) return;
+      if (restore.current) {
+        const target = restore.current();
+        // Explicit null denies restoration (expired view/project); it must not
+        // fall back to a still-connected trigger from another selection epoch.
+        if (!target?.isConnected) return;
+        const parent = layers.length
+          ? Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[role="dialog"][aria-modal="true"]',
+              ),
+            ).at(-1)
+          : undefined;
+        if (parent) {
+          if (previous?.isConnected && parent.contains(previous))
+            previous.focus();
+          else parent.focus();
+        } else target.focus();
+        return;
+      }
       if (previous?.isConnected && previous !== document.body) previous.focus();
       else
         Array.from(

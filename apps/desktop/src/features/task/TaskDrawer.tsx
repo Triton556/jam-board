@@ -22,6 +22,7 @@ import {
   Drawer,
   IconButton,
   Kbd,
+  type ModalFocusReturn,
   SegmentedControl,
   Select,
   Stamp,
@@ -63,18 +64,27 @@ import {
 export function TaskDrawer({
   taskKey,
   close,
+  returnFocus,
 }: {
   taskKey: string;
   close(): void;
+  returnFocus?: ModalFocusReturn;
 }) {
   const task = useQuery({
     queryKey: ["task", taskKey],
     queryFn: () => api.getTask(taskKey),
   });
   if (task.data)
-    return <TaskEditor key={taskKey} task={task.data} close={close} />;
+    return (
+      <TaskEditor
+        key={taskKey}
+        task={task.data}
+        close={close}
+        returnFocus={returnFocus}
+      />
+    );
   return (
-    <Drawer onClose={close} title={taskKey}>
+    <Drawer onClose={close} title={taskKey} returnFocus={returnFocus}>
       {task.error ? (
         <QueryError error={task.error} retry={() => void task.refetch()} />
       ) : (
@@ -86,9 +96,11 @@ export function TaskDrawer({
 export function TaskEditor({
   task,
   close,
+  returnFocus,
 }: {
   task: TaskDetail;
   close(): void;
+  returnFocus?: ModalFocusReturn;
 }) {
   const { settings } = useBoardSettings();
   const navigate = useNavigate();
@@ -404,6 +416,7 @@ export function TaskEditor({
   return (
     <Drawer
       onClose={close}
+      returnFocus={returnFocus}
       title={task.key}
       leading={
         <IconButton label="Copy key" onClick={() => copy(task.key)}>

@@ -175,6 +175,7 @@ function SortableCard({
     <button
       type="button"
       ref={setNodeRef}
+      data-board-task-key={task.key}
       className={`card-button ${isDragging ? "dragging" : ""}`}
       style={{
         transform: transform

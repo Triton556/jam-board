@@ -1,6 +1,6 @@
 import { CatchBoundary, Link } from "@tanstack/react-router";
 import { createContext, type ReactNode, Suspense, useContext } from "react";
-import { Button, Drawer } from "./index";
+import { Button, Drawer, type ModalFocusReturn } from "./index";
 
 const PageLabel = createContext("screen");
 
@@ -55,7 +55,12 @@ export function LazyPageBoundary({
   );
 }
 
-type DrawerLoad = { title: string; kind: "task" | "story"; close(): void };
+type DrawerLoad = {
+  title: string;
+  kind: "task" | "story";
+  close(): void;
+  returnFocus?: ModalFocusReturn;
+};
 const DrawerContext = createContext<DrawerLoad | null>(null);
 
 function DrawerLoadState({ failed = false }: { failed?: boolean }) {
@@ -66,6 +71,7 @@ function DrawerLoadState({ failed = false }: { failed?: boolean }) {
       title={state.title}
       onClose={state.close}
       closeLabel={`Close ${state.kind}`}
+      returnFocus={state.returnFocus}
     >
       <div className="drawer-load-state">
         {failed ? (

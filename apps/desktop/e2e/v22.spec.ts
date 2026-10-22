@@ -165,6 +165,11 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
       key: "JB-1",
     });
   });
+  const storiesTab = page
+    .getByRole("radiogroup", { name: "Epic tabs" })
+    .getByRole("radio", { name: "Stories", exact: true });
+  await storiesTab.click();
+  await expect(storiesTab).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: /JB-1 Light one safe tile/ }).click();
   await expect(
     page.getByRole("region", { name: "Latest report", exact: true }),

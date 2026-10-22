@@ -1,4 +1,6 @@
-import { useModal } from "./controls";
+import { type ModalFocusReturn, useModal } from "./controls";
+
+export type { ModalFocusReturn } from "./controls";
 
 export {
   Combobox,
@@ -190,6 +192,7 @@ export function Drawer({
   leading,
   actions,
   closeLabel = "Close task",
+  returnFocus,
 }: {
   children: ReactNode;
   onClose(): void;
@@ -197,8 +200,9 @@ export function Drawer({
   leading?: ReactNode;
   actions?: ReactNode;
   closeLabel?: string;
+  returnFocus?: ModalFocusReturn;
 }) {
-  const ref = useModal(onClose);
+  const ref = useModal(onClose, returnFocus);
   const id = useId();
   return createPortal(
     // biome-ignore lint/a11y/noStaticElementInteractions: The backdrop closes only on a direct pointer click; Escape and the Close button provide keyboard access.

@@ -197,9 +197,14 @@ test("keyboard opens cards and edits status without dragging; reduced motion ret
     status: "backlog",
     expectedUpdatedAt: before.updatedAt,
   });
+  await expect(
+    page
+      .locator('[data-column="backlog"]')
+      .getByRole("button", { name: /Open JB-2:/ }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await card.focus();
+  await expect(card).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("textbox", { name: "Task title" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -236,3 +241,52 @@ test("minimum window, expanded navigation and Team screen", async ({
   await page.getByRole("link", { name: "Board", exact: true }).click();
   await expect(page.getByTestId("task-card")).toHaveCount(22);
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`keyboard-active Status option is visibly distinct without changing selection (${theme})`, async ({
+    page,
+  }) => {
+    await demo(page);
+    await page
+      .getByRole("combobox", { name: "Theme", exact: true })
+      .selectOption(theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const before = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
+    await page.getByRole("button", { name: /Open JB-2:/ }).click();
+    const status = page.getByRole("combobox", { name: "Status", exact: true });
+    await status.focus();
+    await page.mouse.move(0, 0); // Hover must not accidentally supply the keyboard highlight.
+    await page.keyboard.press("Home");
+    const active = page.getByRole("option", { name: "Backlog", exact: true });
+    const selected = page.getByRole("option", { name: "Ready", exact: true });
+    await expect(active).toHaveAttribute("aria-selected", "false");
+    await expect(selected).toHaveAttribute("aria-selected", "true");
+    await expect(status).toHaveAttribute(
+      "aria-activedescendant",
+      (await active.getAttribute("id")) ?? "missing option",
+    );
+    const expected = await active.evaluate((element) => {
+      const probe = document.createElement("span");
+      probe.style.backgroundColor = "var(--paper-2)";
+      element.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    expect(expected).not.toBe("rgba(0, 0, 0, 0)");
+    await expect(active).toHaveCSS("background-color", expected);
+    await expect(selected).not.toHaveCSS("background-color", expected);
+    await page.keyboard.press("ArrowDown");
+    await expect(status).toHaveAttribute(
+      "aria-activedescendant",
+      (await selected.getAttribute("id")) ?? "missing option",
+    );
+    await expect(selected).toHaveCSS("background-color", expected);
+    await expect(active).not.toHaveCSS("background-color", expected);
+    await page.keyboard.press("Escape");
+    await expect(status).toContainText("Ready");
+    expect(await page.evaluate(() => window.__jamMock.getTask("JB-2"))).toEqual(
+      before,
+    );
+  });
+}
