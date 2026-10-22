@@ -120,7 +120,7 @@ it("P02/AS03: field ABA cannot publish an old completion into the reopened field
     "Old field draft",
   );
 });
-it("P02/AS03: unmount retains the draft without publishing a late saved receipt", async () => {
+it("P02/AS03: unmount acknowledges unchanged retained text without publishing a late saved receipt", async () => {
   const gate = deferred();
   const h = mount(vi.fn(() => gate.promise));
   await edit("Unmounted draft");
@@ -129,7 +129,7 @@ it("P02/AS03: unmount retains the draft without publishing a late saved receipt"
   expect(screen.queryByRole("status")).toBeNull();
   expect(
     h.client.getQueryData(["planning-draft", "epic-a:title"]),
-  ).toMatchObject({ draft: "Unmounted draft", dirty: true });
+  ).toMatchObject({ draft: "Unmounted draft", dirty: false });
 });
 it("P02/AS03: a queued save invalidated before dispatch is not sent or described as uncertain", async () => {
   const gate = deferred(),
@@ -271,3 +271,28 @@ it.each(["success", "failure", "not sent"] as const)(
     spy.mockRestore();
   },
 );
+
+it("P02: departed confirmed value without newer typing returns clean and does not save again on blur", async () => {
+  const gate = deferred();
+  const save = vi.fn(() => gate.promise);
+  const h = mount(save);
+  await edit("Confirmed value");
+  h.scope("epic-b:title");
+  await act(async () => gate.resolve());
+  h.scope("epic-a:title", "Confirmed value");
+  const input = screen.getByRole("textbox", { name: "Epic title" });
+  expect(input).toHaveValue("Confirmed value");
+  expect(
+    h.client.getQueryData(["planning-draft", "epic-a:title"]),
+  ).toMatchObject({
+    baseline: "Confirmed value",
+    draft: "Confirmed value",
+    dirty: false,
+  });
+  expect(screen.queryByText("Unsaved changes")).toBeNull();
+  expect(screen.queryByText("Epic title saved.")).toBeNull();
+  const user = userEvent.setup();
+  await user.click(input);
+  await user.tab();
+  expect(save).toHaveBeenCalledTimes(1);
+});

@@ -106,7 +106,11 @@ function ScopedPlanningInput({
                 cached.source !== submitted.draft)
             )
               return cached;
-            return { ...cached, baseline: submitted.draft };
+            return {
+              ...cached,
+              baseline: submitted.draft,
+              dirty: cached.draft === submitted.draft ? false : cached.dirty,
+            };
           });
         }
         return;
