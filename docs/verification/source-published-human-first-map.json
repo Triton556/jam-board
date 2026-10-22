@@ -1,7 +1,7 @@
 {
   "repository": "Triton556/jam-board",
   "branch": "rumi/human-first-workflow",
-  "note": "Source and API-created published commits have different metadata but identical trees. This map covers the approved alpha29–37 source checkpoints and their exact published history, with the prior alpha28 documentation base. It does not by itself prove CI, native acceptance, installation or release. Alpha38 is not represented before its checked publication.",
+  "note": "Source and API-created published commits have different metadata but identical trees. This map covers approved alpha29–38 source checkpoints through caeb37d6 / d8664a8d, with the prior alpha28 documentation base. It does not by itself prove CI, native acceptance, installation or release; the first alpha38 hosted run passed Windows but had three browser test-contract failures. The test-only follow-up is not predicted.",
   "commits": [
     {
       "source": "2b263795b31767da29db0b62dc81f4da19dfc4d1",
@@ -254,6 +254,60 @@
       "published": "6a91f469d4a4ec919d8de039857b64f41bc39fd6",
       "tree": "35cb9e7321d11c5d4ae9ede381898639306dd9c1",
       "subject": "fix: preserve reference menu Space activation (alpha37)"
+    },
+    {
+      "source": "0399d1363ccaf412e0b2ab9587b409e7cfe40995",
+      "published": "5f0b7eb41cbe91150b4b588070b24a3bcca8782a",
+      "tree": "199452724ccd94756a5132967a63fd5349aaf51b",
+      "subject": "feat(references): place and directly edit autosaved sticky notes"
+    },
+    {
+      "source": "5f80ef32234b764283c23126db425f4648a2e6c6",
+      "published": "0fc7e828f7be37fee0058db9ab8d0fe5228589cc",
+      "tree": "cb434eb928925fd5c0da61eff8e96ba9bf740b22",
+      "subject": "test: retain reference read recovery through direct note placement"
+    },
+    {
+      "source": "645f4d802a1a0559463ee0041c1c837af61bcb14",
+      "published": "0f0c25a31ff0e69a9b6a9378a9148d6d3a0cf5ef",
+      "tree": "a85da67d7e27084f706c3779d8d72c63cce0e4a1",
+      "subject": "fix(references): let clean note viewers leave a changed project"
+    },
+    {
+      "source": "95e6a533513aa8c2b61e8b0a3b06ce4053af3b29",
+      "published": "88f3ce072db61e4d17543b9967da0986e8f47d87",
+      "tree": "1cf87974809772f74aa119a1664eea983ad87a67",
+      "subject": "fix: verify the configured preview deadline and exact timeout outcome"
+    },
+    {
+      "source": "a15082fb2a1d8f1dc174d95dade40aec3f8c45c6",
+      "published": "4daabfebfdacd3bc23d671aed1becddfaaa7af74",
+      "tree": "ec1121b77fb7a966dc4bb89844f4582cbbba9c7e",
+      "subject": "docs: clarify preview deadline evidence wording"
+    },
+    {
+      "source": "395fee090813bf80650328b58e0e01a4b77b21d1",
+      "published": "5d364e194114ec8aac1253c9263ff69c6b669fa4",
+      "tree": "c36e4519392437beb62f8b97f8e6bf3ece972fd7",
+      "subject": "test: align sticky-note validation with strict lint and lazy canvas readiness"
+    },
+    {
+      "source": "bc12fc7c3e6cda74d0a79f8bf99880696a996b61",
+      "published": "73e9340f00b7fc86fa177165f9e29c3ba889f099",
+      "tree": "dfd0db99aa7359169529267ed9f5c8b5020be8e6",
+      "subject": "fix: return reference caption dialogs to their visible Actions opener"
+    },
+    {
+      "source": "a9d7584e324012409bb476cb8923acd405fc4ebe",
+      "published": "a3c4606826dc98ca68c375329a96e7080eeb488d",
+      "tree": "19f07c73d4c5871f99cfd6972e79853226e9c63c",
+      "subject": "test: typecheck captured note calls and exact accessible names"
+    },
+    {
+      "source": "caeb37d6e4d3c2d13672387902f0a65a8d756dad",
+      "published": "d8664a8d9283254c1ade39a993528fbb6c2e8cfc",
+      "tree": "873967f1de772f8abfe421331ee787dd8e0c8031",
+      "subject": "release: checkpoint alpha38 direct notes and verified recovery contracts"
     }
   ]
 }

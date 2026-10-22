@@ -13,17 +13,18 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Load demo jam" }).click();
     await page.goto("/references");
     await expect(
-      page.getByRole("heading", { name: "References", exact: true }),
+      page.getByRole("region", { name: "References canvas", exact: true }),
     ).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => Boolean(window.__jamMock && window.__jamCanvas)),
       )
       .toBe(true);
-    await page.evaluate(async (value) => {
-      document.documentElement.setAttribute("data-theme", value);
-      await document.fonts.ready;
-    }, theme);
+    await page
+      .getByRole("combobox", { name: "Theme", exact: true })
+      .selectOption(theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.evaluate(() => document.fonts.ready);
     const initial = await page.evaluate(() =>
       window.__jamMock.referenceCanvas(),
     );
@@ -87,10 +88,10 @@ for (const theme of ["light", "dark"] as const) {
     await body.press("Escape");
     await expect(paper).toHaveCount(0);
     await page.reload();
-    await page.evaluate(
-      (value) => document.documentElement.setAttribute("data-theme", value),
-      theme,
-    );
+    await expect(
+      page.getByRole("combobox", { name: "Theme", exact: true }),
+    ).toHaveValue(theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.evaluate(() => document.fonts.ready);
     const persisted = page.locator(`[data-reference-id="${created.id}"]`);
     await persisted.getByRole("button", { name: /^Edit note / }).click();
@@ -109,7 +110,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await reopenedBody.focus();
     await page.keyboard.press("Escape");
-    await expect(paper).toHaveCount(0);
+    await expect(reopenedBody).toHaveCount(0);
     const saved = page.locator(`[data-reference-id="${created.id}"]`);
     await saved.getByRole("button", { name: "Edit note Lantern idea" }).click();
     const reopened = saved.getByRole("textbox", { name: "Note text" });
