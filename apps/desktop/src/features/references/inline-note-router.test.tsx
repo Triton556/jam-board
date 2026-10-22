@@ -81,7 +81,7 @@ async function mount(item?: RefItem) {
   );
   if (item) await screen.findByRole("button", { name: /Edit note/ });
   else await screen.findByRole("article", { name: "New note paper" });
-  return router;
+  return Object.assign(router, { testClient: client, testApp: app });
 }
 it("RF03 one deliberate navigation waits for confirmed flush before leaving, with no discarded text", async () => {
   const original = mockApi.addReference.bind(mockApi);
@@ -214,3 +214,102 @@ it("RF03 failed existing-note read can be deliberately abandoned locally, releas
   expect(read).toHaveBeenCalledOnce();
   expect(archive).not.toHaveBeenCalled();
 });
+
+async function changeContext(
+  router: Awaited<ReturnType<typeof mount>>,
+  mode: string,
+) {
+  await act(async () => {
+    router.testClient.setQueryData(["app"], {
+      ...router.testApp,
+      jam:
+        mode === "missing"
+          ? null
+          : { ...router.testApp.jam, id: "different-project" },
+    });
+    if (mode === "ABA") router.testClient.setQueryData(["app"], router.testApp);
+  });
+}
+it.each(["missing", "changed", "ABA"])(
+  "RF03 pristine inactive saved note allows departure after %s project context",
+  async (mode) => {
+    const item = await mockApi.addReference({
+      kind: "note",
+      text: "Already saved",
+    });
+    const update = vi.spyOn(mockApi, "updateReference");
+    const router = await mount(item);
+    await changeContext(router, mode);
+    expect(
+      screen.queryByRole("textbox", { name: "Note text" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("link", { name: "Leave references" }),
+    );
+    await screen.findByRole("heading", { name: "Other route" });
+    expect(router.state.location.pathname).toBe("/board");
+    expect(update).not.toHaveBeenCalled();
+  },
+);
+
+it.each(["missing", "changed", "ABA"])(
+  "RF03 dirty saved note retains draft after %s project context",
+  async (mode) => {
+    const item = await mockApi.addReference({ kind: "note", text: "Original" });
+    const update = vi.spyOn(mockApi, "updateReference");
+    const router = await mount(item);
+    await userEvent.click(screen.getByRole("button", { name: /Edit note/ }));
+    const body = screen.getByRole("textbox", { name: "Note text" });
+    await userEvent.type(body, " unsent wishes");
+    await changeContext(router, mode);
+    await userEvent.click(
+      screen.getByRole("link", { name: "Leave references" }),
+    );
+    expect(router.state.location.pathname).toBe("/references");
+    expect(body).toHaveValue("Original unsent wishes");
+    expect(update).not.toHaveBeenCalled();
+  },
+);
+it.each(["acknowledged after ABA", "lost response"])(
+  "RF03 a dispatched write remains guarded when text returns to baseline and context changes: %s",
+  async (outcome) => {
+    const item = await mockApi.addReference({ kind: "note", text: "Original" });
+    let resolve!: (item: RefItem) => void;
+    let reject!: (error: Error) => void;
+    const update = vi.spyOn(mockApi, "updateReference").mockImplementation(
+      () =>
+        new Promise((yes, no) => {
+          resolve = yes;
+          reject = no;
+        }),
+    );
+    const router = await mount(item);
+    await userEvent.click(screen.getByRole("button", { name: /Edit note/ }));
+    const body = screen.getByRole("textbox", { name: "Note text" });
+    await userEvent.type(body, " sent wishes");
+    fireEvent.keyDown(body, { key: "s", ctrlKey: true });
+    await waitFor(() => expect(update).toHaveBeenCalledOnce());
+    await userEvent.clear(body);
+    await userEvent.type(body, "Original");
+    await changeContext(router, "ABA");
+    await userEvent.click(
+      screen.getByRole("link", { name: "Leave references" }),
+    );
+    expect(router.state.location.pathname).toBe("/references");
+    await act(async () =>
+      outcome === "lost response"
+        ? reject(new Error("Lost response"))
+        : resolve({ ...item, captionMd: "Original sent wishes" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Saving…")).not.toBeInTheDocument(),
+    );
+    // Still no dirty difference from the old baseline, but that is not a receipt.
+    expect(body).toHaveValue("Original");
+    await userEvent.click(
+      screen.getByRole("link", { name: "Leave references" }),
+    );
+    expect(router.state.location.pathname).toBe("/references");
+    expect(update).toHaveBeenCalledOnce();
+  },
+);

@@ -57,6 +57,9 @@ export function useStickyNote({
   const sent = useRef<Text | null>(null);
   const readFlight = useRef(false);
   const dispatched = useRef(false);
+  // Scope loss alone is not unsaved work. Keep uncertainty independently: a
+  // user can type back to the baseline while a sent request is unresolved.
+  const unresolvedWrite = useRef(false);
   const abandoned = useRef(false);
   const entityId = useRef(item?.id);
   entityId.current = item?.id;
@@ -217,9 +220,11 @@ export function useStickyNote({
       try {
         if (!owned()) return false;
         dispatched.current = true;
+        unresolvedWrite.current = true;
         const saved = await operation();
         if (!owned()) return false;
         baseline.current = saved;
+        unresolvedWrite.current = false;
         // Do not replace newer typing with the submitted/server value.
         // The server preserves explicit empty titles. Never replace newer typing
         // or infer intent from a default-looking title.
@@ -234,6 +239,7 @@ export function useStickyNote({
         if (!owned()) return false;
         stopped.current = true;
         const conflict = (error as { code?: string })?.code === "conflict";
+        if (conflict) unresolvedWrite.current = false;
         setPhase(conflict ? "conflict" : "unconfirmed");
         setDetail(
           conflict
@@ -264,14 +270,14 @@ export function useStickyNote({
     shouldBlockFn: async () => {
       if (abandoned.current) return false;
       if (flight.current) await flight.current;
+      if (!isDirty() && !unresolvedWrite.current) return false;
       if (!owned()) return true;
-      if (!isDirty() && !stopped.current) return false;
       // A normal route departure intentionally flushes. Failure retains the
       // mounted paper, instead of quietly abandoning an uncertain write.
       return !(await flush());
     },
     enableBeforeUnload:
-      !abandoned.current && (dirty || pending || phase === "unconfirmed"),
+      !abandoned.current && (dirty || pending || unresolvedWrite.current),
   });
   const checkLatest = async () => {
     if (readFlight.current || flight.current || !owned()) return;
@@ -294,6 +300,7 @@ export function useStickyNote({
       setLatest(found);
       if (same(draft.current, text(found))) {
         baseline.current = found;
+        unresolvedWrite.current = false;
         stopped.current = false;
         abandoned.current = false;
         setPhase("saved");
@@ -329,6 +336,7 @@ export function useStickyNote({
     )
       return;
     baseline.current = latest;
+    unresolvedWrite.current = false;
     abandoned.current = false;
     draft.current = text(latest);
     setValue(draft.current);
