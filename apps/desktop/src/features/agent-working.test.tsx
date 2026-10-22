@@ -142,11 +142,16 @@ it("caches the rough underline by rounded width", () => {
   expect(workingUnderline(200)).toContain("C");
   expect(workingUnderline(200)).not.toEqual(workingUnderline(260));
 });
-it("expires through the application clock without a new event or card timer", () => {
+it("H-B01 / AG10: expires to explicit unconfirmed feedback through the shared clock", () => {
   render(<TaskCard task={task} members={[member]} />);
   expect(screen.getByTestId("working-line")).toBeVisible();
   act(() => useUiStore.getState().tick(now + 120001));
-  expect(screen.queryByTestId("working-line")).toBeNull();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.getByText("Worker · task activity unconfirmed")).toBeVisible();
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
 });
 it("a memoized table row updates active, quiet and cleared states without a task edit", () => {
   const active = agentWorking(task, member, now);
@@ -252,4 +257,34 @@ it("an agent's activity on another task never animates this assigned card as wor
       now,
     ),
   ).toBeNull();
+});
+
+it("H-B01 / AG10: Review shows waiting, never the old worker's active ring", () => {
+  render(<TaskCard task={{ ...task, status: "review" }} members={[member]} />);
+  expect(screen.getByText("Awaiting review")).toBeVisible();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
+  expect(screen.queryByText("Worker · implementing snow tiles")).toBeNull();
+});
+
+it("H-B01 / AG10: unassigned task shows a scoped brain report without claiming execution", () => {
+  render(
+    <TaskCard
+      task={{ ...task, assigneeId: null }}
+      members={[{ ...member, name: "Brain" }]}
+    />,
+  );
+  expect(
+    screen.getByText(
+      "Execution unconfirmed · Brain last reported 0 min ago: implementing snow tiles",
+    ),
+  ).toBeVisible();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
 });
