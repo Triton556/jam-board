@@ -31,18 +31,22 @@ export function MemberDialog({
   const [avatar, setAvatar] = useState(member?.avatar ?? "");
   const valid = !!name.trim() && name.length <= 40 && avatar.length <= 16;
   const write = useProjectWrite(`member:${member?.id ?? "new"}`);
+  const dispatched = useRef(false);
   const submit = () => {
-    if (!valid || write.error) return;
+    if (!valid || write.error || write.isLocked()) return;
+    dispatched.current = false;
     const input = { name: name.trim(), color, avatar: avatar || null };
     write.run(
-      () =>
-        member
+      () => {
+        dispatched.current = true;
+        return member
           ? api.updateMember({
               ...input,
               id: member.id,
               avatar: member.kind === "agent" ? null : input.avatar,
             })
-          : api.createMember(input),
+          : api.createMember(input);
+      },
       () => {
         void client.invalidateQueries({ queryKey: ["members"] });
         close();
@@ -98,7 +102,7 @@ export function MemberDialog({
           form={form}
           action="Saving teammate"
         />
-        {write.error && (
+        {write.error && dispatched.current && (
           <p role="alert">
             The save outcome is unconfirmed. Your draft is retained. Close and
             inspect the team before submitting again; this request will not be

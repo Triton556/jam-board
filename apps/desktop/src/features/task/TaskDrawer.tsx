@@ -446,12 +446,16 @@ export function TaskEditor({
         ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
         ?.focus();
   }, [archiveRefreshError]);
+  const archiveDispatched = useRef(false);
   const submitArchive = () => {
-    if (archiveWrite.error || archiveRefreshError) return;
+    if (archiveWrite.error || archiveRefreshError || archiveWrite.isLocked())
+      return;
+    archiveDispatched.current = false;
     const key = task.key,
       archiveReason = reason.trim() || undefined;
     archiveWrite.run(
       async () => {
+        archiveDispatched.current = true;
         if (task.archivedAt) await api.unarchiveTask(key);
         else await api.archiveTask(key, archiveReason);
         if (!ownsSave()) return { stale: true };
@@ -1069,7 +1073,7 @@ export function TaskEditor({
               form={archiveActions}
               action="Saving archive change"
             />
-            {archiveWrite.error && (
+            {archiveWrite.error && archiveDispatched.current && (
               <p role="alert">
                 The archive outcome is unconfirmed. Your reason is retained.
                 Close the task drawer and reopen it to inspect the task before

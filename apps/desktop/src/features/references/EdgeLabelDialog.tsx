@@ -55,12 +55,15 @@ export function EdgeLabelDialog({
   useEffect(() => {
     if (refreshError) form.current?.querySelector("input")?.focus();
   }, [refreshError]);
+  const dispatched = useRef(false);
   const submit = (archive = false) => {
-    if (write.error || refreshError) return;
+    if (write.error || refreshError || write.isLocked()) return;
+    dispatched.current = false;
     const id = edge.id,
       submitted = label;
     write.run(
       async () => {
+        dispatched.current = true;
         if (archive)
           await api.canvasArchive({ kind: "edge", id, archived: true });
         else await api.updateRefEdge(id, submitted);
@@ -107,7 +110,7 @@ export function EdgeLabelDialog({
           form={form}
           action="Saving edge change"
         />
-        {write.error && (
+        {write.error && dispatched.current && (
           <p role="alert">
             The save outcome is unconfirmed. Your label is retained. Close and
             inspect the canvas before trying again; this request will not be
