@@ -152,3 +152,27 @@ H-R02 / RF02 / VS03: inspect new frame boundary/header in light and dark, select
 and unselected, at39/40/75/100% and fractional/high zoom. Verify one representation,
 clear grouping, readable title, unobstructed children/pan, grip/resize/collapse,
 and unchanged persisted reference content; source/style assertions are not pixels.
+
+## Alpha33 hidden-interaction behavior delta
+
+KB03 / AS01 / AS03: task actions first Escape retains outer drawer and opener;
+archive double click dispatches once, blocks underlying Ctrl/Cmd+S and pending
+navigation/dismissal. Member and edge forms retain text/focus after uncertainty;
+project ABA/unmount/new editor fences prevent follow-up read/close contamination.
+Actual-router tests cover all three forms without replacing useBlocker.
+
+H-G01: deferred command import shows a named loading dialog; repeated shortcut plus
+Escape cancels intent, late resolution stays closed, warm opening still works.
+Rejected import is caught locally; re-entry remains honest cached failure with
+Close/explicit Reload rather than automatic reload or fictitious Retry.
+
+The hosted F07/F08 browser scenario checks full task invariance while pending, no
+underlying update/claim/Start and one intentional archive. Existing archive/restore
+scenario now confirms Unarchive explicitly, retaining its visibility/state checks.
+Browser/native runtime evidence is separate from prepared/typechecked scenarios.
+
+AS01 dispatch-stage refinement: archive/member/edge refuse a scheduled project
+change before API dispatch with zero calls and precise not-sent feedback. A generic
+post-dispatch rejection remains unconfirmed, including modeled persistence before
+a lost response. Six pre-dispatch cases and retained post-dispatch regressions pass
+in DOM; these are not native transport fault injections.

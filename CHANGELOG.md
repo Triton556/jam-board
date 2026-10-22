@@ -3,6 +3,27 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.33] — 2026-10-22
+
+### Reliable hidden interactions
+
+- Task actions consume the first Escape and return focus to their opener instead
+  of closing the task. Archive/unarchive confirmation is single-flight with visible
+  pending state; pending dismissal and underlying Ctrl/Cmd+S cannot dispatch an
+  unrelated save. Restoring a task does not Start or grant execution.
+- Teammate and reference-edge editors retain captured inputs and visible recovery
+  when a write outcome is uncertain. Late completions cannot close a newer editor
+  or refresh a different project; confirmed-write/read-refresh failures are distinct.
+  Retained error text remains selectable; requests are never automatically replayed.
+  A locally refused pre-dispatch intent is identified as not sent, not unconfirmed.
+- Cold Search and commands shows a cancellable loading dialog. Delayed completion
+  cannot reopen a dismissed palette. Chunk failure stays local with Close and an
+  explicit Reload app action warning about unsaved drafts, not a fake cached retry.
+- Edge-label dismissal now restores its actual opener. Behavioral tests use real
+  router blockers and cover pending navigation, nested Escape and recovered focus.
+
+No backend/schema or permission changes. [Verification](docs/verification/0.3.0-alpha.33.md).
+
 ## [0.3.0-alpha.32] — 2026-10-22
 
 ### Readable empty columns and calmer reference frames
