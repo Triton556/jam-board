@@ -9,7 +9,7 @@
 | ID | Path / setup → action | Required functional outcome | Required visual / usability evidence |
 |---|---|---|---|
 | HF01 | H-D01/D03: existing task → edit Description → save → reopen | `descriptionMd` persists; title, brief, reports and comments unchanged except intended edit | Description and real Comments discoverable without expanding Agent plan; both themes |
-| HF02 | H-D02: expand Agent plan → edit structured field → collapse/reopen | Exact unsaved input/registration retained; Save persists intended change only | Disclosure clearly named; summary legible; no hidden-field validation dead end |
+| HF02 | H-D02: expand Agent plan → edit structured field → collapse/reopen | List edits stay unsaved/mounted; Markdown blur retains its established save behavior but task technical autosave excludes unrelated human fields; errors remain visible while collapsed | Disclosure clearly named; summary legible; no hidden-field validation dead end |
 | HF03 | H-P04: Story Description edit → navigate away/back → save | Uses `outcomeMd`; scoped in-session draft retained; no duplicate description/comments schema | Main description readable; secondary acceptance remains reachable and editable |
 | HF04 | H-D03: comment draft → failed send / pending repeated Enter → route return | Draft retained; single pending send; uncertain results not replayed; switching tasks/projects never crosses drafts | Error near composer, pending state visible; report/results remain accessible |
 | HF05 | Task/story edit → background refresh failure/recovery and concurrent agent update | Draft/focus preserved; stale evidence never silently overwritten | Refresh warning not disguised as empty view; no scroll jump |
@@ -79,18 +79,18 @@ No blanket pass from building, checksums, a static screenshot or source inspecti
 
 ## Owner-reported alpha29 checkpoint
 
-On 2026-10-22 the implementation owner reported 528 DOM checks green (19 new behavior probes), and two new browser scenarios added/typechecked but not run. This is a handoff report, not independently executed evidence by this audit and not a per-row PASS assignment. Link actual test names/results and the final source checkpoint before closing HF rows. All native/visual rows remain NOT RUN here.
+On 2026-10-22 the implementation owner reported 539 DOM checks green (30 new behavior probes), and four new browser scenarios added/typechecked but not run. This is a handoff report, not independently executed evidence by this audit and not a per-row PASS assignment. Link actual test names/results and the final source checkpoint before closing HF rows. All native/visual rows remain NOT RUN here.
 
 ### Alpha29 executed behavioral subset
 
-The implementation owner ran the full 528-test DOM suite. New tests in
+The implementation owner ran the full 539-test DOM suite. New tests in
 `features/human-first-editors.test.tsx` cover HF01–HF05 subsets: exact saved
 Description/legacy field preservation, separate labelled goal context, mounted
 technical drafts, existing Story field mapping and entity-scoped drafts, pending
 comment single-flight, uncertain-response retention, A→B/ABA/unmount fencing,
 Cyrillic comment preservation alongside an unsaved description, archived plan
 reading, and active-work holder/lifecycle preservation with a stale-version
-refusal. Existing draft/read-recovery tests were migrated to the visible labels
+refusal. Eleven review-correction probes additionally cover technical-only autosave, unrelated and queued human drafts, explicit main Save from focused Goal, project/ABA/entity/unmount ownership, Story pending/error visibility, read-only recovery and newer Story typing during save. Existing draft/read-recovery tests were migrated to the visible labels
 and explicit disclosure without dropping their failure and concurrency assertions.
 
 These are behavior passes for the named probes, not a blanket HF01–HF06 visual

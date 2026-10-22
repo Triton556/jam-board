@@ -128,3 +128,119 @@ test("Story description is readable without technical fields; acceptance remains
   expect(current.story.acceptance).toEqual(before.story.acceptance);
   expect(current.story.openDecisionsMd).toBe(before.story.openDecisionsMd);
 });
+
+test("technical blur does not submit a separate human draft; explicit task Save remains a single complete intent", async ({
+  page,
+}) => {
+  const before = await page.evaluate(() => window.__jamMock.getTask("JB-7"));
+  await page.goto("/board?task=JB-7");
+  const drawer = page.getByRole("dialog", { name: "JB-7", exact: true });
+  const description = drawer.getByRole("textbox", {
+    name: "Description",
+    exact: true,
+  });
+  await description.fill("Human wish kept until I save");
+  await openAgentPlan(page);
+  await drawer.getByRole("button", { name: "Edit Goal", exact: true }).click();
+  await drawer
+    .getByRole("textbox", { name: "Goal", exact: true })
+    .fill("A technical outcome saved on blur");
+  await drawer.locator("details.agent-plan > summary").click();
+  await expect
+    .poll(
+      async () =>
+        (await page.evaluate(() => window.__jamMock.getTask("JB-7"))).brief
+          .goalMd,
+    )
+    .toBe("A technical outcome saved on blur");
+  const partial = await page.evaluate(() => window.__jamMock.getTask("JB-7"));
+  expect(partial.descriptionMd).toBe(before.descriptionMd);
+  await expect(description).toHaveValue("Human wish kept until I save");
+  await expect(
+    drawer.getByText("Unsaved changes", { exact: true }),
+  ).toBeVisible();
+  await openAgentPlan(page);
+  await drawer.getByRole("button", { name: "Edit Goal", exact: true }).click();
+  await drawer
+    .getByRole("textbox", { name: "Goal", exact: true })
+    .fill("Final technical goal");
+  const count = await page.evaluate(
+    () =>
+      window.__jamMock.calls.filter((c) => c.command === "update_task").length,
+  );
+  await drawer.getByRole("button", { name: /^Save Ctrl/ }).click();
+  await expect(
+    drawer.getByText("All changes saved", { exact: true }),
+  ).toBeVisible();
+  const after = await page.evaluate(
+    () =>
+      window.__jamMock.calls.filter((c) => c.command === "update_task").length,
+  );
+  const saved = await page.evaluate(() => window.__jamMock.getTask("JB-7"));
+  expect(after).toBe(count + 1);
+  expect(saved.descriptionMd).toBe("Human wish kept until I save");
+  expect(saved.brief.goalMd).toBe("Final technical goal");
+  expect(saved.status).toBe(before.status);
+});
+
+test("Story technical save failure stays visible after collapse and read recovery never replays the write", async ({
+  page,
+}) => {
+  await page.goto("/plan/JB-E1?tab=Stories&story=JB-S1");
+  const drawer = page.getByRole("dialog", { name: "JB-S1", exact: true });
+  await expect(
+    drawer.getByRole("heading", { name: "Description", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    Reflect.set(window, "storyWriteAttempts", 0);
+    window.__jamMock.updateStory = async () => {
+      Reflect.set(
+        window,
+        "storyWriteAttempts",
+        Number(Reflect.get(window, "storyWriteAttempts")) + 1,
+      );
+      throw new Error("Synthetic unconfirmed Story save");
+    };
+  });
+  const before = await page.evaluate(() => window.__jamMock.getStory("JB-S1"));
+  await openAgentPlan(page);
+  await drawer
+    .getByRole("button", {
+      name: "Edit Whose material is the basis",
+      exact: true,
+    })
+    .click();
+  await drawer
+    .getByRole("textbox", { name: "Whose material is the basis", exact: true })
+    .fill("My retained technical source");
+  await drawer.locator("details.agent-plan > summary").click();
+  await expect(
+    drawer.getByRole("alert", { name: "Agent plan save problem" }),
+  ).toContainText("Synthetic unconfirmed Story save");
+  await expect(drawer.locator("details.agent-plan")).not.toHaveAttribute(
+    "open",
+  );
+  await drawer
+    .getByRole("button", { name: "Read latest Story", exact: true })
+    .click();
+  await drawer
+    .getByRole("button", { name: "Open Agent plan to inspect drafts" })
+    .click();
+  await drawer
+    .getByRole("button", {
+      name: "Edit Whose material is the basis",
+      exact: true,
+    })
+    .click();
+  await expect(
+    drawer.getByRole("textbox", {
+      name: "Whose material is the basis",
+      exact: true,
+    }),
+  ).toHaveValue("My retained technical source");
+  const after = await page.evaluate(() => window.__jamMock.getStory("JB-S1"));
+  expect(after.story).toEqual(before.story);
+  expect(
+    await page.evaluate(() => Reflect.get(window, "storyWriteAttempts")),
+  ).toBe(1);
+});

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button, Drawer, Stamp } from "../../components/ui";
 import {
   PaperSkeleton,
@@ -19,7 +19,11 @@ import { AcceptanceEditor } from "../task/BriefEditor";
 import { AgentPlan } from "./AgentPlan";
 import { BrainHandoff } from "./BrainHandoff";
 import { NewPlanningDialog } from "./NewPlanningDialog";
-import { PlanningStatus, SavedMarkdown } from "./PlanningControls";
+import {
+  type PlanningSaveState,
+  PlanningStatus,
+  SavedMarkdown,
+} from "./PlanningControls";
 import { PlanningInput } from "./PlanningInput";
 import { usePlanningDraft } from "./planning-draft";
 import { TaskRows } from "./TaskRows";
@@ -49,6 +53,20 @@ export function StoryDrawer({
   const client = useQueryClient(),
     navigate = useNavigate();
   const [newTask, setNewTask] = useState(false);
+  const [planSaves, setPlanSaves] = useState<Record<string, PlanningSaveState>>(
+    {},
+  );
+  const reportPlanSave = useCallback(
+    (identity: string, state: PlanningSaveState | null) => {
+      setPlanSaves((current) => {
+        const next = { ...current };
+        if (state) next[identity] = state;
+        else delete next[identity];
+        return next;
+      });
+    },
+    [],
+  );
   const story = query.data?.story,
     epic = epics.data?.find((e) => e.id === story?.epicId);
   const save = useMutation({
@@ -135,12 +153,25 @@ export function StoryDrawer({
             ) && <Stamp className="needs-info">Needs info</Stamp>}
             <AgentPlan
               key={story.id}
+              readLatest={() => void query.refetch()}
+              reading={query.isFetching}
+              saveStates={[
+                ...Object.entries(planSaves)
+                  .filter(([identity]) => identity.startsWith(`${story.id}:`))
+                  .map(([, state]) => state),
+                {
+                  label: "Acceptance criteria",
+                  pending: save.isPending,
+                  error: save.error,
+                },
+              ]}
               summary={`${story.acceptance.length} acceptance criteria · context and boundaries`}
             >
               {intentFields.slice(1).map(([field, label]) => (
                 <SavedMarkdown
                   key={`${story.id}:${field}`}
                   identity={`${story.id}:${field}`}
+                  onSaveState={reportPlanSave}
                   label={label}
                   value={story[field]}
                   save={(value) =>
@@ -159,12 +190,6 @@ export function StoryDrawer({
                 }
               />
             </AgentPlan>
-            {save.error && (
-              <p role="alert">
-                {save.error.message}. Open Agent plan to inspect the retained
-                draft before retrying.
-              </p>
-            )}
             <div className="section-heading">
               <h2>Tasks</h2>
               <Button

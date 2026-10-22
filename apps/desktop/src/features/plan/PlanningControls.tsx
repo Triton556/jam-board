@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { MarkdownField } from "../../components/ui/MarkdownField";
@@ -81,12 +81,18 @@ export function PlanningStatus({
     </div>
   );
 }
+export type PlanningSaveState = {
+  label: string;
+  pending: boolean;
+  error: Error | null;
+};
 export function SavedMarkdown({
   identity,
   label,
   value,
   save,
   hint,
+  onSaveState,
   disabled = false,
 }: {
   identity?: string;
@@ -94,6 +100,7 @@ export function SavedMarkdown({
   value: string;
   save(value: string): Promise<unknown>;
   hint?: string;
+  onSaveState?(identity: string, state: PlanningSaveState | null): void;
   disabled?: boolean;
 }) {
   const draft = usePlanningDraft(value, identity);
@@ -108,6 +115,20 @@ export function SavedMarkdown({
       invalidatePlanning(client);
     },
   });
+  useEffect(() => {
+    if (identity)
+      onSaveState?.(identity, {
+        label,
+        pending: mutation.isPending,
+        error: mutation.error,
+      });
+  }, [identity, label, onSaveState, mutation.isPending, mutation.error]);
+  useEffect(
+    () => () => {
+      if (identity) onSaveState?.(identity, null);
+    },
+    [identity, onSaveState],
+  );
   return (
     <>
       <MarkdownField
@@ -122,7 +143,9 @@ export function SavedMarkdown({
         hint={hint}
         disabled={disabled}
       />
-      {mutation.error && <p role="alert">{mutation.error.message}</p>}
+      {!onSaveState && mutation.error && (
+        <p role="alert">{mutation.error.message}</p>
+      )}
     </>
   );
 }
