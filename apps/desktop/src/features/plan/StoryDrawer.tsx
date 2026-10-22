@@ -13,11 +13,8 @@ import { ExecutionControls } from "../execution/ExecutionControls";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
 import { BrainHandoff } from "./BrainHandoff";
-import {
-  NewTaskDialog,
-  PlanningStatus,
-  SavedMarkdown,
-} from "./PlanningControls";
+import { NewPlanningDialog } from "./NewPlanningDialog";
+import { PlanningStatus, SavedMarkdown } from "./PlanningControls";
 import { PlanningInput } from "./PlanningInput";
 import { usePlanningDraft } from "./planning-draft";
 import { TaskRows } from "./TaskRows";
@@ -149,8 +146,8 @@ export function StoryDrawer({
             />
             <TaskRows rows={query.data?.tasks ?? []} openTask={openTask} />
             {newTask && (
-              <NewTaskDialog
-                storyKey={story.key}
+              <NewPlanningDialog
+                target={{ kind: "task", storyKey: story.key }}
                 close={() => setNewTask(false)}
                 created={openTask}
               />

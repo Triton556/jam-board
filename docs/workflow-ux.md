@@ -316,3 +316,26 @@ focus rationale in the [WAI modal pattern](https://www.w3.org/WAI/ARIA/apg/patte
 and uses the [scrollIntoView API](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView).
 The retained review draft and exact captured evidence are unchanged; actual visible
 field geometry remains a native acceptance check, not a DOM-test claim.
+
+
+## 15. A pending creation is not cancelled by hiding its dialog
+
+A delayed Epic/Story/Task create previously allowed Cancel or Escape to hide the
+form, then opened the new entity when the write completed. All three paths were
+reproduced with ordinary controls. A shared creation form now captures submitted
+values, refuses duplicate sends, keeps edits/dismissal locked while pending and
+shows a focused, polite processing status. Known rejection restores the retained
+draft and ordinary dismissal; explicit retry is a new user action, never automatic.
+Unmount or any project transition invalidates late navigation, not the write itself.
+
+[NN/G's system-status guidance](https://www.nngroup.com/articles/visibility-system-status/)
+supports immediate, truthful processing feedback. The [WAI modal pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+normally expects Escape dismissal. Our temporary pending lock is a deliberate
+transaction-safety exception, not a blanket accessibility-conformance claim. Focus
+moves to the processing message instead of a disabled input, then back to the title
+on rejection; the ordinary dialog focus cycle resumes after the request settles.
+
+No client timeout claims a pending write failed. If the app is forcibly closed or
+a response is lost, an already submitted creation may remain in the plan. Reopen
+and inspect before repeating an uncertain action. This batch adds no rollback,
+server idempotency key, background process controller or permission grant.

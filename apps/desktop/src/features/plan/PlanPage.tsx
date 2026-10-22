@@ -19,7 +19,6 @@ import type { EpicTree, StoryTree } from "../../bindings";
 import {
   Avatar,
   Button,
-  Dialog,
   EmptyState,
   IconButton,
   SegmentedControl,
@@ -45,8 +44,8 @@ import { ReferencesSection } from "../references/ReferencesSection";
 import { BrainHandoff, WorkflowGuide } from "./BrainHandoff";
 import { Journal } from "./Journal";
 import { epicProgress } from "./journal-model";
+import { NewPlanningDialog } from "./NewPlanningDialog";
 import {
-  NewTaskDialog,
   PlanningStatus,
   participationText,
   SavedMarkdown,
@@ -83,11 +82,9 @@ export function PlanPage({
     tasks = useQuery(tasksQuery),
     members = useQuery(membersQuery),
     questions = useQuery(questionsQuery);
-  const navigate = useNavigate(),
-    client = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState("active"),
-    [creating, setCreating] = useState(false),
-    [title, setTitle] = useState("");
+    [creating, setCreating] = useState(false);
   const selected = useQuery({
     queryKey: ["epic", epicKey],
     queryFn: () => api.getEpic(epicKey ?? ""),
@@ -114,16 +111,6 @@ export function PlanPage({
   useEffect(() => {
     if (search.create === "epic") setCreating(true);
   }, [search.create]);
-  const create = useMutation({
-    mutationFn: () => api.createEpic({ title: title.trim() }),
-    onSuccess: (e) => {
-      setCreating(false);
-      setTitle("");
-      setFilter("all");
-      invalidatePlanning(client);
-      choose(e.key);
-    },
-  });
   const visible = (epics.data ?? []).filter(
     (e) => filter === "all" || e.status === filter || e.key === epicKey,
   );
@@ -298,36 +285,14 @@ export function PlanPage({
         ) : null}
       </div>
       {creating && (
-        <Dialog title="New epic" onClose={() => setCreating(false)}>
-          <form
-            className="planning-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (title.trim()) create.mutate();
-            }}
-          >
-            <label>
-              Title
-              <input
-                aria-label="Epic name"
-                maxLength={140}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </label>
-            {create.error && <p role="alert">{create.error.message}</p>}
-            <div className="dialog-actions">
-              <Button onClick={() => setCreating(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={!title.trim() || create.isPending}
-              >
-                Create epic
-              </Button>
-            </div>
-          </form>
-        </Dialog>
+        <NewPlanningDialog
+          target={{ kind: "epic" }}
+          close={() => setCreating(false)}
+          created={(key) => {
+            setFilter("all");
+            choose(key);
+          }}
+        />
       )}
     </main>
   );
@@ -357,7 +322,6 @@ function EpicDetail({
   const client = useQueryClient();
   const [menu, setMenu] = useState(false),
     [newStory, setNewStory] = useState(createStory),
-    [storyTitle, setStoryTitle] = useState(""),
     [taskStory, setTaskStory] = useState<string | null>(null);
   useEffect(() => {
     if (createStory) setNewStory(true);
@@ -370,16 +334,6 @@ function EpicDetail({
   const brain = useMutation({
     mutationFn: (handle: string | null) => api.setBrain(e.key, handle),
     onSuccess: () => invalidatePlanning(client),
-  });
-  const add = useMutation({
-    mutationFn: () =>
-      api.createStory({ epicKey: e.key, title: storyTitle.trim() }),
-    onSuccess: (s) => {
-      setNewStory(false);
-      setStoryTitle("");
-      invalidatePlanning(client);
-      openStory(s.key);
-    },
   });
   const archived = e.status === "archived";
   return (
@@ -631,40 +585,15 @@ function EpicDetail({
         )}
       </div>
       {newStory && (
-        <Dialog title="New story" onClose={() => setNewStory(false)}>
-          <form
-            className="planning-form"
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              if (storyTitle.trim()) add.mutate();
-            }}
-          >
-            <label>
-              Title
-              <input
-                aria-label="Story name"
-                maxLength={140}
-                value={storyTitle}
-                onChange={(ev) => setStoryTitle(ev.target.value)}
-              />
-            </label>
-            {add.error && <p role="alert">{add.error.message}</p>}
-            <div className="dialog-actions">
-              <Button onClick={() => setNewStory(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={!storyTitle.trim() || add.isPending}
-              >
-                Create story
-              </Button>
-            </div>
-          </form>
-        </Dialog>
+        <NewPlanningDialog
+          target={{ kind: "story", epicKey: e.key }}
+          close={() => setNewStory(false)}
+          created={openStory}
+        />
       )}
       {taskStory && (
-        <NewTaskDialog
-          storyKey={taskStory}
+        <NewPlanningDialog
+          target={{ kind: "task", storyKey: taskStory }}
           close={() => setTaskStory(null)}
           created={openTask}
         />
