@@ -205,3 +205,39 @@ test("RF04 note actions edit directly and retain menu/dialog dismissal ownership
     ).toEqual(initial);
   }
 });
+
+test("RF04 media caption dialog returns focus to Actions without rewriting content", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Load demo jam" }).click();
+  const initial = await page.evaluate(async () => {
+    await window.__jamMock.addReference({
+      kind: "link",
+      title: "Caption focus fixture",
+      url: "https://example.test/focus",
+      x: 100,
+      y: 160,
+    });
+    return window.__jamMock.referenceCanvas();
+  });
+  await page.goto("/references");
+  const summary = page.getByLabel("Actions for Caption focus fixture", {
+    exact: true,
+  });
+  await summary.click();
+  await page.getByRole("button", { name: "Edit caption", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Edit reference" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue("Caption focus fixture");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(summary).toBeFocused();
+  expect(await page.evaluate(() => window.__jamMock.referenceCanvas())).toEqual(
+    initial,
+  );
+});
