@@ -129,16 +129,18 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
   const ready = page.getByRole("dialog", { name: "Not ready · JB-2" });
   await expect(ready).toContainText("At least one test");
   await ready
-    .getByRole("button", { name: "Move anyway…", exact: true })
+    .getByRole("button", { name: "Mark ready anyway…", exact: true })
     .click();
   await ready.getByRole("textbox", { name: "Override reason" }).fill("short");
   await expect(
-    ready.getByRole("button", { name: "Move anyway", exact: true }),
+    ready.getByRole("button", { name: "Mark ready anyway", exact: true }),
   ).toBeDisabled();
   await ready
     .getByRole("textbox", { name: "Override reason" })
     .fill("Explore the existing route before narrowing the test.");
-  await ready.getByRole("button", { name: "Move anyway", exact: true }).click();
+  await ready
+    .getByRole("button", { name: "Mark ready anyway", exact: true })
+    .click();
   await expect(ready).not.toBeVisible();
   await page.getByRole("button", { name: "Close task", exact: true }).click();
   // Ready describes the brief, not permission. The human starts this exact story.

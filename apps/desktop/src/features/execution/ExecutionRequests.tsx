@@ -166,6 +166,7 @@ function StartRequest({
       )}
       {confirmation && (
         <Dialog
+          busy={resolve.isPending}
           title={`Approve start of ${confirmation.request.scopeKey}?`}
           onClose={() => {
             if (!resolve.isPending) setConfirmation(null);

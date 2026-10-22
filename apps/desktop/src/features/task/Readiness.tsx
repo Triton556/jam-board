@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Minus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Readiness } from "../../bindings";
 import { Button, Dialog } from "../../components/ui";
 import { api } from "../../lib/api";
 import { invalidatePlanning } from "../../lib/planning-queries";
+import { labels, type Status } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 export const readyLabels = {
   goal: "Goal",
@@ -56,9 +57,38 @@ export function validOverride(reason: string) {
 }
 export function ReadinessDialog() {
   const request = useUiStore((s) => s.readyRequest);
-  return request ? <ReadyDialog key={request.key} /> : null;
+  const [completed, setCompleted] = useState<{ key: string } | null>(null);
+  useEffect(() => {
+    if (!completed) return;
+    // The Mark ready trigger can disappear after success. Prefer its stable task
+    // drawer, or the Ready destination when the request came from a board move.
+    const drawer = Array.from(
+      document.querySelectorAll<HTMLElement>(".drawer"),
+    ).find(
+      (node) =>
+        document.getElementById(node.getAttribute("aria-labelledby") ?? "")
+          ?.textContent === completed.key,
+    );
+    (
+      drawer ?? document.querySelector<HTMLElement>('[data-column="ready"]')
+    )?.focus();
+    useUiStore
+      .getState()
+      .notify(
+        `${completed.key} moved to Ready. Scope permission is unchanged; no agent session was launched.`,
+      );
+  }, [completed]);
+  return request ? (
+    <ReadyDialog
+      key={request.key}
+      complete={(key) => {
+        setCompleted({ key });
+        useUiStore.setState({ readyRequest: null });
+      }}
+    />
+  ) : null;
 }
-function ReadyDialog() {
+function ReadyDialog({ complete }: { complete(key: string): void }) {
   const request = useUiStore((s) => s.readyRequest);
   const key = request?.key ?? "";
   const readiness = useQuery({
@@ -71,9 +101,15 @@ function ReadyDialog() {
   });
   const [override, setOverride] = useState(false),
     [reason, setReason] = useState("");
+  const reasonInput = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (override) reasonInput.current?.focus();
+  }, [override]);
   const client = useQueryClient(),
     navigate = useNavigate();
-  const close = () => useUiStore.setState({ readyRequest: null });
+  const close = () => {
+    if (!save.isPending) useUiStore.setState({ readyRequest: null });
+  };
   const save = useMutation({
     mutationFn: () =>
       api.moveTask({
@@ -83,12 +119,12 @@ function ReadyDialog() {
         overrideReason: reason.trim(),
       }),
     onSuccess: () => {
-      close();
       invalidatePlanning(client);
+      complete(key);
     },
-    onError: (e) => useUiStore.getState().error(e.message),
   });
   const fix = (code: string) => {
+    if (save.isPending) return;
     close();
     if (code === "story_active" && task.data) {
       void navigate({
@@ -111,22 +147,51 @@ function ReadyDialog() {
     );
   };
   return (
-    <Dialog title={`Not ready · ${key}`} onClose={close}>
+    <Dialog title={`Not ready · ${key}`} onClose={close} busy={save.isPending}>
       <p>Complete the brief so a worker knows what success looks like.</p>
+      <p className="small">
+        Ready describes the brief. It does not start work or grant permission to
+        an agent.
+      </p>
+      {(readiness.isPending || task.isPending) && (
+        <p role="status">Checking the saved brief…</p>
+      )}
       <ul className="readiness-issues">
         {readiness.data?.missing.map((issue) => (
           <li key={issue.code}>
             <span>{issue.message}</span>
-            <Button onClick={() => fix(issue.code)}>Fix</Button>
+            <Button
+              disabled={save.isPending}
+              aria-label={`Fix ${readyLabels[issue.code as keyof typeof readyLabels] ?? issue.code}`}
+              onClick={() => fix(issue.code)}
+            >
+              Fix
+            </Button>
           </li>
         ))}
       </ul>
-      {readiness.error && <p role="alert">{readiness.error.message}</p>}
+      {(readiness.error || task.error) && (
+        <div>
+          <p role="alert">{readiness.error?.message ?? task.error?.message}</p>
+          <Button
+            disabled={readiness.isFetching || task.isFetching || save.isPending}
+            onClick={() => {
+              void readiness.refetch();
+              void task.refetch();
+            }}
+          >
+            Check again
+          </Button>
+        </div>
+      )}
       {override && (
         <label className="field">
           Reason
           <textarea
             aria-label="Override reason"
+            ref={reasonInput}
+            disabled={save.isPending}
+            maxLength={4000}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Why is this brief ready despite the missing details?"
@@ -136,18 +201,40 @@ function ReadyDialog() {
           </small>
         </label>
       )}
+      {save.error && (
+        <p role="alert">
+          {save.error.message} Your reason is kept; retry or return to the task.
+        </p>
+      )}
       <div className="dialog-actions">
-        <Button onClick={close}>Keep in Backlog</Button>
+        <Button disabled={save.isPending} onClick={close}>
+          Keep in{" "}
+          {task.data ? labels[task.data.status as Status] : "current status"}
+        </Button>
         {override ? (
           <Button
             variant="primary"
-            disabled={!validOverride(reason) || save.isPending}
+            disabled={
+              !validOverride(reason) ||
+              save.isPending ||
+              !readiness.data ||
+              !task.data ||
+              !!readiness.error ||
+              !!task.error
+            }
             onClick={() => save.mutate()}
           >
-            Move anyway
+            {save.isPending ? "Moving to Ready…" : "Mark ready anyway"}
           </Button>
         ) : (
-          <Button onClick={() => setOverride(true)}>Move anyway…</Button>
+          <Button
+            disabled={
+              !readiness.data || !task.data || !!readiness.error || !!task.error
+            }
+            onClick={() => setOverride(true)}
+          >
+            Mark ready anyway…
+          </Button>
         )}
       </div>
     </Dialog>

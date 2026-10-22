@@ -3,6 +3,34 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.6] - 2026-10-21
+
+### Fixed
+
+- Request changes now shows the complete captured report inside its modal: changed
+  files, commands, expected/actual results, deviations and unverified work. Explicit
+  rereading can replace evidence without closing the dialog or losing review drafts.
+  The reader and decision dialog share one renderer to avoid partial-evidence drift.
+- Test commands are visible text rather than hover-only hints. The review dialog is
+  wider, with contained overflow for detailed evidence and readable wrapped output.
+- Successful review clears the earlier “inspect before accepting” guidance; a Done
+  receipt no longer contradicts a stale pre-acceptance instruction.
+- Readiness override keeps failed reasons and actionable errors inside the modal,
+  recovers failed initial reads, prevents duplicate submission/dismissal while saving,
+  and returns focus to stable task/board context. Success explicitly leaves scope
+  permission unchanged and does not claim to have launched a worker.
+- Protected confirmation dialogs expose their busy state and disable the Close
+  button rather than presenting an apparently usable control that does nothing.
+
+### Verification and compatibility
+
+- No new schema, MCP request contract, execution semantics or permission grant.
+- The exact alpha5 backend passed an independent adversarial review. Its Linux
+  native migration and first launch also passed; the longer fictional project
+  journey remains in progress. This does not certify alpha6 native interaction.
+- Exact automated checks and remaining limits are recorded in versioned verification
+  notes. Remote branch CI remains alpha3-only; no current browser pass is claimed.
+
 ## [0.3.0-alpha.5] - 2026-10-21
 
 ### Added

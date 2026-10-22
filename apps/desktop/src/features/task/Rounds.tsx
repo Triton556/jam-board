@@ -7,6 +7,7 @@ import { api } from "../../lib/api";
 import { invalidatePlanning } from "../../lib/planning-queries";
 import { relativeTime } from "../../lib/time";
 import { JamError, type Member, type TaskDetail } from "../../lib/types";
+import { ReportEvidence } from "./ReportEvidence";
 import { ReviewContext } from "./ReviewContext";
 export function ReviewDialog({
   report,
@@ -44,6 +45,8 @@ export function ReviewDialog({
   return (
     <Dialog
       title="Request changes"
+      className="review-decision-dialog"
+      busy={pending}
       onClose={() => {
         if (!pending) close();
       }}
@@ -68,17 +71,13 @@ export function ReviewDialog({
           test choices before submitting.
         </p>
       )}
-      {context && (
-        <>
-          <div className="review-captured-report">
-            <h3 ref={capturedHeading} tabIndex={-1}>
-              Captured report
-            </h3>
-            <Markdown>{report.summaryMd}</Markdown>
-          </div>
-          <ReviewContext task={context} expanded={refreshed} />
-        </>
-      )}
+      <div className="review-captured-report">
+        <h3 ref={capturedHeading} tabIndex={-1}>
+          Captured report
+        </h3>
+        <ReportEvidence report={report} expandFiles={refreshed} />
+      </div>
+      {context && <ReviewContext task={context} expanded={refreshed} />}
       <label className="field">
         Comments
         <textarea
@@ -220,6 +219,7 @@ export function Rounds({
     mutationFn: (input: ReviewTask) => api.reviewTask(input),
     onSuccess: async (_review, input) => {
       setRequest(false);
+      setRefreshed(false);
       setNotice(
         input.verdict === "accept"
           ? "Result accepted. The task moved to Done."
@@ -335,7 +335,7 @@ export function Rounds({
         </div>
       )}
       {refresh.error && !request && <p role="alert">{refresh.error.message}</p>}
-      {refreshed && !request && !changed && (
+      {refreshed && evidence.status === "review" && !request && !changed && (
         <p role="status">
           Latest evidence loaded. Inspect this report and its captured criteria
           before accepting.
@@ -376,59 +376,9 @@ export function Rounds({
                   <b>{author(report.authorId)?.name ?? "Worker"}</b>
                   <time>{relativeTime(report.createdAt)}</time>
                 </div>
-                <Markdown>{report.summaryMd}</Markdown>
+                <ReportEvidence report={report} />
                 {round === evidence.reviewRound && (
                   <ReviewContext task={evidence} expanded={refreshed} />
-                )}
-                <details>
-                  <summary>
-                    Changed files · {report.changedFiles.length}
-                  </summary>
-                  <ul>
-                    {report.changedFiles.map((f) => (
-                      <li key={f}>
-                        <code>{f}</code>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-                <div className="report-tests">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Test</th>
-                        <th>Expected</th>
-                        <th>Actual</th>
-                        <th>Result</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.tests.map((t) => (
-                        <tr key={t.name}>
-                          <td title={t.command}>{t.name}</td>
-                          <td>{t.expected}</td>
-                          <td>{t.actual}</td>
-                          <td>
-                            <Stamp className={`test-${t.result.toLowerCase()}`}>
-                              {t.result}
-                            </Stamp>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {report.deviationsMd && (
-                  <>
-                    <h4>Deviations</h4>
-                    <Markdown>{report.deviationsMd}</Markdown>
-                  </>
-                )}
-                {report.notVerifiedMd && (
-                  <>
-                    <h4>Not verified</h4>
-                    <Markdown>{report.notVerifiedMd}</Markdown>
-                  </>
                 )}
               </section>
             )}

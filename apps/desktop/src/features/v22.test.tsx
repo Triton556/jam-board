@@ -98,12 +98,16 @@ it("readiness override requires a trimmed reason of ten characters", async () =>
   useUiStore.setState({ readyRequest: { key: task.key, status: "ready" } });
   wrap(<ReadinessDialog />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Move anyway…" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Mark ready anyway…" }),
+  );
   await user.type(
     screen.getByRole("textbox", { name: "Override reason" }),
     " short ",
   );
-  expect(screen.getByRole("button", { name: "Move anyway" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Mark ready anyway" }),
+  ).toBeDisabled();
   expect(validOverride("1234567890")).toBe(true);
   expect(validOverride("  123456789  ")).toBe(false);
 });

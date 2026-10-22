@@ -241,6 +241,7 @@ function Column({
       className={`board-column ${isOver ? "drop-over" : ""}`}
       ref={setNodeRef}
       data-column={status}
+      tabIndex={-1}
       aria-label={`${labels[status]} column`}
     >
       <header className="column-heading">

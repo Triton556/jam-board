@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
+import type { SubmitReport } from "../bindings";
 import { mockApi } from "../lib/mock-bridge";
 import type { Member, TaskDetail } from "../lib/types";
 import { Rounds } from "./task/Rounds";
@@ -43,7 +44,10 @@ async function changedStory(task: TaskDetail) {
   });
   return mockApi.getTask(task.key);
 }
-async function nextReport(task: TaskDetail) {
+async function nextReport(
+  task: TaskDetail,
+  overrides: Partial<SubmitReport> = {},
+) {
   const oldReport = task.reports.find(
     (report) => report.round === task.reviewRound,
   );
@@ -88,6 +92,7 @@ async function nextReport(task: TaskDetail) {
       ],
       deviationsMd: "",
       notVerifiedMd: "No real implementation was executed.",
+      ...overrides,
     },
   });
   return mockApi.getTask(task.key);
@@ -127,6 +132,11 @@ it("a hidden ancestor change is rejected with the original context and cannot au
   ).toMatchObject({
     expectedReviewContextRevision: fresh.reviewContextRevision,
   });
+  expect(
+    screen.queryByText(
+      /Inspect this report and its captured criteria before accepting/,
+    ),
+  ).toBeNull();
 });
 it.each(["task", "story", "epic"] as const)(
   "a visible %s context change blocks acceptance until an explicit reread",
@@ -281,4 +291,82 @@ it("unsaved task corrections cannot be skipped by accepting the saved report", a
   expect(
     screen.getByText(/Review uses saved criteria, not unsaved changes/),
   ).toBeVisible();
+});
+
+it("rereading inside Request changes exposes the full replacement report without losing the draft", async () => {
+  const task = await mockApi.getTask("JB-9"),
+    user = userEvent.setup();
+  const oldReport = task.reports.find(
+    (report) => report.round === task.reviewRound,
+  );
+  if (!oldReport) throw new Error("Missing report");
+  const view = mount(task, await mockApi.listMembers());
+  await user.click(screen.getByRole("button", { name: "Request changes…" }));
+  const dialog = screen.getByRole("dialog");
+  await user.type(
+    within(dialog).getByRole("textbox"),
+    "Check the changed evidence, not just the summary.",
+  );
+  const fresh = await nextReport(task, {
+    summaryMd: oldReport.summaryMd,
+    changedFiles: ["fictional/replacement-proof.txt"],
+    tests: [
+      {
+        name: "Replacement check",
+        command: "synthetic-check --offline",
+        expected: "Cached result",
+        actual: "Timeout in synthetic case",
+        result: "FAIL",
+      },
+    ],
+    deviationsMd: "The replacement report changed the retry assumption.",
+    notVerifiedMd: "Physical device behavior remains unverified.",
+  });
+  view.update(fresh);
+  expect(within(dialog).queryByText("Timeout in synthetic case")).toBeNull();
+  await user.click(
+    within(dialog).getByRole("button", { name: "Read latest evidence" }),
+  );
+  expect(
+    await within(dialog).findByText("fictional/replacement-proof.txt"),
+  ).toBeVisible();
+  const evidence = within(dialog).getByRole("table", {
+    name: "Reported tests",
+  });
+  for (const text of [
+    "Replacement check",
+    "synthetic-check --offline",
+    "Cached result",
+    "Timeout in synthetic case",
+    "FAIL",
+  ])
+    expect(within(evidence).getByText(text, { exact: true })).toBeVisible();
+  expect(
+    within(dialog).getByText(
+      "The replacement report changed the retry assumption.",
+    ),
+  ).toBeVisible();
+  expect(
+    within(dialog).getByText("Physical device behavior remains unverified."),
+  ).toBeVisible();
+  expect(within(dialog).getByRole("textbox")).toHaveValue(
+    "Check the changed evidence, not just the summary.",
+  );
+  expect(
+    within(dialog).getByRole("heading", { name: "Captured report" }),
+  ).toHaveFocus();
+  await user.click(
+    within(dialog).getByRole("button", { name: "Request changes" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(
+    mockApi.calls.filter((call) => call.command === "review_task").at(-1)
+      ?.input,
+  ).toMatchObject({
+    commentsMd: "Check the changed evidence, not just the summary.",
+    expectedReportId: fresh.reports.find(
+      (report) => report.round === fresh.reviewRound,
+    )?.id,
+    expectedReviewContextRevision: fresh.reviewContextRevision,
+  });
 });

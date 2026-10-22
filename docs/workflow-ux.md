@@ -176,6 +176,24 @@ were adjusted; the paper palette and activity animation remain. This verifies
 specific authored color pairs, not every rendered state, custom color or full WCAG
 conformance. Native visual and keyboard acceptance remain separate checks.
 
+## 9. Keep evidence and recovery inside the active decision
+
+An independent interaction probe found that refreshed Request changes showed only
+its report summary while actual output, commands, changed files and limitations
+remained behind a modal. Closing to inspect that material discarded the draft.
+A shared complete report renderer now keeps the evidence inside the decision;
+rereading retains comments and test choices. Commands are visible, not hover-only.
+This follows the modal focus boundary in the
+[WAI-ARIA dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
+and the correction/recognition guidance above. The wider dialog is an application
+layout choice, not a recommendation to add confirmation steps to every decision.
+
+Readiness uses the same local-error, retained-draft and pending-lock pattern as
+review/release. A failed initial brief read has an explicit retry; an override is
+not available before that read succeeds. Busy Close buttons visibly disable,
+and success moves focus to stable context if the original action disappears.
+Ready remains a planning condition, never a new execution grant.
+
 ## Verification boundaries
 
 Automated frontend tests use a deliberately isolated mock bridge. Rust tests
