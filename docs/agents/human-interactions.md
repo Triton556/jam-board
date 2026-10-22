@@ -156,3 +156,10 @@ receipt/error wrapping pushes subsequent surfaces down with a visible gap. Empty
 space between them still accepts canvas gestures. Fit and initial inline-note
 placement reserve the complete current overlay, not fixed toolbar offsets. Drafts,
 filter semantics, stored camera entry and mutation ownership remain unchanged.
+
+## Alpha37 reference keyboard repair
+
+H-R03: focused item Actions retains native Enter/Space activation; Escape closes
+only its menu and returns focus. Summary Space is isolated from the canvas pan
+shortcut, while empty-canvas Space remains available. The alpha35 hosted failure
+and the unchanged real-key scenario are recorded in alpha37 verification.

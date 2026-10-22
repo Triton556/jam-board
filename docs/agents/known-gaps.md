@@ -141,3 +141,13 @@ passed. It also observed a 13 px toolbar/filter background overlap after Refresh
 Alpha36 replaces fixed overlay offsets with normal flow; DOM/source checks are
 not native spacing acceptance. Dynamic resizing of an already-open note and
 extreme control content consuming the viewport remain separate limits.
+
+## Alpha35 hosted failures and alpha37 correction
+
+The first published35 run passed 86/89 browser cases, not the entire suite. Two
+frame tests ran before the lazy canvas existed; a third exposed real summary
+Space suppression by ReactFlow. Alpha37 fixes the readiness contract and isolates
+the summary key without removing the failing Space assertion. Hosted rerun and
+changed-control native confirmation remain pending. The user's separate rejection
+of the inline creation form is not resolved by this keyboard repair: direct
+placement/writing with optional title is the next scoped design.

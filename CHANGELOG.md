@@ -3,6 +3,21 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.37] — 2026-10-22
+
+### Keyboard reference menu recovery
+
+- Space on a focused reference Actions disclosure now belongs to that control,
+  not the canvas pan shortcut. Native disclosure activation is left intact;
+  Enter, Escape, outside dismissal and canvas Space panning remain supported.
+- Frame geometry browser checks wait for the actual lazy canvas and its test
+  bridge before arranging the viewport. Their readability, hit-test, persistence
+  and collapse assertions remain intact, with no increased timeout.
+
+This is a repair for failures observed in the alpha35 hosted browser run, not the
+separate requested direct-sticker redesign. No data/schema/MCP or authority change.
+[Verification and remaining evidence](docs/verification/0.3.0-alpha.37.md).
+
 ## [0.3.0-alpha.36] — 2026-10-22
 
 ### Reference controls with room for feedback

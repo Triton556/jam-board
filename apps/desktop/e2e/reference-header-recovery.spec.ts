@@ -35,6 +35,14 @@ for (const theme of ["light", "dark"] as const) {
       hasText: "Agent inbox",
     });
     const header = page.locator(".reference-frame-tab");
+    // The route is lazy: page load/fonts readiness is not canvas readiness.
+    await expect(
+      page.getByRole("region", { name: "References canvas" }),
+    ).toBeVisible();
+    await expect(title).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => !!window.__jamCanvas))
+      .toBe(true);
     for (const zoom of [1, 0.75, 0.49, 0.4, 0.39]) {
       await page.evaluate(async (zoom) => {
         if (!window.__jamCanvas) throw Error("Canvas bridge unavailable");
