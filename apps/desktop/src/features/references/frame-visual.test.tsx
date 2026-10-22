@@ -188,3 +188,38 @@ it.each(["light", "dark"])(
     expect(context.roundRect).toHaveBeenCalledWith(24, 56, 240, 180, 10);
   },
 );
+
+it("RF02 native-sized narrow frame keeps title above controls and collapsed bounds reserve both rows", () => {
+  camera.zoom = 0.49;
+  const value = { ...frame, title: "Agent inbox", w: 320, h: 1200 };
+  const { container, rerender } = render(
+    <ReactFlowProvider>
+      <CanvasContext.Provider value={runtime()}>
+        <Frame value={value} />
+      </CanvasContext.Provider>
+    </ReactFlowProvider>,
+  );
+  const header = container.querySelector<HTMLElement>(".reference-frame-tab");
+  expect(header).toHaveClass("compact");
+  expect(header?.firstElementChild).toHaveClass("reference-frame-heading");
+  expect(header?.firstElementChild).toHaveTextContent("Agent inbox");
+  expect(header?.lastElementChild).toHaveClass("reference-frame-actions");
+  expect(
+    screen.getByRole("button", { name: "Edit frame Agent inbox" }),
+  ).toBeVisible();
+  rerender(
+    <ReactFlowProvider>
+      <CanvasContext.Provider value={runtime()}>
+        <Frame value={{ ...value, collapsed: true }} />
+      </CanvasContext.Provider>
+    </ReactFlowProvider>,
+  );
+  const root = container.querySelector<HTMLElement>(".reference-frame");
+  expect(Number.parseFloat(root?.style.minHeight ?? "")).toBeCloseTo(
+    (84 * 0.75) / 0.49,
+  );
+  expect(container.querySelector(".reference-frame-outline")).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Expand Agent inbox" }),
+  ).toBeVisible();
+});
