@@ -7,7 +7,10 @@ import {
   useStore,
 } from "@xyflow/react";
 import {
+  Archive,
   AudioLines,
+  ChevronDown,
+  ChevronRight,
   File,
   GripHorizontal,
   Image,
@@ -24,7 +27,6 @@ import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
 import { LocalMedia } from "./Media";
 import { palette, referenceKind } from "./model";
-import { roughFramePaths } from "./rough";
 import { useCanvas } from "./runtime";
 export type TargetChip = { key: string; viaFrame: boolean; color?: string };
 export type ItemData = {
@@ -311,9 +313,14 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           viewBox={`0 0 ${frame.w} ${frame.h}`}
           aria-hidden="true"
         >
-          {roughFramePaths(frame.w ?? 800, frame.h ?? 600).map((d) => (
-            <path key={d} d={d} />
-          ))}
+          <rect
+            x={0.5}
+            y={0.5}
+            width={Math.max(0, (frame.w ?? 800) - 1)}
+            height={Math.max(0, (frame.h ?? 600) - 1)}
+            rx={12}
+            vectorEffect="non-scaling-stroke"
+          />
         </svg>
       )}
       <div
@@ -335,9 +342,15 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
           onClick={() => c.collapse(frame)}
         >
-          {frame.collapsed ? "▸" : "▾"}
+          {frame.collapsed ? (
+            <ChevronRight size={16} />
+          ) : (
+            <ChevronDown size={16} />
+          )}
         </button>
-        <span>{frame.title}</span>
+        <span className="reference-frame-title" title={frame.title}>
+          {frame.title}
+        </span>
         <button
           type="button"
           className="nodrag"
@@ -352,7 +365,7 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           aria-label={`Archive frame ${frame.title}`}
           onClick={() => c.archive("frame", frame.id)}
         >
-          ×
+          <Archive size={15} />
         </button>
       </div>
     </div>
