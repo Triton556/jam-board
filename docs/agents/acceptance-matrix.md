@@ -112,3 +112,12 @@ alpha30 verification; native geometry, both themes, 800×600/200% scaling and
 ## Alpha31 candidate additions
 
 AC02: both Refine modes, keyboard choice, scoped local request across Close/project return, copy failure/pending/scope changes, exact entity IDs, no board mutations. See `features/brain-handoff.test.tsx` and `e2e/refinement-modes.spec.ts` (browser/native not yet run). AC13: a newly agent-created task has a concise human-readable user-language description, existing human wishes preserved, technical detail secondary. This end-to-end/model behavior is NOT established by prompt-string tests.
+
+## Alpha31 shared-overlay candidate
+
+KB03/VS01/VS02: CustomSelect lower-edge placement intersects viewport/scroll clips,
+chooses above/below and remains scrollable; Escape stays at popup depth before
+closing the parent. `components/ui/select-placement.test.tsx` uses synthetic
+geometry plus real DOM keyboard behavior; `e2e/overlay-placement.spec.ts` adds
+real layout/both-theme checks (not yet run). Agent plan uses monochrome CSS ink;
+archived help and singular counts do not imply edit permission.

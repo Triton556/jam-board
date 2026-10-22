@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { selectClip, selectPlacement } from "./select-placement";
 export type SelectOption = {
   value: string;
   label: string;
@@ -32,6 +33,44 @@ export function CustomSelect({
   const root = useRef<HTMLDivElement>(null),
     button = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] =
+    useState<ReturnType<typeof selectPlacement>>();
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (!button.current || !root.current || !popup.current) return;
+      const next = selectPlacement(
+        button.current.getBoundingClientRect(),
+        root.current.getBoundingClientRect(),
+        selectClip(root.current),
+        Math.min(300, popup.current.scrollHeight + 4),
+      );
+      setPlacement((old) =>
+        old &&
+        Object.entries(next).every(
+          ([key, value]) => old[key as keyof typeof old] === value,
+        )
+          ? old
+          : next,
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (root.current) observer.observe(root.current);
+    if (popup.current) observer.observe(popup.current);
+    window.addEventListener("resize", update);
+    document.addEventListener("scroll", update, true);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      document.removeEventListener("scroll", update, true);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, [open]);
   useEffect(() => {
     if (open)
       document
@@ -66,6 +105,7 @@ export function CustomSelect({
       className="custom-select"
       ref={root}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
           e.preventDefault();
           setOpen(true);
@@ -135,7 +175,22 @@ export function CustomSelect({
         <ChevronDown size={16} />
       </button>
       {open && (
-        <div className="combo-popup">
+        <div
+          className="combo-popup"
+          ref={popup}
+          data-placement={placement?.side}
+          style={
+            placement
+              ? {
+                  left: placement.left,
+                  top: placement.top,
+                  width: placement.width,
+                  minWidth: 0,
+                  maxHeight: placement.maxHeight,
+                }
+              : undefined
+          }
+        >
           {searchable && (
             <input
               ref={search}
