@@ -176,3 +176,13 @@ change before API dispatch with zero calls and precise not-sent feedback. A gene
 post-dispatch rejection remains unconfirmed, including modeled persistence before
 a lost response. Six pre-dispatch cases and retained post-dispatch regressions pass
 in DOM; these are not native transport fault injections.
+
+## Alpha34 answer-continuation delta
+
+AC04 / AC10 / AS03: pending or failed answers do not create a saved receipt;
+confirmed and reloaded Answered cards expose the same copy aid. Verify exact
+project/question/scope IDs, omission of answer/chat text, current appointment and
+phase instructions, clipboard failure/selectable fallback, repeated copy and
+project ABA/unmount. Copy must not change task/assignment/permission or send a
+message. Inspect the revealed preview at narrow width in light/dark; source or
+prompt-string assertions do not establish actual agent compliance or visual ease.

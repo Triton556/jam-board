@@ -3,6 +3,24 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.34] — 2026-10-22
+
+### Saved answers and manual continuation
+
+- Confirmed answers and Inbox → Answered now offer **Continue in brain chat**:
+  inspect and copy a compact prompt naming the exact saved question/project/scope.
+  The answer itself stays on the board; the prompt requests fresh context and
+  current brain/phase checks, not automatic appointment, Start or worker launch.
+- A finished chat is not automatically awakened. Active MCP waiting remains
+  supported; this is an explicit copy-only fallback with no session adapter,
+  external message, credentials or process launch.
+- Revealed prompt content uses a spaced, wrapping selectable preview. Clipboard
+  failure retains text, repeat clicks are single-flight, and project ABA/unmount
+  suppress stale feedback. Instructions use the original notes/latest request's
+  language and ask when unclear rather than guessing or translating human text.
+
+No tool/schema/authority changes. [Verification](docs/verification/0.3.0-alpha.34.md).
+
 ## [0.3.0-alpha.33] — 2026-10-22
 
 ### Reliable hidden interactions

@@ -98,3 +98,12 @@ Alpha33 review also distinguished known pre-dispatch refusal from an unconfirmed
 dispatched outcome. Each repaired dialog records whether its API call began;
 read-only retained drafts and no automatic replay remain unchanged. The shared
 project-write hook and backend contracts are not broadened.
+
+## Alpha34 manual aid, not automatic wake
+
+Saved answers can be deliberately handed back to an existing brain chat through
+a copy-only prompt. Active MCP waits remain supported, but there is no adapter
+that starts a new model turn in a finished conversation. CLI/API/embedded-chat
+design is concept-only and not an implementation prerequisite or implicit grant.
+The prompt cannot guarantee that a model follows the instructions; real-client
+workflow observation is separate from DOM/clipboard checks.

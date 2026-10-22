@@ -116,3 +116,12 @@ form via Ctrl/Cmd+S. Teammate and edge-label writes preserve captured fields/err
 recovery and cannot close a newer scope; retained text is readable/copyable.
 Unconfirmed writes are not replayed; confirmed writes with failed refresh are
 labelled separately. Edge editor returns to its real opener after dismissal.
+
+## Alpha34 saved-answer continuation
+
+H-I01 / H-P06: after a confirmed answer, or from Inbox → Answered, choose
+**Continue in brain chat** to reveal a selectable IDs-only prompt. Copy is explicit;
+clipboard failure retains selectable text, repeated pending copy is single-flight,
+and project ABA/unmount suppresses stale feedback. The answer remains persisted on
+the board. This is not a launched chat or automatic brain wake. See the
+[contract](answer-continuation.md) and release-specific acceptance evidence.

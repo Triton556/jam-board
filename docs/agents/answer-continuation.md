@@ -1,7 +1,6 @@
 # Saved answers and manual brain continuation
 
-Candidate on alpha32 base; release owner assigns the integrated version and map
-updates. This is a **manual copy aid**, not an embedded agent/chat integration.
+Integrated in alpha34 after the alpha33 hidden-interaction repairs. This is a **manual copy aid**, not an embedded agent/chat integration.
 
 ## Current behavior and scope
 
