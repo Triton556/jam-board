@@ -15,6 +15,10 @@ All notable changes to Jam Board are documented here. The format follows
   acceptance criteria live in an explicit Agent plan disclosure. Both task and
   story technical editors remain mounted while collapsed, retaining drafts and
   the existing readiness/review rules.
+- Technical task autosave is isolated from unsaved human Description/status edits;
+  explicit task Save still submits its intended dirty fields. Story technical
+  pending/errors stay visible while the plan is collapsed, with read-only latest
+  Story recovery and retained drafts rather than automatic replay.
 - Comment drafts and Story description drafts stay attached to their entity in
   this app session. Comment posting captures its original target and body,
   prevents duplicate pending sends, and keeps an unconfirmed result for manual

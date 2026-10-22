@@ -7,7 +7,7 @@ Baseline: alpha28, source `2b263795b31767da29db0b62dc81f4da19dfc4d1`, inspected 
 ## Alpha29 working-tree delta (implementation present; final gates pending)
 
 - D01/D03: Task Description uses existing `descriptionMd`; real task Comments move near it (`task/TaskComments.tsx`). No parallel description schema.
-- D02: structured task brief moves under collapsed Agent plan (`plan/AgentPlan.tsx`); children remain mounted/registered. Readiness and reports still use the full structure.
+- D02: structured task brief moves under collapsed Agent plan (`plan/AgentPlan.tsx`); children remain mounted/registered. Readiness and reports still use the full structure. Task technical Markdown blur submits only the brief, not an unrelated human Description/status draft. Main task Save intentionally submits all dirty fields. Story technical pending/unconfirmed errors remain visible when collapsed; Read latest Story is read-only and retains local drafts.
 - P04: Story Description uses existing `outcomeMd`; remaining intent and acceptance move under Agent plan. Story has **no new comments schema**.
 - Task comment and Story Description drafts are scoped/in-session. Do not describe them as persisted across application restart.
 - No alpha29 frame, inline-note, bell, zoom, prompt shortening or session-streaming change is asserted here. See known gaps.
@@ -72,4 +72,4 @@ Legend: `D0` base route; `D1` revealed editor/menu/modal; `D2+` nested layers. E
 
 ## Alpha29 validation handoff (2026-10-22)
 
-Implementation owner reports **528 DOM tests passed**, including 19 new behavior probes. Two new functional-browser scenarios were added/typechecked but **not executed** at this checkpoint. This documentation author did not rerun those tests; the release verification record must supply final source/version and exact terminal evidence. DOM success does not establish native pixel geometry, Windows GUI behavior or browser visual acceptance. These results apply to human-first Task/Story work, not proposed frames/notes/bell/zoom/prompt features.
+Implementation owner reports **539 DOM tests passed**, including 30 new behavior probes. Four new functional-browser scenarios were added/typechecked but **not executed** at this checkpoint. This documentation author did not rerun those tests; the release verification record must supply final source/version and exact terminal evidence. DOM success does not establish native pixel geometry, Windows GUI behavior or browser visual acceptance. These results apply to human-first Task/Story work, not proposed frames/notes/bell/zoom/prompt features.

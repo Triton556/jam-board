@@ -521,3 +521,344 @@ it("description and comments on active work preserve its holder and lifecycle wh
   ).rejects.toMatchObject({ code: "conflict" });
   expect((await mockApi.getTask(original.key)).title).toBe(original.title);
 });
+
+it("technical Markdown blur saves only the plan and keeps unrelated human Description unsaved", async () => {
+  const original = await mockApi.getTask("JB-7");
+  const update = vi.spyOn(mockApi, "updateTask");
+  mount(<TaskDrawer taskKey="JB-7" close={() => {}} />);
+  const description = await screen.findByRole("textbox", {
+    name: "Description",
+  });
+  await userEvent.clear(description);
+  await userEvent.type(description, "Human draft not submitted");
+  await userEvent.click(planSummary());
+  await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
+  const goal = screen.getByRole("textbox", { name: "Goal" });
+  await userEvent.clear(goal);
+  await userEvent.type(goal, "Refined technical goal");
+  expect(update).not.toHaveBeenCalled();
+  await userEvent.click(planSummary());
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(update.mock.calls[0]?.[0]).toEqual({
+    key: original.key,
+    expectedUpdatedAt: original.updatedAt,
+    brief: { ...original.brief, goalMd: "Refined technical goal" },
+  });
+  await waitFor(() => expect(description).not.toBeDisabled());
+  expect(description).toHaveValue("Human draft not submitted");
+  expect(screen.getByText("Unsaved changes")).toBeVisible();
+  expect((await mockApi.getTask(original.key)).descriptionMd).toBe(
+    original.descriptionMd,
+  );
+  await userEvent.click(planSummary());
+  expect(screen.getByText("Refined technical goal")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  expect(update.mock.calls[1]?.[0]).toEqual({
+    key: original.key,
+    expectedUpdatedAt: expect.any(String),
+    descriptionMd: "Human draft not submitted",
+  });
+  expect((await mockApi.getTask(original.key)).brief.goalMd).toBe(
+    "Refined technical goal",
+  );
+});
+
+it("a collapsed Story technical save exposes pending and unconfirmed error without losing its draft", async () => {
+  const pending = deferred<never>();
+  const update = vi
+    .spyOn(mockApi, "updateStory")
+    .mockReturnValue(pending.promise);
+  mount(<StoryDrawer storyKey="JB-S1" close={() => {}} openTask={() => {}} />);
+  await screen.findByText("Agent plan");
+  await userEvent.click(planSummary());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  const basis = screen.getByRole("textbox", {
+    name: "Whose material is the basis",
+  });
+  await userEvent.clear(basis);
+  await userEvent.type(basis, "Retain this source and scope");
+  await userEvent.click(planSummary());
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(
+    screen.getByRole("status", { name: "Agent plan save status" }),
+  ).toBeVisible();
+  await act(async () =>
+    pending.reject(new Error("Synthetic technical rejection")),
+  );
+  const error = await screen.findByRole("alert", {
+    name: "Agent plan save problem",
+  });
+  expect(error).toBeVisible();
+  expect(error).toHaveTextContent("Whose material is the basis");
+  expect(error).toHaveTextContent("unconfirmed");
+  expect(error).toHaveTextContent("Synthetic technical rejection");
+  expect(planSummary().closest("details")).not.toHaveAttribute("open");
+  expect(planSummary()).toHaveFocus();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Open Agent plan to inspect drafts" }),
+  );
+  expect(planSummary()).toHaveFocus();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Whose material is the basis" }),
+  ).toHaveValue("Retain this source and scope");
+  expect(update).toHaveBeenCalledTimes(1);
+});
+
+it("failed technical blur retains both drafts and an explicit main Save can reconcile them", async () => {
+  const original = await mockApi.getTask("JB-7");
+  const update = vi
+    .spyOn(mockApi, "updateTask")
+    .mockRejectedValueOnce(new Error("Synthetic save is unconfirmed"));
+  mount(<TaskDrawer taskKey="JB-7" close={() => {}} />);
+  const description = await screen.findByRole("textbox", {
+    name: "Description",
+  });
+  await userEvent.clear(description);
+  await userEvent.type(description, "My separate human wish");
+  await userEvent.click(planSummary());
+  await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
+  const goal = screen.getByRole("textbox", { name: "Goal" });
+  await userEvent.clear(goal);
+  await userEvent.type(goal, "Technical goal retained after rejection");
+  await userEvent.click(planSummary());
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(description).toBeEnabled());
+  expect(description).toHaveValue("My separate human wish");
+  expect(await mockApi.getTask(original.key)).toEqual(original);
+  await userEvent.click(planSummary());
+  expect(
+    screen.getByText("Technical goal retained after rejection"),
+  ).toBeVisible();
+  expect(update).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  expect(update.mock.calls[1]?.[0]).toEqual({
+    key: original.key,
+    expectedUpdatedAt: original.updatedAt,
+    descriptionMd: "My separate human wish",
+    brief: {
+      ...original.brief,
+      goalMd: "Technical goal retained after rejection",
+    },
+  });
+});
+
+it("a partial save acknowledgement cannot erase input queued after its captured draft", async () => {
+  const original = await mockApi.getTask("JB-7");
+  const pending = deferred<typeof original>();
+  const update = vi
+    .spyOn(mockApi, "updateTask")
+    .mockReturnValue(pending.promise);
+  mount(<TaskDrawer taskKey="JB-7" close={() => {}} />);
+  const description = await screen.findByRole("textbox", {
+    name: "Description",
+  });
+  await userEvent.clear(description);
+  await userEvent.type(description, "Earlier human draft");
+  await userEvent.click(planSummary());
+  await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
+  const goal = screen.getByRole("textbox", { name: "Goal" });
+  await userEvent.clear(goal);
+  await userEvent.type(goal, "Pending technical goal");
+  await userEvent.click(planSummary());
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(description).toBeDisabled();
+  // A queued change is injected to exercise acknowledgement reconciliation;
+  // ordinary typing is intentionally locked while this request is pending.
+  fireEvent.change(description, {
+    target: { value: "Newer queued human draft" },
+  });
+  await act(async () =>
+    pending.resolve({
+      ...original,
+      updatedAt: "2040-01-01T00:00:00Z",
+      brief: { ...original.brief, goalMd: "Pending technical goal" },
+    }),
+  );
+  await waitFor(() => expect(description).toBeEnabled());
+  expect(description).toHaveValue("Newer queued human draft");
+  expect(screen.getByText("Unsaved changes")).toBeVisible();
+  expect(update).toHaveBeenCalledTimes(1);
+});
+
+it.each(["project", "ABA", "entity", "unmount"])(
+  "late partial-save acknowledgement cannot refill or announce into a changed %s view",
+  async (kind) => {
+    const original = await mockApi.getTask("JB-7");
+    const app = await mockApi.appState();
+    const pending = deferred<typeof original>();
+    const update = vi
+      .spyOn(mockApi, "updateTask")
+      .mockReturnValue(pending.promise);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    client.setQueryData(["app"], app);
+    const node = (key: string) => (
+      <QueryClientProvider client={client}>
+        <TaskDrawer taskKey={key} close={() => {}} />
+      </QueryClientProvider>
+    );
+    const view = render(node(original.key));
+    await screen.findByRole("textbox", { name: "Description" });
+    await userEvent.click(planSummary());
+    await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
+    const goal = screen.getByRole("textbox", { name: "Goal" });
+    await userEvent.clear(goal);
+    await userEvent.type(goal, "Captured technical goal");
+    await userEvent.click(planSummary());
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    if (kind === "unmount") view.unmount();
+    else if (kind === "entity") {
+      const other = await mockApi.getTask("JB-8");
+      view.rerender(node("JB-8"));
+      await waitFor(() =>
+        expect(screen.getByRole("textbox", { name: "Task title" })).toHaveValue(
+          other.title,
+        ),
+      );
+    } else
+      act(() => {
+        client.setQueryData(["app"], {
+          ...app,
+          jam: { ...app.jam, id: "another-project" },
+        });
+        if (kind === "ABA") client.setQueryData(["app"], app);
+      });
+    const newer = {
+      ...original,
+      title: "Newer authoritative read",
+      updatedAt: "2041-01-01T00:00:00Z",
+    };
+    act(() => client.setQueryData(["task", original.key], newer));
+    const invalidation = vi.spyOn(client, "invalidateQueries");
+    await act(async () =>
+      pending.resolve({
+        ...original,
+        updatedAt: "2040-01-01T00:00:00Z",
+        brief: { ...original.brief, goalMd: "Captured technical goal" },
+      }),
+    );
+    expect(client.getQueryData(["task", original.key])).toEqual(newer);
+    expect(invalidation).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("a Story technical draft typed during autosave survives the earlier acknowledgement", async () => {
+  const original = await mockApi.getStory("JB-S1");
+  const pending = deferred<typeof original.story>();
+  const update = vi
+    .spyOn(mockApi, "updateStory")
+    .mockReturnValue(pending.promise);
+  mount(<StoryDrawer storyKey="JB-S1" close={() => {}} openTask={() => {}} />);
+  await screen.findByText("Agent plan");
+  await userEvent.click(planSummary());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  await userEvent.clear(
+    screen.getByRole("textbox", { name: "Whose material is the basis" }),
+  );
+  await userEvent.type(
+    screen.getByRole("textbox", { name: "Whose material is the basis" }),
+    "Earlier basis",
+  );
+  await userEvent.click(planSummary());
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  await userEvent.click(planSummary());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  const input = screen.getByRole("textbox", {
+    name: "Whose material is the basis",
+  });
+  await userEvent.clear(input);
+  await userEvent.type(input, "Newer basis still being edited");
+  await act(async () =>
+    pending.resolve({ ...original.story, basisMd: "Earlier basis" }),
+  );
+  expect(input).toHaveValue("Newer basis still being edited");
+  expect(input).toHaveFocus();
+  expect(update).toHaveBeenCalledTimes(1);
+});
+
+it("clicking the explicit task Save from a focused Goal saves the intended form once", async () => {
+  const original = await mockApi.getTask("JB-7");
+  const update = vi.spyOn(mockApi, "updateTask");
+  mount(<TaskDrawer taskKey="JB-7" close={() => {}} />);
+  const description = await screen.findByRole("textbox", {
+    name: "Description",
+  });
+  await userEvent.clear(description);
+  await userEvent.type(description, "Explicitly saving this human wish");
+  await userEvent.click(planSummary());
+  await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
+  const goal = screen.getByRole("textbox", { name: "Goal" });
+  await userEvent.clear(goal);
+  await userEvent.type(goal, "Explicitly saving this goal");
+  await userEvent.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(update.mock.calls[0]?.[0]).toEqual({
+    key: original.key,
+    expectedUpdatedAt: original.updatedAt,
+    descriptionMd: "Explicitly saving this human wish",
+    brief: { ...original.brief, goalMd: "Explicitly saving this goal" },
+  });
+  await waitFor(() =>
+    expect(screen.getByText("All changes saved")).toBeVisible(),
+  );
+});
+
+it("Story error recovery rereads without replaying or clearing the retained technical draft", async () => {
+  const update = vi
+    .spyOn(mockApi, "updateStory")
+    .mockRejectedValue(new Error("Unconfirmed Story write"));
+  mount(<StoryDrawer storyKey="JB-S1" close={() => {}} openTask={() => {}} />);
+  await screen.findByText("Agent plan");
+  await userEvent.click(planSummary());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  const input = screen.getByRole("textbox", {
+    name: "Whose material is the basis",
+  });
+  await userEvent.clear(input);
+  await userEvent.type(input, "Keep this draft through rereads");
+  await userEvent.click(planSummary());
+  await screen.findByRole("alert", { name: "Agent plan save problem" });
+  const read = vi
+    .spyOn(mockApi, "getStory")
+    .mockRejectedValueOnce(new Error("Synthetic reread failure"));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Read latest Story" }),
+  );
+  await screen.findByText(/Synthetic reread failure/);
+  expect(update).toHaveBeenCalledTimes(1);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Read latest Story" }),
+  );
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(/Synthetic reread failure/),
+    ).not.toBeInTheDocument(),
+  );
+  expect(planSummary().closest("details")).not.toHaveAttribute("open");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Open Agent plan to inspect drafts" }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Edit Whose material is the basis" }),
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Whose material is the basis" }),
+  ).toHaveValue("Keep this draft through rereads");
+  expect(update).toHaveBeenCalledTimes(1);
+});

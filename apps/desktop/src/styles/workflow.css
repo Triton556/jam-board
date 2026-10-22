@@ -793,3 +793,16 @@
     padding-inline: 14px;
   }
 }
+
+.agent-plan-feedback {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.agent-plan-feedback > p {
+  margin: 0;
+}
+.agent-plan-feedback > button {
+  justify-self: start;
+}

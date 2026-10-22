@@ -55,6 +55,7 @@ import { TaskComments } from "./TaskComments";
 import { TaskConflictDialog } from "./TaskConflictDialog";
 import type { TaskFields } from "./task-form";
 import {
+  briefSchema,
   equalValue,
   fieldNames,
   taskPatch,
@@ -117,6 +118,31 @@ export function TaskEditor({
   const app = useQuery(appQuery);
   const tags = useQuery({ queryKey: ["tags"], queryFn: () => api.listTags() });
   const client = useQueryClient();
+  // A detached editor must not refill another project/entity view on completion.
+  const saveOwner = useRef({ mounted: true, invalidated: false });
+  useEffect(() => {
+    saveOwner.current.mounted = true;
+    const check = () => {
+      const selected = client.getQueryData<
+        Awaited<ReturnType<typeof api.appState>>
+      >(["app"])?.jam?.id;
+      if (selected && selected !== task.jamId)
+        saveOwner.current.invalidated = true;
+    };
+    check();
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.query.queryKey[0] === "app") check();
+    });
+    return () => {
+      saveOwner.current.mounted = false;
+      unsubscribe();
+    };
+  }, [client, task.jamId]);
+  const ownsSave = () =>
+    saveOwner.current.mounted &&
+    !saveOwner.current.invalidated &&
+    client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])?.jam
+      ?.id === task.jamId;
   const [base, setBase] = useState(task);
   const seenVersions = useRef(new Set([task.updatedAt]));
   const [latest, setLatest] = useState<TaskDetail | null>(null);
@@ -189,6 +215,8 @@ export function TaskEditor({
   };
   const conflictRead = useMutation({
     mutationFn: async () => {
+      if (!ownsSave())
+        throw new Error("The editor target changed before rereading.");
       const fresh = await api.getTask(task.key);
       if (fresh.id !== task.id || fresh.jamId !== task.jamId)
         throw new Error(
@@ -197,6 +225,7 @@ export function TaskEditor({
       return fresh;
     },
     onSuccess: (fresh) => {
+      if (!ownsSave()) return;
       client.setQueryData(["task", task.key], fresh);
       setLatest(fresh);
       setReviewError(null);
@@ -204,19 +233,38 @@ export function TaskEditor({
     },
   });
   const save = useMutation({
-    mutationFn: (input: UpdateInput) => api.updateTask(input),
-    onMutate: () => {
+    mutationFn: (input: UpdateInput) => {
+      if (!ownsSave())
+        throw new Error("The editor target changed before this save was sent.");
+      return api.updateTask(input);
+    },
+    onMutate: (input) => {
       setSaveNotice("");
       setReviewError(null);
-      return { values: structuredClone(getValues()), fromReview: review };
+      const values = structuredClone(getValues());
+      const baseline = taskValues(base);
+      return {
+        values,
+        fromReview: review,
+        retained: fieldNames.filter(
+          (field) =>
+            !(field in input) && !equalValue(values[field], baseline[field]),
+        ),
+      };
     },
     onSuccess: (value, _input, submitted) => {
+      if (!ownsSave()) return;
       const current = getValues();
       client.setQueryData(["task", task.key], value);
       resetTask(value);
-      // Preserve typing made while the previous section's blur-save was in flight.
+      // A section autosave acknowledges only its submitted fields. Preserve
+      // unrelated human drafts AND typing made while that save was in flight.
       for (const field of fieldNames) {
-        if (submitted && !equalValue(current[field], submitted.values[field]))
+        if (
+          submitted &&
+          (submitted.retained.includes(field) ||
+            !equalValue(current[field], submitted.values[field]))
+        )
           form.setValue(field, current[field], {
             shouldDirty: true,
             shouldValidate: true,
@@ -229,11 +277,13 @@ export function TaskEditor({
           .notify("Edits saved against the reviewed version.");
     },
     onError: async (error, input, submitted) => {
+      if (!ownsSave()) return;
       if (submitted?.fromReview) {
         setReviewError(error);
         if ("code" in error && error.code === "conflict") {
           try {
-            setLatest(await api.getTask(task.key));
+            const fresh = await api.getTask(task.key);
+            if (ownsSave()) setLatest(fresh);
           } catch {
             /* The captured comparison and error remain; explicit reread can retry. */
           }
@@ -282,8 +332,10 @@ export function TaskEditor({
               ...patch,
             });
         }
+        if (!ownsSave()) return;
         checking = true;
         const check = await api.checkReady(captured.key);
+        if (!ownsSave()) return;
         if (check.ready) {
           await api.markReady({
             key: captured.key,
@@ -326,6 +378,36 @@ export function TaskEditor({
     if (Object.keys(patch).length)
       save.mutate({ key: task.key, expectedUpdatedAt: version, ...patch });
     else resetTask(latest ?? base);
+  };
+  const saveBrief = (nextFocus?: EventTarget | null) => {
+    // Do not preempt the explicit form Save with a competing blur autosave.
+    if (
+      nextFocus instanceof HTMLButtonElement &&
+      nextFocus.type === "submit" &&
+      nextFocus.form?.id === "task-form"
+    )
+      return;
+    if (
+      task.archivedAt ||
+      save.isPending ||
+      conflictRead.isPending ||
+      markLock.current ||
+      review ||
+      !ownsSave()
+    )
+      return;
+    const brief = structuredClone(getValues("brief"));
+    if (equalValue(brief, taskValues(base).brief)) return;
+    const parsed = briefSchema.safeParse(brief);
+    if (!parsed.success) {
+      void form.trigger("brief");
+      return;
+    }
+    save.mutate({
+      key: task.key,
+      expectedUpdatedAt: base.updatedAt,
+      brief: parsed.data,
+    });
   };
   const submitRef = useRef(() => {});
   submitRef.current = () => {
@@ -723,7 +805,7 @@ export function TaskEditor({
                 <BriefEditor
                   value={field.value}
                   onChange={field.onChange}
-                  onSave={() => submitRef.current()}
+                  onSave={saveBrief}
                   disabled={readonly}
                 />
               )}

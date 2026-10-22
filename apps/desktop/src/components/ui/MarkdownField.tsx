@@ -15,7 +15,7 @@ export function MarkdownField({
   label: string;
   value: string;
   onChange(value: string): void;
-  onSave?(): void;
+  onSave?(nextFocus?: EventTarget | null): void;
   hint?: string;
   meaning?: string;
   disabled?: boolean;
@@ -75,9 +75,9 @@ export function MarkdownField({
           value={value}
           rows={Math.max(4, value.split("\n").length + 1)}
           onChange={(e) => onChange(e.target.value)}
-          onBlur={() => {
+          onBlur={(event) => {
             setEditing(false);
-            if (!canceled.current) onSave?.();
+            if (!canceled.current) onSave?.(event.relatedTarget);
             canceled.current = false;
           }}
           onKeyDown={(e) => {
