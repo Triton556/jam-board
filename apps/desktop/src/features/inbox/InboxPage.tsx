@@ -14,6 +14,7 @@ import {
 } from "../../components/ui";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { PageHeading } from "../../components/ui/m5";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
@@ -22,6 +23,7 @@ import {
   storiesQuery,
 } from "../../lib/planning-queries";
 import { appQuery, membersQuery, tasksQuery } from "../../lib/queries";
+import { useExplicitRead } from "../../lib/use-explicit-read";
 import { ExecutionRequests } from "../execution/ExecutionRequests";
 import { AnswerContinuation } from "./AnswerContinuation";
 export function QuestionCard({
@@ -248,27 +250,53 @@ function QuestionListContent({
 }) {
   const questions = useQuery(questionsQuery),
     epics = useQuery(epicsQuery);
+  const read = useExplicitRead(
+    JSON.stringify(["questions", epicId ?? null, status]),
+  );
+  const refresh = () =>
+    void read.run(() => questions.refetch({ cancelRefetch: false }));
   const filtered =
     questions.data?.filter(
       (q) => q.status === status && (!epicId || q.epicId === epicId),
     ) ?? [];
   if (questions.isPending) return <PaperSkeleton label="Loading questions" />;
-  if (questions.error)
+  if (questions.error && !questions.data)
     return (
-      <QueryError
-        error={questions.error}
-        retry={() => void questions.refetch()}
-      />
-    );
-  if (!filtered.length)
-    return (
-      <EmptyState text="No questions right now">
-        <Button onClick={() => void questions.refetch()}>Refresh</Button>
-      </EmptyState>
+      <>
+        <QueryError
+          error={questions.error}
+          retry={refresh}
+          busy={read.pending || questions.isFetching}
+        />
+        <ReadReceipt
+          checkedAt={read.checkedAt}
+          phase={read.phase}
+          resource="questions"
+        />
+      </>
     );
   const groups = [...new Set(filtered.map((q) => q.epicId ?? "project"))];
   return (
     <div className="question-groups">
+      <Button
+        onClick={refresh}
+        disabled={read.pending || questions.isFetching}
+        aria-busy={read.pending || questions.isFetching}
+      >
+        {read.pending ? "Checking questions…" : "Refresh"}
+      </Button>
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="questions"
+      />
+      {questions.error && (
+        <p role="alert">
+          Could not refresh questions. Showing the last loaded questions; your
+          answer draft is kept. {questions.error.message}
+        </p>
+      )}
+      {!filtered.length && <EmptyState text="No questions right now" />}
       {groups.map((id) => {
         const epic = epics.data?.find((e) => e.id === id);
         const rows = filtered.filter((q) => (q.epicId ?? "project") === id);
