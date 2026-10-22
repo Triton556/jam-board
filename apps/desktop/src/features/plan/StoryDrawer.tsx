@@ -137,7 +137,7 @@ export function StoryDrawer({
             />
             <div className="planning-tools">
               <BrainHandoff
-                scope={{ type: "story", key: story.key }}
+                scope={{ type: "story", id: story.id, key: story.key }}
                 disabled={story.status === "archived"}
               />
             </div>

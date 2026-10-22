@@ -428,7 +428,7 @@ function EpicDetail({
             />
           </div>
           <BrainHandoff
-            scope={{ type: "epic", key: e.key }}
+            scope={{ type: "epic", id: e.id, key: e.key }}
             disabled={archived}
           />
         </div>

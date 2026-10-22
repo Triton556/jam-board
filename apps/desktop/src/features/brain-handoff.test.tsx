@@ -21,13 +21,17 @@ it.each(["project", "epic", "story", "task"] as const)(
   "%s handoff is project-pinned and separates planning from execution",
   (type) => {
     const prompt = brainHandoff(
-      { type, key: "JB2-S3" },
+      type === "project" ? { type } : { type, id: "scope-id", key: "JB2-S3" },
       { id: "exact-project", name: "Fictional project", keyPrefix: "JB2" },
     );
     expect(prompt).toContain("project ID is exact-project");
     expect(prompt).toContain("key prefix is JB2");
     expect(prompt).toContain("a matching name or prefix is not enough");
-    expect(prompt).toContain(`${type} JB2-S3`);
+    expect(prompt).toContain(
+      type === "project"
+        ? "this project"
+        : `${type} JB2-S3 (scope ID scope-id)`,
+    );
     expect(prompt).toContain("stop and ask me to connect the right project");
     expect(prompt).toContain("comments and linked references/assets");
     expect(prompt).toContain("Reconcile my edits");
@@ -46,7 +50,7 @@ it("handoff previews a scoped prompt without writing the board, and can be dismi
   const write = vi.spyOn(navigator.clipboard, "writeText");
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <BrainHandoff scope={{ type: "epic", key: "JB-E1" }} />
+      <BrainHandoff scope={{ type: "epic", id: "id-JB-E1", key: "JB-E1" }} />
     </QueryClientProvider>,
   );
   await waitFor(() =>
@@ -60,7 +64,7 @@ it("handoff previews a scoped prompt without writing the board, and can be dismi
   });
   expect(preview).toHaveValue(
     brainHandoff(
-      { type: "epic", key: "JB-E1" },
+      { type: "epic", id: "id-JB-E1", key: "JB-E1" },
       (await mockApi.appState()).jam ?? undefined,
     ),
   );
@@ -91,7 +95,7 @@ it("clipboard failure leaves a selectable prompt and truthful recovery message",
   );
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <BrainHandoff scope={{ type: "task", key: "JB-1" }} />
+      <BrainHandoff scope={{ type: "task", id: "id-JB-1", key: "JB-1" }} />
     </QueryClientProvider>,
   );
   await waitFor(() =>
@@ -136,7 +140,7 @@ it("an open handoff keeps the inspected project and scope across background sele
   client.setQueryData(["app"], original);
   const { rerender } = render(
     <QueryClientProvider client={client}>
-      <BrainHandoff scope={{ type: "story", key: "JB-S1" }} />
+      <BrainHandoff scope={{ type: "story", id: "id-JB-S1", key: "JB-S1" }} />
     </QueryClientProvider>,
   );
   await user.click(
@@ -173,7 +177,7 @@ it("an open handoff keeps the inspected project and scope across background sele
   );
   rerender(
     <QueryClientProvider client={client}>
-      <BrainHandoff scope={{ type: "story", key: "JB-S2" }} />
+      <BrainHandoff scope={{ type: "story", id: "id-JB-S2", key: "JB-S2" }} />
     </QueryClientProvider>,
   );
   expect(screen.getByRole("textbox", { name: "Planning prompt" })).toHaveValue(
@@ -190,7 +194,7 @@ it("an open handoff keeps the inspected project and scope across background sele
   await user.click(screen.getByRole("button", { name: "Refine with brain" }));
   expect(screen.getByRole("textbox", { name: "Planning prompt" })).toHaveValue(
     brainHandoff(
-      { type: "story", key: "JB-S2" },
+      { type: "story", id: "id-JB-S2", key: "JB-S2" },
       {
         id: "different-database-same-prefix",
         name: "Different board with same key prefix",
@@ -214,7 +218,7 @@ it("a pending handoff copy cannot post an old receipt into a reopened scope", as
   client.setQueryData(["app"], await mockApi.appState());
   const { rerender } = render(
     <QueryClientProvider client={client}>
-      <BrainHandoff scope={{ type: "story", key: "JB-S1" }} />
+      <BrainHandoff scope={{ type: "story", id: "id-JB-S1", key: "JB-S1" }} />
     </QueryClientProvider>,
   );
   await user.click(screen.getByRole("button", { name: "Refine with brain" }));
@@ -225,7 +229,7 @@ it("a pending handoff copy cannot post an old receipt into a reopened scope", as
   await user.keyboard("{Escape}");
   rerender(
     <QueryClientProvider client={client}>
-      <BrainHandoff scope={{ type: "story", key: "JB-S2" }} />
+      <BrainHandoff scope={{ type: "story", id: "id-JB-S2", key: "JB-S2" }} />
     </QueryClientProvider>,
   );
   await user.click(screen.getByRole("button", { name: "Refine with brain" }));
@@ -253,8 +257,219 @@ it("project refinement explicitly inventories rough unassigned Backlog, not only
 it.each(["epic", "story", "task"] as const)(
   "%s refinement does not broaden into a full project inventory",
   (type) => {
-    const prompt = brainHandoff({ type, key: "FIXTURE-1" });
+    const prompt = brainHandoff({ type, id: "fixture-id", key: "FIXTURE-1" });
     expect(prompt).toContain(`Review ${type} FIXTURE-1`);
     expect(prompt).not.toContain("Page list_tasks through nextCursor");
   },
 );
+
+it("AG02 continuation is smaller without dropping identity, stale intent or planning boundaries", () => {
+  const scope = { type: "task", id: "task-id", key: "JB-1" } as const;
+  const project = { id: "project-id", name: "Project", keyPrefix: "JB" };
+  const setup = brainHandoff(scope, project);
+  const short = brainHandoff(scope, project, { mode: "continue" });
+  expect(short.length).toBeLessThan(setup.length * 0.7);
+  for (const text of [
+    "project-id",
+    "scope ID task-id",
+    "get_session_context",
+    "current tool schemas",
+    "exact task/report context inspected",
+    "never refresh tokens just to replay",
+    "ask for the full setup prompt",
+    "even if a scope is running",
+    "no claims",
+    "do not replace it",
+    "EMPTY task Description",
+    "preserve existing human text",
+    "my language",
+    "can remain in chat",
+  ])
+    expect(short).toContain(text);
+  expect(short).not.toContain("Page list_tasks");
+  expect(setup).toContain("Never replace an unprocessed saved checkpoint");
+  expect(setup).toContain("does not wake a chat");
+});
+
+it("H-P04 remembers an explicitly chosen mode and local request across modes and Close without a board write", async () => {
+  const user = userEvent.setup();
+  const client = new QueryClient();
+  client.setQueryData(["app"], await mockApi.appState());
+  render(
+    <QueryClientProvider client={client}>
+      <BrainHandoff scope={{ type: "task", id: "t1", key: "JB-1" }} />
+    </QueryClientProvider>,
+  );
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  expect(
+    screen.getByRole("radio", { name: "First / new chat" }),
+  ).toHaveAttribute("aria-checked", "true");
+  const request = screen.getByRole("textbox", { name: "What should change?" });
+  await user.type(request, "Keep the simple outcome; explain the empty state.");
+  await user.click(
+    screen.getByRole("radio", { name: "Continue in this chat" }),
+  );
+  const short = (
+    screen.getByRole("textbox", {
+      name: "Planning prompt",
+    }) as HTMLTextAreaElement
+  ).value;
+  expect(short).toContain(
+    '"Keep the simple outcome; explain the empty state."',
+  );
+  await user.click(screen.getByRole("radio", { name: "First / new chat" }));
+  expect(request).toHaveValue(
+    "Keep the simple outcome; explain the empty state.",
+  );
+  await user.click(
+    screen.getByRole("radio", { name: "Continue in this chat" }),
+  );
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  expect(
+    screen.getByRole("textbox", { name: "What should change?" }),
+  ).toHaveValue("Keep the simple outcome; explain the empty state.");
+  expect(screen.getByRole("textbox", { name: "Planning prompt" })).toHaveValue(
+    short,
+  );
+  expect(screen.getByText(/Local draft, not saved to the board/)).toBeVisible();
+  expect(mockApi.calls.every((call) => call.command === "app_state")).toBe(
+    true,
+  );
+});
+
+it("H-P04 local request survives project return but never leaks to another project with the same key", async () => {
+  const user = userEvent.setup();
+  const client = new QueryClient();
+  const original = await mockApi.appState();
+  client.setQueryData(["app"], original);
+  const view = () => (
+    <QueryClientProvider client={client}>
+      <BrainHandoff scope={{ type: "story", id: "s1", key: "JB-S1" }} />
+    </QueryClientProvider>
+  );
+  const rendered = render(view());
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  await user.type(
+    screen.getByRole("textbox", { name: "What should change?" }),
+    "Only in project A",
+  );
+  await user.click(screen.getByRole("button", { name: /^Close$/ }));
+  act(() =>
+    client.setQueryData(["app"], {
+      ...original,
+      jam: { ...original.jam, id: "other-project" },
+    }),
+  );
+  rendered.rerender(view());
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  expect(
+    screen.getByRole("textbox", { name: "What should change?" }),
+  ).toHaveValue("");
+  await user.type(
+    screen.getByRole("textbox", { name: "What should change?" }),
+    "Only in project B",
+  );
+  await user.keyboard("{Escape}");
+  act(() => client.setQueryData(["app"], original));
+  rendered.rerender(view());
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  expect(
+    screen.getByRole("textbox", { name: "What should change?" }),
+  ).toHaveValue("Only in project A");
+  expect(
+    screen.getByRole("textbox", { name: "Planning prompt" }),
+  ).not.toHaveValue(expect.stringContaining("Only in project B"));
+});
+
+it("H-P04 mode and request changes never rebind an open captured entity after a scope/project rerender", async () => {
+  const user = userEvent.setup();
+  const client = new QueryClient();
+  const original = await mockApi.appState();
+  client.setQueryData(["app"], original);
+  const { rerender } = render(
+    <QueryClientProvider client={client}>
+      <BrainHandoff
+        scope={{ type: "story", id: "original-story", key: "JB-S1" }}
+      />
+    </QueryClientProvider>,
+  );
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  act(() =>
+    client.setQueryData(["app"], {
+      ...original,
+      jam: { ...original.jam, id: "other-project" },
+    }),
+  );
+  rerender(
+    <QueryClientProvider client={client}>
+      <BrainHandoff
+        scope={{ type: "story", id: "other-story", key: "JB-S1" }}
+      />
+    </QueryClientProvider>,
+  );
+  await user.click(
+    screen.getByRole("radio", { name: "Continue in this chat" }),
+  );
+  await user.type(
+    screen.getByRole("textbox", { name: "What should change?" }),
+    "Captured request",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Copy planning prompt" }),
+  );
+  const text = await navigator.clipboard.readText();
+  expect(text).toContain(`project ${original.jam?.id}`);
+  expect(text).toContain("scope ID original-story");
+  expect(text).not.toContain("other-project");
+  expect(text).not.toContain("other-story");
+});
+
+it("H-P04 copy single-flight locks accepted input and mode, then retains them on known clipboard failure", async () => {
+  const user = userEvent.setup();
+  let reject!: (reason: Error) => void;
+  const write = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((_, no) => {
+          reject = no;
+        }),
+    );
+  const client = new QueryClient();
+  client.setQueryData(["app"], await mockApi.appState());
+  render(
+    <QueryClientProvider client={client}>
+      <BrainHandoff scope={{ type: "project" }} />
+    </QueryClientProvider>,
+  );
+  await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  await user.type(
+    screen.getByRole("textbox", { name: "What should change?" }),
+    "Keep this request",
+  );
+  await user.click(
+    screen.getByRole("radio", { name: "Continue in this chat" }),
+  );
+  await user.dblClick(
+    screen.getByRole("button", { name: "Copy planning prompt" }),
+  );
+  expect(write).toHaveBeenCalledOnce();
+  expect(
+    screen.getByRole("textbox", { name: "What should change?" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("radio", { name: "First / new chat" }),
+  ).toBeDisabled();
+  await act(async () => reject(new Error("denied")));
+  expect(screen.getByRole("status")).toHaveTextContent("Clipboard unavailable");
+  expect(
+    screen.getByRole("textbox", { name: "What should change?" }),
+  ).toHaveValue("Keep this request");
+  expect(
+    screen.getByRole("radio", { name: "Continue in this chat" }),
+  ).toHaveAttribute("aria-checked", "true");
+  expect(
+    screen.getByRole("textbox", { name: "Planning prompt" }),
+  ).toHaveAttribute("readonly");
+});

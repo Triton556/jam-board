@@ -555,7 +555,7 @@ export function TaskEditor({
       )}
       <div className="planning-tools">
         <BrainHandoff
-          scope={{ type: "task", key: task.key }}
+          scope={{ type: "task", id: task.id, key: task.key }}
           disabled={readonly}
         />
         <span className="small muted">
