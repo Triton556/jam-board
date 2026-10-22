@@ -148,9 +148,16 @@ it("report navigation keeps comments and test choices intact in one vertical rea
   if (!report) throw Error("Missing report");
   const onReview = vi.fn();
   render(<ReviewDialog report={report} close={() => {}} onReview={onReview} />);
-  await user.click(screen.getByRole("button", { name: "Go to comments" }));
   const comments = screen.getByRole("textbox", { name: "Review comments" });
+  const commentsScroll = vi.spyOn(comments, "scrollIntoView");
+  const heading = screen.getByRole("heading", { name: "Captured report" });
+  const headingScroll = vi.spyOn(heading, "scrollIntoView");
+  await user.click(screen.getByRole("button", { name: "Go to comments" }));
   expect(comments).toHaveFocus();
+  expect(commentsScroll).toHaveBeenLastCalledWith({
+    block: "center",
+    behavior: "instant",
+  });
   await user.type(comments, "Keep this draft while reading the full report.");
   const checkbox = screen.getAllByRole("checkbox")[0];
   if (!checkbox) throw Error("Missing report check");
@@ -158,9 +165,11 @@ it("report navigation keeps comments and test choices intact in one vertical rea
   await user.click(
     screen.getByRole("button", { name: "Back to captured report" }),
   );
-  expect(
-    screen.getByRole("heading", { name: "Captured report" }),
-  ).toHaveFocus();
+  expect(heading).toHaveFocus();
+  expect(headingScroll).toHaveBeenLastCalledWith({
+    block: "start",
+    behavior: "instant",
+  });
   await user.click(screen.getByRole("button", { name: "Go to comments" }));
   expect(comments).toHaveValue(
     "Keep this draft while reading the full report.",

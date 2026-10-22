@@ -1,0 +1,131 @@
+# From a rough idea to reviewed work
+
+A short walkthrough for a **fictional** project, “Desk Notes”. These are planning
+examples, not instructions to provision a real server or launch an agent process.
+
+## 1. Make a separate board
+
+Open the project name in the left navigation, then **New project**. Choose **Custom**
+for a general project, give it a name and create it. Use **Your projects** to return
+to another board; a project switch does not move tasks or stop workers.
+
+The hierarchy is **Project → Epic → Story → Task**:
+
+- **Epic:** a larger goal, such as “Desktop application” or “Server preparation”.
+- **Story:** a feature-sized outcome, such as “A note can be saved and reopened”.
+- **Task:** a small brief with a result and a way to check it.
+
+In **Plan**, create the two epics. Select one and open **Stories** or its story-count
+button. Stories are the feature layer; there is no extra Feature entity to create.
+If an epic seems missing, check the visible Active/Draft/Done/All filter.
+
+## 2. Connect a brain without starting implementation
+
+Open **Settings → Agents** and follow the three steps:
+
+1. Copy the configuration for the named project into your chosen agent client
+   yourself. Stdio runs the sidecar; HTTP requires Jam Board to be open.
+2. Reconnect the client and use **Copy connection check**. The check must identify
+   the intended project before reading its board. A copied snippet alone is not
+   proof that the agent connected.
+3. Appoint a planning brain for the epic. You can select the connected agent under
+   **Plan → Epic → Brain**, or explicitly appoint it in chat for an unassigned epic.
+   This role is not an execution grant and does not launch a model.
+
+The optional playbook is separate from this connection. Its older examples may
+not contain current required fields; use live MCP schemas and the current in-app
+prompts. See [the compatibility note](agent-playbook-compatibility.md).
+
+**Important:** a connected session stays pinned to its project. Switching boards
+in Jam Board does not redirect it. To use another project, create or replace that
+client's connection entry with the other project's configuration and reconnect.
+Keep entries clearly named when connecting more than one project.
+
+## 3. Capture an incomplete idea
+
+Create a task in **Backlog**. A title and rough Notes are enough to start planning;
+do not invent a complete specification just to capture an idea. Attach local
+assets or link material from **References** to the task, story or epic.
+Local-file references retain their paths; they are not uploaded or copied to the
+agent. The connected client still needs its own permitted access to those files
+and your knowledge base. If it cannot read a source, it should say so and ask for
+accessible material rather than invent what the attachment contains.
+
+Choose **Refine with brain**, inspect the prepared project/scope and copy the
+planning prompt into the connected brain's chat. For example, add:
+
+> Review these two epics and their existing stories. Read the linked source
+> material. Ask about missing decisions, then propose small task briefs. Keep
+> this planning-only; do not start implementation.
+
+The prompt is a message, not an automatic agent launch. The brain should preserve
+source intent and ask where project knowledge or repository instructions are
+located rather than assume it has access.
+
+## 4. Answer, edit and reconcile
+
+Answer the brain's questions in **Inbox**. An ordinary answer is information,
+not permission to start work. The connected brain can read it and revise the plan;
+Jam Board does not start a new chat session when you answer.
+
+Review the proposed Story acceptance and task **Goal / Context / Where / Changes /
+Tests / Boundaries / Result**. Edit the brief or Notes, save, then ask the brain to
+reconcile your changes with the current version. It should explain what changed
+and what remains unclear instead of overwriting your edits.
+
+If your save conflicts with another edit, inspect the comparison. **Read latest**
+updates the comparison while retaining your draft; it does not replay the save.
+Only save after comparing the new version. Changed lists replace that entire list,
+not individual rows. You can close the comparison and keep working on the draft.
+
+## 5. Ready is not Start
+
+Mark a sufficiently specified task **Ready**. This means its brief is usable, not
+that workers may execute it. The Story's **Plan status** also describes planning;
+it is distinct from the **New work allowed / Paused** permission display.
+
+When you want implementation to begin, **Start the story or epic** in Plan and
+confirm the exact scope. Or ask in brain chat; the brain creates a typed Start
+request for that scope, which you approve in **Inbox**. The app currently requires
+this explicit approval—ordinary chat text or an answer containing “start” is not
+a trusted authorization bridge.
+
+Once authorized, the brain can organize connected workers inside the scope without
+asking you to launch each worker separately. Jam Board records permission and
+work; it does not create OS agent sessions or install an execution environment.
+
+## 6. Follow evidence and review the result
+
+The Board shows task progress. A worker's task-specific status can animate its
+card; an online agent without a matching task status is labelled unconfirmed
+rather than presented as proof of task activity.
+
+Open a submitted task's **Reports & review**. Read changed files, commands,
+expected/actual test results, deviations and **Not verified**. Accept sufficient
+results or request changes with precise comments. An independent human or the
+appointed brain reviews; workers cannot approve their own reports.
+
+If the report or acceptance context changed while you were deciding, the app
+requires **Read latest evidence**. Your comments and still-applicable test choices
+remain available, but the new report and criteria still need inspection. **Go to comments** and
+**Back to captured report** move within the dialog without discarding the draft.
+
+Accepting records the decision and moves the task to **Done**. Requesting changes
+returns it to **Ready** for another round and preserves earlier evidence. Human
+manual Done is different from a recorded report review.
+
+## Pause and recover safely
+
+- **Pause** stops new claims/restarts in that scope; existing work can still report.
+  It does not terminate a worker process. Pausing an epic also blocks its children;
+  separately paused stories stay paused when that epic is started again.
+- **Release claim…** returns board tracking to Backlog and clears the holder while
+  preserving evidence. It does not stop the worker or grant new permission. Old
+  work from a released claim cannot be silently reused as a new claim's report.
+- Archive a project only after dealing with its In progress tasks, including hidden
+  archived cards. **Archived projects → Restore & open** restores visibility, not
+  execution authorization.
+- On stale-context errors, preserve the draft, reread and reconcile intentionally.
+  Do not replace validators and resend an old decision automatically.
+
+For precise tool contracts and inheritance rules, see [MCP documentation](mcp.md).

@@ -1185,25 +1185,8 @@ NULL AND key<>? ORDER BY position, key",
             .map_err(|_| invalid("cursor", "expected a non-negative offset"))?;
         self.read(|c| {
             let j = jam(c)?;
-            let mut rows = c
-                .prepare(&format!(
-                    "SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? ORDER BY position,key"
-                ))?
-                .query_map([&j.id], task_row)?
-                .collect::<std::result::Result<Vec<_>, _>>()?;
-            for t in &mut rows {
-                *t = task(c, &t.key)?;
-                t.tags = tags(c, &t.id)?;
-                t.comment_count = c.query_row(
-                    "SELECT count(*) FROM comments WHERE task_id=?",
-                    [&t.id],
-                    |r| r.get(0),
-                )?;
-            }
-            let members = c
-                .prepare("SELECT id,handle FROM members")?
-                .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-                .collect::<std::result::Result<BTreeMap<_, _>, _>>()?;
+            // Resolve explicit ancestors even when another filter would match no rows.
+            // Candidate selection and final hydration share this read transaction.
             let epic_id = filter
                 .epic
                 .as_deref()
@@ -1214,35 +1197,50 @@ NULL AND key<>? ORDER BY position, key",
                 .as_deref()
                 .map(|key| crate::planning::story(c, key).map(|s| s.audit.id))
                 .transpose()?;
-            let readiness = if filter.ready.is_some() {
-                rows.iter()
-                    .map(|t| Ok((t.key.clone(), crate::workflow::readiness(c, &t.key)?.ready)))
-                    .collect::<Result<BTreeMap<_, _>>>()?
+            let members = if filter.assignee.as_deref().is_some_and(|a| !["me", "unassigned"].contains(&a)) {
+                c.prepare("SELECT id,handle FROM members")?
+                    .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<std::result::Result<BTreeMap<_, _>, _>>()?
             } else {
                 BTreeMap::new()
             };
-            rows.retain(|t| {
-                if epic_id.as_ref().is_some_and(|id| t.epic_id != *id)
+            let story_epics = if epic_id.is_some() {
+                c.prepare("SELECT id,epic_id FROM stories WHERE jam_id=?")?
+                    .query_map([&j.id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<std::result::Result<BTreeMap<_, _>, _>>()?
+            } else {
+                BTreeMap::new()
+            };
+            let tagged = filter.tag.as_ref().map(|tag| -> Result<BTreeSet<String>> {
+                Ok(c.prepare("SELECT tt.task_id FROM task_tags tt JOIN tasks t ON t.id=tt.task_id WHERE t.jam_id=? AND tt.tag=?")?
+                    .query_map(params![j.id, tag.trim().to_lowercase()], |r| r.get::<_, String>(0))?
+                    .collect::<std::result::Result<BTreeSet<_>, _>>()?)
+            }).transpose()?;
+            let needs_info = if filter.needs_info.is_some() {
+                c.prepare("SELECT q.scope_id FROM questions q JOIN tasks t ON t.id=q.scope_id WHERE t.jam_id=? AND q.scope_type='task' AND q.status='open'")?
+                    .query_map([&j.id], |r| r.get::<_, String>(0))?
+                    .collect::<std::result::Result<BTreeSet<_>, _>>()?
+            } else {
+                BTreeSet::new()
+            };
+            let query = filter.query.as_ref().map(|q| q.to_lowercase());
+            let mut statement = c.prepare(&format!(
+                "SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? ORDER BY position,key"
+            ))?;
+            let rows = statement.query_map([&j.id], task_row)?;
+            let mut skipped = 0usize;
+            let mut tasks = Vec::with_capacity(limit);
+            let mut next_cursor = None;
+            for row in rows {
+                let t = row?;
+                if epic_id.as_ref().is_some_and(|id| story_epics.get(&t.story_id) != Some(id))
                     || story_id.as_ref().is_some_and(|id| t.story_id != *id)
-                    || filter
-                        .ready
-                        .is_some_and(|ready| readiness.get(&t.key) != Some(&ready))
-                    || filter
-                        .changes_requested
-                        .is_some_and(|v| t.changes_requested != v)
-                    || filter.needs_info.is_some_and(|v| t.needs_info != v)
+                    || filter.changes_requested.is_some_and(|v| t.changes_requested != v)
+                    || filter.needs_info.is_some_and(|v| needs_info.contains(&t.id) != v)
+                    || (!filter.include_archived.unwrap_or(false) && t.archived_at.is_some())
+                    || filter.status.as_ref().is_some_and(|ss| !ss.contains(&t.status))
                 {
-                    return false;
-                }
-                if !filter.include_archived.unwrap_or(false) && t.archived_at.is_some() {
-                    return false;
-                }
-                if filter
-                    .status
-                    .as_ref()
-                    .is_some_and(|ss| !ss.contains(&t.status))
-                {
-                    return false;
+                    continue;
                 }
                 if let Some(a) = &filter.assignee {
                     let matches = match a.as_str() {
@@ -1251,35 +1249,33 @@ NULL AND key<>? ORDER BY position, key",
                         _ => t.assignee_id.as_ref().and_then(|id| members.get(id)) == Some(a),
                     };
                     if !matches {
-                        return false;
+                        continue;
                     }
                 }
-                if filter
-                    .tag
-                    .as_ref()
-                    .is_some_and(|tag| !t.tags.contains(&tag.trim().to_lowercase()))
+                if tagged.as_ref().is_some_and(|ids| !ids.contains(&t.id))
+                    || query.as_ref().is_some_and(|q| !t.title.to_lowercase().contains(q)
+                        && !t.description_md.to_lowercase().contains(q))
                 {
-                    return false;
+                    continue;
                 }
-                if let Some(q) = &filter.query {
-                    let q = q.to_lowercase();
-                    if !t.title.to_lowercase().contains(&q)
-                        && !t.description_md.to_lowercase().contains(&q)
-                    {
-                        return false;
-                    }
+                if let Some(ready) = filter.ready
+                    && crate::workflow::readiness_for(c, &t)?.ready != ready
+                {
+                    continue;
                 }
-                true
-            });
-            let next = if offset.saturating_add(limit) < rows.len() {
-                Some(offset.saturating_add(limit).to_string())
-            } else {
-                None
-            };
-            Ok(TaskPage {
-                tasks: rows.into_iter().skip(offset).take(limit).collect(),
-                next_cursor: next,
-            })
+                if skipped < offset {
+                    skipped += 1;
+                    continue;
+                }
+                if tasks.len() == limit {
+                    next_cursor = Some(offset.saturating_add(limit).to_string());
+                    break;
+                }
+                // Hydrate only the requested page; task() remains authoritative for
+                // all returned fields (including readiness, tags and claim context).
+                tasks.push(task(c, &t.key)?);
+            }
+            Ok(TaskPage { tasks, next_cursor })
         })
     }
     pub fn list_members(&self) -> Result<Vec<MemberStats>> {

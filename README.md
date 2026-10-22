@@ -17,11 +17,11 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Snowball dogfood recording in the real desktop app: a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.10**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.11**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.10.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.11.md).
 
 ## Features
 
@@ -48,6 +48,8 @@ Plan shows the Snowball run. Board, Inbox and References show the bundled demo i
 
 ## Plan with a brain agent
 
+New here? Follow [one project from rough idea to reviewed work](docs/first-project.md).
+
 1. Appoint a brain in your agent chat and choose the worker model.
 2. Answer its interview in Inbox. Confirm the goal, done-when and boundaries.
 3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
@@ -63,7 +65,7 @@ Plan shows the Snowball run. Board, Inbox and References show the bundled demo i
 
 Click the project name at the top to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
 
-MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration for the selected project's prefix. Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
+MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration pinned to the selected project's immutable ID (with its name and prefix shown for orientation). Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
 
 **Start / Pause:** Ready describes a task brief, while execution permission belongs to its story or epic. Starting an epic includes its inheriting stories; a separately paused story stays paused. Pausing the epic blocks new work in all its stories, including separately started ones. Already-running tasks may still submit evidence. Closing, archiving, restoring or importing work never silently resumes a grant. [Full execution policy](docs/mcp.md#human-authorized-execution).
 
@@ -101,7 +103,13 @@ The app shows the exact commands, runs a plan, asks before writing, then install
 
 Download the Windows x64 `-setup.exe` from [Releases](https://github.com/Triton556/jam-board/releases). Installation is per-user and does not require administrator rights. Windows 11 with WebView2 is the tested platform.
 
-Jam Board is **Windows-first**; Linux and macOS runtime behavior is unverified. The Windows package includes the MCP sidecar. Use the installer and `SHA256SUMS.txt` from the same release; the downloaded asset's exact filename identifies its checksum entry.
+Jam Board is **Windows-first**. This development branch has controlled Linux native
+acceptance with explicitly provided runtime dependencies; see the versioned
+[verification notes](docs/verification/). That is not a clean-distribution/FUSE
+installation guarantee. macOS runtime and the current prerelease's Windows
+installation lifecycle remain unverified; Windows CI compilation is separate.
+The Windows package includes the MCP sidecar. Use the installer and `SHA256SUMS.txt`
+from the same release; the downloaded asset's exact filename identifies its checksum entry.
 
 The installer is **unsigned**. Windows SmartScreen may warn that the publisher is unknown. Only run an installer you trust; compare its SHA-256 with the release's `SHA256SUMS.txt`.
 
@@ -169,7 +177,12 @@ The frontend refreshes affected query caches, animates agent changes and preserv
 
 ## Development
 
-Requirements: Rust stable (edition 2024), Node.js 22, and on Windows MSVC Build Tools 2022 plus WebView2. Linux build dependencies are in the CI workflow; Linux runtime and macOS have not been validated for this MVP. Use the committed lockfiles.
+For larger boards, see [the disposable data-volume and performance checks](docs/performance.md).
+
+Requirements: Rust stable (edition 2024), Node.js 22 or newer, and on Windows MSVC
+Build Tools 2022 plus WebView2. Linux build dependencies are in the CI workflow;
+the controlled Linux runtime checks and remaining platform limits are recorded in
+the [verification notes](docs/verification/). Use the committed lockfiles.
 
 ```powershell
 cd apps/desktop
@@ -218,7 +231,8 @@ installation paths and shortcuts, verifies the exact parent-owned native target,
 and simulates human Start/review only inside that fresh test project. It removes
 only its fresh data after checking uninstall retention; artifacts stay in a unique
 `.dev-data/install-check-*` directory. This is not permission to run against an
-existing user's installation. The Windows lifecycle remains separately verified.
+existing user's installation. The Windows lifecycle requires separate verification;
+it is not covered by the local Linux checks.
 
 Historical capture scripts preserve old evidence; their milestone names are not
 current executable examples or package-version guarantees. They fail before side

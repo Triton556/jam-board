@@ -922,6 +922,11 @@ async fn every_v2_tool_success_and_error_through_stdio() {
             .await
             .unwrap();
         assert!(!prompt.messages.is_empty());
+        let text = serde_json::to_string(&prompt).unwrap();
+        assert!(text.contains("Read the connected tool schemas first"));
+        assert!(text.contains("Optional agent-playbook"));
+        assert!(text.contains("intended exact project ID"));
+        assert!(!text.contains("agent-playbook 1.1.0"));
     }
     worker.cancel().await.unwrap();
     brain.cancel().await.unwrap();

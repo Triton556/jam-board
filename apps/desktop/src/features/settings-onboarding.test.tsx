@@ -224,7 +224,10 @@ it("optional acquisition keeps a selectable command after clipboard failure", as
   expect(screen.getByText(playbookCloneCommand)).toBeVisible();
 });
 it("planning prompts defer to live schemas and preserve the separate per-epic appointment", () => {
-  const prompt = brainHandoff({ type: "epic", key: "JB-E1" }, "JB");
+  const prompt = brainHandoff(
+    { type: "epic", key: "JB-E1" },
+    { id: "exact-project", name: "Fictional project", keyPrefix: "JB" },
+  );
   expect(prompt).toContain("Read the connected tool schemas");
   expect(prompt).toContain("do not replace another brain");
   expect(prompt).toContain(
