@@ -27,6 +27,7 @@ export function AddReferenceDialog({
       onClose={() => write.dismiss(close)}
     >
       <form
+        className="m5-form"
         ref={form}
         onSubmit={(e) => {
           e.preventDefault();
@@ -99,6 +100,7 @@ export function FrameDialog({
       onClose={() => write.dismiss(close)}
     >
       <form
+        className="m5-form"
         ref={form}
         onSubmit={(e) => {
           e.preventDefault();
@@ -181,6 +183,7 @@ export function EditReferenceDialog({
       onClose={() => write.dismiss(close)}
     >
       <form
+        className="m5-form"
         ref={form}
         onSubmit={(e) => {
           e.preventDefault();

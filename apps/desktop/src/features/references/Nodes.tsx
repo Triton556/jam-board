@@ -9,6 +9,7 @@ import {
 import {
   AudioLines,
   File,
+  GripHorizontal,
   Image,
   Link,
   MoreHorizontal,
@@ -283,7 +284,9 @@ export const ReferenceFrame = memo(function ReferenceFrame({
 }: NodeProps<FrameNode>) {
   const { frame } = data,
     c = useCanvas();
-  const overview = useStore((s) => s.transform[2] < 0.4);
+  const zoom = useStore((s) => s.transform[2]);
+  const overview = zoom < 0.4;
+  const headerScale = Math.max(1, 0.75 / zoom);
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -313,7 +316,19 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           ))}
         </svg>
       )}
-      <div className="reference-frame-tab">
+      <div
+        className="reference-frame-tab"
+        style={{
+          transform: `scale(${headerScale})`,
+          width: `${100 / headerScale}%`,
+        }}
+        title="Drag this header to move the frame; select it to resize"
+      >
+        <GripHorizontal
+          className="reference-frame-grip"
+          size={20}
+          aria-hidden="true"
+        />
         <button
           type="button"
           className="nodrag"

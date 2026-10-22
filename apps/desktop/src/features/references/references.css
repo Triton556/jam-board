@@ -358,13 +358,16 @@
   pointer-events: none;
 }
 .reference-frame-tab {
+  transform-origin: left bottom;
   position: absolute;
   left: 0;
-  top: -17px;
+  top: -42px;
   display: flex;
   align-items: center;
   gap: 9px;
-  max-width: 100%;
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
   background: var(--paper);
   border: 1.5px solid var(--reference-color);
   border-radius: 7px;
@@ -376,11 +379,14 @@
   white-space: nowrap;
 }
 .reference-frame-tab span {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .reference-frame-tab button {
-  padding: 0 3px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 3px;
   border: 0;
   background: none;
   color: var(--ink);
@@ -389,7 +395,7 @@
   visibility: hidden;
 }
 .reference-frame-overview .reference-frame-tab {
-  opacity: 0;
+  opacity: 1;
 }
 .reference-frame.collapsed .reference-frame-tab {
   top: 0;
@@ -589,4 +595,53 @@ p.reference-read-notice {
 .reference-toolbar {
   max-width: calc(100% - 32px);
   flex-wrap: wrap;
+}
+
+/* Frame interiors stay pointer-transparent; only the explicit header and resize controls capture gestures. */
+.reference-frame.selected .reference-frame-tab {
+  border-color: var(--coral);
+}
+.reference-frame .react-flow__resize-control.handle {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.reference-frame-grip {
+  flex-shrink: 0;
+}
+.reference-note-draft {
+  user-select: text;
+  position: absolute;
+  width: 340px;
+  max-height: 480px;
+  overflow: auto;
+  pointer-events: auto;
+  padding: 20px;
+  border: 2px solid var(--coral);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 22px #0002;
+}
+.reference-note-draft header {
+  display: grid;
+  gap: 4px;
+}
+.reference-note-draft header small {
+  color: var(--ink-2);
+}
+.reference-note-draft textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+.reference-note-draft p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reference-frame-overview .reference-frame-tab button {
+  display: none;
+}
+.reference-frame-tab:focus-within button {
+  display: block;
 }
