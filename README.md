@@ -17,13 +17,13 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Historical Snowball dogfood recording in the real desktop app (not current-prerelease acceptance): a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.24**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.25**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
 > Alpha15 adds `latestActivityCursor` to session context; strict/cached output
 > schemas also need updating. Missing on an older server does not mean zero.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.24.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.25.md).
 
 ## Features
 
@@ -52,7 +52,7 @@ These historical screenshots show the earlier Snowball run (Plan) and bundled de
 
 New here? Follow [one project from rough idea to reviewed work](docs/first-project.md).
 
-1. Appoint a brain in your agent chat and choose the worker model.
+1. Connect the agent in **Settings → Agents**, then appoint it under **Plan → Epic → Brain** (or explicitly ask it in chat to take an unassigned epic’s brain role). Choose the worker model in your agent client.
 2. Answer its interview in Inbox. Confirm the goal, done-when and boundaries.
 3. Follow the epic, stories and full task briefs in Plan. Only actionable work becomes Ready.
 4. Start the agreed story or epic in Plan. Or ask the brain in chat: it creates a typed start request for your exact-scope confirmation in Inbox. This grants work permission; it never launches an agent session.
@@ -65,9 +65,11 @@ New here? Follow [one project from rough idea to reviewed work](docs/first-proje
 
 ## Separate projects
 
-Use **Switch project** in the left navigation to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
+Use **Switch project** in the top bar to open **Your projects**. Create a new project for a separate board, or reopen an existing one. Each project keeps its own plan, tasks, questions, assets and references; immutable key prefixes distinguish their entities.
 
 MCP connections are pinned to one project for their lifetime. Opening another board in the app does not redirect connected agents or pause their work. **Settings → Agents** generates configuration pinned to the selected project's immutable ID (with its name and prefix shown for orientation). Reconnect an agent using that project's configuration when you want it on a different board; `get_session_context` reports its current binding.
+
+For separately tracked brain and worker connections, use distinct stable `JAM_AGENT_NAME` (stdio) or `X-Jam-Agent` (HTTP) values. Another chat or an inherited subagent using the same connection shares its board member identity; it is not automatically an independent worker or reviewer. See **Settings → Agents → Agent identity**.
 
 **Start / Pause:** Ready describes a task brief, while execution permission belongs to its story or epic. Starting an epic includes its inheriting stories; a separately paused story stays paused. Pausing the epic blocks new work in all its stories, including separately started ones. Already-running tasks may still submit evidence. Closing, archiving, restoring or importing work never silently resumes a grant. [Full execution policy](docs/mcp.md#human-authorized-execution).
 

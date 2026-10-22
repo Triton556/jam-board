@@ -5,7 +5,7 @@ examples, not instructions to provision a real server or launch an agent process
 
 ## 1. Make a separate board
 
-Use **Switch project** in the left navigation, then **New project**. Choose **Custom**
+Use **Switch project** in the top bar, then **New project**. Choose **Custom**
 for a general project, give it a name and create it. Use **Your projects** to return
 to another board; a project switch does not move tasks or stop workers.
 
@@ -43,8 +43,18 @@ Keep entries clearly named when connecting more than one project.
 
 ## 3. Capture an incomplete idea
 
-Create a task in **Backlog**. A title and rough Notes are enough to start planning;
-do not invent a complete specification just to capture an idea. Attach local
+If the intended Story already exists, open it in **Plan** and use **+ Task**.
+Alternatively, filter **Board** by its Epic, use **Add task to Backlog**, and choose
+**Story for new draft** before adding. Both routes create directly in that Story.
+
+Without an Epic filter, Board quick capture goes to **Unplanned work**. It reuses
+an existing Story with that name or creates a draft Epic and Story when needed.
+This candidate has **no UI or MCP action to change an existing task’s Story**;
+choose the intended Story at creation when placement matters. Refining a brief
+in place does not relocate the task or its evidence.
+
+A title and rough Notes are enough to start planning in **Backlog**; do not invent
+a complete specification just to capture an idea. Attach local
 assets or link material from **References** to the task, story or epic.
 Local-file references retain their paths; they are not uploaded or copied to the
 agent. The connected client still needs its own permitted access to those files

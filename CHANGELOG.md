@@ -3,6 +3,24 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.25] - 2026-10-22
+
+### Fixed
+
+- Board quick-capture guidance now distinguishes an unfiltered draft in Unplanned
+  work from an Epic-filtered draft with a chosen Story. It no longer promises
+  later Story reassignment: this candidate has no exposed task-reparent action.
+  Existing task creation, readiness and execution policies are unchanged.
+- The first-project walkthrough shows both direct Story → + Task and filtered
+  Board capture, and names the top-bar Switch project control correctly. README
+  includes the visible Plan → Epic → Brain appointment route beside chat.
+
+### Verification
+
+- [Verification and limits](docs/verification/0.3.0-alpha.25.md). This is a
+  copy/docs/test correction; alpha24's separate native observations remain
+  attributed to that exact package, not automatically to this version.
+
 ## [0.3.0-alpha.24] - 2026-10-22
 
 ### Fixed
