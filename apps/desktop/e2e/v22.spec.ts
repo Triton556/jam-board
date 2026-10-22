@@ -141,6 +141,19 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
   await ready.getByRole("button", { name: "Move anyway", exact: true }).click();
   await expect(ready).not.toBeVisible();
   await page.getByRole("button", { name: "Close task", exact: true }).click();
+  // Ready describes the brief, not permission. The human starts this exact story.
+  const planned = await page.evaluate(() => window.__jamMock.getTask("JB-1"));
+  await page.goto(`/plan/${planned.epic.key}?story=${planned.story.key}`);
+  await page.getByRole("button", { name: "Start story", exact: true }).click();
+  const start = page.getByRole("dialog", {
+    name: `Start ${planned.story.key}?`,
+  });
+  await expect(start).toContainText("does not launch");
+  await start
+    .getByRole("button", { name: `Start ${planned.story.key}`, exact: true })
+    .click();
+  await expect(start).not.toBeVisible();
+  await page.getByRole("button", { name: "Close task", exact: true }).click();
   await page.evaluate(async () => {
     await window.__jamMock.simulateAgent({
       action: "task.claimed",
@@ -348,7 +361,17 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
   await page.keyboard.press("p");
   await expect(page).toHaveURL(/\/plan/);
   await page.setViewportSize({ width: 1100, height: 700 });
-  await expect(page.locator(".epic-rail")).toHaveCSS("width", "64px");
+  await expect(page.locator(".epic-rail")).toHaveCSS("width", "220px");
+  await expect(
+    page.getByRole("combobox", { name: "Epic filter" }),
+  ).toBeVisible();
+  await expect(page.locator(".epic-card h2").first()).toBeVisible();
+  await select(page, "Epic filter", "Draft");
+  await expect(
+    page.locator(".epic-card").filter({ hasText: "JB-E2" }),
+  ).toBeVisible();
+  await select(page, "Epic filter", "All");
+  await expect(page.locator(".epic-card")).toHaveCount(2);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

@@ -96,6 +96,8 @@ type Host = {
 const copy = <T>(v: T): T => structuredClone(v);
 const now = () => new Date().toISOString();
 export class MockPlanning {
+  private claims = new Map<string, string>();
+  private reviewContexts = new Map<string, string>();
   constructor(private h: Host) {}
   epic(key: string) {
     const e = this.h.data().epics.find((e) => e.key === key || e.id === key);
@@ -112,8 +114,13 @@ export class MockPlanning {
     if (!t) throw new JamError("not_found", "Task not found");
     return t;
   }
-  sync() {
-    for (const t of this.h.tasks()) {
+  sync(only?: TaskDetail) {
+    for (const t of only ? [only] : this.h.tasks()) {
+      const claim = JSON.stringify([t.assigneeId, t.status, t.reviewRound]);
+      const previous = this.claims.get(t.id);
+      if (!t.claimGeneration || (previous !== undefined && previous !== claim))
+        t.claimGeneration = crypto.randomUUID();
+      this.claims.set(t.id, claim);
       const story = this.h.data().stories.find((s) => s.id === t.storyId);
       if (story) t.story = copy(story);
       const epic = this.h.data().epics.find((e) => e.id === t.story.epicId);
@@ -139,6 +146,27 @@ export class MockPlanning {
           ),
       );
       t.ready = mockReadiness(t).ready;
+      const report = t.reports.find((item) => item.round === t.reviewRound);
+      if (t.status === "review" && report) {
+        const context = JSON.stringify([
+          t.id,
+          t.updatedAt,
+          report.id,
+          t.brief,
+          t.story,
+          t.epic,
+        ]);
+        const previousContext = this.reviewContexts.get(t.id);
+        if (
+          !t.reviewContextRevision ||
+          (previousContext !== undefined && previousContext !== context)
+        )
+          t.reviewContextRevision = crypto.randomUUID();
+        this.reviewContexts.set(t.id, context);
+      } else {
+        t.reviewContextRevision = null;
+        this.reviewContexts.delete(t.id);
+      }
     }
   }
   private audit() {
@@ -557,7 +585,13 @@ export class MockPlanning {
     return copy(q);
   }
   async submitReport(input: SubmitReport, actor: Member) {
+    this.sync();
     const t = this.task(input.key);
+    if (input.expectedClaimGeneration !== t.claimGeneration)
+      throw new JamError(
+        "stale_claim",
+        "This claim changed. Read the task and reconcile this report before submitting again.",
+      );
     if (t.assigneeId !== actor.id)
       throw new JamError("forbidden", "Only the assignee may submit a report");
     if (t.status !== "in_progress")
@@ -590,9 +624,20 @@ export class MockPlanning {
   }
   async reviewTask(input: ReviewTask) {
     await this.h.call("review_task", input);
+    this.sync();
     const t = this.task(input.key),
       actor = this.h.human(),
       report = t.reports.find((r) => r.round === t.reviewRound);
+    if (
+      !input.expectedReportId ||
+      input.expectedReportId !== report?.id ||
+      !input.expectedReviewContextRevision ||
+      input.expectedReviewContextRevision !== t.reviewContextRevision
+    )
+      throw new JamError(
+        "conflict",
+        "The report or task/story/epic context changed. Read the latest evidence and reconcile your review.",
+      );
     if (!report)
       throw new JamError("validation", `No report for round ${t.reviewRound}`);
     if (t.assigneeId === actor.id || report.authorId === actor.id)

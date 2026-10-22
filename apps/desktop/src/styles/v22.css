@@ -416,7 +416,7 @@
 }
 .test-fail,
 .changes-requested {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .test-not_run {
   color: var(--ink-2);

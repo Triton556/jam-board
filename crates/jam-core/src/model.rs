@@ -107,6 +107,9 @@ pub struct TaskSummary {
     pub needs_info: bool,
     #[serde(default)]
     pub review_round: i64,
+    /// Opaque, task-bound lifecycle validator. Read again after a successful mutation.
+    #[serde(default)]
+    pub claim_generation: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -119,6 +122,9 @@ pub struct TaskDetail {
     pub activity: Vec<ActivityEvent>,
     pub history: Vec<ActivityEvent>,
     pub brief: crate::TaskBrief,
+    /// Binds the current report to the task, story and epic versions reviewed.
+    #[serde(default)]
+    pub review_context_revision: Option<String>,
     #[serde(default)]
     pub ancestor_questions: Vec<crate::Question>,
     pub story: crate::Story,
@@ -271,6 +277,8 @@ pub type BoardTasks = std::collections::BTreeMap<String, Vec<TaskSummary>>;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateTask {
     pub key: String,
+    pub expected_claim_generation: String,
+    pub expected_updated_at: String,
     pub title: Option<String>,
     pub description: Option<String>,
     pub priority: Option<String>,

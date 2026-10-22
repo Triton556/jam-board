@@ -82,7 +82,7 @@ it("failed Request changes stays inside the dialog with draft preserved and usab
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(screen.getByRole("status")).toHaveTextContent(
-    "task is Ready for another round",
+    "task returned to Ready for another round",
   );
   expect(
     screen.getByRole("heading", { name: "Reports & review" }),

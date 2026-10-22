@@ -173,6 +173,7 @@ record!(Report {id:String,task_id:String,round:i64,author_id:String,summary_md:S
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SubmitReport {
     pub key: String,
+    pub expected_claim_generation: String,
     pub summary_md: String,
     pub changed_files: Vec<String>,
     pub tests: Vec<ReportTest>,
@@ -185,6 +186,8 @@ record!(Review {id:String,task_id:String,round:i64,reviewer_id:String,verdict:St
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReviewTask {
     pub key: String,
+    pub expected_report_id: String,
+    pub expected_review_context_revision: String,
     pub verdict: String,
     pub comments_md: String,
     pub failed_tests: Option<Vec<String>>,

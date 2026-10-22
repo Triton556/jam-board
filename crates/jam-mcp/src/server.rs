@@ -172,12 +172,21 @@ impl JamServer {
                     a.before_key.as_deref(),
                     a.after_key.as_deref(),
                     a.override_reason.as_deref(),
+                    Some(&a.context()),
                 )?)
             }
-            "claim_task" => value(store.claim_task(&actor.id, &parse::<Key>(args)?.key)?),
+            "claim_task" => {
+                let a = parse::<Claim>(args)?;
+                value(store.claim_task(&actor.id, &a.key, Some(&a.context()))?)
+            }
             "release_task" => {
                 let a = parse::<Release>(args)?;
-                value(store.release_task(&actor.id, &a.key, a.status.as_deref())?)
+                value(store.release_task(
+                    &actor.id,
+                    &a.key,
+                    a.status.as_deref(),
+                    Some(&a.expected_claim_generation),
+                )?)
             }
             "add_comment" => {
                 let a = parse::<AddComment>(args)?;
@@ -185,7 +194,12 @@ impl JamServer {
             }
             "archive_task" => {
                 let a = parse::<Archive>(args)?;
-                value(store.archive_task(&actor.id, &a.key, a.reason.as_deref())?)
+                value(store.archive_task(
+                    &actor.id,
+                    &a.key,
+                    a.reason.as_deref(),
+                    Some(&a.context()),
+                )?)
             }
             "list_members" => {
                 parse::<Empty>(args)?;
@@ -291,7 +305,20 @@ pub(crate) fn tool<T: JsonSchema>(
             a.push(json!("storyKey"));
         }
     }
-    let mut result = Tool::new(name, description, input).with_annotations(
+    let freshness = match name {
+        "claim_task" | "move_task" | "mark_ready" | "archive_task" | "update_task"
+        | "update_task_brief" => {
+            " Required: expectedClaimGeneration and expectedUpdatedAt captured from get_task before deciding this mutation. On stale_claim/conflict, reread and reconcile; never blindly refresh validators and replay."
+        }
+        "release_task" | "submit_report" => {
+            " Required: expectedClaimGeneration from the claim you are returning/reporting, not a later same-identity claim. A stale_claim rejects the old payload without mutation; do not relabel it with a fresh validator."
+        }
+        "review_task" => {
+            " Required: expectedReportId and expectedReviewContextRevision captured from the exact current report and TaskDetail.reviewContextRevision you inspected. A changed report/task/story/epic context conflicts; reread evidence and reconsider the decision."
+        }
+        _ => "",
+    };
+    let mut result = Tool::new(name, format!("{description}{freshness}"), input).with_annotations(
         ToolAnnotations::new()
             .read_only(read_only)
             .destructive(false)
@@ -369,7 +396,7 @@ fn tools() -> Vec<Tool> {
             "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses, but entry into In progress always requires a human-started story/epic. Agents cannot move directly to Done; use review_task with an independent report. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
             false,
         ),
-        tool::<Key>(
+        tool::<Claim>(
             "claim_task",
             "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name. New work requires a human-started story/epic; Ready alone is not execution permission.",
             false,
@@ -417,7 +444,7 @@ impl ServerHandler for JamServer {
         self.negotiate_initialize(&request)
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your game jam with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, claim a Ready task before working, then submit_report with results and test evidence. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your game jam with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -489,6 +516,7 @@ impl ServerHandler for JamServer {
                     jam_core::Error::Forbidden(_) => "forbidden",
                     jam_core::Error::Archived(_) => "archived",
                     jam_core::Error::Conflict => "conflict",
+                    jam_core::Error::StaleClaim => "stale_claim",
                     _ => "validation",
                 };
                 let message = e.to_string();
@@ -673,15 +701,18 @@ pub(crate) struct Key {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Move {
     key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
     status: String,
     before_key: Option<String>,
     after_key: Option<String>,
     override_reason: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Release {
     key: String,
+    expected_claim_generation: String,
     status: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
@@ -691,9 +722,11 @@ struct AddComment {
     body: String,
 }
 #[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Archive {
     key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
     reason: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
@@ -702,3 +735,22 @@ struct Assets {
     kind: Option<String>,
     query: Option<String>,
 }
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Claim {
+    key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
+}
+macro_rules! write_context {
+    ($($name:ty),+) => {$(impl $name {
+        fn context(&self) -> jam_core::TaskWriteContext {
+            jam_core::TaskWriteContext {
+                expected_claim_generation: self.expected_claim_generation.clone(),
+                expected_updated_at: self.expected_updated_at.clone(),
+            }
+        }
+    })+};
+}
+write_context!(Claim, Move, Archive);

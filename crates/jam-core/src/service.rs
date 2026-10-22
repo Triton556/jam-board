@@ -70,13 +70,14 @@ pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
         ready: false,
         changes_requested: r.get(18)?,
         review_round: r.get(19)?,
+        claim_generation: format!("{}:{}", r.get::<_, String>(0)?, r.get::<_, i64>(20)?),
         epic_id: String::new(),
         epic_key: String::new(),
         epic_color: String::new(),
         needs_info: false,
     })
 }
-pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round";
+pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round,claim_generation";
 pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
     let mut t = c
         .query_row(
@@ -254,13 +255,7 @@ pub(crate) fn touch(c: &Connection, id: &str, actor: &str) -> Result<()> {
     let previous: String = c.query_row("SELECT updated_at FROM tasks WHERE id=?", [id], |row| {
         row.get(0)
     })?;
-    let format = &time::format_description::well_known::Rfc3339;
-    let previous = time::OffsetDateTime::parse(&previous, format)
-        .map_err(|_| invalid("updatedAt", "Invalid stored version"))?;
-    let stamp = time::OffsetDateTime::now_utc()
-        .max(previous + time::Duration::nanoseconds(1))
-        .format(format)
-        .expect("UTC");
+    let stamp = crate::context::next_version(&previous)?;
     c.execute(
         "UPDATE tasks SET updated_at=?,updated_by=? WHERE id=?",
         params![stamp, actor, id],
@@ -628,6 +623,10 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             actor,
             &input.key,
             None,
+            Some(&TaskWriteContext {
+                expected_claim_generation: input.expected_claim_generation,
+                expected_updated_at: input.expected_updated_at,
+            }),
             TaskPatch {
                 title: input.title,
                 description_md: input.description,
@@ -644,10 +643,12 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         actor: &str,
         key: &str,
         expected: Option<&str>,
+        context: Option<&TaskWriteContext>,
         input: TaskPatch,
     ) -> Result<TaskDetail> {
         self.write(|c| {
  let old=editable(c,key,actor)?;
+ crate::context::check_write(c,actor,&old,context)?;
  if expected.is_some_and(|stamp| stamp != old.updated_at) { return Err(Error::Conflict); }
  let brief_fields = if let Some(b) = input.brief {
      crate::workflow::validate_brief(&b)?;
@@ -703,9 +704,11 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         target: &str,
         before: Option<&str>,
         after: Option<&str>,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
-        self.move_task_with_override(actor, key, target, before, after, None)
+        self.move_task_with_override(actor, key, target, before, after, None, context)
     }
+    #[allow(clippy::too_many_arguments)] // Position neighbors and readiness override are independent of freshness.
     pub fn move_task_with_override(
         &self,
         actor: &str,
@@ -714,10 +717,12 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         before: Option<&str>,
         after: Option<&str>,
         override_reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
         status(target)?;
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &old, context)?;
             let overridden=crate::workflow::transition(c,actor,&old,target,override_reason)?;
             let mut rows = c
                 .prepare(
@@ -795,9 +800,15 @@ NULL AND key<>? ORDER BY position, key",
             task(c, key)
         })
     }
-    pub fn claim_task(&self, actor: &str, key: &str) -> Result<TaskDetail> {
+    pub fn claim_task(
+        &self,
+        actor: &str,
+        key: &str,
+        context: Option<&TaskWriteContext>,
+    ) -> Result<TaskDetail> {
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &old, context)?;
             if let Some(holder) = &old.assignee_id
                 && holder != actor
             {
@@ -841,17 +852,20 @@ NULL AND key<>? ORDER BY position, key",
                 "assigneeId":[old.assignee_id,actor],"status":[old.status,s]}
                 ),
             )?;
-            Ok(())
-        })?;
-        self.get_task(key)
+            // Return the accepted claim snapshot before releasing the writer lock.
+            // A subsequent same-identity reclaim must never relabel this response
+            // with that newer generation between commit and a separate read.
+            detail(c, key)
+        })
     }
     pub fn release_task(
         &self,
         actor: &str,
         key: &str,
         target: Option<&str>,
+        expected_claim_generation: Option<&str>,
     ) -> Result<TaskSummary> {
-        self.release_task_checked(actor, key, target, None)
+        self.release_task_checked(actor, key, target, None, expected_claim_generation)
     }
     pub(crate) fn release_task_checked(
         &self,
@@ -859,11 +873,17 @@ NULL AND key<>? ORDER BY position, key",
         key: &str,
         target: Option<&str>,
         expected_updated_at: Option<&str>,
+        expected_claim_generation: Option<&str>,
     ) -> Result<TaskSummary> {
         let target = target.unwrap_or("backlog");
         status(target)?;
         self.write(|c| {
             let old = task(c, key)?;
+            if let Some(expected) = expected_claim_generation {
+                crate::context::check_claim(&old, expected)?;
+            } else {
+                crate::context::require_human(c, actor)?;
+            }
             // A confirmation is about this exact claim/version, not whichever
             // worker happens to hold the card when a queued command is executed.
             if let Some(expected) = expected_updated_at {
@@ -957,12 +977,14 @@ NULL AND key<>? ORDER BY position, key",
         actor: &str,
         key: &str,
         reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
         if let Some(body) = reason {
             comment_body(body)?;
         }
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &old, context)?;
             let stamp = now();
             c.execute(
                 "UPDATE tasks SET archived_at=? WHERE id=?",
@@ -1427,6 +1449,7 @@ task_id=? ORDER BY created_at, id",
     let activity = crate::db::activity(c, 0, Some(&t.id), Some(20))?;
     let history = crate::db::activity(c, 0, Some(&t.id), Some(50))?;
     Ok(TaskDetail {
+        review_context_revision: crate::context::review_revision(c, &t)?,
         ancestor_questions: crate::planning::records(
             c,
             "questions",

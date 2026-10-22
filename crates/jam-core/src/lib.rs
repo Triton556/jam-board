@@ -1,6 +1,7 @@
 //! Shared domain and SQLite storage. No desktop or MCP dependencies.
 mod canvas;
 mod changes;
+mod context;
 mod db;
 mod desktop;
 mod execution;
@@ -20,6 +21,7 @@ mod v2model;
 mod workflow;
 
 pub use changes::ACTIVITY_ACTIONS;
+pub use context::TaskWriteContext;
 pub use db::{ChangeFeed, Store, resolve_db_path};
 pub use execution::*;
 pub use m5::*;
@@ -50,6 +52,10 @@ pub enum Error {
     Validation { field: String, reason: String },
     #[error("archived: {0}")]
     Archived(String),
+    #[error(
+        "stale_claim: This task lifecycle changed. Read the current claim and reconcile your work; do not replay the old payload with a fresh token."
+    )]
+    StaleClaim,
     #[error("conflict: This item changed since you opened it. Review the latest changes.")]
     Conflict,
     #[error("storage: {0}")]

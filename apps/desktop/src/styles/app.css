@@ -586,7 +586,7 @@ p {
   box-shadow: inset 3px 0 0 var(--agent-color);
 }
 [data-theme="dark"] .sticker-wrap {
-  --card-mix: 22%;
+  --card-mix: 16%;
 }
 [data-theme="dark"]
   :is([data-color-by="assignee"], [data-color-by="epic"])
@@ -610,7 +610,7 @@ p {
   color: var(--coral-ink);
 }
 .priority.critical {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .card-title {
   font-size: 14px;
@@ -896,7 +896,7 @@ form label {
   margin-bottom: 14px;
 }
 input[aria-invalid="true"] {
-  border-color: var(--danger);
+  border-color: var(--danger-ink);
 }
 .form-row {
   display: flex;
@@ -926,7 +926,7 @@ input[aria-invalid="true"] {
   color: var(--ink-2);
 }
 .field-error {
-  color: var(--danger);
+  color: var(--danger-ink);
   font-size: 12px;
   margin: -7px 0 12px;
 }
@@ -979,7 +979,7 @@ input[aria-invalid="true"] {
   color: var(--coral-ink);
 }
 .priority-critical svg {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .table-page {
   display: flex;
@@ -1421,7 +1421,7 @@ input[aria-invalid="true"] {
 .overdue {
   color: var(--ink) !important;
   background: color-mix(in srgb, var(--danger) 25%, var(--card));
-  border-color: var(--danger);
+  border-color: var(--danger-ink);
   align-self: flex-start;
 }
 .section-heading {
@@ -2007,7 +2007,7 @@ kbd {
   margin-top: 8px;
 }
 .flag-changes {
-  color: var(--danger);
+  color: var(--danger-ink);
   background: var(--card);
 }
 .flag-info {

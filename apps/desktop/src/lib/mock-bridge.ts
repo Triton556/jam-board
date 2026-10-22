@@ -561,6 +561,9 @@ export class MockBridge implements JamApi {
       );
     }
     if (action === "jam.archived") this.execution.revokeClosed(actor, true);
+    if (task) this.planning.sync(task);
+    else if (action.startsWith("epic.") || action.startsWith("story."))
+      this.planning.sync();
     const event: ActivityEvent = {
       seq: (this.activity.at(-1)?.seq ?? 0) + 1,
       action,
@@ -933,9 +936,9 @@ export class MockBridge implements JamApi {
   }
   async getTask(key: string) {
     await this.call("get_task", key);
-    this.planning.sync();
     const task = this.tasks.find((t) => t.key === key);
     if (!task) throw new JamError("not_found", `Task ${key} was not found`);
+    this.planning.sync(task);
     return clone({
       ...task,
       activity: this.activity.filter((e) => e.taskKey === key).slice(-20),
@@ -1070,6 +1073,8 @@ export class MockBridge implements JamApi {
       changesRequested: false,
       needsInfo: false,
       reviewRound: 0,
+      claimGeneration: crypto.randomUUID(),
+      reviewContextRevision: null,
     };
     task.ready = mockReadiness(task).ready;
     if (task.status === "ready") this.guardReady(task, actor);
@@ -1668,6 +1673,8 @@ export class MockBridge implements JamApi {
       references: remap(t.references),
       key: oldKeys.get(t.key) ?? t.key,
       id: mapped(t.id),
+      claimGeneration: crypto.randomUUID(),
+      reviewContextRevision: null,
       jamId: jid,
       createdBy: mapped(t.createdBy),
       updatedBy: mapped(t.updatedBy),
@@ -1896,6 +1903,8 @@ export class MockBridge implements JamApi {
       return this.planning.submitReport(
         input.report ?? {
           key: input.key ?? "JB-12",
+          expectedClaimGeneration:
+            this.find(input.key ?? "JB-12").claimGeneration ?? "",
           summaryMd: "Implemented the lantern cue.",
           changedFiles: ["game/lantern.gd"],
           tests: [

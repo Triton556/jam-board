@@ -1,4 +1,6 @@
+mod support;
 use jam_core::*;
+use support::FreshContext;
 fn setup() -> (tempfile::TempDir, Store) {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
     std::fs::create_dir_all(&base).unwrap();
@@ -98,7 +100,7 @@ fn all_board_tasks_are_grouped_ordered_and_have_counts() {
             .comment_count,
         1
     );
-    s.archive_task(&actor.id, &t.task.key, None).unwrap();
+    s.archive_task_fresh(&actor.id, &t.task.key, None).unwrap();
     assert_eq!(
         s.list_board_tasks()
             .unwrap()

@@ -1,5 +1,6 @@
 mod support;
 use jam_core::*;
+use support::FreshContext;
 
 fn setup() -> (tempfile::TempDir, Store, Member, Member, Member) {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
@@ -119,7 +120,7 @@ fn positions_neighbors_and_renumber() {
     assert_eq!(a.task.position, 1024.0);
     assert_eq!(b.task.position, 2048.0);
     let t = s
-        .move_task(
+        .move_task_fresh(
             &h.id,
             &c.task.key,
             "ready",
@@ -129,7 +130,7 @@ fn positions_neighbors_and_renumber() {
         .unwrap();
     assert_eq!(t.position, 1536.0);
     assert!(
-        s.move_task(
+        s.move_task_fresh(
             &h.id,
             &c.task.key,
             "ready",
@@ -139,14 +140,14 @@ fn positions_neighbors_and_renumber() {
         .is_err()
     );
     for _ in 0..40 {
-        s.move_task(&h.id, &c.task.key, "ready", Some(&b.task.key), None)
+        s.move_task_fresh(&h.id, &c.task.key, "ready", Some(&b.task.key), None)
             .unwrap();
         let rows = s.list_tasks(None, TaskFilter::default()).unwrap().tasks;
         assert!(
             rows.windows(2)
                 .all(|r| r[1].position - r[0].position >= 1e-6)
         );
-        s.move_task(&h.id, &a.task.key, "ready", Some(&b.task.key), None)
+        s.move_task_fresh(&h.id, &a.task.key, "ready", Some(&b.task.key), None)
             .unwrap();
         let rows = s.list_tasks(None, TaskFilter::default()).unwrap().tasks;
         assert!(
@@ -157,7 +158,7 @@ fn positions_neighbors_and_renumber() {
     let rows = s.list_tasks(None, TaskFilter::default()).unwrap().tasks;
     assert!(rows.windows(2).all(|r| r[1].position > r[0].position));
     let seq = s.activity_count().unwrap();
-    s.move_task(&h.id, &a.task.key, "review", None, None)
+    s.move_task_fresh(&h.id, &a.task.key, "review", None, None)
         .unwrap();
     assert_eq!(s.activity_count().unwrap(), seq + 1);
 }
@@ -179,36 +180,40 @@ fn claim_release_all_branches() {
             .unwrap();
         if status != "ready" {
             assert!(matches!(
-                s.claim_task(&a.id, &t.task.key),
+                s.claim_task_fresh(&a.id, &t.task.key),
                 Err(Error::NotReady(_) | Error::WrongStatus(_))
             ));
-            s.mark_ready(&h.id, &t.task.key, None).unwrap();
+            s.mark_ready_fresh(&h.id, &t.task.key, None).unwrap();
         }
         let n = s.activity_count().unwrap();
-        let claimed = s.claim_task(&a.id, &t.task.key).unwrap();
+        let claimed = s.claim_task_fresh(&a.id, &t.task.key).unwrap();
         assert_eq!(claimed.task.status, "in_progress");
         assert_eq!(s.activity_count().unwrap(), n + 1);
         assert!(matches!(
-            s.claim_task(&a.id, &t.task.key),
+            s.claim_task_fresh(&a.id, &t.task.key),
             Err(Error::WrongStatus(_))
         ));
         assert!(
-            matches!(s.claim_task(&b.id,&t.task.key),Err(Error::ClaimConflict{holder}) if holder=="Codex")
+            matches!(s.claim_task_fresh(&b.id,&t.task.key),Err(Error::ClaimConflict{holder}) if holder=="Codex")
         );
-        assert!(s.release_task(&b.id, &t.task.key, None).is_err());
+        assert!(s.release_task_fresh(&b.id, &t.task.key, None).is_err());
         assert_eq!(
-            s.release_task(&a.id, &t.task.key, None).unwrap().status,
+            s.release_task_fresh(&a.id, &t.task.key, None)
+                .unwrap()
+                .status,
             "backlog"
         );
-        s.mark_ready(&h.id, &t.task.key, None).unwrap();
-        s.claim_task(&a.id, &t.task.key).unwrap();
-        let released = s.release_task(&h.id, &t.task.key, Some("review")).unwrap();
+        s.mark_ready_fresh(&h.id, &t.task.key, None).unwrap();
+        s.claim_task_fresh(&a.id, &t.task.key).unwrap();
+        let released = s
+            .release_task_fresh(&h.id, &t.task.key, Some("review"))
+            .unwrap();
         assert_eq!(released.status, "review");
         assert!(released.assignee_id.is_none());
     }
     let t = create(&s, &h, "Unassigned");
-    assert!(s.release_task(&b.id, &t.task.key, None).is_err());
-    s.release_task(&h.id, &t.task.key, None).unwrap();
+    assert!(s.release_task_fresh(&b.id, &t.task.key, None).is_err());
+    s.release_task_fresh(&h.id, &t.task.key, None).unwrap();
 }
 #[test]
 fn archive_blocks_all_edits_and_human_unarchives() {
@@ -216,11 +221,12 @@ fn archive_blocks_all_edits_and_human_unarchives() {
     let t = create(&s, &h, "Archive");
     let key = &t.task.key;
     let n = s.activity_count().unwrap();
-    s.archive_task(&a.id, key, Some("Superseded")).unwrap();
+    s.archive_task_fresh(&a.id, key, Some("Superseded"))
+        .unwrap();
     assert_eq!(s.activity_count().unwrap(), n + 1);
     assert_eq!(s.get_task(key).unwrap().comments.len(), 1);
     let errors = [
-        s.update_task(
+        s.update_task_fresh(
             &a.id,
             UpdateTask {
                 key: key.clone(),
@@ -229,11 +235,12 @@ fn archive_blocks_all_edits_and_human_unarchives() {
             },
         )
         .map(|_| ()),
-        s.claim_task(&a.id, key).map(|_| ()),
-        s.move_task(&a.id, key, "done", None, None).map(|_| ()),
-        s.release_task(&h.id, key, None).map(|_| ()),
+        s.claim_task_fresh(&a.id, key).map(|_| ()),
+        s.move_task_fresh(&a.id, key, "done", None, None)
+            .map(|_| ()),
+        s.release_task_fresh(&h.id, key, None).map(|_| ()),
         s.add_comment(&a.id, key, "No").map(|_| ()),
-        s.archive_task(&a.id, key, None).map(|_| ()),
+        s.archive_task_fresh(&a.id, key, None).map(|_| ()),
     ];
     assert!(
         errors.iter().all(|e| matches!(e, Err(Error::Archived(_)))),
@@ -262,7 +269,7 @@ fn validation_nullable_updates_pagination_and_activity() {
     let (_d, s, h, a, _) = setup();
     let t = create(&s, &h, "Task");
     let n = s.activity_count().unwrap();
-    s.update_task(
+    s.update_task_fresh(
         &h.id,
         UpdateTask {
             key: t.task.key.clone(),
@@ -275,13 +282,13 @@ fn validation_nullable_updates_pagination_and_activity() {
     .unwrap();
     assert_eq!(s.activity_count().unwrap(), n + 1);
     let input: UpdateTask =
-        serde_json::from_value(serde_json::json!({"key":t.task.key,"estimate":null,"dueAt":null}))
+        serde_json::from_value(serde_json::json!({"key":t.task.key,"expectedClaimGeneration":t.task.claim_generation,"expectedUpdatedAt":t.task.updated_at,"estimate":null,"dueAt":null}))
             .unwrap();
-    let t = s.update_task(&h.id, input).unwrap();
+    let t = s.update_task_fresh(&h.id, input).unwrap();
     assert!(t.task.estimate.is_none());
     assert!(t.task.due_at.is_none());
     assert!(
-        s.update_task(
+        s.update_task_fresh(
             &h.id,
             UpdateTask {
                 key: t.task.key.clone(),

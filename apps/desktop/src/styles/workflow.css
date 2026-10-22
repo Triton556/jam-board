@@ -291,7 +291,7 @@
 }
 .column-policy {
   margin: -4px 2px 10px;
-  min-height: 28px;
+  min-height: 32px;
   font-size: 11px;
   line-height: 1.4;
   color: var(--ink-2);
@@ -390,4 +390,81 @@
 }
 .round > .button-row {
   flex-wrap: wrap;
+}
+
+/* Equal policy rows keep the first paper cards aligned across the workflow. */
+.column-empty {
+  margin: 0;
+  padding: 20px 10px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.quick-create > .quick-create-story {
+  display: grid;
+  gap: 6px;
+  padding-block: 8px;
+}
+.quick-create > p,
+.quick-create-story p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.quick-create-actions {
+  flex-wrap: wrap;
+}
+.card-hierarchy {
+  font: 500 11px / 1.4 var(--font-sans);
+}
+.card-story-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.epic-header-controls {
+  align-items: flex-end;
+}
+.epic-brain-control {
+  display: grid;
+  gap: 6px;
+}
+.epic-header-controls .epic-swatches {
+  padding-block: 9px;
+}
+.epic-detail-heading > .scope-hierarchy {
+  padding: 10px 14px;
+  margin-block: 12px;
+}
+
+.review-context {
+  margin-block: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--paper-2);
+}
+.review-context summary {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.review-context > details {
+  margin-block: 10px;
+}
+.review-context h4 {
+  margin-block: 14px 6px;
+}
+.review-context-changed {
+  padding: 12px;
+  border-left: 3px solid var(--coral);
+  border-radius: 0 var(--r-input) var(--r-input) 0;
+  background: var(--paper-2);
+  line-height: 1.6;
+  margin-block: 12px;
+}
+.review-captured-report {
+  margin-block: 12px;
+  max-height: 180px;
+  overflow-y: auto;
 }

@@ -419,30 +419,38 @@ function EpicDetail({
               />
             ))}
           </fieldset>
-          <CustomSelect
-            label="Epic brain"
-            value={
-              members.data?.find((m) => m.id === e.brainMemberId)?.handle ?? ""
-            }
-            onChange={(value) => brain.mutate(value || null)}
+          <div className="epic-brain-control">
+            <span className="small muted">Brain</span>
+            <CustomSelect
+              label="Epic brain"
+              value={
+                members.data?.find((m) => m.id === e.brainMemberId)?.handle ??
+                ""
+              }
+              onChange={(value) => brain.mutate(value || null)}
+              disabled={archived}
+              options={[
+                { value: "", label: "Unassigned" },
+                ...(members.data ?? [])
+                  .slice()
+                  .sort((a, b) =>
+                    a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1,
+                  )
+                  .map((m) => ({
+                    value: m.handle,
+                    label:
+                      m.kind === "agent"
+                        ? m.name
+                        : `${m.name} (brain must be an agent)`,
+                    disabled: m.kind !== "agent",
+                    group: m.kind === "agent" ? "Agents" : "Humans",
+                  })),
+              ]}
+            />
+          </div>
+          <BrainHandoff
+            scope={{ type: "epic", key: e.key }}
             disabled={archived}
-            options={[
-              { value: "", label: "Unassigned" },
-              ...(members.data ?? [])
-                .slice()
-                .sort((a, b) =>
-                  a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1,
-                )
-                .map((m) => ({
-                  value: m.handle,
-                  label:
-                    m.kind === "agent"
-                      ? m.name
-                      : `${m.name} (brain must be an agent)`,
-                  disabled: m.kind !== "agent",
-                  group: m.kind === "agent" ? "Agents" : "Humans",
-                })),
-            ]}
           />
         </div>
         <nav className="scope-hierarchy" aria-label="Epic hierarchy">
@@ -460,17 +468,7 @@ function EpicDetail({
             {tree.stories.reduce((total, row) => total + row.tasks.length, 0)}{" "}
             tasks
           </span>
-          <p className="hierarchy-note">
-            Stories live inside this epic. Open them to see their acceptance
-            criteria and tasks.
-          </p>
         </nav>
-        <div className="planning-tools">
-          <BrainHandoff
-            scope={{ type: "epic", key: e.key }}
-            disabled={archived}
-          />
-        </div>
         <ExecutionControls
           key={`execution:${e.id}`}
           scope={{ type: "epic", id: e.id }}
@@ -512,11 +510,6 @@ function EpicDetail({
         {tab === "Overview" ? (
           <div className="epic-overview">
             <div>
-              <ReferencesSection
-                targetKey={e.key}
-                epicKey={e.key}
-                disabled={archived}
-              />
               {overviewFields.map(([field, label, hint]) => (
                 <SavedMarkdown
                   key={`${e.id}:${field}`}
@@ -527,6 +520,11 @@ function EpicDetail({
                   save={(value) => api.updateEpic(e.key, { [field]: value })}
                 />
               ))}
+              <ReferencesSection
+                targetKey={e.key}
+                epicKey={e.key}
+                disabled={archived}
+              />
             </div>
             <aside className="epic-process">
               <label htmlFor="participation">

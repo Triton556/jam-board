@@ -207,17 +207,25 @@ impl Store {
     pub fn check_ready(&self, key: &str) -> Result<Readiness> {
         self.read(|c| readiness(c, key))
     }
-    pub fn mark_ready(&self, actor: &str, key: &str, reason: Option<&str>) -> Result<TaskSummary> {
-        self.move_task_with_override(actor, key, "ready", None, None, reason)
+    pub fn mark_ready(
+        &self,
+        actor: &str,
+        key: &str,
+        reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
+    ) -> Result<TaskSummary> {
+        self.move_task_with_override(actor, key, "ready", None, None, reason, context)
     }
     pub fn update_task_brief(
         &self,
         actor: &str,
         key: &str,
         input: BriefPatch,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskDetail> {
         self.write(|c| {
             let t = crate::service::editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &t, context)?;
             let patch = serde_json::to_value(input)?;
             let mut merged = serde_json::to_value(brief(c, key)?)?;
             for (k, v) in patch.as_object().unwrap() {
@@ -239,7 +247,7 @@ impl Store {
     }
     pub fn submit_report(&self, actor: &str, input: SubmitReport) -> Result<Report> {
         self.write(|c|{
-        let t=task(c,&input.key)?;member(c,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
+        let t=task(c,&input.key)?;crate::context::check_claim(&t,&input.expected_claim_generation)?;member(c,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
         if t.status!="in_progress"{return Err(Error::WrongStatus(format!("Expected in_progress, current status is {}",t.status)));}
         crate::m5::validate_name("summaryMd",&input.summary_md,20000)?;let mut names=std::collections::BTreeSet::new();for test in &input.tests{if test.name.trim().is_empty()||!names.insert(&test.name)||!["PASS","FAIL","NOT_RUN"].contains(&test.result.as_str()){return Err(invalid("tests","Each test needs a unique name and PASS, FAIL or NOT_RUN result"));}}
         let duplicate:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM reports WHERE task_id=? AND round=?)",params![t.id,t.review_round],|r|r.get(0))?;
@@ -255,6 +263,7 @@ impl Store {
         let reports:Vec<Report>=records(c,"reports","task_id=? AND round=?",&[&t.id,&t.review_round])?;let report=reports.first().ok_or_else(||invalid("report",&format!("No report for round {}",t.review_round)))?;
         if report.author_id==actor{return Err(Error::Forbidden("A worker can never review its own report".into()));}
         if t.status!="review"{return Err(Error::WrongStatus(format!("Expected review, current status is {}",t.status)));}
+        if report.id != input.expected_report_id || crate::context::review_revision(c,&t)?.as_deref() != Some(input.expected_review_context_revision.as_str()) { return Err(Error::Conflict); }
         if !["accept","changes_requested"].contains(&input.verdict.as_str()){return Err(invalid("verdict","Choose accept or changes_requested"));}
         let failed=input.failed_tests.unwrap_or_default();for name in &failed{if !report.tests.iter().any(|t|t.name==*name){return Err(invalid("failedTests",&format!("Unknown report test {name}")));}}
         let review=Review{id:id(),task_id:t.id.clone(),round:t.review_round,reviewer_id:actor.into(),verdict:input.verdict.clone(),comments_md:input.comments_md,failed_tests:failed.clone(),created_at:now()};insert(c,"reviews",&review)?;

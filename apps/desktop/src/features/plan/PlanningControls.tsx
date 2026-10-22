@@ -129,21 +129,31 @@ export function StoryPicker({
   onChange,
   label = "Story",
   epicKey,
+  epicKeys,
+  disabled = false,
   remember = false,
 }: {
   value: string;
   onChange(key: string): void;
   label?: string;
   epicKey?: string;
+  epicKeys?: string[];
+  disabled?: boolean;
   remember?: boolean;
 }) {
   const stories = useQuery(storiesQuery),
     epics = useQuery(epicsQuery);
-  const selected = epics.data?.find((e) => e.key === epicKey);
+  const allowedKeys = epicKeys ?? (epicKey ? [epicKey] : []);
+  const allowedIds = new Set(
+    (epics.data ?? [])
+      .filter((epic) => allowedKeys.includes(epic.key))
+      .map((epic) => epic.id),
+  );
   return (
     <CustomSelect
       label={label}
       value={value}
+      disabled={disabled}
       searchable
       onChange={(key) => {
         onChange(key);
@@ -155,7 +165,7 @@ export function StoryPicker({
       options={[
         { value: "", label: "Choose a story" },
         ...(stories.data ?? [])
-          .filter((s) => !selected || s.epicId === selected.id)
+          .filter((s) => !allowedKeys.length || allowedIds.has(s.epicId))
           .map((s) => ({
             value: s.key,
             label: `${s.key} · ${s.title}`,

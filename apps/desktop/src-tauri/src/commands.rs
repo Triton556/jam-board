@@ -10,6 +10,7 @@ use tauri_specta::Event;
 pub enum ApiErrorCode {
     NotFound,
     ClaimConflict,
+    StaleClaim,
     Validation,
     Archived,
     Conflict,
@@ -31,6 +32,7 @@ impl From<jam_core::Error> for ApiError {
         let (code, field) = match &error {
             Error::NotFound(_) => (ApiErrorCode::NotFound, None),
             Error::ClaimConflict { .. } => (ApiErrorCode::ClaimConflict, None),
+            Error::StaleClaim => (ApiErrorCode::StaleClaim, None),
             Error::Validation { field, .. } => (ApiErrorCode::Validation, Some(field.clone())),
             Error::Archived(_) => (ApiErrorCode::Archived, None),
             Error::Conflict => (ApiErrorCode::Conflict, None),
@@ -244,6 +246,7 @@ pub async fn move_task(
             input.before_key.as_deref(),
             input.after_key.as_deref(),
             input.override_reason.as_deref(),
+            None,
         )
     })
     .await

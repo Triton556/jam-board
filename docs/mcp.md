@@ -99,7 +99,7 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means the active project. Reference items/questions use their returned IDs.
 
-Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
+Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, stale_claim, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
@@ -121,19 +121,19 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | update_story | key; title?, any intent field?, acceptance? | Story |
 | set_story_status | key, status; overrideReason? | Story |
 | create_task | storyKey, title; description?, status?=backlog, priority?=medium, tags?, estimate?, dueAt?, idempotencyKey?, all brief fields? | TaskDetail |
-| update_task | key; title?, description?, priority?, tags?, estimate?, dueAt? | TaskDetail; non-brief fields |
-| update_task_brief | key; goalMd?, contextMd?, whereMd?, changes?, tests?, boundariesMd?, resultMd?, userQuotesMd? | TaskDetail |
+| update_task | key, expectedClaimGeneration, expectedUpdatedAt; title?, description?, priority?, tags?, estimate?, dueAt? | TaskDetail; non-brief fields |
+| update_task_brief | key, expectedClaimGeneration, expectedUpdatedAt; goalMd?, contextMd?, whereMd?, changes?, tests?, boundariesMd?, resultMd?, userQuotesMd? | TaskDetail |
 | check_ready | key | { ready, missing: [{ code, message }] } |
-| mark_ready | key; overrideReason? | TaskSummary |
+| mark_ready | key, expectedClaimGeneration, expectedUpdatedAt; overrideReason? | TaskSummary |
 | list_tasks | status?: string[], assignee?, tag?, query?, includeArchived?=false, limit?=50, cursor?, epic?, story?, ready?, changesRequested?, needsInfo? | { tasks, nextCursor? } |
 | get_task | key | TaskDetail with hierarchy/context, brief, references, assets, all reports/reviews, comments/history |
-| claim_task | key | TaskDetail; assigns caller and moves Ready > In progress |
-| release_task | key; status?=backlog | TaskSummary; current holder/human only |
-| move_task | key, status; beforeKey?, afterKey?, overrideReason? | TaskSummary |
-| submit_report | key, summaryMd, changedFiles, tests; deviationsMd?, notVerifiedMd? | Report |
+| claim_task | key, expectedClaimGeneration, expectedUpdatedAt | TaskDetail; assigns caller and moves Ready > In progress |
+| release_task | key, expectedClaimGeneration; status?=backlog | TaskSummary; current holder/human only |
+| move_task | key, status, expectedClaimGeneration, expectedUpdatedAt; beforeKey?, afterKey?, overrideReason? | TaskSummary |
+| submit_report | key, expectedClaimGeneration, summaryMd, changedFiles, tests; deviationsMd?, notVerifiedMd? | Report |
 | add_comment | key, body | Comment |
-| review_task | key, verdict, commentsMd; failedTests? | Review |
-| archive_task | key; reason? | TaskSummary; reason is an atomic comment |
+| review_task | key, expectedReportId, expectedReviewContextRevision, verdict, commentsMd; failedTests? | Review |
+| archive_task | key, expectedClaimGeneration, expectedUpdatedAt; reason? | TaskSummary; reason is an atomic comment |
 | ask_user | scope, title; bodyMd?, options?, recommendedIndex?, allowFreeText?=true, roundLabel? | Question |
 | wait_for_answer | questionIds, timeoutSeconds (0..60) | { answered: Question[], pending: Question[] } |
 | list_questions | status? (open/answered/withdrawn), scope? | Question[] |
@@ -264,13 +264,13 @@ TaskBrief is { goalMd, contextMd, whereMd, changes, tests, boundariesMd, resultM
 | result | Result (report format) is empty |
 | story_active | The story is still draft |
 
-Moving into Ready runs that check. An authorized nonempty override writes task.ready_override instead of task.moved, exactly one event. Claim rechecks readiness; a recorded override remains valid until a subsequent brief edit. A worker claiming Backlog gets not_ready; another non-Ready status gets wrong_status with the current status. Another holder takes precedence and returns claim_conflict. A brain may claim a complete brief from another status; human status changes retain their planning controls but cannot bypass the execution gate for entry into In progress. Agents can reach Done only through independent `review_task`; direct agent creation, move, versioned status update or release to Done is forbidden, including for the appointed brain. Explicit human manual Done remains available and does not fabricate a review row.
+Moving into Ready runs that check. An authorized nonempty override writes task.ready_override instead of task.moved, exactly one event. Claim rechecks readiness; a recorded override remains valid until a subsequent brief edit. A worker claiming Backlog gets not_ready; another non-Ready status gets wrong_status with the current status. With current context, another holder returns claim_conflict; a stale lifecycle validator returns stale_claim first. A brain may claim a complete brief from another status; human status changes retain their planning controls but cannot bypass the execution gate for entry into In progress. Agents can reach Done only through independent `review_task`; direct agent creation, move, versioned status update or release to Done is forbidden, including for the appointed brain. Explicit human manual Done remains available and does not fabricate a review row.
 
 Workers enter In progress through claim_task and Review through submit_report. move_task/release_task cannot substitute for those gates or move another holder's task. Workers may create Backlog/Ready tasks; direct creation in working/review statuses requires a human or the appointed epic brain. Agent creation in Done is always forbidden; explicit human manual completion remains available. update_task does not accept status or assignee fields. A permitted return to work after a submitted report allocates one successor round, preserving prior evidence; repeated moves in that status do not advance the round.
 
 submit_report requires the current assignee and In progress. It inserts one report for the current reviewRound, moves to Review and clears changesRequested. Report tests are [{ name, command, expected, actual, result: PASS|FAIL|NOT_RUN }], with unique nonempty names. A review requires the current-round report; otherwise validation says "No report for round N". accept moves to Done. changes_requested moves to Ready, sets the flag, increments reviewRound, preserves the assignee and records failedTests using report test names. The assignee/report author cannot review its own work. Historical reports/reviews remain visible.
 
-Titles: 1–140 Unicode characters. Comments: 1–4000. Priorities: low/medium/high/critical; estimates 1/2/3/5/8 or null. Tags are trimmed, lowercased, deduplicated/sorted, at most 24 characters. Dates use RFC 3339 UTC. update_task omission preserves estimate/dueAt; null clears them. Description input remains description; output descriptionMd. Existing activity contains the latest 20 task rows and history the last 50, chronological. updatedAt is an opaque optimistic version for native editing.
+Titles: 1–140 Unicode characters. Comments: 1–4000. Priorities: low/medium/high/critical; estimates 1/2/3/5/8 or null. Tags are trimmed, lowercased, deduplicated/sorted, at most 24 characters. Dates use RFC 3339 UTC. update_task omission preserves estimate/dueAt; null clears them. Description input remains description; output descriptionMd. Existing activity contains the latest 20 task rows and history the last 50, chronological. updatedAt is an opaque optimistic version for native and MCP task overwrites.
 
 list_tasks.assignee accepts a handle, me or unassigned; query matches literal title/Notes substrings. epic/story accept keys or IDs. ready means the readiness check passes, independently of the status; combine with status=["ready"] for workers. Limit is 1..200; cursors are offsets and can shift during concurrent ordering. afterKey immediately precedes a moved task and beforeKey follows it; neighbors must be adjacent within the destination column. No neighbors appends. Tiny gaps trigger atomic renumbering. Retrying create_task with the same actor/idempotencyKey returns the original, without another event.
 
@@ -310,6 +310,28 @@ Both transports call jam-core. Short BEGIN IMMEDIATE writes append one activity 
 
 Run cargo test --workspace for the committed v0.1 migration fixture, readiness/permissions/review/questions/references, stdio coverage of every new tool with errors, exact tool-set assertions, concurrent mixed hierarchy creation and HTTP 401/403. Functional tests use the Rust-exported mock fixture. Production table and canvas performance projects run separately from functional checks.
 
-### Claim lifetime limitation
+### Claim generations and stale decisions (breaking MCP change in 0.3.0-alpha.5)
 
-A released task has no current holder, so a former holder cannot submit its report while it remains unassigned. Native human recovery uses an expected task revision to avoid clearing newer work. Agent claim/report/release calls do not yet carry a distinct claim-generation token, however: if the same agent identity later reclaims the task, an old payload can be indistinguishable from its current work. Workers must re-read the current task, assignment, round and brief before reporting; this is a compatibility limitation, not a guarantee of stale-worker fencing or process cancellation.
+TaskSummary/TaskDetail now expose **claimGeneration**, an opaque task-bound lifecycle validator. Schema 7 advances it whenever status, assignee or review round actually changes. Returning a claim and later reclaiming it with the **same agent identity** creates a different generation. No-op assignment and task visibility changes do not. This is freshness, not an execution grant, authentication credential, time lease or process cancellation.
+
+All covered MCP arguments are required; omitted context fails closed. There is no unchecked compatibility tool, brain bypass or server-side injection of the latest validator. Existing data, read tools and version-1/2 snapshots remain compatible. Import discards any exported claimGeneration and allocates fresh task identities; migration preserves live holders/statuses/rounds without granting execution. A migrated/imported live holder may read its current context and report while paused.
+
+| Mutation | Caller must capture and submit |
+|---|---|
+| claim_task, move_task, mark_ready, archive_task, update_task, update_task_brief | expectedClaimGeneration + expectedUpdatedAt from get_task before deciding the mutation |
+| submit_report, release_task | expectedClaimGeneration from the live claim being reported/returned |
+| review_task (brain or native human) | expectedReportId + expectedReviewContextRevision from the exact report and planning context inspected |
+
+`claim_task` returns the new generation in TaskDetail. Keep it with that work attempt. For example, after reading the task and checking its running story, call:
+
+```json
+{"key":"JB-12","expectedClaimGeneration":"<observed claimGeneration>","expectedUpdatedAt":"<observed updatedAt>"}
+```
+
+A report includes `expectedClaimGeneration` from the **successful claim response**, not the pre-claim validator. Review reads `reports` for the current `reviewRound` and captures that report's immutable `id` plus `reviewContextRevision`; the latter is null unless the task is in Review with a current-round report. This opaque revision binds report ID and the task/story/epic identities and versions. A changed brief, story acceptance, epic planning context or report requires a new inspection, not silently substituting fresh validators into an old decision. Explicit human manual Done remains separate from reviewed acceptance.
+
+Every precondition is compared inside the same immediate SQLite write transaction as the mutation and activity. `stale_claim` means the lifecycle changed; `conflict` means an overwrite/review context changed. Both leave the mutation and task history untouched. **Do not fetch a fresh token and automatically retry an old payload.** Preserve draft evidence, read the latest task/claim/context, reconcile what still applies, and deliberately submit a new decision. Reports use generation rather than updatedAt, so unrelated Notes/comments do not discard evidence from an unchanged live claim. Scope Pause/closure/archive and task archive/restore do not rotate the live generation: in-flight reporting and cancellation remain possible; new work still requires human-started scope authority.
+
+Native human recovery retains its expectedUpdatedAt confirmation CAS. Native reports and reviews require the captured claim/review context too. Other native human planning actions retain their existing policies. Append-only comments/questions/reference additions and informational handwritten presence are not claim-generation fenced in this bounded change; they do not grant or complete work. Epic/story planning edits are not a general CAS API in this alpha, but their resulting versions invalidate pending task review decisions. Board fencing cannot stop an external worker process or fence its filesystem writes, and it does not prevent the same authorized identity from intentionally reading fresh context.
+
+The optimistic-context design follows conditional-write principles in [RFC 9110 If-Match](https://www.rfc-editor.org/rfc/rfc9110.html#name-if-match) and [Kubernetes resource versions](https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions), implemented as explicit MCP arguments rather than HTTP If-Match headers. [SQLite immediate transactions](https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions) serialize validation with the accepted write.
