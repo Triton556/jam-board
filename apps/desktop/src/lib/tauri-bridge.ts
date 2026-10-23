@@ -255,6 +255,8 @@ export const tauriApi: JamApi = {
   setSettings: (input) =>
     unwrap(
       commands.setSettings({
+        projectFolder: null,
+        expectedProjectId: null,
         theme: null,
         soundEnabled: null,
         colorBy: null,

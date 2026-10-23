@@ -17,7 +17,7 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Historical Snowball dogfood recording in the real desktop app (not current-prerelease acceptance): a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.29**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.41**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
@@ -104,18 +104,28 @@ Drop local images, audio, video or other files onto the canvas, add captions, no
 
 Choose **Game jam** for a 48-hour countdown, **Gamedev** for a longer game project, **Web app** for product work, or **Custom** to start blank. Gamedev and Web app offer an optional milestone. Switching templates keeps existing tags and work.
 
-## Optional agent skill
+## Connect an agent and install optional guidance
 
-MCP connection does not require installing a playbook. If you want its additional
-workflow guidance, open **Settings → Agents** after connecting MCP, then choose a local clone of [agent-playbook](https://github.com/Triton556/agent-playbook), a target project folder and Codex or Claude Code. **Jam Board skill** installs the `jam-board` profile with its procedures; **Whole agent-playbook** installs the full profile.
+In **Settings → Agents**, use **Connect agent to board** to copy one project-bound
+setup prompt. It checks existing MCP first, verifies the exact project ID and
+reads this version's `jam://guide`. If configuration is missing, the agent must
+inspect existing settings, obtain required permission and explain any restart;
+the prompt contains no authentication token. It does not appoint a brain, start
+work or launch a model. A task or role you separately request determines what
+happens next. The optional project folder is a filesystem hint, not board identity.
 
-The app shows the exact commands, runs a plan, asks before writing, then installs and verifies. Python 3.12+ is required. The harness records a receipt in the selected playbook folder's `.harness-state/`. Nothing is downloaded by the app and global agent configuration is left alone. Start a new session in that project and use the app’s current planning prompt.
+MCP works without installing files. For local skill discovery, **Install Jam Board
+skill** copies the bundled board-owned instructions into the chosen project's
+Codex or Claude skill folder. There is no agent-playbook clone, Python dependency
+or full-playbook option. Review the destination, then confirm install and verify.
 
-Older playbook examples do not include every current required MCP field. Live
-schemas and this version’s prompts are authoritative; installing files is not
-proof of live protocol compatibility, Brain appointment or execution permission.
-After upgrading, reconnect and refresh cached schemas rather than replaying old
-requests with replacement validators. See the [compatibility notes](docs/agent-playbook-compatibility.md).
+Upgrade preserves a backup outside the skill catalog and checks a matching private
+app ownership receipt. Modified files, an existing foreign skill or missing
+ownership proof stop before overwrite. For a skill installed by an older playbook,
+use that original installer's migration/removal procedure first; this application
+never adopts or removes another installer's files silently. Global client settings
+and other skills remain unchanged. File verification is not a live-model or MCP
+compatibility test. See [standalone skill and migration](docs/agent-playbook-compatibility.md).
 
 ## Install
 

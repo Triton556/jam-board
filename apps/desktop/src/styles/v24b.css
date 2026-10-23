@@ -86,6 +86,16 @@
   overflow-x: hidden;
 }
 
+.skill-setup .path-value,
+.skill-confirm .path-value {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.skill-confirm > p {
+  margin-block: 12px;
+  line-height: 1.6;
+}
+
 .skill-setup .settings-row-control {
   display: flex;
   flex-wrap: wrap;
@@ -101,4 +111,14 @@
 .skill-setup .settings-row-control > .path-value {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.skill-setup .settings-row-control > details {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.skill-setup .settings-row-control > details > summary {
+  cursor: pointer;
+  padding-block: 8px;
+  font-weight: 600;
 }

@@ -748,6 +748,14 @@ fn assert_session_context_compatibility(context: &serde_json::Value) {
         .as_object_mut()
         .unwrap()
         .remove("latestActivityCursor");
+    // A cached pre-alpha41 strict client must refresh its output schema too.
+    let strict_folder =
+        serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap_err();
+    assert!(strict_folder.to_string().contains("projectFolder"));
+    older_server
+        .as_object_mut()
+        .unwrap()
+        .remove("projectFolder");
     serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap();
     assert!(
         serde_json::from_value::<CrossVersionContext>(older_server)

@@ -213,3 +213,11 @@ predicate changes. Human guidance explains taking a Ready task versus starting
 an external session; no-message agent status no longer promises availability.
 Kanban lift is pointer feedback, not a worker-execution signal. Existing
 structured plans, complete prompts and captured validators remain unchanged.
+
+## Alpha41 standalone guide and neutral bootstrap
+
+The two read-only MCP resources `jam://guide` and `jam://guide/operations` serve
+board-owned skill files. No tool is added; existing 44-tool contracts remain.
+Connection-only setup verifies exact project, reads guide and reports availability,
+folder hint and next step; no appointment/plan/work follows without a requested task.
+Use the app's current schemas and captured validators, not legacy playbook calls.

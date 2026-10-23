@@ -82,6 +82,8 @@ pub struct ActivityQuery {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    pub project_id: Option<String>,
+    pub project_folder: Option<String>,
     pub color_by: String,
     pub estimates_enabled: bool,
     pub wip_limit: u32,
@@ -93,6 +95,8 @@ pub struct Settings {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub project_folder: Option<String>,
+    pub expected_project_id: Option<String>,
     pub color_by: Option<String>,
     pub estimates_enabled: Option<bool>,
     pub wip_limit: Option<u32>,
@@ -381,12 +385,16 @@ impl Store {
         })
     }
     pub fn get_settings(&self) -> Result<Settings> {
-        let prefix = self
-            .app_state()?
-            .jam
-            .map(|j| format!("board.{}.", j.id))
+        let project_id = self.app_state()?.jam.map(|j| j.id);
+        let prefix = project_id
+            .as_ref()
+            .map(|id| format!("board.{id}."))
             .unwrap_or_default();
         Ok(Settings {
+            project_id,
+            project_folder: self
+                .setting(&format!("{prefix}project_folder"))?
+                .filter(|v| !v.is_empty()),
             color_by: self
                 .setting(&format!("{prefix}color_by"))?
                 .unwrap_or_else(|| "epic".into()),
@@ -410,6 +418,15 @@ impl Store {
         })
     }
     pub fn set_settings(&self, input: SettingsPatch) -> Result<Settings> {
+        if let Some(folder) = &input.project_folder {
+            let active = self.active_jam()?;
+            if input.expected_project_id.as_deref() != Some(active.id.as_str()) {
+                return Err(Error::Conflict);
+            }
+            if folder.len() > 4096 || folder.chars().any(char::is_control) {
+                return Err(invalid("projectFolder", "Choose a valid project folder"));
+            }
+        }
         if input
             .theme
             .as_deref()
@@ -445,7 +462,15 @@ impl Store {
             .map(|j| format!("board.{}.", j.id))
             .unwrap_or_default();
         self.write(|c| {
-            for (key,value) in [(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
+            if input.project_folder.is_some() {
+                let current = jam(c)?;
+                if input.expected_project_id.as_deref() != Some(current.id.as_str())
+                    || prefix != format!("board.{}.", current.id)
+                {
+                    return Err(Error::Conflict);
+                }
+            }
+            for (key,value) in [(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
                 if let Some(v)=value { c.execute("INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,v])?; }
             }
             Ok(())

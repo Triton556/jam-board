@@ -416,7 +416,7 @@ async fn full_stdio_contract_and_errors() {
             .len(),
         1
     );
-    assert_eq!(c.list_all_resources().await.unwrap().len(), 1);
+    assert_eq!(c.list_all_resources().await.unwrap().len(), 3);
     assert_eq!(
         c.list_all_resource_templates()
             .await
@@ -940,7 +940,7 @@ async fn every_v2_tool_success_and_error_through_stdio() {
         assert!(!prompt.messages.is_empty());
         let text = serde_json::to_string(&prompt).unwrap();
         assert!(text.contains("Read the connected tool schemas first"));
-        assert!(text.contains("Optional agent-playbook"));
+        assert!(text.contains("board-owned jam://guide"));
         assert!(text.contains("intended exact project ID"));
         assert!(!text.contains("agent-playbook 1.1.0"));
     }
@@ -1271,12 +1271,26 @@ async fn eight_change_waiters_and_two_hundred_stdio_writes_do_not_lock() {
 async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
     let (_dir, s, h) = fixture();
     let project_a = s.active_jam().unwrap();
+    s.set_settings(
+        serde_json::from_value(
+            json!({"projectFolder":"/project-a", "expectedProjectId": project_a.id}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
     let story_a = planning_with_human_start(&s, &h);
     let worker = client(&s.path, "Pinned worker").await;
     let first = data(call_fresh(&worker, "create_task", task_input(&story_a, "A task")).await);
     let (project_b, hb) = s
         .create_jam("Second project", None, None, None, "UTC", "Second human")
         .unwrap();
+    s.set_settings(
+        serde_json::from_value(
+            json!({"projectFolder":"/project-b", "expectedProjectId": project_b.id}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
     let story_b = planning_with_human_start(&s, &hb);
     let second_client = client(&s.path, "Second worker").await;
     let second = data(
@@ -1290,6 +1304,7 @@ async fn project_binding_survives_selection_changes_and_rejects_foreign_keys() {
     let context = data(call_fresh(&worker, "get_session_context", json!({})).await);
     assert_eq!(context["projectId"], project_a.id);
     assert_eq!(context["keyPrefix"], project_a.key_prefix);
+    assert_eq!(context["projectFolder"], "/project-a");
     assert_eq!(context["canSwitchProject"], false);
     let expected_a = s
         .for_project(&project_a.id)
@@ -1839,4 +1854,193 @@ async fn board_and_epic_resources_share_bounded_observation_policy() {
     }
     assert_eq!(policies[0], policies[1], "Resources must share one policy");
     c.cancel().await.unwrap();
+}
+
+// The shipped example itself is exercised; this disposable fixture's human
+// approval is not exposed as an agent tool or applied to a real user board.
+#[tokio::test]
+async fn standalone_skill_example_lifecycle() {
+    fn bind(v: &Value, pairs: &[(&str, Value)]) -> Value {
+        match v {
+            Value::String(s) => pairs
+                .iter()
+                .find(|(k, _)| *k == s)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_else(|| v.clone()),
+            Value::Object(o) => {
+                Value::Object(o.iter().map(|(k, v)| (k.clone(), bind(v, pairs))).collect())
+            }
+            Value::Array(a) => Value::Array(a.iter().map(|v| bind(v, pairs)).collect()),
+            _ => v.clone(),
+        }
+    }
+    let source =
+        include_str!("../../../integrations/agent-skill/jam-board/references/operations.md");
+    let example: Value = serde_json::from_str(
+        source
+            .split_once("```json\n")
+            .unwrap()
+            .1
+            .split_once("\n```")
+            .unwrap()
+            .0,
+    )
+    .unwrap();
+    let (_dir, s, h) = fixture();
+    s.set_settings(
+        serde_json::from_value(json!({
+            "projectFolder": "/fixture/known-project",
+            "expectedProjectId": s.active_jam().unwrap().id
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let brain = client(&s.path, "Skill coordinator").await;
+    let worker = client(&s.path, "Skill worker").await;
+    let context = data(call_raw(&brain, "get_session_context", json!({})).await);
+    assert_eq!(context["projectId"], json!(s.active_jam().unwrap().id));
+    assert_eq!(context["projectFolder"], "/fixture/known-project");
+    assert!(context.get("mcpToken").is_none());
+    let cursor = context["latestActivityCursor"].clone();
+    data(call_raw(&brain, "get_project", json!({})).await);
+    data(call_raw(&brain, "get_board", json!({})).await);
+    let resources = brain.list_all_resources().await.unwrap();
+    assert!(resources.iter().any(|r| r.uri == "jam://guide"));
+    let guide = brain
+        .read_resource(ReadResourceRequestParams::new("jam://guide"))
+        .await
+        .unwrap();
+    assert!(format!("{:?}", guide.contents).contains("jam://guide/operations"));
+    let replay = data(
+        call_raw(
+            &brain,
+            "wait_for_changes",
+            json!({"cursor":cursor,"includeProject":true,"excludeSelf":false,"timeoutSeconds":1}),
+        )
+        .await,
+    );
+    assert_eq!(replay["timedOut"], true);
+    let epic = data(call_raw(&brain, "create_epic", example["epic"].clone()).await);
+    data(call_raw(&brain, "become_brain", json!({"epicKey":epic["key"]})).await);
+    data(
+        call_raw(
+            &brain,
+            "set_epic_status",
+            json!({"key":epic["key"],"status":"active"}),
+        )
+        .await,
+    );
+    let story = data(
+        call_raw(
+            &brain,
+            "create_story",
+            bind(&example["story"], &[("$epic", epic["key"].clone())]),
+        )
+        .await,
+    );
+    data(
+        call_raw(
+            &brain,
+            "set_story_status",
+            json!({"key":story["key"],"status":"active"}),
+        )
+        .await,
+    );
+    let task = data(
+        call_raw(
+            &brain,
+            "create_task",
+            bind(&example["task"], &[("$story", story["key"].clone())]),
+        )
+        .await,
+    );
+    let key = task["key"].clone();
+    assert_eq!(
+        data(call_raw(&brain, "check_ready", json!({"key":key})).await)["ready"],
+        true
+    );
+    let observed = data(call_raw(&brain, "get_task", json!({"key":key})).await);
+    data(call_raw(&brain,"mark_ready",json!({"key":key,"expectedClaimGeneration":observed["claimGeneration"],"expectedUpdatedAt":observed["updatedAt"]})).await);
+    let observed = data(call_raw(&worker, "get_task", json!({"key":key})).await);
+    let claim = bind(
+        &example["claim"],
+        &[
+            ("$task", key.clone()),
+            ("$generation", observed["claimGeneration"].clone()),
+            ("$updated", observed["updatedAt"].clone()),
+        ],
+    );
+    let scope = json!({"type":"story","id":story["id"]});
+    assert_eq!(
+        data(call_raw(&worker, "get_execution", json!({"scope":scope})).await)["effectiveState"],
+        "paused"
+    );
+    error(
+        call_raw(&worker, "claim_task", claim.clone()).await,
+        "execution_required",
+    );
+    let request = data(
+        call_raw(
+            &brain,
+            "request_execution",
+            json!({"scope":scope,"reason":"Disposable fixture"}),
+        )
+        .await,
+    );
+    s.resolve_execution_request(
+        &h.id,
+        jam_core::ResolveExecutionRequest {
+            id: request["id"].as_str().unwrap().into(),
+            decision: jam_core::ExecutionDecision::Approve,
+            expected_revision: request["revision"].as_str().unwrap().into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        data(call_raw(&worker, "get_execution", json!({"scope":scope})).await)["effectiveState"],
+        "running"
+    );
+    let claimed = data(call_raw(&worker, "claim_task", claim.clone()).await);
+    error(call_raw(&worker, "claim_task", claim).await, "stale_claim");
+    data(
+        call_raw(
+            &worker,
+            "submit_report",
+            bind(
+                &example["report"],
+                &[
+                    ("$task", key.clone()),
+                    ("$generation", claimed["claimGeneration"].clone()),
+                ],
+            ),
+        )
+        .await,
+    );
+    let observed = data(call_raw(&brain, "get_task", json!({"key":key})).await);
+    let review = bind(
+        &example["review"],
+        &[
+            ("$task", key.clone()),
+            ("$report", observed["reports"][0]["id"].clone()),
+            ("$revision", observed["reviewContextRevision"].clone()),
+        ],
+    );
+    error(
+        call_raw(&worker, "review_task", review.clone()).await,
+        "forbidden",
+    );
+    let mut wrong = review.clone();
+    wrong["expectedReviewContextRevision"] = json!("stale-fixture");
+    error(call_raw(&brain, "review_task", wrong).await, "conflict");
+    assert_eq!(
+        data(call_raw(&brain, "get_task", json!({"key":key})).await)["status"],
+        "review"
+    );
+    data(call_raw(&brain, "review_task", review).await);
+    assert_eq!(
+        data(call_raw(&brain, "get_task", json!({"key":key})).await)["status"],
+        "done"
+    );
+    worker.cancel().await.unwrap();
+    brain.cancel().await.unwrap();
 }

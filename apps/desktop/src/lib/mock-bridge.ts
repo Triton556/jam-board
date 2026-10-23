@@ -423,7 +423,12 @@ export class MockBridge implements JamApi {
   private soundEnabled = false;
   private boardSettings: Record<
     string,
-    { colorBy: string; estimatesEnabled: boolean; wipLimit: number }
+    {
+      colorBy: string;
+      estimatesEnabled: boolean;
+      wipLimit: number;
+      projectFolder?: string | null;
+    }
   > = {};
   private assetsView = "grid";
   private collapsedAssetKinds: string[] = [];
@@ -606,16 +611,15 @@ export class MockBridge implements JamApi {
     input: import("../bindings").SkillInput,
   ): Promise<import("../bindings").SkillCheck> {
     await this.call("skill_check", input);
-    this.skillPath = input.playbook;
+    this.skillPath = input.target;
     this.checkpoint();
     return {
-      version: input.playbook ? "1.3.0" : null,
-      python: "py -3",
-      pythonVersion: "Python 3.14.5",
-      errors: [
-        ...(!input.playbook ? ["Choose a local agent-playbook folder"] : []),
-        ...(!input.target ? ["Choose an existing project folder"] : []),
-      ],
+      version: "0.3.0-alpha.41",
+      destination: input.target
+        ? `${input.target.replace(/[\\/]$/, "")}/${input.client === "claude" ? ".claude" : ".agents"}/skills/jam-board`
+        : null,
+      status: input.target ? "new" : "blocked",
+      errors: !input.target ? ["Choose an existing project folder"] : [],
     };
   }
   onSkillOutput(cb: (line: string) => void) {
@@ -631,7 +635,7 @@ export class MockBridge implements JamApi {
     await this.call("run_skill", { input, step });
     this.skillCancelled = false;
     for (const cb of this.skillListeners)
-      cb(`${step} ${input.client} ${input.profile}`);
+      cb(`${step} ${input.client} Jam Board skill → ${input.target}`);
     await new Promise((r) => setTimeout(r, 100));
     return {
       exitCode: this.skillCancelled ? null : 0,
@@ -1482,6 +1486,8 @@ export class MockBridge implements JamApi {
     return {
       theme: this.state.theme,
       soundEnabled: this.soundEnabled,
+      projectId: this.state.jam?.id ?? null,
+      projectFolder: null,
       colorBy: "epic",
       estimatesEnabled: false,
       wipLimit: 6,
@@ -1497,6 +1503,19 @@ export class MockBridge implements JamApi {
         throw new JamError("validation", "Invalid theme");
     }
     const id = this.state.jam?.id ?? "";
+    if (input.projectFolder != null && input.expectedProjectId !== id)
+      throw new JamError(
+        "conflict",
+        "The project changed before saving its folder",
+      );
+    if (
+      input.projectFolder != null &&
+      (input.projectFolder.length > 4096 ||
+        Array.from(input.projectFolder).some(
+          (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
+        ))
+    )
+      throw new JamError("validation", "Choose a valid project folder");
     if (
       input.colorBy != null &&
       !["none", "assignee", "epic"].includes(input.colorBy)
@@ -1523,6 +1542,10 @@ export class MockBridge implements JamApi {
     if (input.theme != null) this.state.theme = input.theme;
     if (input.soundEnabled != null) this.soundEnabled = input.soundEnabled;
     this.boardSettings[id] = {
+      projectFolder:
+        input.projectFolder != null
+          ? input.projectFolder.trim() || null
+          : (this.boardSettings[id]?.projectFolder ?? null),
       colorBy: input.colorBy ?? this.boardSettings[id]?.colorBy ?? "epic",
       estimatesEnabled:
         input.estimatesEnabled ??

@@ -305,3 +305,16 @@ browser scenarios, including the requirements immediately above. All 12 syntheti
 paper/pickup/guidance PNGs were inspected. This is bounded Chromium behavior and
 rendering evidence, not all-family native or accessibility certification; see
 [the exact record](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
+
+## Alpha41 scenarios
+
+- AS41-1: review bundled skill target, cancel, confirm, pending double-click, verify;
+  modified/foreign content refusal retains bytes, app-owned upgrade retains backup.
+- AS41-2: connection prompt for already connected/missing MCP/wrong project/restart;
+  no token disclosure or automatic brain appointment/start.
+- AS41-3: project folder save/reload/clear/isolation and stale project rejection.
+- AS41-4: actual shipped example over disposable stdio: fresh bootstrap, plan,
+  paused claim rejection, human fixture approval, claim, report, self/stale review
+  rejection and exact acceptance. This is protocol evidence, not live-model UX.
+
+Execution evidence belongs in the alpha41 verification record.

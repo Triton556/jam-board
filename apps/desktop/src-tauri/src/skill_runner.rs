@@ -1,32 +1,35 @@
+//! Project-local installation of the skill shipped with this exact application.
+//! No downloads, Python, global client configuration or agent launches.
 use serde::{Deserialize, Serialize};
 use std::{
-    path::{Path, PathBuf},
-    process::Stdio,
+    collections::BTreeMap,
+    fs,
+    path::{Component, Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
-use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    process::Command,
-};
+
+const ENTRY: &str = include_str!("../../../../integrations/agent-skill/jam-board/SKILL.md");
+const OPERATIONS: &str =
+    include_str!("../../../../integrations/agent-skill/jam-board/references/operations.md");
+const RECEIPT: &str = ".jam-board-skill.json";
+static SERIAL: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SkillInput {
-    pub playbook: String,
     pub target: String,
     pub client: String,
-    pub profile: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillCheck {
-    pub version: Option<String>,
-    pub python: Option<String>,
-    pub python_version: Option<String>,
+    pub version: String,
+    pub destination: Option<String>,
+    pub status: String,
     pub errors: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -36,146 +39,415 @@ pub struct SkillResult {
     pub cancelled: bool,
     pub timed_out: bool,
 }
-#[derive(Debug, Clone)]
-struct Python {
-    program: String,
-    prefix: Vec<String>,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Receipt {
+    format: u32,
+    owner: String,
     version: String,
+    files: BTreeMap<String, String>,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustedRecord {
+    target: String,
+    client: String,
+    receipt: Receipt,
+}
+fn target_identity(input: &SkillInput) -> String {
+    fs::canonicalize(&input.target)
+        .unwrap_or_else(|_| PathBuf::from(&input.target))
+        .to_string_lossy()
+        .into_owned()
+}
+fn trusted_path(input: &SkillInput, root: &Path) -> PathBuf {
+    // Stable lookup key only, not a security hash. The record's full identity is
+    // checked before use, including on first installation, to reject collisions.
+    let key = format!("{}\0{}", target_identity(input), input.client);
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in key.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    root.join(format!("{hash:016x}.json"))
+}
+#[derive(Debug)]
+struct Plan {
+    destination: PathBuf,
+    status: &'static str,
+}
+fn bundle() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("SKILL.md".into(), ENTRY.into()),
+        ("references/operations.md".into(), OPERATIONS.into()),
+    ])
+}
+fn error(e: impl std::fmt::Display) -> String {
+    e.to_string()
+}
+fn no_links(path: &Path) -> Result<(), String> {
+    let mut current = PathBuf::new();
+    for part in path.components() {
+        if matches!(part, Component::ParentDir) {
+            return Err("Use an absolute project path without '..'".into());
+        }
+        current.push(part);
+        match fs::symlink_metadata(&current) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                return Err(format!(
+                    "Symbolic links are not installation targets: {}",
+                    current.display()
+                ));
+            }
+            Ok(_) => (),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(error(e)),
+        }
+    }
+    Ok(())
+}
+fn validate_tree(path: &Path) -> Result<(), String> {
+    let meta = fs::symlink_metadata(path).map_err(error)?;
+    if meta.file_type().is_symlink() {
+        return Err(format!(
+            "Preserve linked file and resolve it manually: {}",
+            path.display()
+        ));
+    }
+    if meta.is_dir() {
+        for item in fs::read_dir(path).map_err(error)? {
+            validate_tree(&item.map_err(error)?.path())?;
+        }
+    } else if !meta.is_file() {
+        return Err(format!("Unsupported special file: {}", path.display()));
+    }
+    Ok(())
+}
+fn inspect(
+    input: &SkillInput,
+    files: &BTreeMap<String, String>,
+    version: &str,
+    trust: &Path,
+) -> Result<Plan, String> {
+    no_links(trust)?;
+    no_links(&trusted_path(input, trust))?;
+    let client = match input.client.as_str() {
+        "codex" => ".agents",
+        "claude" => ".claude",
+        _ => return Err("Choose Codex or Claude Code".into()),
+    };
+    let target = Path::new(&input.target);
+    if !target.is_absolute() || !target.is_dir() {
+        return Err("Choose an existing absolute project folder".into());
+    }
+    no_links(target)?;
+    let destination = target.join(client).join("skills/jam-board");
+    no_links(&destination)?;
+    if !destination.exists() {
+        let prior = trusted_path(input, trust);
+        if prior.exists() {
+            let record: TrustedRecord = serde_json::from_slice(&fs::read(prior).map_err(error)?)
+                .map_err(|_| "Invalid app ownership record".to_string())?;
+            if record.target != target_identity(input) || record.client != input.client {
+                return Err("App ownership record identity conflict; no files changed".into());
+            }
+        }
+        return Ok(Plan {
+            destination,
+            status: "new",
+        });
+    }
+    if !destination.is_dir() {
+        return Err("The skill destination is not a directory; nothing was changed".into());
+    }
+    validate_tree(&destination)?;
+    let receipt:Receipt=serde_json::from_slice(&fs::read(destination.join(RECEIPT)).map_err(|_| "An existing Jam Board skill has no app ownership receipt. If installed by agent-playbook, use its original installer and receipts to remove or migrate unchanged files first. Preserve edits; nothing was overwritten".to_string())?).map_err(|_|"Invalid skill ownership receipt; nothing was changed".to_string())?;
+    if receipt.format != 1 || receipt.owner != "jam-board" || receipt.files.keys().ne(files.keys())
+    {
+        return Err("Unsupported skill ownership receipt; preserve this installation for explicit migration".into());
+    }
+    let trusted:TrustedRecord=serde_json::from_slice(&fs::read(trusted_path(input,trust)).map_err(|_| "Original app ownership record is missing. Preserve this installation for explicit migration".to_string())?).map_err(|_| "Invalid app ownership record".to_string())?;
+    if trusted.target != target_identity(input)
+        || trusted.client != input.client
+        || trusted.receipt != receipt
+    {
+        return Err(
+            "Skill receipt differs from the app ownership record; preserve files for inspection"
+                .into(),
+        );
+    }
+    for (path, expected) in &receipt.files {
+        let actual = fs::read(destination.join(path)).map_err(|_| {
+            format!(
+                "Managed file is missing: {path}. Preserve and reconcile it before reinstalling"
+            )
+        })?;
+        if actual != expected.as_bytes() {
+            return Err(format!(
+                "Managed file was edited: {path}. Your version is preserved; reconcile it before reinstalling"
+            ));
+        }
+    }
+    let status = if receipt.version == version && receipt.files == *files {
+        "current"
+    } else {
+        "upgrade"
+    };
+    Ok(Plan {
+        destination,
+        status,
+    })
+}
+pub async fn check(input: &SkillInput, trust: &Path) -> SkillCheck {
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    match inspect(input, &bundle(), &version, trust) {
+        Ok(plan) => SkillCheck {
+            version,
+            destination: Some(plan.destination.to_string_lossy().into()),
+            status: plan.status.into(),
+            errors: vec![],
+        },
+        Err(e) => SkillCheck {
+            version,
+            destination: None,
+            status: "blocked".into(),
+            errors: vec![e],
+        },
+    }
+}
+fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir(destination).map_err(error)?;
+    for item in fs::read_dir(source).map_err(error)? {
+        let item = item.map_err(error)?;
+        let from = item.path();
+        let to = destination.join(item.file_name());
+        let meta = fs::symlink_metadata(&from).map_err(error)?;
+        if meta.file_type().is_symlink() {
+            return Err("A symbolic link appeared during installation; stopped".into());
+        }
+        if meta.is_dir() {
+            copy_tree(&from, &to)?;
+        } else if meta.is_file() {
+            fs::copy(from, to).map_err(error)?;
+        } else {
+            return Err("A special file appeared during installation; stopped".into());
+        }
+    }
+    Ok(())
+}
+fn tree_snapshot(root: &Path) -> Result<BTreeMap<PathBuf, Option<Vec<u8>>>, String> {
+    fn visit(
+        root: &Path,
+        path: &Path,
+        out: &mut BTreeMap<PathBuf, Option<Vec<u8>>>,
+    ) -> Result<(), String> {
+        let meta = fs::symlink_metadata(path).map_err(error)?;
+        if meta.file_type().is_symlink() {
+            return Err("A link appeared during installation".into());
+        }
+        let key = path.strip_prefix(root).map_err(error)?.to_path_buf();
+        if meta.is_dir() {
+            out.insert(key, None);
+            for item in fs::read_dir(path).map_err(error)? {
+                visit(root, &item.map_err(error)?.path(), out)?;
+            }
+        } else if meta.is_file() {
+            out.insert(key, Some(fs::read(path).map_err(error)?));
+        } else {
+            return Err("A special file appeared during installation".into());
+        }
+        Ok(())
+    }
+    let mut out = BTreeMap::new();
+    visit(root, root, &mut out)?;
+    Ok(out)
+}
+fn unique_sibling(destination: &Path, kind: &str) -> PathBuf {
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    destination.with_file_name(format!(
+        ".jam-board-{kind}-{}-{time}-{}",
+        std::process::id(),
+        SERIAL.fetch_add(1, Ordering::SeqCst)
+    ))
 }
 
-fn validate(input: &SkillInput) -> Result<PathBuf, String> {
-    if !["codex", "claude"].contains(&input.client.as_str())
-        || !["jam-board", "full"].contains(&input.profile.as_str())
-    {
-        return Err("Choose Codex or Claude Code and a supported profile".into());
+fn install(
+    input: &SkillInput,
+    files: &BTreeMap<String, String>,
+    version: &str,
+    trust: &Path,
+    cancel: &AtomicBool,
+    emit: &impl Fn(String),
+) -> Result<(), String> {
+    let plan = inspect(input, files, version, trust)?;
+    if plan.status == "current" {
+        emit("Already current; no files changed".into());
+        return Ok(());
     }
-    let root = std::fs::canonicalize(&input.playbook)
-        .map_err(|_| "Choose a local agent-playbook folder")?;
-    if !root.join("harness.py").is_file() || !root.join("manifest.json").is_file() {
-        return Err("The playbook folder must contain harness.py and manifest.json".into());
-    }
-    let m: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(root.join("manifest.json")).map_err(|e| e.to_string())?,
-    )
-    .map_err(|_| "Invalid manifest.json")?;
-    if m["name"] != "agent-playbook" || m["version"].as_str().is_none() {
-        return Err("Choose an agent-playbook checkout with a valid version".into());
-    }
-    if !Path::new(&input.target).is_absolute() {
-        return Err("Choose an absolute project folder path".into());
-    }
-    let target =
-        std::fs::canonicalize(&input.target).map_err(|_| "Choose an existing project folder")?;
-    if !target.is_dir() || target.starts_with(&root) || root.starts_with(&target) {
-        return Err("Choose a separate project folder outside the playbook checkout".into());
-    }
-    Ok(root)
-}
-fn command(program: &str) -> Command {
-    let mut c = Command::new(program);
-    c.kill_on_drop(true)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    c.creation_flags(0x08000000);
-    c
-}
-fn supported_python(version: &str) -> bool {
-    let mut parts = version
-        .trim()
-        .strip_prefix("Python ")
-        .unwrap_or("")
-        .split('.');
-    match (
-        parts.next().and_then(|s| s.parse::<u32>().ok()),
-        parts.next().and_then(|s| s.parse::<u32>().ok()),
-    ) {
-        (Some(major), Some(minor)) => (major, minor) >= (3, 12),
-        _ => false,
-    }
-}
-async fn python() -> Option<Python> {
-    for (program, prefix) in [("py", vec!["-3"]), ("python", vec![]), ("python3", vec![])] {
-        let output = tokio::time::timeout(
-            Duration::from_secs(5),
-            command(program).args(&prefix).arg("--version").output(),
-        )
-        .await;
-        if let Ok(Ok(out)) = output {
-            if !out.status.success() {
-                continue;
-            }
-            let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if supported_python(&version) {
-                return Some(Python {
-                    program: program.into(),
-                    prefix: prefix.into_iter().map(str::to_owned).collect(),
-                    version,
-                });
-            }
-        }
-    }
-    None
-}
-pub async fn check(input: &SkillInput) -> SkillCheck {
-    let mut errors = Vec::new();
-    let version = match validate(input) {
-        Ok(root) => std::fs::read(root.join("manifest.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
-            .and_then(|v| v["version"].as_str().map(str::to_owned)),
-        Err(e) => {
-            errors.push(e);
-            None
-        }
+    let destination = &plan.destination;
+    let parent = destination.parent().ok_or("Invalid destination")?;
+    fs::create_dir_all(parent).map_err(error)?;
+    no_links(parent)?;
+    let staging_root = Path::new(&input.target)
+        .join(".jam-board/skill-installations")
+        .join(&input.client);
+    no_links(&staging_root)?;
+    fs::create_dir_all(&staging_root).map_err(error)?;
+    let stage = unique_sibling(&staging_root.join("jam-board"), "staging");
+    let original = if destination.exists() {
+        Some(tree_snapshot(destination)?)
+    } else {
+        None
     };
-    let p = python().await;
-    if p.is_none() {
-        errors.push(
-            "Python 3.12 or newer is required. Install it separately, then check again.".into(),
+    let stage_result = (|| {
+        if destination.exists() {
+            copy_tree(destination, &stage)?;
+        } else {
+            fs::create_dir(&stage).map_err(error)?;
+        }
+        for (path, body) in files {
+            let file = stage.join(path);
+            fs::create_dir_all(file.parent().ok_or("Invalid file")?).map_err(error)?;
+            fs::write(file, body).map_err(error)?;
+        }
+        let receipt = Receipt {
+            format: 1,
+            owner: "jam-board".into(),
+            version: version.into(),
+            files: files.clone(),
+        };
+        fs::write(
+            stage.join(RECEIPT),
+            serde_json::to_vec_pretty(&receipt).map_err(error)?,
         )
+        .map_err(error)?;
+        Ok::<_, String>(())
+    })();
+    if let Err(e) = stage_result {
+        let _ = fs::remove_dir_all(&stage);
+        return Err(e);
     }
-    SkillCheck {
-        version,
-        python: p.as_ref().map(|p| {
-            if p.prefix.is_empty() {
-                p.program.clone()
-            } else {
-                format!("{} {}", p.program, p.prefix.join(" "))
+    if cancel.load(Ordering::SeqCst) {
+        let _ = fs::remove_dir_all(&stage);
+        return Err("Installation cancelled before changing skill files".into());
+    }
+    // Revalidate immediately before switching folders; no old intent is replayed.
+    if let Err(e) = inspect(input, files, version, trust) {
+        let _ = fs::remove_dir_all(&stage);
+        return Err(e);
+    }
+    let now = if destination.exists() {
+        Some(tree_snapshot(destination)?)
+    } else {
+        None
+    };
+    if original != now {
+        let _ = fs::remove_dir_all(&stage);
+        return Err("Files changed while preparing installation. Nothing was replaced; inspect the new state and retry".into());
+    }
+    let backup = if destination.exists() {
+        let backup = unique_sibling(&staging_root.join("jam-board"), "backup");
+        if let Err(e) = fs::rename(destination, &backup) {
+            let _ = fs::remove_dir_all(&stage);
+            return Err(error(e));
+        }
+        Some(backup)
+    } else {
+        None
+    };
+    if let Err(e) = fs::rename(&stage, destination) {
+        if let Some(ref backup) = backup {
+            if let Err(restore) = fs::rename(backup, destination) {
+                return Err(format!(
+                    "Install failed: {e}. Restore failed: {restore}. Original files remain at {}",
+                    backup.display()
+                ));
             }
-        }),
-        python_version: p.map(|p| p.version),
-        errors,
+        }
+        let _ = fs::remove_dir_all(&stage);
+        return Err(error(e));
     }
-}
-fn argv(root: &Path, input: &SkillInput, step: &str) -> Result<Vec<String>, String> {
-    if !["plan", "install", "verify"].contains(&step) {
-        return Err("Only plan, install and verify are permitted".into());
+    let save_trust = (|| {
+        no_links(trust)?;
+        fs::create_dir_all(trust).map_err(error)?;
+        let path = trusted_path(input, trust);
+        let temp = unique_sibling(&path, "receipt");
+        let record = TrustedRecord {
+            target: target_identity(input),
+            client: input.client.clone(),
+            receipt: Receipt {
+                format: 1,
+                owner: "jam-board".into(),
+                version: version.into(),
+                files: files.clone(),
+            },
+        };
+        fs::write(&temp, serde_json::to_vec_pretty(&record).map_err(error)?).map_err(error)?;
+        let previous = if path.exists() {
+            let prior = unique_sibling(&path, "prior-receipt");
+            fs::rename(&path, &prior).map_err(error)?;
+            Some(prior)
+        } else {
+            None
+        };
+        if let Err(e) = fs::rename(&temp, &path) {
+            if let Some(previous) = previous {
+                let _ = fs::rename(previous, &path);
+            }
+            return Err(error(e));
+        }
+        Ok::<_, String>(())
+    })();
+    if let Err(e) = save_trust {
+        let failed = unique_sibling(&staging_root.join("jam-board"), "failed");
+        fs::rename(destination,&failed).map_err(|move_error|format!("Ownership record failed: {e}; installed files could not be set aside: {move_error}. Original backup: {backup:?}"))?;
+        if let Some(ref backup) = backup {
+            fs::rename(backup,destination).map_err(|restore|format!("Ownership record failed: {e}; restore failed: {restore}. Original retained at {}",backup.display()))?;
+        }
+        return Err(format!(
+            "Ownership record could not be saved: {e}. Installation rolled back; candidate retained at {}",
+            failed.display()
+        ));
     }
-    let mut args = vec![
-        "-B".into(),
-        root.join("harness.py").to_string_lossy().into_owned(),
-        step.into(),
-        "--client".into(),
-        input.client.clone(),
-        "--target".into(),
-        input.target.clone(),
-    ];
-    if step != "verify" {
-        args.extend(["--profile".into(), input.profile.clone()])
+    if let Some(backup) = backup {
+        emit(format!(
+            "Previous installation retained at {}",
+            backup.display()
+        ));
     }
-    Ok(args)
+    emit(format!(
+        "Installed bundled Jam Board skill {version} at {}",
+        destination.display()
+    ));
+    Ok(())
 }
 pub async fn run(
     input: SkillInput,
     step: &str,
+    trust: PathBuf,
     cancel: Arc<AtomicBool>,
-    timeout: Duration,
+    _timeout: Duration,
     emit: impl Fn(String) + Send + Sync + 'static,
 ) -> Result<SkillResult, String> {
-    let root = validate(&input)?;
-    let p = python().await.ok_or("Python 3.12 or newer is required")?;
+    let step = step.to_owned();
+    tokio::task::spawn_blocking(move || run_sync(input, &step, trust, cancel, _timeout, emit))
+        .await
+        .map_err(error)?
+}
+fn run_sync(
+    input: SkillInput,
+    step: &str,
+    trust: PathBuf,
+    cancel: Arc<AtomicBool>,
+    _timeout: Duration,
+    emit: impl Fn(String) + Send + Sync + 'static,
+) -> Result<SkillResult, String> {
+    if !["plan", "install", "verify"].contains(&step) {
+        return Err("Only plan, install and verify are permitted".into());
+    }
     if cancel.load(Ordering::SeqCst) {
         return Ok(SkillResult {
             exit_code: None,
@@ -183,188 +455,180 @@ pub async fn run(
             timed_out: false,
         });
     }
-    run_process(
-        &p.program,
-        [p.prefix, argv(&root, &input, step)?].concat(),
-        &root,
-        cancel,
-        timeout,
-        emit,
-    )
-    .await
-}
-async fn run_process(
-    program: &str,
-    args: Vec<String>,
-    cwd: &Path,
-    cancel: Arc<AtomicBool>,
-    timeout: Duration,
-    emit: impl Fn(String) + Send + Sync + 'static,
-) -> Result<SkillResult, String> {
-    let mut child = command(program)
-        .args(args)
-        .current_dir(cwd)
-        .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env("PYTHONUNBUFFERED", "1")
-        .spawn()
-        .map_err(|e| format!("Cannot start Python: {e}"))?;
-    let out = child.stdout.take().ok_or("Missing stdout")?;
-    let err = child.stderr.take().ok_or("Missing stderr")?;
-    let emit: Arc<dyn Fn(String) + Send + Sync> = Arc::new(emit);
-    let stream = |reader: Box<dyn tokio::io::AsyncRead + Unpin + Send>,
-                  emit: Arc<dyn Fn(String) + Send + Sync>| {
-        tokio::spawn(async move {
-            let mut lines = BufReader::new(reader).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                emit(line)
-            }
-        })
-    };
-    let stdout = stream(Box::new(out), emit.clone());
-    let stderr = stream(Box::new(err), emit);
-    let start = std::time::Instant::now();
-    let mut result = SkillResult {
-        exit_code: None,
+    let files = bundle();
+    let version = env!("CARGO_PKG_VERSION");
+    let plan = inspect(&input, &files, version, &trust)?;
+    emit(format!(
+        "Bundled Jam Board skill {version} · {} · {}",
+        plan.status,
+        plan.destination.display()
+    ));
+    match step {
+        "plan"=>emit("Plan only: no files changed. Install changes this project's skill only; existing edited/unowned files stop installation. Upgrades keep a backup.".into()),
+        "install"=>install(&input,&files,version,&trust,&cancel,&emit)?,
+        "verify" if plan.status!="current"=>return Err("Installed skill does not match this application version".into()),
+        "verify"=>emit("Installed files match this application. This is not a live MCP or model-behavior test.".into()),
+        _=>unreachable!(),
+    }
+    Ok(SkillResult {
+        exit_code: Some(0),
         cancelled: false,
         timed_out: false,
-    };
-    loop {
-        if cancel.load(Ordering::SeqCst) || start.elapsed() >= timeout {
-            result.cancelled = cancel.load(Ordering::SeqCst);
-            result.timed_out = !result.cancelled;
-            child.kill().await.map_err(|e| e.to_string())?;
-            let status = child.wait().await.map_err(|e| e.to_string())?;
-            result.exit_code = status.code();
-            break;
-        }
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            result.exit_code = status.code();
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-    let _ = stdout.await;
-    let _ = stderr.await;
-    Ok(result)
+    })
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    fn root() -> PathBuf {
-        let base =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../.dev-data/skill-runner-tests");
-        let path = base.join(format!(
-            "{}-{}",
-            std::process::id(),
-            COUNT.fetch_add(1, Ordering::SeqCst)
-        ));
-        std::fs::create_dir_all(&path).unwrap();
-        path
+    fn trust(i: &SkillInput) -> PathBuf {
+        Path::new(&i.target).join("test-app-private-receipts")
     }
-    fn setup() -> (PathBuf, SkillInput) {
-        let root = root();
-        let source = root.join("playbook space ' quotes");
-        let target = root.join("project space & no shell");
-        std::fs::create_dir(&source).unwrap();
-        std::fs::create_dir(&target).unwrap();
-        std::fs::write(source.join("harness.py"), "print('stub')").unwrap();
-        std::fs::write(
-            source.join("manifest.json"),
-            r#"{"name":"agent-playbook","version":"1.3.0"}"#,
-        )
-        .unwrap();
-        let input = SkillInput {
-            playbook: source.to_string_lossy().into_owned(),
-            target: target.to_string_lossy().into_owned(),
-            client: "claude".into(),
-            profile: "jam-board".into(),
-        };
-        (root, input)
+    fn inspect(i: &SkillInput, f: &BTreeMap<String, String>, v: &str) -> Result<Plan, String> {
+        super::inspect(i, f, v, &trust(i))
     }
-    #[test]
-    fn enforces_python_minimum_version() {
-        assert!(!supported_python("Python 3.11.9"));
-        assert!(!supported_python("Python 2.7.18"));
-        assert!(!supported_python("not Python"));
-        assert!(supported_python("Python 3.12.0"));
-        assert!(supported_python("Python 3.14.5"));
+    fn install(
+        i: &SkillInput,
+        f: &BTreeMap<String, String>,
+        v: &str,
+        c: &AtomicBool,
+        e: &impl Fn(String),
+    ) -> Result<(), String> {
+        super::install(i, f, v, &trust(i), c, e)
     }
-    #[test]
-    fn argv_is_allowlisted_and_paths_are_separate_arguments() {
-        let (root, input) = setup();
-        let source = validate(&input).unwrap();
-        for step in ["plan", "install", "verify"] {
-            let args = argv(&source, &input, step).unwrap();
-            assert_eq!(args[0], "-B");
-            assert!(args[1].ends_with("harness.py"));
-            assert_eq!(args[2], step);
-            assert_eq!(args[6], input.target);
-            assert_eq!(args.contains(&"--profile".into()), step != "verify");
-            assert!(!args.contains(&"-c".into()));
+    async fn run(
+        i: SkillInput,
+        s: &str,
+        c: Arc<AtomicBool>,
+        d: Duration,
+        e: impl Fn(String) + Send + Sync + 'static,
+    ) -> Result<SkillResult, String> {
+        let t = trust(&i);
+        super::run(i, s, t, c, d, e).await
+    }
+
+    struct Temp(PathBuf);
+    impl Temp {
+        fn new() -> Self {
+            let p = std::env::temp_dir().join(format!(
+                "jam-skill-test-{}-{}",
+                std::process::id(),
+                SERIAL.fetch_add(1, Ordering::SeqCst)
+            ));
+            fs::create_dir(&p).unwrap();
+            Self(p)
         }
-        let mut relative = input.clone();
-        relative.target = "relative-project".into();
-        assert!(validate(&relative).unwrap_err().contains("absolute"));
-        assert!(argv(&source, &input, "doctor").is_err());
-        assert!(argv(&source, &input, "install && calc").is_err());
-        std::fs::remove_dir_all(root).unwrap();
+        fn input(&self, client: &str) -> SkillInput {
+            SkillInput {
+                target: self.0.to_string_lossy().into(),
+                client: client.into(),
+            }
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    fn put(input: &SkillInput, files: &BTreeMap<String, String>, version: &str) {
+        install(input, files, version, &AtomicBool::new(false), &|_| {}).unwrap();
+    }
+    #[test]
+    fn installs_both_clients_without_touching_project_or_global_config() {
+        for client in ["codex", "claude"] {
+            let t = Temp::new();
+            fs::write(t.0.join("AGENTS.md"), "human rules").unwrap();
+            let input = t.input(client);
+            let files = bundle();
+            assert_eq!(inspect(&input, &files, "1").unwrap().status, "new");
+            put(&input, &files, "1");
+            assert_eq!(inspect(&input, &files, "1").unwrap().status, "current");
+            assert_eq!(
+                fs::read_to_string(t.0.join("AGENTS.md")).unwrap(),
+                "human rules"
+            );
+        }
+    }
+    #[test]
+    fn upgrade_keeps_backup_and_neighbor_files() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        let old = bundle();
+        put(&i, &old, "old");
+        let d = inspect(&i, &old, "old").unwrap().destination;
+        fs::write(d.join("user-note.md"), "retain me").unwrap();
+        let mut new = old.clone();
+        new.insert("SKILL.md".into(), "new instructions".into());
+        put(&i, &new, "new");
+        assert_eq!(
+            fs::read_to_string(d.join("user-note.md")).unwrap(),
+            "retain me"
+        );
+        let backup = fs::read_dir(t.0.join(".jam-board/skill-installations/codex"))
+            .unwrap()
+            .map(|x| x.unwrap().path())
+            .find(|x| {
+                x.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with(".jam-board-backup")
+            })
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(backup.join("SKILL.md")).unwrap(),
+            old["SKILL.md"]
+        );
+        assert_eq!(inspect(&i, &new, "new").unwrap().status, "current");
+    }
+    #[test]
+    fn modified_owned_file_is_not_overwritten() {
+        let t = Temp::new();
+        let i = t.input("claude");
+        let files = bundle();
+        put(&i, &files, "old");
+        let d = inspect(&i, &files, "old").unwrap().destination;
+        fs::write(d.join("SKILL.md"), "my edits").unwrap();
+        assert!(
+            install(&i, &files, "new", &AtomicBool::new(false), &|_| {})
+                .unwrap_err()
+                .contains("edited")
+        );
+        assert_eq!(fs::read_to_string(d.join("SKILL.md")).unwrap(), "my edits");
+    }
+    #[test]
+    fn unowned_installation_is_preserved() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        let d = t.0.join(".agents/skills/jam-board");
+        fs::create_dir_all(&d).unwrap();
+        fs::write(d.join("SKILL.md"), "old playbook").unwrap();
+        assert!(
+            inspect(&i, &bundle(), "1")
+                .unwrap_err()
+                .contains("no app ownership receipt")
+        );
+        assert_eq!(
+            fs::read_to_string(d.join("SKILL.md")).unwrap(),
+            "old playbook"
+        );
     }
     #[tokio::test]
-    async fn validates_source_and_python_without_executing_the_harness() {
-        let (root, input) = setup();
-        let result = check(&input).await;
-        assert!(result.errors.is_empty(), "{:?}", result.errors);
-        assert_eq!(result.version.as_deref(), Some("1.3.0"));
-        assert!(result.python_version.unwrap().starts_with("Python 3."));
-        std::fs::remove_file(Path::new(&input.playbook).join("harness.py")).unwrap();
-        assert!(validate(&input).unwrap_err().contains("harness.py"));
-        std::fs::write(Path::new(&input.playbook).join("harness.py"), "").unwrap();
-        std::fs::remove_file(Path::new(&input.playbook).join("manifest.json")).unwrap();
-        assert!(validate(&input).is_err());
-        std::fs::remove_dir_all(root).unwrap();
-    }
-    #[tokio::test]
-    async fn timeout_and_cancel_kill_and_wait_for_the_child() {
-        let (root, input) = setup();
-        let source = Path::new(&input.playbook);
-        std::fs::write(source.join("harness.py"),"import time, pathlib\nprint('started',flush=True)\ntime.sleep(1)\npathlib.Path('child-survived').write_text('bad')\n").unwrap();
-        let cancelled = Arc::new(AtomicBool::new(false));
-        let r = run(
-            input.clone(),
+    async fn plan_is_read_only_and_verify_missing_fails() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        run(
+            i.clone(),
             "plan",
-            cancelled,
-            Duration::from_millis(100),
+            Arc::new(AtomicBool::new(false)),
+            Duration::from_secs(1),
             |_| {},
         )
         .await
         .unwrap();
-        assert!(r.timed_out);
-        let flag = Arc::new(AtomicBool::new(false));
-        let on_output = flag.clone();
-        let r = run(
-            input.clone(),
-            "install",
-            flag,
-            Duration::from_secs(10),
-            move |line| {
-                if line == "started" {
-                    on_output.store(true, Ordering::SeqCst)
-                }
-            },
-        )
-        .await
-        .unwrap();
-        assert!(r.cancelled);
-        assert!(!r.timed_out);
-        tokio::time::sleep(Duration::from_millis(1200)).await;
-        assert!(!source.join("child-survived").exists());
-        let mut bad = input;
-        bad.client = "claude && calc".into();
+        assert_eq!(fs::read_dir(&t.0).unwrap().count(), 0);
         assert!(
             run(
-                bad,
-                "plan",
+                i,
+                "verify",
                 Arc::new(AtomicBool::new(false)),
                 Duration::from_secs(1),
                 |_| {}
@@ -372,6 +636,73 @@ mod tests {
             .await
             .is_err()
         );
-        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn cancellation_leaves_no_skill() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        assert!(install(&i, &bundle(), "1", &AtomicBool::new(true), &|_| {}).is_err());
+        assert!(!t.0.join(".agents/skills/jam-board").exists());
+    }
+    #[test]
+    fn repeat_install_is_idempotent() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        let f = bundle();
+        put(&i, &f, "1");
+        put(&i, &f, "1");
+        let parent = t.0.join(".agents/skills");
+        assert_eq!(fs::read_dir(parent).unwrap().count(), 1);
+    }
+    #[cfg(unix)]
+    #[test]
+    fn linked_destination_and_linked_neighbor_are_rejected() {
+        use std::os::unix::fs::symlink;
+        let t = Temp::new();
+        let i = t.input("codex");
+        let outside = Temp::new();
+        symlink(&outside.0, t.0.join(".agents")).unwrap();
+        assert!(inspect(&i, &bundle(), "1").is_err());
+        fs::remove_file(t.0.join(".agents")).unwrap();
+        put(&i, &bundle(), "1");
+        let d = t.0.join(".agents/skills/jam-board");
+        symlink(outside.0.join("secret"), d.join("linked")).unwrap();
+        assert!(inspect(&i, &bundle(), "1").is_err());
+    }
+    #[test]
+    fn changed_receipt_does_not_hide_edited_file() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        let f = bundle();
+        put(&i, &f, "1");
+        let d = inspect(&i, &f, "1").unwrap().destination;
+        let p = d.join(RECEIPT);
+        let mut r: Receipt = serde_json::from_slice(&fs::read(&p).unwrap()).unwrap();
+        r.files.insert("SKILL.md".into(), "my edits".into());
+        fs::write(d.join("SKILL.md"), "my edits").unwrap();
+        fs::write(p, serde_json::to_vec(&r).unwrap()).unwrap();
+        assert!(inspect(&i, &f, "2").unwrap_err().contains("differs"));
+    }
+    #[test]
+    fn missing_private_record_preserves_existing_install() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        let f = bundle();
+        put(&i, &f, "1");
+        let d = inspect(&i, &f, "1").unwrap().destination;
+        fs::remove_file(trusted_path(&i, &trust(&i))).unwrap();
+        assert!(inspect(&i, &f, "2").unwrap_err().contains("missing"));
+        assert_eq!(
+            fs::read_to_string(d.join("SKILL.md")).unwrap(),
+            f["SKILL.md"]
+        );
+    }
+    #[test]
+    fn receipt_write_failure_rolls_back_fresh_install() {
+        let t = Temp::new();
+        let i = t.input("codex");
+        fs::write(trust(&i), "blocks directory creation").unwrap();
+        assert!(install(&i, &bundle(), "1", &AtomicBool::new(false), &|_| {}).is_err());
+        assert!(!t.0.join(".agents/skills/jam-board").exists());
     }
 }

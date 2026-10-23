@@ -3,6 +3,18 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0-alpha.41] - 2026-10-23
+
+### Changed
+- Jam Board owns its standalone agent skill and operation examples. MCP exposes the same files as `jam://guide` and `jam://guide/operations`; no universal playbook or brain skill is required.
+- Settings installs only this bundled skill into a selected Codex/Claude project. Review-before-write, trusted ownership records, outside-catalog upgrade backups and modified/unowned-file refusal replace the external Python/playbook installer.
+- A neutral “Connect agent to board” prompt checks existing MCP and exact project identity, offers configuration/restart recovery without copied credentials, and reads board-owned guidance. Connecting does not appoint a brain or start work.
+- A project-scoped folder hint persists separately from board identity and rejects saves for a stale project. Missing folders require the user's choice, not invented paths.
+
+### Verification
+- Shipped JSON operation examples have a disposable real-stdio lifecycle test covering planning, blocked execution, human fixture approval, claim/report/review and stale context rejection.
+- Installer and connection UI checks cover pending/failure/cancel/conflict states. See `docs/verification/0.3.0-alpha.41.md` for actual executed and blocked checks; no native installation or live-model success is implied.
+
 ## [0.3.0-alpha.40] — 2026-10-22
 
 ### Clearer instructions and restrained card movement
