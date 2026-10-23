@@ -359,13 +359,13 @@ fn install(
         None
     };
     if let Err(e) = fs::rename(&stage, destination) {
-        if let Some(ref backup) = backup {
-            if let Err(restore) = fs::rename(backup, destination) {
-                return Err(format!(
-                    "Install failed: {e}. Restore failed: {restore}. Original files remain at {}",
-                    backup.display()
-                ));
-            }
+        if let Some(ref backup) = backup
+            && let Err(restore) = fs::rename(backup, destination)
+        {
+            return Err(format!(
+                "Install failed: {e}. Restore failed: {restore}. Original files remain at {}",
+                backup.display()
+            ));
         }
         let _ = fs::remove_dir_all(&stage);
         return Err(error(e));
