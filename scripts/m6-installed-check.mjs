@@ -1,192 +1,203 @@
-// Drive only the installed Jam Board WebView and its installed stdio sidecar.
+// Supported current-contract scenario. Parent-owned, fresh installed QA data ONLY.
+// This does not represent real user approval or an AI worker session.
+import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
-import { mkdir, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	assertFreshInstalledTarget,
+	assertInstalledReceipt,
+	assertInstalledRuntime,
+} from "./installed-smoke-preflight.mjs";
+import {
+	assertCurrentContract,
+	fixtureDisclosure,
+	qaAgentName,
+	qaHumanName,
+	runInstalledWorkflow,
+} from "./smoke-contracts.mjs";
+import { openStdio } from "./smoke-stdio.mjs";
+
+assert.equal(
+	process.platform,
+	"win32",
+	"Installed WebView lifecycle is NOT_RUN on this platform",
+);
+const [executable, receiptPath] = process.argv.slice(2);
+assert.ok(
+	executable && receiptPath,
+	"Run only through m6-install-check.mjs --fresh-disposable-install; a parent-owned receipt is required",
+);
+const root = fileURLToPath(new URL("../", import.meta.url));
+const version = JSON.parse(
+	await readFile(
+		new URL("../apps/desktop/package.json", import.meta.url),
+		"utf8",
+	),
+).version;
+const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+assertInstalledReceipt(receipt, {
+	expectedDataDir: path.join(process.env.APPDATA, "dev.triton556.jamboard"),
+	executable,
+	parentPid: process.ppid,
+	version,
+});
+assert.equal(
+	path.resolve(receipt.outputDir),
+	path.join(root, ".dev-data", `install-check-${receipt.runId}`),
+);
+for (const name of ["JAM_BOARD_DB", "JAM_BOARD_DATA_DIR", "JAM_BOARD_PROJECT"])
+	assert.ok(!process.env[name], `${name} must be unset`);
 const require = createRequire(
 	new URL("../apps/desktop/package.json", import.meta.url),
 );
 const { chromium } = require("@playwright/test");
-const executable = process.argv[2];
-if (!executable) throw new Error("Pass the installed sidecar path.");
 let browser;
-for (let attempt = 0; attempt < 100; attempt++) {
-	try {
-		browser = await chromium.connectOverCDP("http://127.0.0.1:9223");
-		break;
-	} catch {
+let client;
+try {
+	for (let attempt = 0; attempt < 100; attempt++) {
+		try {
+			browser = await chromium.connectOverCDP("http://127.0.0.1:9223");
+			break;
+		} catch {
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+	}
+	assert.ok(browser, "Installed WebView diagnostics did not start");
+	let page;
+	for (let attempt = 0; attempt < 150; attempt++) {
+		page = browser
+			.contexts()
+			.flatMap((context) => context.pages())
+			.find((candidate) => /tauri\.localhost/.test(candidate.url()));
+		if (page) break;
 		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
-}
-if (!browser) throw new Error("Installed WebView diagnostics did not start.");
-let page;
-for (let attempt = 0; attempt < 150; attempt++) {
-	page = browser
-		.contexts()
-		.flatMap((context) => context.pages())
-		.find((page) => /tauri\.localhost/.test(page.url()));
-	if (page) break;
-	await new Promise((resolve) => setTimeout(resolve, 100));
-}
-if (!page) throw new Error("No installed Jam Board page.");
-await page.waitForFunction(
-	() => document.documentElement.dataset.ready === "true",
-);
-const invoke = (command, args = {}) =>
-	page.evaluate(
-		({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args),
-		{ command, args },
-	);
-let state = await invoke("app_state");
-const onboarding = !state.hasJam;
-if (onboarding)
-	await page
-		.getByRole("button", { name: "Load demo jam", exact: true })
-		.click();
-await page.getByTestId("task-card").first().waitFor();
-state = await invoke("app_state");
-const runtime = await invoke("runtime_info");
-if (
-	!/[\\/]AppData[\\/]Roaming[\\/]dev\.triton556\.jamboard$/i.test(
-		runtime.dataDir,
-	)
-)
-	throw new Error(
-		"Installed app did not use its default roaming data directory.",
-	);
-const env = { ...process.env, JAM_AGENT_NAME: "Codex", RUST_LOG: "warn" };
-delete env.JAM_BOARD_DATA_DIR;
-delete env.JAM_BOARD_DB;
-const server = spawn(executable, [], {
-	env,
-	windowsHide: true,
-	stdio: ["pipe", "pipe", "inherit"],
-});
-const pending = new Map();
-let sequence = 0;
-const lines = createInterface({ input: server.stdout });
-lines.on("line", (line) => {
-	const result = JSON.parse(line),
-		entry = pending.get(result.id);
-	if (entry) {
-		clearTimeout(entry.timer);
-		pending.delete(result.id);
-		result.error
-			? entry.reject(new Error(JSON.stringify(result.error)))
-			: entry.resolve(result.result);
-	}
-});
-const request = (method, params) =>
-	new Promise((resolve, reject) => {
-		const id = ++sequence;
-		const timer = setTimeout(
-			() => reject(new Error(`Timeout: ${method}`)),
-			10000,
-		);
-		pending.set(id, { resolve, reject, timer });
-		server.stdin.write(
-			JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n",
-		);
-	});
-try {
-	await request("initialize", {
-		protocolVersion: "2025-06-18",
-		capabilities: {},
-		clientInfo: { name: "codex-installed-m6", version: "1" },
-	});
-	server.stdin.write(
-		JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) +
-			"\n",
-	);
-	const started = Date.now();
-	const result = await request("tools/call", {
-		name: "create_task",
-		arguments: {
-			title: "Installed Codex: tune the lantern glow",
-			tags: ["polish"],
-			idempotencyKey: "m6-installed-check",
-		},
-	});
-	if (result.isError) throw new Error(JSON.stringify(result.content));
-	const key = result.structuredContent.key;
-	const card = page.locator(`[data-key="${key}"]`);
-	await card.waitFor();
-	const deliveryMs = Date.now() - started;
-	const highlighted = (await card.getAttribute("data-highlighted")) === "true";
-	const claimed = await request("tools/call", {
-		name: "claim_task",
-		arguments: { key },
-	});
-	if (claimed.isError) throw new Error("Installed claim failed");
+	assert.ok(page, "No installed Jam Board page");
 	await page.waitForFunction(
-		(key) =>
-			document.querySelector(`[data-column="in_progress"] [data-key="${key}"]`),
-		key,
+		() => document.documentElement.dataset.ready === "true",
 	);
-	await card.scrollIntoViewIfNeeded();
-	await page.waitForTimeout(150);
-	await mkdir(new URL("../docs/media/m6/", import.meta.url), {
-		recursive: true,
+	const invoke = (command, args = {}) =>
+		page.evaluate(
+			({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args),
+			{ command, args },
+		);
+	// All target/context checks precede ANY native or MCP domain mutation.
+	assert.equal(
+		await invoke("plugin:app|version"),
+		version,
+		"Installed native binary differs from checkout",
+	);
+	const runtime = await invoke("runtime_info");
+	assertInstalledRuntime(receipt, runtime);
+	await assertFreshInstalledTarget({
+		receipt,
+		runtime,
+		state: await invoke("app_state"),
+		projects: await invoke("list_projects", { includeArchived: true }),
 	});
-	await page.screenshot({
-		path: fileURLToPath(
-			new URL("../docs/media/m6/installed-agent-card.png", import.meta.url),
-		),
-	});
-	await request("tools/call", {
-		name: "add_comment",
-		arguments: {
-			key,
-			body: "Verified the installed sidecar and default local database.",
+	const state = await invoke("create_jam", {
+		input: {
+			name: "Disposable installed smoke QA",
+			yourName: qaHumanName,
+			theme: null,
+			startsAt: "",
+			endsAt: "",
+			timezone: "UTC",
+			template: "custom",
+			milestoneAt: null,
 		},
 	});
-	await page.waitForFunction(async () =>
-		(await window.__TAURI_INTERNALS__.invoke("mcp_status")).recentCalls.some(
-			(call) => call.tool === "add_comment",
-		),
+	assert.equal(state.currentMember.name, qaHumanName);
+	assert.equal(state.currentMember.kind, "human");
+	await page.goto(new URL("/board", page.url()).href);
+	await page.waitForFunction(
+		() => document.documentElement.dataset.ready === "true",
 	);
-	const status = await invoke("mcp_status");
+	const env = { ...process.env, JAM_AGENT_NAME: qaAgentName, RUST_LOG: "warn" };
+	delete env.JAM_BOARD_DB;
+	delete env.JAM_BOARD_DATA_DIR;
+	delete env.JAM_BOARD_PROJECT;
+	client = openStdio(executable, { env });
+	assertCurrentContract(
+		await client.initialize(),
+		await client.request("tools/list", {}),
+		version,
+	);
+	const session = await client.tool("get_session_context");
+	assert.equal(
+		session.projectId,
+		state.jam.id,
+		"Sidecar did not bind the exact fresh project",
+	);
+	let deliveryMs;
+	let highlighted;
+	const workflow = await runInstalledWorkflow({
+		tool: client.tool,
+		invoke,
+		qaHumanId: state.currentMember.id,
+		async onCreated(task, started) {
+			const card = page.locator(`[data-key="${task.key}"]`);
+			await card.waitFor();
+			deliveryMs = Date.now() - started;
+			highlighted = (await card.getAttribute("data-highlighted")) === "true";
+			assert.ok(
+				highlighted && deliveryMs <= 1000,
+				"Installed create delivery/highlight check failed",
+			);
+		},
+		async onClaimed(task) {
+			await page.waitForFunction(
+				(key) =>
+					document.querySelector(
+						`[data-column="in_progress"] [data-key="${key}"]`,
+					),
+				task.key,
+			);
+			await page.locator(`[data-key="${task.key}"]`).scrollIntoViewIfNeeded();
+			await page.screenshot({
+				path: path.join(receipt.outputDir, "installed-agent-card.png"),
+			});
+		},
+	});
 	const members = await invoke("list_members");
+	const worker = members.find(
+		(member) => member.id === workflow.claimed.assigneeId,
+	);
+	assert.equal(worker?.name, qaAgentName);
+	assert.equal(worker?.kind, "agent");
+	assert.equal(worker?.online, true);
+	const status = await invoke("mcp_status");
 	const check = {
 		installed: true,
-		onboarding,
+		version,
+		fixture: fixtureDisclosure,
+		onboarding: "native create_jam QA fixture; Welcome form UI NOT_RUN",
 		defaultDatabase: true,
+		exactFreshTargetVerified: true,
 		sidecarWithoutOverrides: true,
-		key,
+		projectId: session.projectId,
+		key: workflow.key,
 		deliveryMs,
 		highlighted,
-		claimed: claimed.structuredContent.status === "in_progress",
-		assignedToCodex: members.some(
-			(member) =>
-				member.handle === "codex" &&
-				member.id === claimed.structuredContent.assigneeId,
-		),
+		claimed: true,
+		pausedClaimRejected: true,
+		independentReview: workflow.independentReview,
+		reportId: workflow.reportId,
+		workerOnline: true,
+		recentTools: status.recentCalls.map((call) => call.tool),
 		captureSource:
 			"installed release WebView2 CDP content, without cursor overlay",
-		codexOnline: members.some(
-			(member) => member.handle === "codex" && member.online,
-		),
-		recentTools: status.recentCalls.map((call) => call.tool),
-		jam: state.jam.name,
+		windowsInstallLifecycle:
+			"Checked separately by parent; not asserted by this child",
 	};
-	if (
-		!check.codexOnline ||
-		!check.claimed ||
-		!check.assignedToCodex ||
-		!highlighted ||
-		deliveryMs > 1000
-	)
-		throw new Error("Installed live delivery/presence check failed.");
-	await mkdir(new URL("../.dev-data/", import.meta.url), { recursive: true });
 	await writeFile(
-		new URL("../.dev-data/m6-installed-live.json", import.meta.url),
+		path.join(receipt.outputDir, "installed-live.json"),
 		JSON.stringify(check, null, 2) + "\n",
 	);
 	console.log(JSON.stringify(check));
 } finally {
-	server.stdin.end();
-	lines.close();
-	setTimeout(() => server.kill(), 500).unref();
-	await browser.close();
+	await client?.close();
+	await browser?.close();
 }

@@ -10,10 +10,12 @@ use tauri_specta::Event;
 pub enum ApiErrorCode {
     NotFound,
     ClaimConflict,
+    StaleClaim,
     Validation,
     Archived,
     Conflict,
     NotReady,
+    ExecutionRequired,
     WrongStatus,
     Forbidden,
     Internal,
@@ -30,10 +32,12 @@ impl From<jam_core::Error> for ApiError {
         let (code, field) = match &error {
             Error::NotFound(_) => (ApiErrorCode::NotFound, None),
             Error::ClaimConflict { .. } => (ApiErrorCode::ClaimConflict, None),
+            Error::StaleClaim => (ApiErrorCode::StaleClaim, None),
             Error::Validation { field, .. } => (ApiErrorCode::Validation, Some(field.clone())),
             Error::Archived(_) => (ApiErrorCode::Archived, None),
             Error::Conflict => (ApiErrorCode::Conflict, None),
             Error::NotReady(_) => (ApiErrorCode::NotReady, None),
+            Error::ExecutionRequired(_) => (ApiErrorCode::ExecutionRequired, None),
             Error::WrongStatus(_) => (ApiErrorCode::WrongStatus, None),
             Error::Forbidden(_) => (ApiErrorCode::Forbidden, None),
             _ => (ApiErrorCode::Internal, None),
@@ -58,16 +62,39 @@ pub(crate) async fn execute<T: Send + 'static>(
     mutation: bool,
     f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
 ) -> Result<T, ApiError> {
-    let store = state.store.clone();
+    // Capture the project before scheduling; later navigation cannot retarget this command.
+    let scoped = captured_project_store(&state.store)?;
+    execute_with_store(state, app, mutation, scoped, f).await
+}
+fn captured_project_store(store: &Store) -> Result<Store, ApiError> {
+    store.selected_snapshot().map_err(ApiError::from)
+}
+pub(crate) async fn execute_unbound<T: Send + 'static>(
+    state: &DesktopState,
+    app: tauri::AppHandle,
+    mutation: bool,
+    f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
+) -> Result<T, ApiError> {
+    execute_with_store(state, app, mutation, (*state.store).clone(), f).await
+}
+async fn execute_with_store<T: Send + 'static>(
+    state: &DesktopState,
+    app: tauri::AppHandle,
+    mutation: bool,
+    scoped: Store,
+    f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
+) -> Result<T, ApiError> {
+    let selected = state.store.clone();
     let feed = state.feed.clone();
     tokio::task::spawn_blocking(move || {
-        let result = f(&store).map_err(ApiError::from)?;
+        let result = f(&scoped).map_err(ApiError::from)?;
         if mutation {
             let events = feed
                 .lock()
                 .map_err(internal)?
                 .poll()
                 .map_err(ApiError::from)?;
+            let events = selected.selected_events(events).map_err(ApiError::from)?;
             if !events.is_empty() {
                 BoardChanged { events }.emit(&app).map_err(internal)?;
             }
@@ -81,6 +108,7 @@ pub(crate) async fn execute<T: Send + 'static>(
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MoveInput {
     pub key: String,
+    pub expected_updated_at: String,
     pub status: String,
     pub before_key: Option<String>,
     pub after_key: Option<String>,
@@ -99,7 +127,37 @@ pub async fn app_state(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState, ApiError> {
-    execute(&state, app, false, Store::app_state).await
+    execute_unbound(&state, app, false, Store::app_state).await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn list_projects(
+    include_archived: Option<bool>,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<Vec<ProjectSummary>, ApiError> {
+    execute_unbound(&state, app, false, move |s| {
+        s.list_projects(include_archived.unwrap_or(false))
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn select_project(
+    project_id: String,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<AppState, ApiError> {
+    execute_unbound(&state, app, false, move |s| s.select_project(&project_id)).await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn restore_project(
+    project_id: String,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<AppState, ApiError> {
+    execute_unbound(&state, app, true, move |s| s.restore_project(&project_id)).await
 }
 #[tauri::command]
 #[specta::specta]
@@ -108,7 +166,7 @@ pub async fn create_jam(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState, ApiError> {
-    execute(&state, app, true, move |s| s.onboard(input)).await
+    execute_unbound(&state, app, true, move |s| s.onboard(input)).await
 }
 #[tauri::command]
 #[specta::specta]
@@ -116,7 +174,7 @@ pub async fn load_demo_jam(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState, ApiError> {
-    execute(&state, app, true, |s| {
+    execute_unbound(&state, app, true, |s| {
         s.seed_demo()?;
         s.app_state()
     })
@@ -182,10 +240,10 @@ pub async fn move_task(
     app: tauri::AppHandle,
 ) -> Result<TaskSummary, ApiError> {
     execute(&state, app, true, move |s| {
-        s.move_task_with_override(
-            &s.current_member()?.id,
+        s.move_current_task(
             &input.key,
             &input.status,
+            &input.expected_updated_at,
             input.before_key.as_deref(),
             input.after_key.as_deref(),
             input.override_reason.as_deref(),
@@ -217,7 +275,7 @@ pub async fn set_theme(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<(), ApiError> {
-    execute(&state, app, true, move |s| s.set_theme(&theme)).await
+    execute_unbound(&state, app, true, move |s| s.set_theme(&theme)).await
 }
 
 #[tauri::command]
@@ -238,6 +296,18 @@ pub async fn update_task(
 ) -> Result<TaskDetail, ApiError> {
     execute(&state, app, true, move |store| {
         store.update_current_task(input)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn release_task(
+    input: ReleaseClaim,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<TaskSummary, ApiError> {
+    execute(&state, app, true, move |store| {
+        store.release_current_task(input)
     })
     .await
 }
@@ -304,7 +374,7 @@ pub async fn runtime_info(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<RuntimeInfo, ApiError> {
-    execute(&state, app, false, |store| {
+    execute_unbound(&state, app, false, |store| {
         Ok(RuntimeInfo {
             data_dir: std::path::absolute(store.path.parent().ok_or_else(invalid_path)?)?
                 .to_string_lossy()
@@ -365,4 +435,58 @@ pub fn app_ready(state: State<'_, DesktopState>, app: tauri::AppHandle) -> Resul
     std::fs::write(directory.join("app-ready.json"), receipt.to_string()).map_err(internal)?;
     app.emit("app-ready", receipt).map_err(internal)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod project_command_tests {
+    use super::*;
+    #[test]
+    fn ordinary_commands_never_fall_back_to_unbound_after_the_last_project_is_archived() {
+        let directory = std::env::temp_dir().join(format!(
+            "jam-native-scope-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        {
+            let store = Store::open(directory.join("jam.db")).unwrap();
+            assert!(captured_project_store(&store).is_err());
+            let (project, human) = store
+                .create_jam("Archived board", None, None, None, "UTC", "Human")
+                .unwrap();
+            let story = store.default_task_story(&human.id).unwrap();
+            let task = store
+                .create_task(
+                    &human.id,
+                    CreateTask {
+                        story_key: Some(story.key),
+                        title: "Retained data".into(),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            let captured = captured_project_store(&store).unwrap();
+            store.reset_jam(&human.id, &project.name).unwrap();
+            assert!(matches!(
+                captured_project_store(&store),
+                Err(ApiError {
+                    code: ApiErrorCode::NotFound,
+                    ..
+                })
+            ));
+            assert!(matches!(
+                captured.get_task(&task.task.key),
+                Err(Error::Archived(_))
+            ));
+            // Legacy core explicit-key reads still exist; native commands cannot reach them.
+            assert_eq!(
+                store.get_task(&task.task.key).unwrap().task.title,
+                "Retained data"
+            );
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

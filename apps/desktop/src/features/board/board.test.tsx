@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -14,10 +18,10 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
 import { mockApi } from "../../lib/mock-bridge";
-import { useMoveTask } from "../../lib/queries";
+import { tasksQuery, useMoveTask } from "../../lib/queries";
 import type {
   ActivityEvent,
   BoardTasks,
@@ -37,6 +41,7 @@ function wrapper(
     },
   }),
 ) {
+  client.setQueryData(["app"], appState);
   return {
     client,
     Wrapper: ({ children }: { children: React.ReactNode }) => (
@@ -44,11 +49,13 @@ function wrapper(
     ),
   };
 }
+let appState: Awaited<ReturnType<typeof api.appState>>;
 let members: Member[];
 let task: TaskSummary;
 beforeEach(async () => {
   mockApi.setLatency(0);
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
+  appState = await api.appState();
   members = await mockApi.listMembers();
   const board = await mockApi.listBoardTasks();
   task = board.in_progress.find(
@@ -138,19 +145,24 @@ describe("agent events", () => {
     expect(useUiStore.getState().toasts).toHaveLength(0);
   });
 });
-it("rolls back the optimistic move when move_task fails", async () => {
+it("keeps last-read positions and reconciles an unconfirmed move by reading, never rollback", async () => {
   const board = await api.listBoardTasks();
   const source = board.ready[0];
   if (!source) throw new Error("Missing task");
   const { client, Wrapper } = wrapper();
   client.setQueryData(["boardTasks"], board);
   function Move() {
+    useQuery(tasksQuery);
     const move = useMoveTask();
     return (
       <button
         type="button"
         onClick={() =>
-          move.mutate({ key: source?.key ?? "", status: "review" })
+          move.mutate({
+            key: source?.key ?? "",
+            status: "review",
+            expectedUpdatedAt: source?.updatedAt ?? "missing",
+          })
         }
       >
         Move
@@ -161,23 +173,27 @@ it("rolls back the optimistic move when move_task fails", async () => {
   mockApi.failNext("move_task");
   mockApi.setLatency(100);
   fireEvent.click(screen.getByText("Move"));
+  expect(
+    client
+      .getQueryData<BoardTasks>(["boardTasks"])
+      ?.ready.some((t) => t.key === source.key),
+  ).toBe(true);
   await waitFor(() =>
-    expect(
-      client
-        .getQueryData<BoardTasks>(["boardTasks"])
-        ?.review.some((t) => t.key === source.key),
-    ).toBe(true),
+    expect(useUiStore.getState().toasts[0]?.text).toContain(
+      `Move result unconfirmed for ${source.key}`,
+    ),
   );
   await waitFor(() =>
-    expect(
-      client
-        .getQueryData<BoardTasks>(["boardTasks"])
-        ?.ready.some((t) => t.key === source.key),
-    ).toBe(true),
+    expect(client.isFetching({ queryKey: ["boardTasks"] })).toBe(0),
   );
-  expect(useUiStore.getState().toasts[0]?.text).toBe(
-    `Couldn't move ${source.key} — Simulated failure`,
-  );
+  expect(
+    client
+      .getQueryData<BoardTasks>(["boardTasks"])
+      ?.ready.some((t) => t.key === source.key),
+  ).toBe(true);
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(1);
   mockApi.setLatency(0);
 });
 it("creates on Enter, keeps the editor, ignores blank titles and cancels on Escape", async () => {
@@ -198,33 +214,142 @@ it("creates on Enter, keeps the editor, ignores blank titles and cancels on Esca
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 });
-it("moves with Space, Right, Space and supplies destination neighbors", async () => {
-  const user = userEvent.setup();
+// Synthetic rectangles exercise real PointerSensor mechanics, not native layout.
+let restorePointerRects: (() => void) | undefined;
+afterEach(() => {
+  restorePointerRects?.();
+  restorePointerRects = undefined;
+});
+function pointerRects() {
+  const rects = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const column = this.matches("[data-column]")
+        ? this
+        : this.closest("[data-column]");
+      const index = [
+        "backlog",
+        "ready",
+        "in_progress",
+        "review",
+        "done",
+      ].indexOf(column?.getAttribute("data-column") ?? "");
+      if (index >= 0 && column) {
+        const card = this.matches(".card-button")
+          ? this
+          : this.closest(".card-button");
+        const offset = card
+          ? Array.from(column.querySelectorAll(".card-button")).indexOf(card)
+          : 0;
+        return new DOMRect(
+          index * 300,
+          card ? 100 + offset * 110 : 0,
+          280,
+          card ? 100 : 800,
+        );
+      }
+      // The measured overlay child fills its positioned wrapper, not the viewport.
+      if (this.matches(".drag-overlay") && this.parentElement) {
+        return this.parentElement.getBoundingClientRect();
+      }
+      if (this.style.position === "fixed") {
+        return new DOMRect(
+          Number.parseFloat(this.style.left),
+          Number.parseFloat(this.style.top),
+          Number.parseFloat(this.style.width),
+          Number.parseFloat(this.style.height),
+        );
+      }
+      return new DOMRect(0, 0, 1500, 900);
+    });
+  restorePointerRects = () => rects.mockRestore();
+}
+async function pickWithPointer(card: HTMLElement) {
+  const rect = card.getBoundingClientRect();
+  fireEvent.pointerDown(card, {
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+    clientX: rect.x + 20,
+    clientY: rect.y + 20,
+  });
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    isPrimary: true,
+    buttons: 1,
+    clientX: rect.x + 30,
+    clientY: rect.y + 20,
+  });
+  await waitFor(() => expect(card).toHaveClass("dragging"));
+}
+function dropPointerInDoing() {
+  fireEvent.pointerMove(document, {
+    pointerId: 1,
+    isPrimary: true,
+    buttons: 1,
+    clientX: 620,
+    clientY: 130,
+  });
+  fireEvent.pointerUp(document, {
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+    clientX: 620,
+    clientY: 130,
+  });
+}
+it("pointer dragging supplies destination neighbors and the captured version", async () => {
+  await mockApi.startAllDemoScopes();
+  pointerRects();
   const { Wrapper } = wrapper();
   const original = await api.listBoardTasks();
   render(<Board open={() => {}} />, { wrapper: Wrapper });
-  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
-  button.focus();
-  await user.keyboard("[Space]");
-  await user.keyboard("[ArrowRight]");
-  await user.keyboard("[Space]");
+  const button = await screen.findByRole("button", { name: /Open JB-2:/ });
+  await pickWithPointer(button);
+  dropPointerInDoing();
   await waitFor(() =>
     expect(mockApi.calls.some((c) => c.command === "move_task")).toBe(true),
   );
-  const call = mockApi.calls.find((c) => c.command === "move_task");
-  expect(call?.input).toEqual({
-    key: "JB-7",
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toEqual({
+    key: "JB-2",
     status: "in_progress",
-    afterKey: original.in_progress.at(-1)?.key,
-    beforeKey: undefined,
+    expectedUpdatedAt: original.ready.find((task) => task.key === "JB-2")
+      ?.updatedAt,
+    beforeKey: original.in_progress[0]?.key,
+    afterKey: undefined,
   });
   await waitFor(() =>
     expect(
       within(
         screen.getByRole("region", { name: "In progress column" }),
-      ).getByText("JB-7"),
+      ).getByText("JB-2"),
     ).toBeVisible(),
   );
+});
+it("the former Space/arrow gesture activates a card but cannot drag or move it", async () => {
+  const open = vi.fn(),
+    { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const before = await api.listBoardTasks();
+  render(<Board open={open} />, { wrapper: Wrapper });
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  card.focus();
+  await user.keyboard("[Space][ArrowRight][Space][ArrowLeft]");
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(open).toHaveBeenLastCalledWith("JB-7");
+  expect(card).toHaveFocus();
+  expect(card).not.toHaveClass("dragging");
+  expect(card).not.toHaveAttribute("aria-roledescription");
+  expect(card).not.toHaveAttribute("aria-describedby");
+  expect(
+    screen.queryByText(/Space to pick|Space to drop|space bar to pick/i),
+  ).toBeNull();
+  expect(
+    mockApi.calls.filter((call) => call.command === "move_task"),
+  ).toHaveLength(0);
+  expect(await api.listBoardTasks()).toEqual(before);
 });
 describe("onboarding validation", () => {
   const valid = {
@@ -249,7 +374,8 @@ describe("onboarding validation", () => {
       );
   });
   it("shows field errors without sending an invalid form to Rust", async () => {
-    const { Wrapper } = wrapper();
+    const { client, Wrapper } = wrapper();
+    client.removeQueries({ queryKey: ["app"] });
     const router = createRouter({
       routeTree: createRootRoute({ component: Welcome }),
       history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -260,7 +386,7 @@ describe("onboarding validation", () => {
       name: "Create jam",
     });
     fireEvent.click(submit);
-    expect(await screen.findByText("Give your jam a name")).toBeVisible();
+    expect(await screen.findByText("Give your project a name")).toBeVisible();
     expect(screen.getByText("Tell us your name")).toBeVisible();
     fireEvent.change(screen.getByLabelText("Jam name"), {
       target: { value: "A tiny jam" },
@@ -279,4 +405,394 @@ describe("onboarding validation", () => {
       false,
     );
   });
+});
+
+it.each(["Enter", "Space"])(
+  "%s opens a card without starting a drag or mutating its status",
+  async (key) => {
+    const open = vi.fn(),
+      { Wrapper } = wrapper(),
+      user = userEvent.setup();
+    render(<Board open={open} />, { wrapper: Wrapper });
+    const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+    card.focus();
+    await user.keyboard(`[${key}]`);
+    expect(open).toHaveBeenCalledExactlyOnceWith("JB-7");
+    expect(card).not.toHaveAttribute("aria-pressed", "true");
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      false,
+    );
+  },
+);
+it("activation without implicit focus retains an explicit drawer return target", async () => {
+  let openingFocus: Element | null = null;
+  const { Wrapper } = wrapper();
+  render(
+    <Board
+      open={() => {
+        openingFocus = document.activeElement;
+      }}
+    />,
+    { wrapper: Wrapper },
+  );
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  // Exercise activation without synthetic pointer focus (also relevant to accessibility APIs).
+  fireEvent.click(card);
+  expect(openingFocus).toBe(card);
+});
+it("an epic filter does not hide a project-wide Doing-limit warning", async () => {
+  const { client, Wrapper } = wrapper(),
+    source = await api.listBoardTasks();
+  const base = source.in_progress[0];
+  if (!base) throw new Error("Missing fixture");
+  const board = {
+    ...source,
+    in_progress: Array.from({ length: 7 }, (_, i) => ({
+      ...base,
+      id: `capacity-${i}`,
+      key: `CP-${i + 1}`,
+      epicKey: i < 2 ? "CP-E1" : "CP-E2",
+    })),
+  };
+  client.setQueryData(["boardTasks"], board);
+  client.setQueryData(["settings"], {
+    ...(await api.getSettings()),
+    wipLimit: 6,
+  });
+  render(<Board open={() => {}} epicKeys={["CP-E1"]} />, { wrapper: Wrapper });
+  const column = await screen.findByRole("region", {
+    name: "In progress column",
+  });
+  expect(within(column).getAllByTestId("task-card")).toHaveLength(2);
+  expect(
+    within(column).getByText("7 / 6 Doing across board · 2 shown"),
+  ).toHaveClass("over-wip");
+});
+
+it("quick capture is Backlog-only and cards show readable story context", async () => {
+  const { Wrapper } = wrapper();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const card = await screen.findByRole("button", { name: /Open JB-7:/ });
+  const detail = await mockApi.getTask("JB-7");
+  await waitFor(() =>
+    expect(card).toHaveAccessibleName(
+      expect.stringContaining(detail.story.title),
+    ),
+  );
+  expect(within(card).getByText(detail.story.title)).toHaveAttribute(
+    "title",
+    `${detail.story.key} · ${detail.story.title}`,
+  );
+  expect(screen.getAllByRole("button", { name: /^Add task to / })).toHaveLength(
+    1,
+  );
+  expect(document.querySelectorAll(".column-policy")).toHaveLength(5);
+  expect(screen.getByText("Prepared briefs")).toBeVisible();
+});
+it("unfiltered quick capture names its default and does not promise later Story reassignment", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  expect(
+    screen.getByText(
+      "This draft goes to Unplanned work. Filter by Epic first to choose a Story.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      "Choose the Story carefully: it cannot be changed later. Prepare the task details before moving it to Ready.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("combobox", { name: "Story for new draft" }),
+  ).toBeNull();
+  await user.type(
+    screen.getByRole("textbox", { name: "New task in Backlog" }),
+    "Rough capture in the default Story",
+  );
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await screen.findByRole("button", {
+    name: /Open .*Rough capture in the default Story/,
+  });
+  const saved = (await mockApi.listBoardTasks()).backlog.find(
+    (task) => task.title === "Rough capture in the default Story",
+  );
+  expect(saved).toBeDefined();
+  if (!saved) throw new Error("Missing created capture");
+  const detail = await mockApi.getTask(saved.key);
+  expect(detail.story.title).toBe("Unplanned work");
+  expect(detail.status).toBe("backlog");
+});
+it("filtered quick capture requires a matching story and keeps its draft visible in that epic", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const story = (await mockApi.getTask("JB-7")).story;
+  const { epic } = await mockApi.getTask("JB-7");
+  render(<Board open={() => {}} epicKeys={[epic.key]} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  expect(screen.getByText("Choose the Story for this draft.")).toBeVisible();
+  expect(
+    screen.getByText(
+      "Choose the Story carefully: it cannot be changed later. Prepare the task details before moving it to Ready.",
+    ),
+  ).toBeVisible();
+  expect(screen.queryByText(/This draft goes to Unplanned work/)).toBeNull();
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "A scoped draft");
+  await user.keyboard("{Enter}");
+  expect(
+    mockApi.calls.filter((call) => call.command === "create_task"),
+  ).toHaveLength(0);
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  await user.click(
+    screen.getByRole("option", { name: `${story.key} · ${story.title}` }),
+  );
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  expect(
+    await screen.findByRole("button", { name: /Open .*A scoped draft/ }),
+  ).toBeVisible();
+  const saved = (await mockApi.listBoardTasks()).backlog.find(
+    (task) => task.title === "A scoped draft",
+  );
+  expect(saved?.storyKey).toBe(story.key);
+  expect(saved?.epicKey).toBe(epic.key);
+});
+it("changing an epic filter retains quick text but cannot reuse a story from another epic", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  const { epic, story } = await mockApi.getTask("JB-7");
+  const other = (await mockApi.listEpics()).find((item) => item.id !== epic.id);
+  if (!other) throw new Error("Missing other epic");
+  const view = render(<Board open={() => {}} epicKeys={[epic.key]} />, {
+    wrapper: Wrapper,
+  });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Retain this thought");
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  await user.click(
+    screen.getByRole("option", { name: `${story.key} · ${story.title}` }),
+  );
+  view.rerender(<Board open={() => {}} epicKeys={[other.key]} />);
+  expect(input).toHaveValue("Retain this thought");
+  expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+  await user.click(
+    screen.getByRole("combobox", { name: "Story for new draft" }),
+  );
+  expect(
+    screen.queryByRole("option", { name: `${story.key} · ${story.title}` }),
+  ).toBeNull();
+  expect(
+    mockApi.calls.filter((call) => call.command === "create_task"),
+  ).toHaveLength(0);
+});
+it("quick-create failure keeps the title and an inline error for retry", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  await user.click(
+    await screen.findByRole("button", { name: "Add task to Backlog" }),
+  );
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Retain after error");
+  mockApi.failNext("create_task");
+  await user.keyboard("{Enter}");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Simulated failure",
+  );
+  expect(input).toHaveValue("Retain after error");
+  await user.keyboard("{Enter}");
+  expect(
+    await screen.findByRole("button", { name: /Open .*Retain after error/ }),
+  ).toBeVisible();
+});
+
+it("pending quick capture is single-submit, returns focus for the next draft and restores its trigger on close", async () => {
+  const { Wrapper } = wrapper(),
+    user = userEvent.setup();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const trigger = await screen.findByRole("button", {
+    name: "Add task to Backlog",
+  });
+  await user.click(trigger);
+  const input = screen.getByRole("textbox", { name: "New task in Backlog" });
+  await user.type(input, "Only one draft");
+  let resolve: (() => void) | undefined;
+  const gate = new Promise<void>((done) => {
+    resolve = done;
+  });
+  const original = mockApi.createTask.bind(mockApi);
+  const spy = vi
+    .spyOn(mockApi, "createTask")
+    .mockImplementation(async (value) => {
+      await gate;
+      return original(value);
+    });
+  await user.dblClick(screen.getByRole("button", { name: "Add" }));
+  expect(spy).toHaveBeenCalledTimes(1);
+  expect(input).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Cancel new task" }),
+  ).toBeDisabled();
+  await user.keyboard("{Escape}");
+  expect(input).toBeInTheDocument();
+  await act(async () => resolve?.());
+  await waitFor(() => expect(input).toHaveFocus());
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveFocus();
+});
+
+it("a pointer drag keeps its starting version after a newer task arrives and refuses the stale drop without losing authoritative state", async () => {
+  await mockApi.startAllDemoScopes();
+  pointerRects();
+  const { Wrapper, client } = wrapper();
+  const captured = await mockApi.getTask("JB-7");
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
+  await pickWithPointer(button);
+  const newer = await mockApi.updateTask({
+    key: captured.key,
+    expectedUpdatedAt: captured.updatedAt,
+    descriptionMd: "A newer brief must be inspected before moving.",
+  });
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["boardTasks"] });
+  });
+  expect(newer.updatedAt).not.toBe(captured.updatedAt);
+  const beforeHistory = (await mockApi.getTask(captured.key)).history.length;
+  dropPointerInDoing();
+  await waitFor(() =>
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      true,
+    ),
+  );
+  expect(
+    mockApi.calls.find((call) => call.command === "move_task")?.input,
+  ).toMatchObject({
+    key: captured.key,
+    status: "in_progress",
+    expectedUpdatedAt: captured.updatedAt,
+  });
+  await waitFor(() =>
+    expect(useUiStore.getState().toasts.at(-1)?.text).toContain(
+      "Inspect the task before moving it again",
+    ),
+  );
+  const saved = await mockApi.getTask(captured.key);
+  expect(saved.status).toBe("ready");
+  expect(saved.updatedAt).toBe(newer.updatedAt);
+  expect(saved.history).toHaveLength(beforeHistory);
+  await waitFor(() =>
+    expect(
+      client
+        .getQueryData<BoardTasks>(["boardTasks"])
+        ?.ready.find((task) => task.key === captured.key)?.updatedAt,
+    ).toBe(newer.updatedAt),
+  );
+  expect(
+    within(screen.getByRole("region", { name: "Ready column" })).getByText(
+      captured.key,
+    ),
+  ).toBeVisible();
+});
+
+it("announces pending move without a speculative jump and exposes read-only recovery after an uncertain reply", async () => {
+  const { client, Wrapper } = wrapper(),
+    user = userEvent.setup();
+  let reject!: (error: Error) => void;
+  const pending = new Promise<never>((_, no) => {
+    reject = no;
+  });
+  const move = vi.spyOn(api, "moveTask").mockReturnValue(pending);
+  pointerRects();
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  const button = await screen.findByRole("button", { name: /Open JB-7:/ });
+  const before = client.getQueryData<BoardTasks>(["boardTasks"]);
+  await pickWithPointer(button);
+  dropPointerInDoing();
+  await waitFor(() => expect(move).toHaveBeenCalledTimes(1));
+  expect(
+    await screen.findByText(/Saving move and refreshing the board/),
+  ).toBeVisible();
+  expect(client.getQueryData(["boardTasks"])).toEqual(before);
+  const read = vi
+    .spyOn(api, "listBoardTasks")
+    .mockRejectedValue(new Error("read unavailable"));
+  await act(async () => reject(new Error("notification unavailable")));
+  expect(
+    await screen.findByText(
+      "Could not refresh board or team. Showing the last loaded view.",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  expect(useUiStore.getState().toasts.at(-1)).toMatchObject({
+    persistent: true,
+    text: expect.stringContaining("Move result unconfirmed for JB-7"),
+  });
+  read.mockResolvedValue(before as BoardTasks);
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(/Could not refresh board or team/),
+    ).not.toBeInTheDocument(),
+  );
+  expect(move).toHaveBeenCalledTimes(1);
+  expect(client.getQueryData(["boardTasks"])).toEqual(before);
+  move.mockRestore();
+  read.mockRestore();
+});
+
+it("H-B01: empty columns use one short neutral phrase without granting or claiming work", async () => {
+  const { Wrapper, client } = wrapper();
+  client.setQueryData(["boardTasks"], {
+    backlog: [],
+    ready: [],
+    in_progress: [],
+    review: [],
+    done: [],
+  });
+  render(<Board open={() => {}} />, { wrapper: Wrapper });
+  for (const name of ["Backlog", "Ready", "In progress", "Review", "Done"]) {
+    const column = await screen.findByRole("region", {
+      name: `${name} column`,
+    });
+    expect(within(column).getByText("No tasks yet")).toHaveClass(
+      "column-empty",
+    );
+    expect(column.querySelectorAll(".column-empty")).toHaveLength(1);
+  }
+  expect(
+    mockApi.calls.filter((call) =>
+      /claim_task|move_task|set_execution/.test(call.command),
+    ),
+  ).toEqual([]);
+});
+
+it("H-B01: a filtered-out column distinguishes hidden work from no tasks", async () => {
+  const { Wrapper } = wrapper();
+  render(<Board open={() => {}} epicKeys={["missing-epic"]} />, {
+    wrapper: Wrapper,
+  });
+  const source = await api.listBoardTasks();
+  await screen.findByRole("region", { name: "Backlog column" });
+  for (const [status, tasks] of Object.entries(source)) {
+    const column = document.querySelector(`[data-column="${status}"]`);
+    if (!column) throw new Error("Missing column");
+    await waitFor(() =>
+      expect(column.querySelector(".column-empty")).toHaveTextContent(
+        tasks.length ? "No matching tasks" : "No tasks yet",
+      ),
+    );
+  }
 });

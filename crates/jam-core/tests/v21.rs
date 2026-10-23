@@ -1,5 +1,7 @@
+mod support;
 use jam_core::*;
 use std::sync::Arc;
+use support::FreshContext;
 
 fn setup() -> (tempfile::TempDir, Arc<Store>, Member, Member, Member, Story) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests-v21");
@@ -43,6 +45,7 @@ fn setup() -> (tempfile::TempDir, Arc<Store>, Member, Member, Member, Story) {
         .unwrap();
     s.set_story_status(&h.id, &story.key, "active", None)
         .unwrap();
+    support::start_story(&s, &h.id, &story.key);
     let story = s.get_story(&story.key).unwrap().story;
     (dir, s, h, brain, worker, story)
 }
@@ -133,7 +136,7 @@ fn v01_fixture_migrates_without_losing_tasks_and_only_once() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        4
+        7
     );
     assert!(
         db.prepare("PRAGMA foreign_key_check")
@@ -175,15 +178,15 @@ fn readiness_codes_overrides_and_changes_cursor() {
         ["goal", "where", "change", "test", "result"]
     );
     assert!(matches!(
-        s.mark_ready(&worker.id, &t.task.key, None),
+        s.mark_ready_fresh(&worker.id, &t.task.key, None),
         Err(Error::NotReady(_))
     ));
     assert!(matches!(
-        s.mark_ready(&worker.id, &t.task.key, Some("I want it")),
+        s.mark_ready_fresh(&worker.id, &t.task.key, Some("I want it")),
         Err(Error::Forbidden(_))
     ));
     let before = s.latest_seq().unwrap();
-    s.mark_ready(
+    s.mark_ready_fresh(
         &brain.id,
         &t.task.key,
         Some("Investigate the legacy prototype first."),
@@ -192,9 +195,9 @@ fn readiness_codes_overrides_and_changes_cursor() {
     assert_eq!(s.activity_count().unwrap() - before, 1);
     let events = s.list_changes_since(before, Some(&t.epic.key)).unwrap();
     assert_eq!(events[0].action, "task.ready_override");
-    s.claim_task(&worker.id, &t.task.key).unwrap();
+    s.claim_task_fresh(&worker.id, &t.task.key).unwrap();
     let cursor = s.latest_seq().unwrap();
-    s.update_task_brief(
+    s.update_task_brief_fresh(
         &h.id,
         &t.task.key,
         BriefPatch {
@@ -266,7 +269,7 @@ fn each_readiness_field_and_story_active_are_independent() {
         ),
     ];
     for (code, patch) in cases {
-        s.update_task_brief(
+        s.update_task_brief_fresh(
             &h.id,
             &t.task.key,
             BriefPatch {
@@ -279,7 +282,8 @@ fn each_readiness_field_and_story_active_are_independent() {
             },
         )
         .unwrap();
-        s.update_task_brief(&h.id, &t.task.key, patch).unwrap();
+        s.update_task_brief_fresh(&h.id, &t.task.key, patch)
+            .unwrap();
         let r = s.check_ready(&t.task.key).unwrap();
         assert_eq!(r.missing.len(), 1);
         assert_eq!(r.missing[0].code, code);
@@ -287,6 +291,7 @@ fn each_readiness_field_and_story_active_are_independent() {
 }
 fn report(key: &str) -> SubmitReport {
     SubmitReport {
+        expected_claim_generation: String::new(),
         key: key.into(),
         summary_md: "Implemented the adjacent-tile lantern cue.".into(),
         changed_files: vec!["game/lantern.gd".into()],
@@ -305,23 +310,27 @@ fn report_review_loop_permissions_and_rounds() {
     let (_d, s, h, brain, worker, story) = setup();
     let t = create(&s, &h, &story, "backlog");
     assert!(matches!(
-        s.claim_task(&worker.id, &t.task.key),
+        s.claim_task_fresh(&worker.id, &t.task.key),
         Err(Error::NotReady(_))
     ));
-    s.mark_ready(&h.id, &t.task.key, None).unwrap();
-    s.claim_task(&worker.id, &t.task.key).unwrap();
+    s.mark_ready_fresh(&h.id, &t.task.key, None).unwrap();
+    s.claim_task_fresh(&worker.id, &t.task.key).unwrap();
     assert!(matches!(
-        s.claim_task(&brain.id, &t.task.key),
+        s.claim_task_fresh(&brain.id, &t.task.key),
         Err(Error::ClaimConflict { .. })
     ));
-    let r = s.submit_report(&worker.id, report(&t.task.key)).unwrap();
+    let r = s
+        .submit_report_fresh(&worker.id, report(&t.task.key))
+        .unwrap();
     assert_eq!(r.round, 0);
     assert_eq!(s.get_task(&t.task.key).unwrap().task.status, "review");
     s.set_brain(&h.id, "JB-E1", &worker.handle).unwrap();
     assert!(matches!(
-        s.review_task(
+        s.review_task_fresh(
             &worker.id,
             ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
                 verdict: "accept".into(),
                 ..Default::default()
@@ -331,9 +340,11 @@ fn report_review_loop_permissions_and_rounds() {
     ));
     s.set_brain(&h.id, "JB-E1", &brain.handle).unwrap();
     assert!(matches!(
-        s.review_task(
+        s.review_task_fresh(
             &worker.id,
             ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
                 verdict: "accept".into(),
                 ..Default::default()
@@ -341,9 +352,11 @@ fn report_review_loop_permissions_and_rounds() {
         ),
         Err(Error::Forbidden(_))
     ));
-    s.review_task(
+    s.review_task_fresh(
         &brain.id,
         ReviewTask {
+            expected_report_id: String::new(),
+            expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
             verdict: "changes_requested".into(),
             comments_md: "Only the adjacent tile should light up.".into(),
@@ -356,14 +369,18 @@ fn report_review_loop_permissions_and_rounds() {
     assert!(t.task.changes_requested);
     assert_eq!(t.task.review_round, 1);
     assert_eq!(t.task.assignee_id.as_deref(), Some(worker.id.as_str()));
-    assert!(
-        matches!(s.review_task(&brain.id,ReviewTask{key:t.task.key.clone(),verdict:"accept".into(),..Default::default()}),Err(Error::Validation{reason,..}) if reason=="No report for round 1")
-    );
-    s.claim_task(&worker.id, &t.task.key).unwrap();
-    s.submit_report(&worker.id, report(&t.task.key)).unwrap();
-    s.review_task(
+    assert!(matches!(s.review_task_fresh(&brain.id,ReviewTask {
+        expected_report_id: String::new(),
+        expected_review_context_revision: String::new(),
+        key:t.task.key.clone(),verdict:"accept".into(),..Default::default()}),Err(Error::Validation{reason,..}) if reason=="No report for round 1"));
+    s.claim_task_fresh(&worker.id, &t.task.key).unwrap();
+    s.submit_report_fresh(&worker.id, report(&t.task.key))
+        .unwrap();
+    s.review_task_fresh(
         &brain.id,
         ReviewTask {
+            expected_report_id: String::new(),
+            expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
             verdict: "accept".into(),
             ..Default::default()
@@ -380,7 +397,7 @@ fn status_rules_and_no_legacy_done_bypass() {
     let (_d, s, h, brain, worker, story) = setup();
     let t = create(&s, &h, &story, "ready");
     assert!(matches!(
-        s.move_task(&worker.id, &t.task.key, "done", None, None),
+        s.move_task_fresh(&worker.id, &t.task.key, "done", None, None),
         Err(Error::Forbidden(_))
     ));
     assert!(
@@ -614,7 +631,7 @@ fn project_templates_and_agent_status() {
     rusqlite::Connection::open(&s.path)
         .unwrap()
         .execute(
-            "UPDATE members SET status_at=? WHERE id=?",
+            "UPDATE project_members SET status_at=? WHERE member_id=?",
             rusqlite::params![old, brain.id],
         )
         .unwrap();
@@ -733,6 +750,7 @@ fn active_intents_nullable_model_restoration_and_invalid_import_are_checked() {
         .unwrap();
     s.set_epic_status(&h.id, &e.key, "archived", None).unwrap();
     s.set_epic_status(&h.id, &e.key, "active", None).unwrap();
+    support::start_story(&s, &h.id, &story.key);
     let t = create(&s, &h, &story, "backlog");
     let incomplete = s
         .create_task(
@@ -745,16 +763,16 @@ fn active_intents_nullable_model_restoration_and_invalid_import_are_checked() {
         )
         .unwrap();
     assert!(matches!(
-        s.claim_task(&h.id, &incomplete.task.key),
+        s.claim_task_fresh(&h.id, &incomplete.task.key),
         Err(Error::NotReady(_))
     ));
-    s.mark_ready(
+    s.mark_ready_fresh(
         &h.id,
         &incomplete.task.key,
         Some("Explore the prototype before implementation"),
     )
     .unwrap();
-    s.claim_task(&h.id, &incomplete.task.key).unwrap();
+    s.claim_task_fresh(&h.id, &incomplete.task.key).unwrap();
     let note = s
         .add_reference(
             &h.id,
@@ -838,22 +856,24 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
             let t = create(&s, &h, &story, "ready");
             let key = &t.task.key;
             let review = |verdict: &str| ReviewTask {
+                expected_report_id: String::new(),
+                expected_review_context_revision: String::new(),
                 key: key.clone(),
                 verdict: verdict.into(),
                 comments_md: "Verified".into(),
                 ..Default::default()
             };
-            s.claim_task(&worker.id, key).unwrap();
-            s.submit_report(&worker.id, report(key)).unwrap();
+            s.claim_task_fresh(&worker.id, key).unwrap();
+            s.submit_report_fresh(&worker.id, report(key)).unwrap();
             if changes_first {
-                s.review_task(&brain.id, review("changes_requested"))
+                s.review_task_fresh(&brain.id, review("changes_requested"))
                     .unwrap();
-                s.claim_task(&worker.id, key).unwrap();
-                s.submit_report(&worker.id, report(key)).unwrap();
+                s.claim_task_fresh(&worker.id, key).unwrap();
+                s.submit_report_fresh(&worker.id, report(key)).unwrap();
             }
-            s.review_task(&brain.id, review("accept")).unwrap();
+            s.review_task_fresh(&brain.id, review("accept")).unwrap();
             let before = s.get_task(key).unwrap();
-            s.update_task_brief(
+            s.update_task_brief_fresh(
                 &h.id,
                 key,
                 BriefPatch {
@@ -864,7 +884,7 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
             .unwrap();
             let seq = s.latest_seq().unwrap();
             assert!(matches!(
-                s.move_task(&h.id, key, "ready", None, None),
+                s.move_task_fresh(&h.id, key, "ready", None, None),
                 Err(Error::NotReady(_))
             ));
             assert!(matches!(
@@ -883,7 +903,7 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                 s.get_task(key).unwrap().task.review_round,
                 before.task.review_round
             );
-            s.update_task_brief(
+            s.update_task_brief_fresh(
                 &h.id,
                 key,
                 BriefPatch {
@@ -892,13 +912,13 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                 },
             )
             .unwrap();
-            s.move_task(&h.id, key, "done", None, None).unwrap();
+            s.move_task_fresh(&h.id, key, "done", None, None).unwrap();
             assert_eq!(
                 s.get_task(key).unwrap().task.review_round,
                 before.task.review_round
             );
             assert!(
-                s.move_task(&h.id, key, "ready", Some("JB-99999"), None)
+                s.move_task_fresh(&h.id, key, "ready", Some("JB-99999"), None)
                     .is_err()
             );
             assert_eq!(
@@ -916,25 +936,25 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                 })
                 .unwrap();
             } else {
-                s.move_task(&h.id, key, "ready", None, None).unwrap();
+                s.move_task_fresh(&h.id, key, "ready", None, None).unwrap();
             }
             let round = before.task.review_round + 1;
             assert_eq!(s.get_task(key).unwrap().task.review_round, round);
-            s.move_task(&h.id, key, "ready", None, None).unwrap();
-            assert!(s.submit_report(&worker.id, report(key)).is_err());
-            s.claim_task(&worker.id, key).unwrap();
+            s.move_task_fresh(&h.id, key, "ready", None, None).unwrap();
+            assert!(s.submit_report_fresh(&worker.id, report(key)).is_err());
+            s.claim_task_fresh(&worker.id, key).unwrap();
             assert!(matches!(
-                s.submit_report(&brain.id, report(key)),
+                s.submit_report_fresh(&brain.id, report(key)),
                 Err(Error::Forbidden(_))
             ));
-            let second = s.submit_report(&worker.id, report(key)).unwrap();
+            let second = s.submit_report_fresh(&worker.id, report(key)).unwrap();
             assert_eq!(second.round, round);
-            assert!(s.submit_report(&worker.id, report(key)).is_err());
+            assert!(s.submit_report_fresh(&worker.id, report(key)).is_err());
             assert!(matches!(
-                s.review_task(&worker.id, review("accept")),
+                s.review_task_fresh(&worker.id, review("accept")),
                 Err(Error::Forbidden(_))
             ));
-            s.review_task(&brain.id, review("accept")).unwrap();
+            s.review_task_fresh(&brain.id, review("accept")).unwrap();
             let after = s.get_task(key).unwrap();
             assert_eq!(after.task.status, "done");
             assert_eq!(after.task.review_round, round);

@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // A real stdio MCP client; optionally observes console events in the running WebView2.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";

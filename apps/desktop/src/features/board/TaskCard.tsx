@@ -13,9 +13,10 @@ import {
   WorkingRing,
   watchWorkingVisibility,
 } from "../../components/ui/AgentWorking";
-import { useAgentWorking } from "../../lib/agent-working";
+import { useCardPresence } from "../../lib/agent-working";
 import type { ColorBy, Member, TaskSummary } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { cardMotion } from "./card-motion";
 
 const icons = {
   low: ChevronDown,
@@ -26,12 +27,14 @@ const icons = {
 export function TaskCard({
   task,
   members,
+  storyTitle,
   overlay = false,
   colorBy = "none",
   estimatesEnabled = false,
 }: {
   task: TaskSummary;
   members: Member[];
+  storyTitle?: string;
   overlay?: boolean;
   colorBy?: ColorBy;
   estimatesEnabled?: boolean;
@@ -40,7 +43,7 @@ export function TaskCard({
   const reduced = useReducedMotion();
 
   const member = members.find((m) => m.id === task.assigneeId);
-  const working = useAgentWorking(task, member);
+  const working = useCardPresence(task, members);
   const Icon = icons[task.priority as keyof typeof icons] ?? Equal;
   const paint =
     colorBy === "epic" && task.epicColor
@@ -72,15 +75,8 @@ export function TaskCard({
       data-color-by={paint ? colorBy : "none"}
       data-highlighted={highlight ? "true" : "false"}
       style={style}
-      layout={!reduced && !overlay}
+      {...cardMotion(!!reduced, overlay, highlight?.action === "task.created")}
       layoutId={overlay || reduced ? undefined : task.key}
-      initial={
-        highlight?.action === "task.created" && !reduced
-          ? { y: -12, scale: 0.94 }
-          : false
-      }
-      animate={{ y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 380, damping: 26 }}
     >
       <div className="task-card">
         <div className="card-key">
@@ -93,7 +89,12 @@ export function TaskCard({
         </div>
         <div className="card-hierarchy">
           <i style={{ background: `var(--${task.epicColor ?? "m1"})` }} />
-          <span>{task.storyKey}</span>
+          <span
+            className="card-story-title"
+            title={[task.storyKey, storyTitle].filter(Boolean).join(" · ")}
+          >
+            {storyTitle ?? task.storyKey ?? "Unplanned work"}
+          </span>
         </div>
         <div className="card-title">{task.title}</div>
         {(task.changesRequested || task.needsInfo) && (
@@ -135,7 +136,7 @@ export function TaskCard({
           )}
           {member && (
             <span className="card-assignee">
-              <WorkingRing state={working}>
+              <WorkingRing state={working?.mode === "active" ? working : null}>
                 <Avatar member={member} allMembers={members} size={26} />
               </WorkingRing>
             </span>

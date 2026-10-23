@@ -1,13 +1,16 @@
 //! Shared domain and SQLite storage. No desktop or MCP dependencies.
 mod canvas;
 mod changes;
+mod context;
 mod db;
 mod desktop;
+mod execution;
 mod human_planning;
 mod m5;
 mod migration_v3;
 mod model;
 mod planning;
+mod projects;
 mod references;
 mod seed;
 mod service;
@@ -18,10 +21,13 @@ mod v2model;
 mod workflow;
 
 pub use changes::ACTIVITY_ACTIONS;
+pub use context::TaskWriteContext;
 pub use db::{ChangeFeed, Store, resolve_db_path};
+pub use execution::*;
 pub use m5::*;
 pub use model::*;
 pub use planning::activity_sentence;
+pub use projects::ProjectSummary;
 pub use snapshot::*;
 pub use snapshot_v2::PlanningExport;
 pub use v2model::*;
@@ -30,6 +36,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("execution_required: {0}")]
+    ExecutionRequired(String),
     #[error("not_ready: {0}")]
     NotReady(String),
     #[error("wrong_status: {0}")]
@@ -44,7 +52,11 @@ pub enum Error {
     Validation { field: String, reason: String },
     #[error("archived: {0}")]
     Archived(String),
-    #[error("conflict: This task changed since you opened it. Review the latest changes.")]
+    #[error(
+        "stale_claim: This task lifecycle changed. Read the current claim and reconcile your work; do not replay the old payload with a fresh token."
+    )]
+    StaleClaim,
+    #[error("conflict: This item changed since you opened it. Review the latest changes.")]
     Conflict,
     #[error("storage: {0}")]
     Storage(#[from] rusqlite::Error),

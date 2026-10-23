@@ -11,6 +11,7 @@ import {
   useReactFlow,
   useStore,
   type Viewport,
+  ViewportPortal,
 } from "@xyflow/react";
 import {
   Focus,
@@ -26,18 +27,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import paint from "../../assets/chibi/wife-paint-256.webp";
 import type { CanvasGeometry, RefFrame, RefItem } from "../../bindings";
 import { Button, Dialog, EmptyState, IconButton } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
+import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { epicsQuery } from "../../lib/planning-queries";
 import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useUiStore } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
+import { useClipboardImagePaste } from "./clipboard-paste";
+import { referenceControlsBottom } from "./control-layout";
+import { DraftNote } from "./DraftNote";
 import {
   AddReferenceDialog,
   EditReferenceDialog,
   FrameDialog,
 } from "./dialogs";
 import { ReferenceEdge } from "./Edge";
+import { EdgeLabelDialog } from "./EdgeLabelDialog";
+import { referenceFitViewport } from "./frame-layout";
 import { stopReferenceAudio } from "./Media";
 import {
   CanvasHistory,
@@ -50,6 +63,7 @@ import {
   readingOrder,
   referenceKind,
   referenceKindColors,
+  referenceLabel,
   worldPosition,
 } from "./model";
 import {
@@ -58,8 +72,10 @@ import {
   ReferenceFrame,
   ReferenceNode,
 } from "./Nodes";
+import { placedNoteLayout } from "./note-draft-layout";
 import { OverviewScene } from "./OverviewScene";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
+import { editedNoteTarget, retainNoteEditors } from "./sticky-node-ownership";
 import "@xyflow/react/dist/style.css";
 import "./references.css";
 
@@ -83,6 +99,8 @@ export const referencesQuery = {
   staleTime: Infinity,
 };
 function Canvas() {
+  const batch = useFileDropBatch("references"),
+    pasteImage = useClipboardImagePaste();
   const query = useQuery(referencesQuery),
     epics = useQuery(epicsQuery),
     stories = useQuery({
@@ -104,7 +122,15 @@ function Canvas() {
     [filter, setFilter] = useState<string[]>([]),
     [connect, setConnect] = useState(false),
     [minimap, setMinimap] = useState(true),
-    [add, setAdd] = useState<"link" | "note" | "frame" | null>(null),
+    [add, setAdd] = useState<"link" | "frame" | null>(null),
+    [noteDraft, setNoteDraft] = useState<{
+      projectId: string;
+      x: number;
+      y: number;
+      createdId?: string;
+      maxHeight: number;
+    } | null>(null),
+    [placingNote, setPlacingNote] = useState<string | null>(null),
     [menu, setMenu] = useState(false),
     [frameEdit, setFrameEdit] = useState<RefFrame | null>(null),
     [edit, setEdit] = useState<{
@@ -121,10 +147,42 @@ function Canvas() {
     [revision, setRevision] = useState(0),
     dragging = useRef(false),
     selectNext = useRef<string | undefined>(undefined);
+  const activeNotes = useRef(new Set<string>());
+  const [editingNotes, setEditingNotes] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const draftRef = useRef(noteDraft);
+  draftRef.current = noteDraft;
+  const noteEditing = useCallback((id: string, active: boolean) => {
+    if (active === activeNotes.current.has(id)) return;
+    if (active) activeNotes.current.add(id);
+    else activeNotes.current.delete(id);
+    setEditingNotes(new Set(activeNotes.current));
+  }, []);
+  const noteOwnsTarget = useCallback(
+    (kind: "item" | "frame" | "edge", id: string) =>
+      (kind === "item" && draftRef.current?.createdId === id) ||
+      editedNoteTarget(kind, id, flow.getNodes(), activeNotes.current),
+    [flow],
+  );
+  const requireFinishedNote = useCallback(
+    (kind: "item" | "frame" | "edge", id: string) => {
+      if (noteOwnsTarget(kind, id))
+        throw Error(
+          "Finish editing or deliberately discard the retained note edits before changing this note or its frame.",
+        );
+    },
+    [noteOwnsTarget],
+  );
   const selectedReference = useRouterState({
       select: (s) => (s.location.search as { section?: string }).section,
     }),
     centered = useRef<string | undefined>(undefined);
+  const read = useExplicitRead(
+    JSON.stringify(["references", filter, selectedReference]),
+  );
+  const explicitRefresh = () =>
+    void read.run(() => query.refetch({ cancelRefetch: false }));
   const highlights = useUiStore((s) => s.highlights),
     overview = useStore((s) => s.transform[2] < 0.4),
     data = query.data,
@@ -145,6 +203,7 @@ function Canvas() {
         (n.parentId && selectedFrames.split(",").includes(n.parentId)),
     )
     .map((n) => n.id)
+    .concat(noteDraft?.createdId ?? [], [...editingNotes])
     .join(",");
   const edges = useMemo(
     () =>
@@ -215,17 +274,41 @@ function Canvas() {
   );
   const announce = useCallback((text: string) => setNotice(text), []);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fitCanvas = useCallback(
+    (duration: number) => {
+      const bounds = container.current?.getBoundingClientRect();
+      if (!bounds) return Promise.resolve(false);
+      const toolsBottom = referenceControlsBottom(container.current);
+      const viewport = referenceFitViewport(
+        flow
+          .getNodes()
+          .filter((node) => !node.hidden)
+          .map((node) => ({
+            ...flow.getNodesBounds([node.id]),
+            frame:
+              node.type === "frame"
+                ? { collapsed: !!node.data.frame.collapsed }
+                : undefined,
+          })),
+        { width: bounds.width, height: bounds.height, toolsBottom },
+      );
+      return viewport
+        ? flow.setViewport(viewport, { duration })
+        : Promise.resolve(false);
+    },
+    [flow],
+  );
   useEffect(() => {
     if (import.meta.env.VITE_MOCK_BRIDGE !== "1") return;
     window.__jamCanvas = {
       setViewport: (v) => flow.setViewport(v, { duration: 0 }),
       getViewport: () => flow.getViewport(),
-      fit: () => flow.fitView({ duration: 0, padding: 0.3 }),
+      fit: () => fitCanvas(0),
     };
     return () => {
       delete window.__jamCanvas;
     };
-  }, [flow]);
+  }, [flow, fitCanvas]);
   const center = useCallback(() => {
     const rect = container.current?.getBoundingClientRect();
     return flow.screenToFlowPosition({
@@ -233,6 +316,36 @@ function Canvas() {
       y: (rect?.top ?? 0) + (rect?.height ?? 600) / 2,
     });
   }, [flow]);
+  const placeNote = (clientPoint?: { x: number; y: number }) => {
+    if (!placingNote || placingNote !== app.data?.jam?.id || noteDraft) return;
+    const bounds = container.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const screen = clientPoint ?? {
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+    };
+    const world = flow.screenToFlowPosition(screen);
+    const layout = placedNoteLayout(
+      world,
+      { x: screen.x - bounds.left, y: screen.y - bounds.top },
+      {
+        width: bounds.width,
+        height: bounds.height,
+        toolsBottom: referenceControlsBottom(container.current),
+      },
+    );
+    setPlacingNote(null);
+    setNoteDraft({
+      projectId: placingNote,
+      x: layout.x,
+      y: layout.y,
+      maxHeight: layout.maxHeight,
+    });
+    void flow.setViewport(layout.viewport, { duration: 0 });
+  };
+  useEffect(() => {
+    if (placingNote && placingNote !== app.data?.jam?.id) setPlacingNote(null);
+  }, [placingNote, app.data?.jam?.id]);
   const saveGeometry = useRef(
     new Map<string, ReturnType<typeof debounceSave<CanvasGeometry>>>(),
   );
@@ -327,13 +440,22 @@ function Canvas() {
   );
   const archive = useCallback(
     (kind: "item" | "frame" | "edge", id: string) => {
+      try {
+        requireFinishedNote(kind, id);
+      } catch (reason) {
+        error(reason);
+        return;
+      }
       void api
         .canvasArchive({ kind, id, archived: true })
         .then(async () => {
           history.record({
             label: "Archive reference",
             undo: () => api.canvasArchive({ kind, id, archived: false }),
-            redo: () => api.canvasArchive({ kind, id, archived: true }),
+            redo: () => {
+              requireFinishedNote(kind, id);
+              return api.canvasArchive({ kind, id, archived: true });
+            },
           });
           setRevision((r) => r + 1);
           announce("Archived reference");
@@ -341,7 +463,7 @@ function Canvas() {
         })
         .catch(error);
     },
-    [history, refresh, error, announce],
+    [history, refresh, error, announce, requireFinishedNote],
   );
   const open = useCallback(
     (key: string) => {
@@ -367,6 +489,31 @@ function Canvas() {
       open,
       lightbox: (url, title) => setLightbox({ url, title }),
       edgeLabel: (id, label) => setEdgeEdit({ id, label }),
+      noteEditing,
+      noteSaved: (item, previous) => {
+        if (previous)
+          history.record({
+            label: "Edit note",
+            undo: () => {
+              requireFinishedNote("item", item.id);
+              return api.updateReference(
+                item.id,
+                { title: previous.title, caption: previous.captionMd },
+                { title: item.title, caption: item.captionMd },
+              );
+            },
+            redo: () => {
+              requireFinishedNote("item", item.id);
+              return api.updateReference(
+                item.id,
+                { title: item.title, caption: item.captionMd },
+                { title: previous.title, caption: previous.captionMd },
+              );
+            },
+          });
+        setRevision((r) => r + 1);
+        void refresh().catch(error);
+      },
       caption: async (item, value) => {
         await api.updateReference(item.id, { caption: value });
         history.record({
@@ -390,13 +537,31 @@ function Canvas() {
       resizeFrame: (frame, w, h) => queueFrame(frame, { w, h }),
       editFrame: setFrameEdit,
       collapse: (frame) => {
+        if (!frame.collapsed) {
+          try {
+            requireFinishedNote("frame", frame.id);
+          } catch (reason) {
+            error(reason);
+            return;
+          }
+        }
         void api
           .updateRefFrame(frame.id, { collapsed: !frame.collapsed })
           .then(refresh)
           .catch(error);
       },
     }),
-    [archive, open, queueGeometry, queueFrame, history, refresh, error],
+    [
+      archive,
+      open,
+      queueGeometry,
+      queueFrame,
+      history,
+      refresh,
+      error,
+      noteEditing,
+      requireFinishedNote,
+    ],
   );
   useEffect(() => {
     if (!data || dragging.current) return;
@@ -486,7 +651,9 @@ function Canvas() {
             ? { x: item.x ?? 0, y: item.y ?? 0 }
             : worldPosition(item, effectiveFrames),
           parentId: activeFrame ? frame.id : undefined,
-          hidden: !!(activeFrame && frame.collapsed),
+          hidden:
+            item.id === noteDraft?.createdId ||
+            !!(activeFrame && frame.collapsed),
           style: contentSized
             ? {
                 width: Math.max(240, item.w ?? 240),
@@ -515,7 +682,7 @@ function Canvas() {
             },
           ],
           zIndex: item.z ?? 0,
-          ariaLabel: `${kind} reference: ${item.title}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`,
+          ariaLabel: `${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`,
         };
       });
     const requested = selectNext.current;
@@ -525,13 +692,22 @@ function Canvas() {
       const selected = requested
         ? new Set([requested])
         : new Set(previous.filter((n) => n.selected).map((n) => n.id));
-      return readingOrder<CanvasNode>([...frames, ...items]).map((n) => ({
+      return readingOrder<CanvasNode>(
+        retainNoteEditors(
+          [...frames, ...items],
+          previous,
+          editingNotes,
+          app.data?.jam?.id,
+        ),
+      ).map((n) => ({
         ...n,
         selected: selected.has(n.id),
       }));
     });
   }, [
     data,
+    app.data?.jam?.id,
+    editingNotes,
     targets,
     assets.data,
     filter,
@@ -541,6 +717,7 @@ function Canvas() {
     selectedFrames,
     selectedItems,
     overview,
+    noteDraft?.createdId,
   ]);
   const hasRequestedNode =
     !!selectedReference && nodes.some((n) => n.id === selectedReference);
@@ -638,7 +815,7 @@ function Canvas() {
         return;
       if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 });
+        void fitCanvas(reduced ? 0 : 220);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         void undo(e.shiftKey);
@@ -646,7 +823,7 @@ function Canvas() {
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [flow, reduced, undo]);
+  }, [fitCanvas, reduced, undo]);
   const addInput = useCallback(
     async (input: ReferenceInput) => {
       const point = center(),
@@ -667,19 +844,20 @@ function Canvas() {
     async (paths: string[], point = center()) => {
       if (!paths.length) return;
       const frame = parentAt(point, latest.current?.frames ?? []);
-      for (const [i, path] of paths.entries())
-        await api.addReference({
-          kind: "asset",
-          filePath: path,
-          frameId: frame?.id,
-          x: point.x - (frame?.x ?? 0) + (i % 3) * 290,
-          y: point.y - (frame?.y ?? 0) + Math.floor(i / 3) * 250,
-        });
-      announce(`Added ${paths.length} references`);
-      await client.invalidateQueries({ queryKey: ["assets"] });
-      await refresh();
+      await batch.run(
+        paths,
+        (path, i) =>
+          api.addReference({
+            kind: "asset",
+            filePath: path,
+            frameId: frame?.id,
+            x: point.x - (frame?.x ?? 0) + (i % 3) * 290,
+            y: point.y - (frame?.y ?? 0) + Math.floor(i / 3) * 250,
+          }),
+        [["assets"], ["references"]],
+      );
     },
-    [center, announce, client, refresh],
+    [center, batch.run],
   );
   useEffect(
     () =>
@@ -729,14 +907,25 @@ function Canvas() {
     [flow, queueFrame, queueGeometry],
   );
   if (query.isPending) return <PaperSkeleton label="Loading references" />;
-  if (query.error)
+  if (query.error && !query.data)
     return (
-      <QueryError error={query.error} retry={() => void query.refetch()} />
+      <>
+        <QueryError
+          error={query.error}
+          retry={explicitRefresh}
+          busy={read.pending || query.isFetching}
+        />
+        <ReadReceipt
+          checkedAt={read.checkedAt}
+          phase={read.phase}
+          resource="references"
+        />
+      </>
     );
   return (
     <CanvasContext.Provider value={runtime}>
       <section
-        className="references-page"
+        className={`references-page ${placingNote ? "reference-placing-note" : ""}`}
         ref={container}
         tabIndex={-1}
         aria-label="References canvas"
@@ -749,29 +938,14 @@ function Canvas() {
           e.preventDefault();
           void (async () => {
             if (content.kind === "image") {
-              const image = await createImageBitmap(content.file),
-                c = document.createElement("canvas");
-              c.width = image.width;
-              c.height = image.height;
-              c.getContext("2d")?.drawImage(image, 0, 0);
-              image.close();
-              const blob = await new Promise<Blob>((resolve, reject) =>
-                c.toBlob(
-                  (b) =>
-                    b
-                      ? resolve(b)
-                      : reject(Error("Clipboard image could not be encoded")),
-                  "image/png",
-                ),
+              await pasteImage(
+                content.file,
+                center(),
+                (item) => {
+                  selectNext.current = item.id;
+                },
+                refresh,
               );
-              const p = center();
-              const item = await api.clipboardReference(
-                Array.from(new Uint8Array(await blob.arrayBuffer())),
-                p.x,
-                p.y,
-              );
-              selectNext.current = item.id;
-              await refresh();
             } else
               await addInput(
                 content.kind === "link"
@@ -781,6 +955,15 @@ function Canvas() {
           })().catch(error);
         }}
         onKeyDownCapture={(e) => {
+          if (placingNote && (e.key === "Escape" || e.key === "Enter")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.key === "Escape") setPlacingNote(null);
+            else placeNote();
+            return;
+          }
+          if ((e.target as HTMLElement).closest(".reference-note-draft"))
+            return;
           if (
             ["INPUT", "TEXTAREA", "SELECT"].includes(
               (e.target as HTMLElement).tagName,
@@ -796,7 +979,7 @@ function Canvas() {
           }
           if (key === "f") {
             e.preventDefault();
-            void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 });
+            void fitCanvas(reduced ? 0 : 220);
             return;
           }
           const focused = (e.target as HTMLElement).closest<HTMLElement>(
@@ -888,7 +1071,9 @@ function Canvas() {
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          onlyRenderVisibleElements
+          // An active editor owns an unsaved draft even when panned offscreen.
+          // Restore normal viewport virtualization as soon as editing ends.
+          onlyRenderVisibleElements={editingNotes.size === 0}
           minZoom={0.1}
           maxZoom={4}
           nodeDragThreshold={4}
@@ -973,7 +1158,11 @@ function Canvas() {
           }}
           proOptions={{ hideAttribution: false }}
           edgesFocusable={false}
-          onPaneClick={() => {
+          onPaneClick={(event) => {
+            if (placingNote) {
+              placeNote({ x: event.clientX, y: event.clientY });
+              return;
+            }
             setSelectedEdges([]);
             container.current?.focus({ preventScroll: true });
           }}
@@ -1004,6 +1193,41 @@ function Canvas() {
               targets={targets}
             />
           )}
+          {noteDraft && noteDraft.projectId === app.data?.jam?.id && (
+            <ViewportPortal>
+              <DraftNote
+                {...noteDraft}
+                item={data?.items.find(
+                  (item) => item.id === noteDraft.createdId,
+                )}
+                zoom={flow.getZoom()}
+                confirmed={(item, previous) => {
+                  setNoteDraft((current) =>
+                    current ? { ...current, createdId: item.id } : null,
+                  );
+                  runtime.noteSaved?.(item, previous);
+                }}
+                close={(restoreFocus) => {
+                  setNoteDraft(null);
+                  if (restoreFocus)
+                    container.current
+                      ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                      ?.focus();
+                }}
+                saved={(item, restoreFocus) => {
+                  selectNext.current = item.id;
+                  setNoteDraft(null);
+                  announce("Note created");
+                  if (restoreFocus)
+                    container.current
+                      ?.querySelector<HTMLButtonElement>("[data-reference-add]")
+                      ?.focus();
+                  // Creation is already confirmed; a failed reread must not offer create again.
+                  void refresh().catch(error);
+                }}
+              />
+            </ViewportPortal>
+          )}
           <Background color="var(--ink-3)" gap={24} size={0.7} />
           {minimap && (
             <MiniMap
@@ -1019,163 +1243,215 @@ function Canvas() {
             />
           )}
         </ReactFlow>
-        <div
-          className="reference-toolbar"
-          role="toolbar"
-          aria-label="Canvas tools"
-        >
-          <div className="reference-add">
-            <Button variant="primary" onClick={() => setMenu(!menu)}>
-              <Plus size={16} />
-              Add
-            </Button>
-            {menu && (
-              <div className="reference-add-menu">
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    void api
-                      .pickFiles()
-                      .then((paths) => addFiles(paths))
-                      .catch(error);
-                  }}
-                >
-                  File…
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    setAdd("link");
-                  }}
-                >
-                  Link…
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMenu(false);
-                    setAdd("note");
-                  }}
-                >
-                  Note
-                </Button>
-              </div>
-            )}
+        {placingNote && (
+          <div className="reference-note-placement" role="status">
+            Click the canvas to place a note · Enter places it in view · Escape
+            cancels
           </div>
-          <Button variant="ghost" onClick={() => setAdd("frame")}>
-            <Frame size={16} />
-            Frame
-          </Button>
-          <Button
-            variant="ghost"
-            aria-pressed={connect}
-            onClick={() => setConnect(!connect)}
+        )}
+        <FileDropProgress progress={batch.progress} />
+        <div className="reference-control-stack">
+          <div
+            className="reference-toolbar"
+            role="toolbar"
+            aria-label="Canvas tools"
           >
-            <Link2 size={16} />
-            Connect
-          </Button>
-          <IconButton
-            label="Fit view · F"
-            onClick={() =>
-              void flow.fitView({ duration: reduced ? 0 : 220, padding: 0.3 })
-            }
+            <div className="reference-add">
+              <Button
+                data-reference-add
+                variant="primary"
+                onClick={() => setMenu(!menu)}
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+              {menu && (
+                <div className="reference-add-menu">
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      void api
+                        .pickFiles()
+                        .then((paths) => addFiles(paths))
+                        .catch(error);
+                    }}
+                  >
+                    File…
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      setAdd("link");
+                    }}
+                  >
+                    Link…
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setMenu(false);
+                      if (noteDraft || !app.data?.jam) return;
+                      setPlacingNote(app.data.jam.id);
+                      container.current?.focus({ preventScroll: true });
+                    }}
+                    disabled={!!noteDraft || !!placingNote || !app.data?.jam}
+                  >
+                    Note
+                  </Button>
+                </div>
+              )}
+            </div>
+            <Button variant="ghost" onClick={() => setAdd("frame")}>
+              <Frame size={16} />
+              Frame
+            </Button>
+            <Button
+              variant="ghost"
+              aria-pressed={connect}
+              onClick={() => setConnect(!connect)}
+            >
+              <Link2 size={16} />
+              Connect
+            </Button>
+            <IconButton
+              label="Fit view · F"
+              onClick={() => void fitCanvas(reduced ? 0 : 220)}
+            >
+              <Focus size={18} />
+            </IconButton>
+            <IconButton
+              label="Zoom out"
+              onClick={() => void flow.zoomOut({ duration: 0 })}
+            >
+              <Minus size={18} />
+            </IconButton>
+            <ZoomReadout />
+            <IconButton
+              label="Zoom in"
+              onClick={() => void flow.zoomIn({ duration: 0 })}
+            >
+              <Plus size={18} />
+            </IconButton>
+            <IconButton
+              label="Toggle minimap"
+              onClick={() => setMinimap(!minimap)}
+            >
+              <MinimapIcon size={18} />
+            </IconButton>
+            <IconButton
+              label="Undo"
+              disabled={!history.canUndo}
+              onClick={() => void undo()}
+            >
+              <Undo2 size={18} />
+            </IconButton>
+            <IconButton
+              label="Redo"
+              disabled={!history.canRedo}
+              onClick={() => void undo(true)}
+            >
+              <Redo2 size={18} />
+            </IconButton>
+            <Button
+              variant="ghost"
+              disabled={read.pending || query.isFetching}
+              aria-busy={read.pending || query.isFetching}
+              onClick={explicitRefresh}
+            >
+              {read.pending ? "Checking references…" : "Refresh references"}
+            </Button>
+            <ReadReceipt
+              checkedAt={read.checkedAt}
+              phase={read.phase}
+              resource="references"
+            />
+          </div>
+          <fieldset
+            className="reference-filters"
+            aria-label="Filter references"
           >
-            <Focus size={18} />
-          </IconButton>
-          <IconButton
-            label="Zoom out"
-            onClick={() => void flow.zoomOut({ duration: 0 })}
-          >
-            <Minus size={18} />
-          </IconButton>
-          <ZoomReadout />
-          <IconButton
-            label="Zoom in"
-            onClick={() => void flow.zoomIn({ duration: 0 })}
-          >
-            <Plus size={18} />
-          </IconButton>
-          <IconButton
-            label="Toggle minimap"
-            onClick={() => setMinimap(!minimap)}
-          >
-            <MinimapIcon size={18} />
-          </IconButton>
-          <IconButton
-            label="Undo"
-            disabled={!history.canUndo}
-            onClick={() => void undo()}
-          >
-            <Undo2 size={18} />
-          </IconButton>
-          <IconButton
-            label="Redo"
-            disabled={!history.canRedo}
-            onClick={() => void undo(true)}
-          >
-            <Redo2 size={18} />
-          </IconButton>
-        </div>
-        <fieldset className="reference-filters" aria-label="Filter references">
-          <button
-            type="button"
-            aria-pressed={!filter.length}
-            onClick={() => setFilter([])}
-          >
-            All
-          </button>
-          {(epics.data ?? []).map((e) => (
             <button
               type="button"
-              key={e.id}
-              aria-pressed={filter.includes(e.id)}
-              style={
-                { "--chip-color": palette(e.color) } as React.CSSProperties
-              }
+              aria-pressed={!filter.length}
+              onClick={() => setFilter([])}
+            >
+              All
+            </button>
+            {(epics.data ?? []).map((e) => (
+              <button
+                type="button"
+                key={e.id}
+                aria-pressed={filter.includes(e.id)}
+                style={
+                  { "--chip-color": palette(e.color) } as React.CSSProperties
+                }
+                onClick={() =>
+                  setFilter((f) =>
+                    f.includes(e.id)
+                      ? f.filter((id) => id !== e.id)
+                      : [...f, e.id],
+                  )
+                }
+              >
+                {e.key}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={filter.includes("unlinked")}
               onClick={() =>
                 setFilter((f) =>
-                  f.includes(e.id)
-                    ? f.filter((id) => id !== e.id)
-                    : [...f, e.id],
+                  f.includes("unlinked")
+                    ? f.filter((id) => id !== "unlinked")
+                    : [...f, "unlinked"],
                 )
               }
             >
-              {e.key}
+              Unlinked
             </button>
-          ))}
-          <button
-            type="button"
-            aria-pressed={filter.includes("unlinked")}
-            onClick={() =>
-              setFilter((f) =>
-                f.includes("unlinked")
-                  ? f.filter((id) => id !== "unlinked")
-                  : [...f, "unlinked"],
-              )
-            }
-          >
-            Unlinked
-          </button>
-        </fieldset>
-        {!data?.items.length && (
-          <div className="reference-empty">
-            <EmptyState
-              image={paint}
-              text="Drop images, sounds, videos or links here"
-            >
-              <Button
-                variant="primary"
-                onClick={() =>
-                  void api
-                    .pickFiles()
-                    .then((paths) => addFiles(paths))
-                    .catch(error)
-                }
-              >
-                Add file…
-              </Button>
-            </EmptyState>
+          </fieldset>
+          <div className="reference-read-notice">
+            {query.error && query.data && (
+              <QueryRefreshNotice
+                error={query.error}
+                resource="references"
+                busy={query.isFetching}
+                retry={explicitRefresh}
+              />
+            )}
+
+            {query.isFetching &&
+              query.data &&
+              !query.error &&
+              !read.pending && (
+                <p role="status">
+                  Refreshing references… showing the last loaded canvas.
+                </p>
+              )}
           </div>
-        )}
+        </div>
+        {!data?.items.some((item) => !item.archivedAt) &&
+          !data?.frames.some((frame) => !frame.archivedAt) &&
+          !noteDraft &&
+          !placingNote && (
+            <div className="reference-empty">
+              <EmptyState
+                image={paint}
+                text="Drop images, sounds, videos or links here"
+              >
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    void api
+                      .pickFiles()
+                      .then((paths) => addFiles(paths))
+                      .catch(error)
+                  }
+                >
+                  Add file…
+                </Button>
+              </EmptyState>
+            </div>
+          )}
         {notice && (
           <div className="reference-notice" role="status">
             {notice}
@@ -1190,10 +1466,11 @@ function Canvas() {
         )}
         {connect && (
           <div className="reference-connect-hint">
-            Drag from a node handle to connect · right-click an edge to archive
+            Drag between card handles to connect · right-click a connection to
+            archive
           </div>
         )}
-        {(add === "link" || add === "note") && (
+        {add === "link" && (
           <AddReferenceDialog
             kind={add}
             close={() => setAdd(null)}
@@ -1236,11 +1513,16 @@ function Canvas() {
               history.record({
                 label: "Edit reference",
                 undo: () =>
-                  api.updateReference(edit.id, {
-                    title: old.title,
-                    caption: old.captionMd,
-                    tags: old.tags,
-                  }),
+                  api.updateReference(
+                    edit.id,
+                    old.kind === "note" && edit.mode === "tags"
+                      ? { tags: old.tags }
+                      : {
+                          title: old.title,
+                          caption: old.captionMd,
+                          tags: old.tags,
+                        },
+                  ),
                 redo: () => api.updateReference(edit.id, patch),
               });
               setRevision((r) => r + 1);
@@ -1269,41 +1551,24 @@ function Canvas() {
           </Dialog>
         )}
         {edgeEdit && (
-          <Dialog title="Edge label" onClose={() => setEdgeEdit(null)}>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void api
-                  .updateRefEdge(edgeEdit.id, edgeEdit.label)
-                  .then(refresh)
-                  .then(() => setEdgeEdit(null))
-                  .catch(error);
-              }}
-            >
-              <label className="field">
-                Label
-                <input
-                  autoFocus
-                  value={edgeEdit.label}
-                  onChange={(e) =>
-                    setEdgeEdit({ ...edgeEdit, label: e.target.value })
-                  }
-                />
-              </label>
-              <Button variant="primary" type="submit">
-                Save label
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  archive("edge", edgeEdit.id);
-                  setEdgeEdit(null);
-                }}
-              >
-                Archive edge
-              </Button>
-            </form>
-          </Dialog>
+          <EdgeLabelDialog
+            key={edgeEdit.id}
+            edge={edgeEdit}
+            close={() => setEdgeEdit(null)}
+            refresh={refresh}
+            archived={() => {
+              const id = edgeEdit.id;
+              history.record({
+                label: "Archive reference",
+                undo: () =>
+                  api.canvasArchive({ kind: "edge", id, archived: false }),
+                redo: () =>
+                  api.canvasArchive({ kind: "edge", id, archived: true }),
+              });
+              setRevision((r) => r + 1);
+              announce("Archived reference");
+            }}
+          />
         )}
       </section>
     </CanvasContext.Provider>

@@ -1,5 +1,10 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  selectClip,
+  selectPlacement,
+  selectViewport,
+} from "./select-placement";
 export type SelectOption = {
   value: string;
   label: string;
@@ -32,6 +37,104 @@ export function CustomSelect({
   const root = useRef<HTMLDivElement>(null),
     button = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] =
+    useState<ReturnType<typeof selectPlacement>>();
+  const [presentation, setPresentation] = useState<
+    "anchored" | "top-layer" | "inline"
+  >("anchored");
+  useLayoutEffect(() => {
+    if (!open) return;
+    const element = popup.current;
+    if (!element) return;
+    let topLayer = false;
+    let inlineFallback = false;
+    // The native top layer escapes a short dialog's overflow without moving
+    // the popup out of its modal/select DOM ownership or keyboard scope.
+    if (
+      typeof element.showPopover === "function" &&
+      typeof element.hidePopover === "function"
+    ) {
+      try {
+        element.setAttribute("popover", "manual");
+        element.showPopover();
+        topLayer = true;
+      } catch {
+        element.removeAttribute("popover");
+      }
+    }
+    const update = () => {
+      if (!button.current || !root.current || !popup.current) return;
+      const anchor = button.current.getBoundingClientRect();
+      const clip = selectClip(root.current);
+      if (
+        (anchor.width > 0 || anchor.height > 0) &&
+        (anchor.bottom <= clip.top ||
+          anchor.top >= clip.bottom ||
+          anchor.right <= clip.left ||
+          anchor.left >= clip.right)
+      ) {
+        // A scrolled-away trigger must not leave an orphaned popup. Do not
+        // refocus/scroll it back against the person's navigation intent.
+        setOpen(false);
+        setQuery("");
+        return;
+      }
+      const viewport = selectViewport();
+      const height = Math.min(300, popup.current.scrollHeight + 4);
+      const next = selectPlacement(
+        anchor,
+        topLayer
+          ? { left: 0, top: 0, right: 0, bottom: 0 }
+          : root.current.getBoundingClientRect(),
+        topLayer ? viewport : clip,
+        height,
+      );
+      if (!topLayer && next.maxHeight < Math.min(height, searchable ? 150 : 80))
+        inlineFallback = true;
+      // Unsupported/throwing Popover implementations must still expose choices.
+      // Stay in flow for this opening, rather than oscillating as the dialog grows.
+      if (inlineFallback)
+        next.maxHeight = Math.max(
+          1,
+          Math.min(300, viewport.bottom - viewport.top - 32),
+        );
+      setPresentation(
+        topLayer ? "top-layer" : inlineFallback ? "inline" : "anchored",
+      );
+      setPlacement((old) =>
+        old &&
+        Object.entries(next).every(
+          ([key, value]) => old[key as keyof typeof old] === value,
+        )
+          ? old
+          : next,
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (root.current) observer.observe(root.current);
+    if (popup.current) observer.observe(popup.current);
+    window.addEventListener("resize", update);
+    document.addEventListener("scroll", update, true);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      if (topLayer) {
+        try {
+          element.hidePopover();
+        } catch {
+          // The owner may already have removed this popup during navigation.
+        }
+        element.removeAttribute("popover");
+      }
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      document.removeEventListener("scroll", update, true);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, [open, searchable]);
   useEffect(() => {
     if (open)
       document
@@ -50,8 +153,16 @@ export function CustomSelect({
     const close = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
+    const focus = (e: FocusEvent) => {
+      // A newer modal must never sit behind an old manual top-layer popup.
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
+    document.addEventListener("focusin", focus);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("focusin", focus);
+    };
   }, [open]);
   const choose = (v: string) => {
     if (options.find((o) => o.value === v)?.disabled) return;
@@ -66,6 +177,7 @@ export function CustomSelect({
       className="custom-select"
       ref={root}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
           e.preventDefault();
           setOpen(true);
@@ -135,7 +247,25 @@ export function CustomSelect({
         <ChevronDown size={16} />
       </button>
       {open && (
-        <div className="combo-popup">
+        <div
+          className="combo-popup"
+          ref={popup}
+          data-placement={placement?.side}
+          data-presentation={presentation}
+          style={
+            presentation === "inline"
+              ? { width: "100%", minWidth: 0, maxHeight: placement?.maxHeight }
+              : placement
+                ? {
+                    left: placement.left,
+                    top: placement.top,
+                    width: placement.width,
+                    minWidth: 0,
+                    maxHeight: placement.maxHeight,
+                  }
+                : undefined
+          }
+        >
           {searchable && (
             <input
               ref={search}

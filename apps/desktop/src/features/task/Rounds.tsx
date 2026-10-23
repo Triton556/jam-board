@@ -1,35 +1,123 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Report, ReviewTask } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { Avatar, Button, Dialog, Stamp } from "../../components/ui";
 import { api } from "../../lib/api";
 import { invalidatePlanning } from "../../lib/planning-queries";
 import { relativeTime } from "../../lib/time";
-import type { Member, TaskDetail } from "../../lib/types";
+import { JamError, type Member, type TaskDetail } from "../../lib/types";
+import { ReportEvidence } from "./ReportEvidence";
+import { ReviewContext } from "./ReviewContext";
+
+function focusReadingTarget(
+  target: HTMLElement | null,
+  block: ScrollLogicalPosition = "start",
+) {
+  target?.focus({ preventScroll: true });
+  // Native WebKit can focus a field while leaving most of it below the modal.
+  target?.scrollIntoView({ block, behavior: "instant" });
+}
+
 export function ReviewDialog({
   report,
   close,
   onReview,
+  pending = false,
+  error,
+  context,
+  changed = false,
+  refreshing = false,
+  refreshed = false,
+  refresh,
 }: {
   report: Report;
+  pending?: boolean;
+  error?: string;
+  context?: TaskDetail;
+  changed?: boolean;
+  refreshing?: boolean;
+  refreshed?: boolean;
+  refresh?(): void;
   close(): void;
   onReview(input: Pick<ReviewTask, "commentsMd" | "failedTests">): void;
 }) {
   const [comments, setComments] = useState(""),
     [failed, setFailed] = useState<string[]>([]);
+  const capturedHeading = useRef<HTMLHeadingElement>(null);
+  const commentsField = useRef<HTMLTextAreaElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: every explicitly reread snapshot needs focus, including a second reread while refreshed remains true.
+  useEffect(() => {
+    if (refreshed) focusReadingTarget(capturedHeading.current);
+  }, [refreshed, context?.reviewContextRevision, report.id]);
+  const missingTests = failed.filter(
+    (name) => !report.tests.some((test) => test.name === name),
+  );
   return (
-    <Dialog title="Request changes" onClose={close}>
+    <Dialog
+      title="Request changes"
+      className="review-decision-dialog"
+      busy={pending}
+      onClose={() => {
+        if (!pending) close();
+      }}
+    >
+      <p className="small">
+        Reviewing {context?.key ?? "task"} · report round {report.round}
+      </p>
+      {changed && (
+        <p role="alert" className="review-context-changed">
+          Evidence changed. Your comments and test choices are kept. Read the
+          latest evidence and reconcile them before sending.
+        </p>
+      )}
+      {refresh && (changed || error) && (
+        <Button disabled={pending || refreshing} onClick={refresh}>
+          {refreshing ? "Reading latest…" : "Read latest evidence"}
+        </Button>
+      )}
+      {refreshed && !changed && (
+        <p role="status">
+          Latest evidence loaded. Your draft is kept; check the criteria and
+          test choices before submitting.
+        </p>
+      )}
+      <div className="review-reading-navigation">
+        <span className="small">
+          Full report below · scroll this dialog to read the evidence.
+        </span>
+        <Button
+          disabled={pending}
+          onClick={() => focusReadingTarget(commentsField.current, "center")}
+        >
+          Go to comments
+        </Button>
+      </div>
+      <div className="review-captured-report">
+        <h3 ref={capturedHeading} tabIndex={-1}>
+          Captured report
+        </h3>
+        <ReportEvidence report={report} expandFiles={refreshed} />
+      </div>
+      {context && <ReviewContext task={context} expanded={refreshed} />}
+      <Button
+        disabled={pending}
+        onClick={() => focusReadingTarget(capturedHeading.current)}
+      >
+        Back to captured report
+      </Button>
       <label className="field">
         Comments
         <textarea
+          ref={commentsField}
           aria-label="Review comments"
+          disabled={pending}
           value={comments}
           onChange={(e) => setComments(e.target.value)}
           required
         />
       </label>
-      <fieldset className="failed-tests">
+      <fieldset className="failed-tests" disabled={pending}>
         <legend>Failed tests from round {report.round}</legend>
         {report.tests.map((t) => (
           <label key={t.name}>
@@ -53,16 +141,51 @@ export function ReviewDialog({
           </label>
         ))}
       </fieldset>
+      {missingTests.length > 0 && (
+        <fieldset className="failed-tests">
+          <legend>Earlier test choices to reconcile</legend>
+          <p className="small">
+            These selected tests are not in this report. Keep their concern in
+            your comments, then remove the obsolete selection.
+          </p>
+          {missingTests.map((name) => (
+            <label key={name}>
+              <input
+                type="checkbox"
+                checked
+                disabled={pending}
+                onChange={() =>
+                  setFailed(failed.filter((item) => item !== name))
+                }
+              />
+              {name}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <p className="small muted">
+        The task returns to Ready for another round. New work still needs scope
+        permission.
+      </p>
+      {error && <p role="alert">{error}</p>}
       <div className="dialog-actions">
-        <Button onClick={close}>Cancel</Button>
+        <Button disabled={pending} onClick={close}>
+          Cancel
+        </Button>
         <Button
           variant="primary"
-          disabled={!comments.trim()}
+          disabled={
+            pending ||
+            refreshing ||
+            changed ||
+            missingTests.length > 0 ||
+            !comments.trim()
+          }
           onClick={() =>
             onReview({ commentsMd: comments.trim(), failedTests: failed })
           }
         >
-          Request changes
+          {pending ? "Saving review…" : "Request changes"}
         </Button>
       </div>
     </Dialog>
@@ -71,46 +194,210 @@ export function ReviewDialog({
 export function Rounds({
   task,
   members,
+  hasUnsavedEdits = false,
 }: {
   task: TaskDetail;
   members: Member[];
+  hasUnsavedEdits?: boolean;
 }) {
   const [request, setRequest] = useState(false);
+  const [evidence, setEvidence] = useState(task);
+  const [observedRevision, setObservedRevision] = useState(
+    task.reviewContextRevision,
+  );
+  const [refreshed, setRefreshed] = useState(false);
+  const [conflicted, setConflicted] = useState(false);
+  const [notice, setNotice] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (notice) heading.current?.focus();
+  }, [notice]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus follows each explicit snapshot replacement, not only the first successful reread.
+  useEffect(() => {
+    if (refreshed && !request) heading.current?.focus();
+  }, [refreshed, request, evidence.reviewContextRevision]);
   const client = useQueryClient();
+  const changed =
+    conflicted ||
+    (task.reviewContextRevision !== observedRevision &&
+      task.reviewContextRevision !== evidence.reviewContextRevision);
+  const refresh = useMutation({
+    mutationFn: async () => {
+      const latestTask = await api.getTask(evidence.key);
+      if (latestTask.id !== evidence.id || latestTask.jamId !== evidence.jamId)
+        throw new Error(
+          "The selected project or task changed. This review was not retargeted.",
+        );
+      if (request && latestTask.status !== "review")
+        throw new Error(
+          "This result is no longer awaiting review. Your comments are kept; close this dialog after saving any notes you need.",
+        );
+      return latestTask;
+    },
+    onSuccess: (latestTask) => {
+      setObservedRevision(task.reviewContextRevision);
+      setEvidence(latestTask);
+      setRefreshed(true);
+      setNotice("");
+      setConflicted(false);
+      review.reset();
+      client.setQueryData(["task", latestTask.key], latestTask);
+    },
+  });
   const review = useMutation({
     mutationFn: (input: ReviewTask) => api.reviewTask(input),
-    onSuccess: () => {
+    onSuccess: async (_review, input) => {
       setRequest(false);
+      setRefreshed(false);
+      setNotice(
+        input.verdict === "accept"
+          ? "Result accepted. The task moved to Done."
+          : "Changes requested. The task returned to Ready for another round; new work still needs scope permission.",
+      );
+      invalidatePlanning(client);
+      // Display our completed decision, but never silently authorize a successor report.
+      try {
+        const updated = await api.getTask(input.key);
+        if (
+          updated.id === evidence.id &&
+          updated.jamId === evidence.jamId &&
+          updated.status !== "review"
+        ) {
+          setEvidence(updated);
+          setObservedRevision(task.reviewContextRevision);
+        }
+      } catch {
+        /* The receipt is confirmed; a later explicit refresh can load its history. */
+      }
+    },
+    onError: (error) => {
+      if (
+        error instanceof JamError &&
+        ["conflict", "stale_claim", "wrong_status"].includes(error.code)
+      )
+        setConflicted(true);
       invalidatePlanning(client);
     },
   });
-  const latest = task.reports.find((r) => r.round === (task.reviewRound ?? 0));
+  const latest = evidence.reports.find(
+    (r) => r.round === (evidence.reviewRound ?? 0),
+  );
   const author = (id: string) => members.find((m) => m.id === id);
   const rounds = [
     ...new Set([
-      ...task.reports.map((r) => r.round),
-      ...task.reviews.map((r) => r.round),
+      ...evidence.reports.map((r) => r.round),
+      ...evidence.reviews.map((r) => r.round),
     ]),
-  ].sort((a, b) => a - b);
+  ].sort((a, b) => b - a);
+  const reviewActions = evidence.status === "review" && latest && (
+    <div className="button-row">
+      <Button
+        variant="primary"
+        disabled={
+          review.isPending ||
+          refresh.isPending ||
+          changed ||
+          hasUnsavedEdits ||
+          !evidence.reviewContextRevision
+        }
+        onClick={() =>
+          review.mutate({
+            key: evidence.key,
+            expectedReportId: latest.id,
+            expectedReviewContextRevision: evidence.reviewContextRevision ?? "",
+            verdict: "accept",
+            commentsMd: "Accepted after checking the report and acceptance.",
+            failedTests: [],
+          })
+        }
+      >
+        Accept result
+      </Button>
+      <Button
+        disabled={
+          review.isPending ||
+          refresh.isPending ||
+          changed ||
+          hasUnsavedEdits ||
+          !evidence.reviewContextRevision
+        }
+        onClick={() => {
+          review.reset();
+          setNotice("");
+          refresh.reset();
+          setRefreshed(false);
+          setRequest(true);
+        }}
+      >
+        Request changes…
+      </Button>
+    </div>
+  );
   return (
     <section className="task-section rounds">
-      <h2>Rounds</h2>
+      <h2 ref={heading} tabIndex={-1}>
+        Reports &amp; review
+      </h2>
+      {notice && (
+        <p role="status" className="execution-feedback">
+          {notice}
+        </p>
+      )}
+      {hasUnsavedEdits && evidence.status === "review" && (
+        <p className="small muted">
+          Save or discard your task edits before reviewing. Review uses saved
+          criteria, not unsaved changes.
+        </p>
+      )}
+      {!request && (changed || review.error) && (
+        <div className="review-context-changed">
+          <p role="alert">
+            The report or task/story/epic context changed, or this decision
+            could not be saved. The displayed snapshot has not been replaced.
+          </p>
+          <Button
+            disabled={refresh.isPending || review.isPending}
+            onClick={() => refresh.mutate()}
+          >
+            {refresh.isPending ? "Reading latest…" : "Read latest evidence"}
+          </Button>
+        </div>
+      )}
+      {refresh.error && !request && <p role="alert">{refresh.error.message}</p>}
+      {refreshed && evidence.status === "review" && !request && !changed && (
+        <p role="status">
+          Latest evidence loaded. Inspect this report and its captured criteria
+          before accepting.
+        </p>
+      )}
       {!rounds.length && (
         <p className="muted">
           The worker's report and your review will appear here.
         </p>
       )}
       {rounds.map((round) => {
-        const report = task.reports.find((r) => r.round === round),
-          verdict = task.reviews.find((r) => r.round === round);
+        const report = evidence.reports.find((r) => r.round === round),
+          verdict = evidence.reviews.find((r) => r.round === round);
         return (
-          <div className="round" key={round}>
-            <h3>Round {round}</h3>
+          <details
+            className="round ink-disclosure"
+            key={round}
+            open={round === rounds[0]}
+          >
+            <summary>
+              Round {round}
+              {round === rounds[0]
+                ? changed
+                  ? " · Previously read"
+                  : " · Latest read"
+                : " · Earlier evidence"}
+            </summary>
             {report && (
               <section
                 className="report-card"
                 aria-label={
-                  report === task.reports.at(-1)
+                  report.round ===
+                  Math.max(...evidence.reports.map((item) => item.round))
                     ? "Latest report"
                     : `Report round ${round}`
                 }
@@ -122,56 +409,9 @@ export function Rounds({
                   <b>{author(report.authorId)?.name ?? "Worker"}</b>
                   <time>{relativeTime(report.createdAt)}</time>
                 </div>
-                <Markdown>{report.summaryMd}</Markdown>
-                <details>
-                  <summary>
-                    Changed files · {report.changedFiles.length}
-                  </summary>
-                  <ul>
-                    {report.changedFiles.map((f) => (
-                      <li key={f}>
-                        <code>{f}</code>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-                <div className="report-tests">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Test</th>
-                        <th>Expected</th>
-                        <th>Actual</th>
-                        <th>Result</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.tests.map((t) => (
-                        <tr key={t.name}>
-                          <td title={t.command}>{t.name}</td>
-                          <td>{t.expected}</td>
-                          <td>{t.actual}</td>
-                          <td>
-                            <Stamp className={`test-${t.result.toLowerCase()}`}>
-                              {t.result}
-                            </Stamp>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {report.deviationsMd && (
-                  <>
-                    <h4>Deviations</h4>
-                    <Markdown>{report.deviationsMd}</Markdown>
-                  </>
-                )}
-                {report.notVerifiedMd && (
-                  <>
-                    <h4>Not verified</h4>
-                    <Markdown>{report.notVerifiedMd}</Markdown>
-                  </>
+                <ReportEvidence report={report} />
+                {round === evidence.reviewRound && (
+                  <ReviewContext task={evidence} expanded={refreshed} />
                 )}
               </section>
             )}
@@ -179,7 +419,8 @@ export function Rounds({
               <section
                 className={`review-card ${verdict.verdict}`}
                 aria-label={
-                  verdict === task.reviews.at(-1)
+                  verdict.round ===
+                  Math.max(...evidence.reviews.map((item) => item.round))
                     ? "Latest review"
                     : `Review round ${round}`
                 }
@@ -201,43 +442,34 @@ export function Rounds({
                 )}
               </section>
             )}
-          </div>
+            {round === evidence.reviewRound && reviewActions}
+          </details>
         );
       })}
-      {task.status === "review" && latest && (
-        <div className="button-row">
-          <Button
-            variant="primary"
-            disabled={review.isPending}
-            onClick={() =>
-              review.mutate({
-                key: task.key,
-                verdict: "accept",
-                commentsMd:
-                  "Accepted after checking the report and acceptance.",
-                failedTests: [],
-              })
-            }
-          >
-            Accept
-          </Button>
-          <Button onClick={() => setRequest(true)}>Request changes…</Button>
-        </div>
-      )}
       {request && latest && (
         <ReviewDialog
           report={latest}
+          context={evidence}
+          changed={changed || !evidence.reviewContextRevision}
+          refreshing={refresh.isPending}
+          refreshed={refreshed}
+          refresh={() => refresh.mutate()}
+          pending={review.isPending}
+          error={refresh.error?.message ?? review.error?.message}
           close={() => setRequest(false)}
           onReview={(input) =>
             review.mutate({
-              key: task.key,
+              key: evidence.key,
+              expectedReportId: latest.id,
+              expectedReviewContextRevision:
+                evidence.reviewContextRevision ?? "",
               verdict: "changes_requested",
               ...input,
             })
           }
         />
       )}{" "}
-      {review.error && <p role="alert">{review.error.message}</p>}
+      {review.error && !request && <p role="alert">{review.error.message}</p>}
     </section>
   );
 }

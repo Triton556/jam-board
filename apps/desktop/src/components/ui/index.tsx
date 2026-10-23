@@ -1,4 +1,6 @@
-import { useModal } from "./controls";
+import { type ModalFocusReturn, useModal } from "./controls";
+
+export type { ModalFocusReturn } from "./controls";
 
 export {
   Combobox,
@@ -7,13 +9,21 @@ export {
   Kbd,
   SegmentedControl,
   Select,
-  Tabs,
   TagInput,
 } from "./controls";
+export { TabPanels, Tabs } from "./Tabs";
 
 import { Bot, X } from "lucide-react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
-import { createContext, useContext, useId, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import laptop from "../../assets/chibi/danil-laptop-256.webp";
 import type { MemberRef } from "../../bindings";
@@ -65,7 +75,7 @@ export function Tooltip({
     left: number;
     top: number;
   } | null>(null);
-  const show = () => {
+  const show = useCallback(() => {
     const rect = anchor.current?.getBoundingClientRect();
     if (rect)
       setPosition({
@@ -81,7 +91,11 @@ export function Tooltip({
             ? rect.bottom + 8
             : rect.top - 34,
       });
-  };
+  }, [text]);
+  const open = position !== null;
+  useLayoutEffect(() => {
+    if (open) show();
+  }, [open, show]);
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: The wrapper observes descendant focus without becoming another focus target.
     <span
@@ -189,14 +203,18 @@ export function Drawer({
   title,
   leading,
   actions,
+  closeLabel = "Close task",
+  returnFocus,
 }: {
   children: ReactNode;
   onClose(): void;
   title: string;
   leading?: ReactNode;
   actions?: ReactNode;
+  closeLabel?: string;
+  returnFocus?: ModalFocusReturn;
 }) {
-  const ref = useModal(onClose);
+  const ref = useModal(onClose, returnFocus);
   const id = useId();
   return createPortal(
     // biome-ignore lint/a11y/noStaticElementInteractions: The backdrop closes only on a direct pointer click; Escape and the Close button provide keyboard access.
@@ -222,7 +240,7 @@ export function Drawer({
           {leading}
           <div className="drawer-heading-actions">
             {actions}
-            <IconButton label="Close task" onClick={onClose}>
+            <IconButton label={closeLabel} onClick={onClose}>
               <X />
             </IconButton>
           </div>

@@ -30,13 +30,36 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.getByRole("button", { name: "Add link", exact: true }).click();
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByRole("button", { name: "Note", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Title", exact: true })
+  await expect(
+    page.getByRole("region", { name: "References canvas", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  const paper = page.getByRole("article", { name: "New note paper" });
+  const body = paper.getByRole("textbox", { name: "Note text", exact: true });
+  await expect(body).toBeFocused();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await body.fill("# Warm light\nKeep the snowy silhouettes readable.");
+  await paper.getByRole("button", { name: "Add heading" }).click();
+  await paper
+    .getByRole("textbox", { name: "Optional note heading", exact: true })
     .fill("Snow and amber");
-  await page
-    .getByRole("textbox", { name: "Note", exact: true })
-    .fill("# Warm light\nKeep the snowy silhouettes readable.");
-  await page.getByRole("button", { name: "Add note", exact: true }).click();
+  await expect(paper.getByRole("status")).toHaveText("Saved");
+  await expect
+    .poll(async () =>
+      page.evaluate(async () =>
+        (await window.__jamMock.referenceCanvas()).items
+          .filter((item) => item.kind === "note")
+          .map(({ title, captionMd }) => ({ title, captionMd })),
+      ),
+    )
+    .toEqual([
+      {
+        title: "Snow and amber",
+        captionMd: "# Warm light\nKeep the snowy silhouettes readable.",
+      },
+    ]);
+  await page.keyboard.press("Escape");
+  await expect(paper).toHaveCount(0);
   await expect(page.locator(".reference-card")).toHaveCount(4);
   await page.getByRole("button", { name: "Frame", exact: true }).click();
   await page

@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Exercise the real stdio sidecar and verify its calls reach the open desktop window.
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';

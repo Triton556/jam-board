@@ -7,8 +7,12 @@ import {
   useStore,
 } from "@xyflow/react";
 import {
+  Archive,
   AudioLines,
+  ChevronDown,
+  ChevronRight,
   File,
+  GripHorizontal,
   Image,
   Link,
   MoreHorizontal,
@@ -16,15 +20,23 @@ import {
   Type,
   Video,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { RefFrame, RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
+import { frameHeaderLayout } from "./frame-layout";
 import { LocalMedia } from "./Media";
-import { palette, referenceKind } from "./model";
-import { roughFramePaths } from "./rough";
+import { palette, referenceKind, referenceLabel } from "./model";
 import { useCanvas } from "./runtime";
+import { StickyEditor } from "./StickyEditor";
 export type TargetChip = { key: string; viaFrame: boolean; color?: string };
 export type ItemData = {
   item: RefItem;
@@ -35,6 +47,7 @@ export type ItemData = {
   highlight?: string;
   connect: boolean;
   expanded?: boolean;
+  missing?: boolean;
   fitContent?: boolean;
 };
 export type FrameData = { frame: RefFrame; dim: boolean };
@@ -49,6 +62,119 @@ const icons = {
   link: Link,
   note: StickyNote,
 };
+
+/** Native disclosure semantics, with explicit nested dismissal and dialog opener ownership. */
+export function ReferenceActions({
+  item,
+  links,
+  editNote,
+  noteEditing = false,
+}: {
+  item: RefItem;
+  links: TargetChip[];
+  editNote?: () => void;
+  noteEditing?: boolean;
+}) {
+  const runtime = useCanvas();
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDetailsElement>(null);
+  const summary = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as globalThis.Node)) {
+        if (menu.current) menu.current.open = false;
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => document.removeEventListener("pointerdown", dismiss, true);
+  }, [open]);
+  const close = () => {
+    if (menu.current) menu.current.open = false;
+    setOpen(false);
+  };
+  const activate = (action: () => void) => {
+    close();
+    // Dialogs capture this visible opener, not the button about to become hidden.
+    summary.current?.focus();
+    action();
+  };
+  return (
+    <details
+      ref={menu}
+      className="reference-menu nodrag nopan"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onKeyDownCapture={(event) => {
+        // ReactFlow's document Space handler does not recognize SUMMARY as
+        // interactive. Keep its native disclosure default, not canvas panning.
+        if (event.key === " " && event.target === summary.current) {
+          event.stopPropagation();
+          return;
+        }
+        if (event.key !== "Escape" || !menu.current?.open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        summary.current?.focus();
+      }}
+    >
+      <summary ref={summary} aria-label={`Actions for ${referenceLabel(item)}`}>
+        <MoreHorizontal size={18} />
+      </summary>
+      <fieldset
+        className="reference-action-list"
+        aria-label="Reference actions"
+      >
+        <button
+          type="button"
+          onClick={() =>
+            activate(() =>
+              item.kind === "note"
+                ? editNote?.()
+                : runtime.edit(item.id, "caption"),
+            )
+          }
+        >
+          {item.kind === "note" ? "Edit note" : "Edit caption"}
+        </button>
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.edit(item.id, "tags"))}
+        >
+          Tags
+        </button>
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.edit(item.id, "link"))}
+        >
+          Link to…
+        </button>
+        {links.map((l) => (
+          <button
+            type="button"
+            key={l.key}
+            onClick={() => activate(() => runtime.open(l.key))}
+          >
+            Open {l.key}
+          </button>
+        ))}
+        <button
+          type="button"
+          disabled={noteEditing}
+          title={
+            noteEditing
+              ? "Finish editing this note before archiving it"
+              : undefined
+          }
+          onClick={() => activate(() => runtime.archive("item", item.id))}
+        >
+          Archive
+        </button>
+      </fieldset>
+    </details>
+  );
+}
 export const ReferenceNode = memo(function ReferenceNode({
   data,
   selected,
@@ -57,8 +183,17 @@ export const ReferenceNode = memo(function ReferenceNode({
     runtime = useCanvas(),
     kind = referenceKind(item, path),
     Icon = icons[kind];
+  const editNote = useRef<(() => void) | null>(null);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const editingChanged = useCallback(
+    (active: boolean) => {
+      setNoteEditing(active);
+      runtime.noteEditing?.(item.id, active);
+    },
+    [item.id, runtime.noteEditing],
+  );
   const overview = useStore((s) => s.transform[2] < 0.4);
-  if (overview && !selected && !data.connect && !data.expanded)
+  if (overview && !selected && !data.connect && !data.expanded && !noteEditing)
     return (
       <article
         className="reference-overview-hit"
@@ -67,7 +202,7 @@ export const ReferenceNode = memo(function ReferenceNode({
         aria-label={
           kind +
           " reference: " +
-          item.title +
+          referenceLabel(item) +
           ", linked to " +
           links.map((l) => l.key).join(", ")
         }
@@ -87,7 +222,7 @@ export const ReferenceNode = memo(function ReferenceNode({
       className={`reference-card kind-${kind} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
       data-reference-id={item.id}
       data-highlighted={!!data.highlight}
-      aria-label={`${kind} reference: ${item.title}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
+      aria-label={`${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
       style={
         {
           opacity: data.dim ? 0.15 : 1,
@@ -106,44 +241,15 @@ export const ReferenceNode = memo(function ReferenceNode({
       <Handle type="target" position={Position.Left} isConnectable />
       <header className="reference-card-header">
         <Icon size={15} />
-        <strong>{item.title}</strong>
-        <details className="reference-menu nodrag nopan">
-          <summary aria-label={`Actions for ${item.title}`}>
-            <MoreHorizontal size={18} />
-          </summary>
-          <fieldset
-            className="reference-action-list"
-            aria-label="Reference actions"
-          >
-            <button
-              type="button"
-              onClick={() => runtime.edit(item.id, "caption")}
-            >
-              Edit caption
-            </button>
-            <button type="button" onClick={() => runtime.edit(item.id, "tags")}>
-              Tags
-            </button>
-            <button type="button" onClick={() => runtime.edit(item.id, "link")}>
-              Link to…
-            </button>
-            {links.map((l) => (
-              <button
-                type="button"
-                key={l.key}
-                onClick={() => runtime.open(l.key)}
-              >
-                Open {l.key}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => runtime.archive("item", item.id)}
-            >
-              Archive
-            </button>
-          </fieldset>
-        </details>
+        <strong className={kind === "note" ? "sticky-kind-label" : undefined}>
+          {kind === "note" ? "Note" : item.title}
+        </strong>
+        <ReferenceActions
+          item={item}
+          links={links}
+          editNote={() => editNote.current?.()}
+          noteEditing={noteEditing}
+        />
       </header>
       <div className="reference-content">
         {item.kind === "asset" ? (
@@ -187,7 +293,12 @@ export const ReferenceNode = memo(function ReferenceNode({
           </div>
         ) : null}
         {kind === "note" ? (
-          <NoteContent item={item} />
+          <NoteContent
+            item={item}
+            beginRef={editNote}
+            editingChanged={editingChanged}
+            unavailable={data.missing}
+          />
         ) : (
           <div className="reference-caption">
             <Markdown>{item.captionMd || ""}</Markdown>
@@ -218,72 +329,40 @@ export const ReferenceNode = memo(function ReferenceNode({
     </article>
   );
 });
-function NoteContent({ item }: { item: RefItem }) {
-  const [editing, setEditing] = useState(false),
-    [value, setValue] = useState(item.captionMd),
-    [error, setError] = useState("");
+function NoteContent({
+  item,
+  beginRef,
+  editingChanged,
+  unavailable,
+}: {
+  item: RefItem;
+  beginRef: RefObject<(() => void) | null>;
+  editingChanged(active: boolean): void;
+  unavailable?: boolean;
+}) {
   const runtime = useCanvas();
-  const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (editing) input.current?.focus();
-  }, [editing]);
-  const save = () =>
-    void runtime
-      .caption(item, value)
-      .then(() => setEditing(false))
-      .catch((e) => setError(String(e)));
-  if (editing)
-    return (
-      <div className="nodrag nowheel">
-        <textarea
-          aria-label="Note text"
-          ref={input}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setValue(item.captionMd);
-              setEditing(false);
-            }
-            if (e.ctrlKey && e.key === "s") {
-              e.preventDefault();
-              save();
-            }
-          }}
-        />
-        <button type="button" className="button secondary" onClick={save}>
-          Save note
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </div>
-    );
   return (
-    <button
-      type="button"
-      className="reference-note-text reference-caption nodrag"
-      onDoubleClick={() => {
-        setValue(item.captionMd);
-        setEditing(true);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          setValue(item.captionMd);
-          setEditing(true);
-        }
-      }}
-      aria-label={`Edit note ${item.title}`}
-    >
-      <Markdown>{item.captionMd}</Markdown>
-    </button>
+    <StickyEditor
+      key={item.id}
+      beginRef={beginRef}
+      editingChanged={editingChanged}
+      unavailable={unavailable}
+      item={item}
+      projectId={item.jamId}
+      confirmed={(saved, previous) => runtime.noteSaved?.(saved, previous)}
+    />
   );
 }
 export const ReferenceFrame = memo(function ReferenceFrame({
   data,
   selected,
+  width,
 }: NodeProps<FrameNode>) {
   const { frame } = data,
     c = useCanvas();
-  const overview = useStore((s) => s.transform[2] < 0.4);
+  const zoom = useStore((s) => s.transform[2]);
+  const overview = zoom < 0.4;
+  const header = frameHeaderLayout(width ?? frame.w ?? 800, zoom);
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -293,6 +372,7 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             ? palette(frame.color)
             : "var(--line)",
           opacity: data.dim ? 0.15 : 1,
+          minHeight: frame.collapsed ? header.height * header.scale : undefined,
         } as React.CSSProperties
       }
     >
@@ -308,37 +388,64 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           viewBox={`0 0 ${frame.w} ${frame.h}`}
           aria-hidden="true"
         >
-          {roughFramePaths(frame.w ?? 800, frame.h ?? 600).map((d) => (
-            <path key={d} d={d} />
-          ))}
+          <rect
+            x={0.5}
+            y={0.5}
+            width={Math.max(0, (frame.w ?? 800) - 1)}
+            height={Math.max(0, (frame.h ?? 600) - 1)}
+            rx={12}
+            vectorEffect="non-scaling-stroke"
+          />
         </svg>
       )}
-      <div className="reference-frame-tab">
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
-          onClick={() => c.collapse(frame)}
-        >
-          {frame.collapsed ? "▸" : "▾"}
-        </button>
-        <span>{frame.title}</span>
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`Edit frame ${frame.title}`}
-          onClick={() => c.editFrame(frame)}
-        >
-          <MoreHorizontal size={15} />
-        </button>
-        <button
-          type="button"
-          className="nodrag"
-          aria-label={`Archive frame ${frame.title}`}
-          onClick={() => c.archive("frame", frame.id)}
-        >
-          ×
-        </button>
+      <div
+        className={`reference-frame-tab ${header.compact ? "compact" : ""}`}
+        style={{
+          transform: `scale(${header.scale})`,
+          width: `${header.cssWidth}px`,
+        }}
+        title="Drag this header to move the frame; select it to resize"
+      >
+        <div className="reference-frame-heading">
+          <GripHorizontal
+            className="reference-frame-grip"
+            size={20}
+            aria-hidden="true"
+          />
+          <span className="reference-frame-title" title={frame.title}>
+            {frame.title}
+          </span>
+        </div>
+        <div className="reference-frame-actions">
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+            onClick={() => c.collapse(frame)}
+          >
+            {frame.collapsed ? (
+              <ChevronRight size={16} />
+            ) : (
+              <ChevronDown size={16} />
+            )}
+          </button>
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`Edit frame ${frame.title}`}
+            onClick={() => c.editFrame(frame)}
+          >
+            <MoreHorizontal size={15} />
+          </button>
+          <button
+            type="button"
+            className="nodrag"
+            aria-label={`Archive frame ${frame.title}`}
+            onClick={() => c.archive("frame", frame.id)}
+          >
+            <Archive size={15} />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ flowchart LR
 
 ## Processes and crates
 
-`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to 39 MCP tools, resources, three prompts and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
+`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to 44 MCP tools, resources, three prompts and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
 
 The installer places `jam-board.exe` and `jam-board-mcp.exe` together. Installed processes use `%APPDATA%\dev.triton556.jamboard\jam.db`. Development sets `JAM_BOARD_DATA_DIR` to a directory inside `.dev-data`. The CLI resolves `--db`, then `JAM_BOARD_DB`, then `JAM_BOARD_DATA_DIR/jam.db`, then the platform default. The HTTP server exists only while the desktop is open; stdio can work independently.
 
@@ -26,7 +26,7 @@ The installer places `jam-board.exe` and `jam-board-mcp.exe` together. Installed
 
 A UI mutation crosses the generated `bindings.ts` through `lib/api.ts`. The Rust command resolves the human from `settings.current_member_id`, runs a core service on `spawn_blocking`, polls the feed, and emits typed events. The frontend never chooses its actor. MCP initialize classifies `clientInfo.name`; `JAM_AGENT_NAME` or `X-Jam-Agent` selects its display identity. Core creates an unknown agent and tracks its heartbeat. Handles/client kinds remain stable when a member is renamed.
 
-Every business mutation writes one activity row in the same transaction. A task form sends only changed fields and its `expectedUpdatedAt`; a stale version returns `conflict` rather than overwriting another actor. Dirty inputs remain local until the user chooses Keep mine or Take theirs. MCP tools use the same core services; their smaller update contract does not expose the desktop version field.
+Every business mutation records its activity in the same transaction; a typed execution approval records both the human decision and resulting scope start. A task form sends only changed fields and its `expectedUpdatedAt`; a stale version returns `conflict` rather than overwriting another actor. Dirty inputs remain local until the user explicitly saves their edits against an inspected saved version or discards them. The conflict comparison freezes its base, local draft and server snapshot; changed evidence requires rereading and never silently refills the CAS validator. MCP tools use the same core services and require captured task/claim validators according to the matrix in `docs/mcp.md`; these are freshness checks, not process credentials.
 
 ## Concurrency and live delivery
 
@@ -46,7 +46,7 @@ Tasks and entire jams are archived, never physically deleted. Import creates a n
 
 ## Startup and release
 
-The native window starts hidden. After app state, initial board data, route content and local fonts are ready, the frontend waits for painted frames, shows the window, and invokes `app_ready`. Rust emits `app-ready` and writes a local `logs/app-ready.json` receipt containing only PID and timestamp. Release measurements compare that timestamp with process creation; it is not telemetry.
+The native window starts hidden. After app state is available, the frontend gives local fonts a bounded 250 ms wait and shows the window before waiting for animation frames. Hidden WebKit windows may suspend animation frames, so neither frames nor a route-specific element can gate visibility. A bounded observation of two visible frames precedes `app_ready`; if no frames are observed, the window remains visible without a fabricated first-frame receipt. Rust emits `app-ready` and writes a local `logs/app-ready.json` receipt containing only PID and timestamp. Release measurements compare that timestamp with process creation; it is not telemetry.
 
 Feature screens, the table, task drawer, command palette and Markdown renderer load in separate chunks. Motion and roughjs have dedicated vendor chunks. CI checks both operating systems but only Windows builds the desktop; Linux runtime and macOS are not release targets of this MVP.
 
@@ -63,7 +63,7 @@ A project retains the jams table, adding a template, optional milestone and tran
 
 Reports/reviews are immutable per task and review round. A worker submission moves In progress > Review; changes requested returns to Ready with the assignee and history retained. Questions use a validated polymorphic project/epic/story/task scope. Humans answer; each level shows only its own open questions. Task detail separately carries open story/epic questions as ancestorQuestions, preserving worker context without flooding task flags. Cross-process waits release all SQLite locks, then consume the existing activity/data-version feed at 250ms intervals until an answer, matching activity or a bounded timeout. wait_for_changes applies action/actor/self/epic filters, returns at most 100 ordered events and advances nextCursor through every inspected row, including non-matches. Its dedicated read snapshot ends before sleeping; the writer stays available. Presence refreshes add no activity.
 
-activity.epic_id indexes the epic journal; seq remains the project cursor and English event sentences are generated in core. Project interviews before epic creation keep epic_id null. Plan → Journal also displays those earlier project questions, answers and status lines as **Project prelude**, bounded by the preceding epic creation. This is labeled presentation context from the project feed: stored scope, scoped MCP journal reads and event sequence remain unchanged. Scoped agent status updates last_seen_at, records one event and becomes stale after 30 minutes. The separate online threshold stays 120 seconds.
+activity.epic_id indexes the epic journal; seq remains a global activity sequence filtered by project and English event sentences are generated in core. Project interviews before epic creation keep epic_id null. Plan → Journal also displays those earlier project questions, answers and status lines as **Project prelude**, bounded by the preceding epic creation. This is labeled presentation context from the project feed: stored scope, scoped MCP journal reads and event sequence remain unchanged. Scoped agent status updates last_seen_at, records one event and becomes stale after 30 minutes. The separate online threshold stays 120 seconds.
 
 References are a React Flow canvas backed by frames, items, edges and target links. File items create role=reference assets in the same transaction and reference local paths. Adding/rendering a link only stores or reads its URL and never fetches it. A separate explicit human preview operation uses the OS curl client with a five-second deadline, HTTP(S)-only redirects and a 2 MiB cap; only title/og:image metadata is retained. Archival hides items/links without deleting records. A version-2 JSON snapshot retains this graph and planning history; imports validate polymorphic targets as well as ordinary foreign keys, allocate new IDs/keys and match member handles. Version-1 snapshots remain importable.
 
@@ -75,7 +75,7 @@ The human planning surface adds Plan (epic Overview, ordered Stories, Journal an
 
 ## Human planning adapters and live state
 
-The native adapter adds list_plan_epics (including archives for the All filter), list_plan_stories, clear_brain and reorder_story. Their rules remain in jam-core; no MCP tool is added. An optional full brief in the version-checked native task patch saves Notes, fields and brief atomically, with one task.brief_updated event listing changed fields. A late save response preserves text typed while it was in flight. Dirty task edits retain the existing conflict comparison and Keep mine / Take theirs controls.
+The native adapter adds list_plan_epics (including archives for the All filter), list_plan_stories, clear_brain and reorder_story. Their rules remain in jam-core; no MCP tool is added. An optional full brief in the version-checked native task patch saves Notes, fields and brief atomically, with one task.brief_updated event listing changed fields. A late save response preserves text typed while it was in flight. Dirty task edits retain a frozen conflict comparison with human-readable field/list labels. “Save my edits against latest” applies only changed top-level/brief properties to the inspected server version; Changes and acceptance-test arrays replace whole lists, not individual entries. “Discard my edits and use latest” discards only the local draft. Pending decisions cannot be double-submitted or dismissed, failures stay inside the modal, and explicit rereading preserves the draft.
 
 One board-changed listener invalidates hierarchy, readiness, questions and journal queries in addition to task data. Question toasts open Inbox; agent.status updates presence/status views without a toast or sound. Journals group consecutive steps by actor and day, splitting at ten minutes, and freeze the visible history while a reader is scrolled down. New-step controls reveal pending entries. The existing shared thirty-second clock handles stale status text; the table continues to use memoized rows without per-row store subscriptions.
 
@@ -101,4 +101,64 @@ The app neither bundles nor downloads the playbook. A successful plan precedes a
 
 Frames use cached unfilled rough outlines with paper title tabs. Readable link cards grow to fit content and persist their measured size through the existing geometry debounce. Sizing is disabled for overview placeholders: a camera move must never rewrite stored node geometry. Selecting an item or returning to readable zoom restores content fitting. Connection handles appear on hover, focus, selection or Connect mode.
 
-The desktop and sidecar share release version 0.2.0. NSIS remains an unsigned per-user Windows package; the sidecar is bundled beside the application. Preparing the package does not install it over an existing user's build. Hardware-dependent production performance checks remain local, separate from CI functional checks. End-to-end agent acceptance is recorded separately from successful unit/browser tests and does not follow merely from a packaged executable.
+The desktop and sidecar share the version declared in the workspace, desktop manifest and Tauri config; `scripts/check-versions.mjs` checks those values and both lockfiles. NSIS remains an unsigned per-user Windows package; the sidecar is bundled beside the application. Preparing the package does not install it over an existing user's build. Hardware-dependent production performance checks remain local, separate from CI functional checks. End-to-end agent acceptance is recorded separately from successful unit/browser tests and does not follow merely from a packaged executable.
+
+## Multiple projects and scoped connections
+
+Schema version 5 introduces `project_members`, project-scoped task idempotency, and persists `settings.current_project_id`. Migration selects the formerly newest unarchived project once, backfills historical membership, and retains legacy presence/status and canvas viewport only on that project. Subsequent selection is explicit. Member identity profiles remain shared; membership, heartbeat, status and canvas viewport are project-local. Exports include the selected project's member profiles rather than unrelated identities.
+
+A `Store` clone may carry an immutable project ID. Its shared writer/readers install that ID in a temporary connection-local context while holding the connection mutex for the entire transaction. Every borrow resets the context, including unbound management operations; no thread-local state, async ambient state or mutable global selection is used for agent scope. All scoped transactions validate that the project is still unarchived. Entity fetches validate project membership before returning or mutating records. The internal unbound explicit-key API remains compatible with historical tests, but ordinary desktop commands capture a selected, bound snapshot before scheduling blocking work. Project archive also captures an expected ID, failing if selection changed instead of archiving a similarly named project.
+
+MCP initialization captures the requested project (`JAM_BOARD_PROJECT`/`--project` or `X-Jam-Project`) and fixes both project and agent identity for the session lifetime. Absent explicit configuration, it captures the selected project once. `get_session_context` exposes this binding and the exact project's maximum activity sequence (or zero), read in the same transaction. This project-filtered bootstrap cursor is not a database-generation identifier and may be lower than a valid saved wait cursor that scanned foreign events. Generated configs contain the selected project's immutable ID. Long-polls, HTTP resources and stdio calls use that same scoped Store even if the human switches boards. Desktop activity delivery and recent MCP-call metadata are filtered to the displayed project.
+
+Archiving a project is a transaction guarded against any In progress task, including individually archived cards and racing claims. It does not rewrite child archive flags. The next unarchived project is selected, or onboarding is shown when none remain. Restore makes the exact project available and selects it without unarchiving individually archived tasks. Legacy bulk-archived tasks keep their historical flags; migration does not guess user intent.
+
+Task retries use the additive `task_idempotency(jam_id, actor_id, token)` mapping. Migration copies existing tokens unchanged; the legacy tasks column and global unique constraint remain intact but new rows leave that column null. Reads still expose the original token. Reusing the same agent/token on another project creates an independent task, while retries within one project return the original key without extra activity.
+
+## Execution authority (schema 6)
+
+Execution is deliberately separate from planning status. Additive `execution_states` rows store epic/story own state, monotonically increasing revision, human actor and time. Missing rows mean paused epics and inheriting stories, never an automatic grant. `execution_requests` are a separate typed Inbox queue, not special text in generic questions. Its pending unique index makes repeat brain requests idempotent. Project, epic and immutable scope IDs are fixed when a request is created; reads enforce the pinned Store context.
+
+Only native human commands may start/pause or resolve a request. MCP exposes state/request reads and an appointed-brain request operation, but no authorization operation. The native adapter resolves the human on its captured project Store; callers supply neither actor nor approval boolean. Approval and grant share one writer transaction. A request and the human's confirmation must match the current execution revision. Story revisions include the epic revision; epic revisions include child state revisions. Child changes invalidate a broad pending epic request; epic changes invalidate its subtree. Planning edits can continue independently.
+
+The [MCP execution matrix](mcp.md#inheritance-and-pause-matrix) is enforced by core. Epic pause clears explicitly running child grants to inherit while preserving explicit child pauses. An independently started story can subsequently run under a paused epic. Done/archive revokes persistent grants, so reopen/restore cannot reactivate old authority. Closing an inheriting story explicitly pauses it even if its epic remains running. Export/import omits grants and requests; schema migration preserves existing work without granting new work. The demo's In progress rows are explicitly seeded historical examples, not authorized claims.
+
+`require_execution` is shared by claim, task creation, transitions into In progress and active-holder changes. It also requires an active story and an open epic/story. No readiness override or role bypass is possible. Work-entry checks and pause/close updates serialize through `BEGIN IMMEDIATE`, so racing claims either precede pause or fail after it. A same-status reorder and unarchive preserving identical work are visibility operations, not new starts. Reparenting is currently absent from the task/story update API; any future move must validate the target scope before transferring active work.
+
+Pause leaves current status, assignee, review round and evidence untouched. Reports and independent review remain accepted for existing work even when a planning parent or task was archived. Rework requires a fresh claim under current permission. Individually archived tasks still count as In progress for scope/project displays and the transactional project archive guard. Existing holders and humans may release a claim to Backlog/Ready even while the task or a parent is archived; this preserves archive flags and does not create a grant or stop an operating-system process. Agents can reach Done only through independent report review. Explicit human manual Done is retained without fabricating review evidence. Bound archived projects remain unavailable until restored, so project archive first requires all active claims to be released or reported.
+
+No execution operation spawns an OS agent process. A human authorizes a story/epic scope; the brain may coordinate workers inside it according to the existing permissions. Chat requests currently flow through typed Inbox approval: accepting unauthenticated chat text as a human grant is intentionally unsupported.
+
+### Human claim recovery
+
+The native `release_task` command resolves the human identity and captures the selected project before entering core. `ReleaseClaim` contains the task key and expected `updatedAt`; comparison and release run in the same write transaction. A changed task rejects with `conflict`. The UI only exposes this for In progress work, including unassigned historical rows, and always returns to Backlog. It preserves notes, rounds, reports and archive flags. Release is board-state recovery, not an operating-system cancellation signal. MCP holder release additionally requires its captured claim generation, so a delayed return cannot clear a later same-identity claim.
+
+
+## Work context and review freshness (schema 7)
+
+Task rows persist a nonnegative claim generation. An update trigger advances it
+when status, assignee or review round actually changes; overflow aborts rather
+than reusing a validator. The public opaque value binds generation to immutable
+task identity. Scope Pause/archive and visibility alone do not rotate it. Import
+allocates new identities and does not trust exported validators. Existing live
+claims survive migration but callers must reread their current context.
+
+Covered agent task writes compare caller-captured generation, with `updatedAt`
+CAS additionally required for overwrite/status/claim decisions. Exact required
+arguments and deliberate exclusions are in the [MCP contract](mcp.md#claim-generations-and-stale-decisions-breaking-mcp-change-in-030-alpha5).
+Checks, lifecycle transition and activity append share one immediate transaction.
+The successful claim's response is assembled inside that same transaction, avoiding
+a post-commit response race with a successor claim.
+
+Review binds the immutable current report ID and task/story/epic identities and
+versions, for humans and brains alike. `reviewContextRevision` is null outside
+Review or without a current-round report. The UI retains an inspected snapshot
+rather than replacing its authority on a query refetch. Explicit rereading updates
+visible evidence; comments survive, and obsolete failed-test choices must be
+reconciled. Unsaved task edits block review until saved or discarded. A changed
+context is never automatically inserted into a rejected decision and replayed.
+
+These controls fence accepted board writes, not operating-system processes or
+repository-file writes. They do not prevent an authorized identity from deliberately
+reading new context and issuing a new permitted request. Append-only contributions
+and informational presence are outside this bounded lifecycle mechanism.

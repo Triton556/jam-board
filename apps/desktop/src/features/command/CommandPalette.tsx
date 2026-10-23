@@ -36,10 +36,6 @@ export function CommandPalette({
   const [active, setActive] = useState(0);
   const tasks = useQuery(tasksQuery);
   const epics = useQuery(epicsQuery);
-  const runtime = useQuery({
-    queryKey: ["runtime"],
-    queryFn: () => api.runtimeInfo(),
-  });
   const navigate = useNavigate();
   const client = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
@@ -122,20 +118,17 @@ export function CommandPalette({
       { id: "theme", label: "Toggle theme", run: toggleTheme },
       {
         id: "config",
-        label: "Copy MCP config (Codex)",
+        label: "Set up agent connection (MCP)…",
         run: () => {
-          if (!runtime.data) return;
-          const path = runtime.data.sidecarPath.replace(/'/g, "''");
-          const dataDir = runtime.data.dataDir.replace(/'/g, "''");
-          void navigator.clipboard
-            .writeText(
-              `[mcp_servers.jam-board]\ncommand = '${path}'\nenv = { JAM_AGENT_NAME = "Codex", JAM_BOARD_DATA_DIR = '${dataDir}' }\n`,
-            )
-            .catch((e) => useUiStore.getState().error(String(e)));
+          void navigate({ to: "/settings", search: { section: "Agents" } });
         },
       },
     ]
-      .filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))
+      .filter((item) =>
+        `${item.label}${item.id === "config" ? " config codex claude" : ""}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      )
       .map((item) => ({ ...item, group: "Actions" })),
     ...destinations
       .filter((name) => name.toLowerCase().includes(query.toLowerCase()))

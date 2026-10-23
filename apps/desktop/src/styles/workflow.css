@@ -1,0 +1,870 @@
+.workflow-guide {
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+.workflow-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.workflow-hierarchy {
+  color: var(--ink-2);
+  margin: 16px 0;
+}
+.workflow-guide ol {
+  display: grid;
+  gap: 16px;
+  padding-left: 22px;
+  margin: 0 0 8px;
+}
+.workflow-guide li {
+  padding-left: 6px;
+}
+.workflow-guide li strong,
+.workflow-guide li span {
+  display: block;
+}
+.workflow-guide li span {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.scope-hierarchy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  background: var(--paper-2);
+  border-radius: var(--r-input);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.scope-hierarchy .button {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+}
+.scope-hierarchy .hierarchy-note {
+  flex-basis: 100%;
+  margin: 0;
+}
+.planning-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+.brain-handoff {
+  width: min(680px, calc(100vw - 40px));
+}
+.brain-handoff .dialog-heading {
+  align-items: flex-start;
+  gap: 16px;
+}
+.brain-handoff textarea {
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.handoff-boundary {
+  border-left: 3px solid var(--coral);
+  background: var(--paper-2);
+  padding: 12px 16px;
+  border-radius: 0 var(--r-input) var(--r-input) 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.story-editor > .planning-tools {
+  margin-block: 16px 24px;
+}
+.project-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: min(360px, 35vw);
+  padding: 6px 10px;
+  margin-left: -10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-input);
+  color: var(--ink);
+  text-decoration: none;
+}
+.project-switcher:hover {
+  background: var(--paper-2);
+  border-color: var(--line-soft);
+}
+.project-switcher-label {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.project-switcher small {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.project-switcher-title {
+  font: 600 17px var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-switcher svg {
+  flex-shrink: 0;
+}
+.projects-page {
+  max-width: 1160px;
+  width: 100%;
+  margin-inline: auto;
+  overflow-y: auto;
+  min-height: 100vh;
+  padding: 32px;
+}
+.projects-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.projects-intro {
+  max-width: 760px;
+  line-height: 1.7;
+  margin-block: 0 24px;
+}
+.projects-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.project-card {
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+}
+.project-card h2 {
+  font: 600 26px var(--font-display);
+  margin: 20px 0 12px;
+  overflow-wrap: anywhere;
+}
+.project-card p {
+  line-height: 1.6;
+}
+.project-card .button {
+  margin-top: 12px;
+}
+.project-card-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--ink-2);
+}
+.project-card-meta code {
+  font-size: 12px;
+}
+.projects-empty {
+  grid-column: 1 / -1;
+  padding: 32px 0;
+}
+@media (width < 600px) {
+  .projects-page {
+    padding: 20px 16px;
+  }
+  .projects-navigation .button {
+    white-space: normal;
+    height: auto;
+    min-height: 40px;
+  }
+}
+
+.execution-controls {
+  padding: 15px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.execution-heading,
+.execution-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.execution-heading + p,
+.execution-actions + p {
+  margin-top: 9px;
+}
+.execution-controls p {
+  line-height: 1.6;
+}
+.execution-controls p:last-child {
+  margin-bottom: 0;
+}
+.execution-running {
+  color: var(--ink);
+  background: var(--mint);
+}
+.execution-partial {
+  font-weight: 600;
+}
+.execution-feedback {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+}
+.execution-confirmation {
+  padding: 20px 24px 24px;
+  max-width: 660px;
+}
+.execution-confirmation h3 {
+  font-size: 20px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.execution-confirmation p {
+  line-height: 1.7;
+}
+.execution-requests {
+  margin: 0 0 24px;
+}
+.execution-requests > h2 {
+  font-size: 19px;
+  margin-bottom: 10px;
+}
+.execution-request {
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: var(--paper);
+}
+.execution-scope-link {
+  margin: 12px 0 4px;
+  white-space: normal;
+  text-align: left;
+}
+.execution-request .execution-actions {
+  margin-top: 14px;
+}
+@media (max-width: 700px) {
+  .execution-confirmation,
+  .execution-request {
+    padding: 16px;
+  }
+  .execution-actions .button {
+    white-space: normal;
+  }
+}
+.task-execution-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.task-execution-notice > div {
+  flex: 1 1 250px;
+}
+.task-execution-notice p {
+  margin: 4px 0 0;
+  line-height: 1.6;
+}
+.column-policy {
+  margin: -4px 2px 10px;
+  min-height: 42px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.column-policy.over-wip {
+  color: var(--ink);
+  font-weight: 650;
+}
+.execution-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  padding: 12px 16px;
+}
+.execution-controls > .execution-heading {
+  grid-column: 1;
+  grid-row: 1;
+}
+.execution-controls > .execution-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end;
+}
+.execution-controls > p,
+.execution-help {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.execution-help summary {
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+  width: fit-content;
+}
+.execution-help p {
+  margin-bottom: 0;
+}
+/* The Story drawer stays narrow even in a wide desktop window. */
+.story-editor .execution-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+.story-editor .execution-controls > .execution-actions {
+  grid-column: 1;
+  grid-row: auto;
+  justify-content: flex-start;
+}
+.story-editor .execution-heading > .small {
+  white-space: nowrap;
+}
+@media (width < 700px) {
+  .execution-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .execution-controls > .execution-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+  }
+}
+.planning-status {
+  display: grid;
+  gap: 5px;
+}
+.planning-status-label {
+  font-size: 11px;
+}
+.epic-filter {
+  display: grid;
+  gap: 5px;
+}
+.claim-recovery {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.claim-recovery-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.claim-recovery-hint {
+  flex: 1 1 250px;
+  line-height: 1.6;
+}
+.claim-recovery p {
+  margin-block: 6px 0;
+}
+.claim-worker-status {
+  padding: 12px 16px;
+  background: var(--paper-2);
+  border-radius: 8px;
+}
+.claim-worker-status p {
+  margin-block: 6px;
+  overflow-wrap: anywhere;
+}
+.claim-worker-status .button {
+  display: flex;
+  margin-top: 8px;
+}
+.round > summary {
+  cursor: pointer;
+  font: 600 18px var(--font-display);
+  padding: 6px 0;
+}
+.round:not([open]) {
+  margin-bottom: 12px;
+}
+.round > .button-row {
+  flex-wrap: wrap;
+}
+
+/* Equal policy rows keep the first paper cards aligned across the workflow. */
+.column-empty {
+  margin: 0;
+  padding: 20px 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.quick-create > .quick-create-story {
+  display: grid;
+  gap: 6px;
+  padding-block: 8px;
+}
+.quick-create > p,
+.quick-create-story p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.quick-create-actions {
+  flex-wrap: wrap;
+}
+.card-hierarchy {
+  font: 500 11px / 1.4 var(--font-sans);
+}
+.card-story-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.epic-header-controls {
+  align-items: flex-end;
+}
+.epic-brain-control {
+  display: grid;
+  gap: 6px;
+}
+.epic-header-controls .epic-swatches {
+  padding-block: 9px;
+}
+.epic-detail-heading > .scope-hierarchy {
+  padding: 10px 14px;
+  margin-block: 12px;
+}
+
+.review-context {
+  margin-block: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--paper-2);
+}
+.review-context summary {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.review-context > details {
+  margin-block: 10px;
+}
+.review-context h4 {
+  margin-block: 14px 6px;
+}
+.review-context-changed {
+  padding: 12px;
+  border-left: 3px solid var(--coral);
+  border-radius: 0 var(--r-input) var(--r-input) 0;
+  background: var(--paper-2);
+  line-height: 1.6;
+  margin-block: 12px;
+}
+.review-captured-report {
+  margin-block: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+}
+
+/* Evidence must remain readable inside both the task drawer and review dialog. */
+.report-command {
+  display: block;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.review-captured-report .report-tests {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.review-decision-dialog {
+  width: 760px;
+}
+.report-tests td {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.readiness-dialog {
+  width: 640px;
+}
+.ready-snapshot {
+  margin: 16px 0;
+}
+.ready-snapshot summary {
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.ready-snapshot .readonly-brief {
+  margin-top: 12px;
+}
+
+/* Compare human edits without raw object dumps or a cramped four-column grid. */
+.task-conflict-dialog {
+  width: 860px;
+}
+.task-comparison {
+  display: grid;
+  gap: 18px;
+  margin-block: 18px;
+}
+.task-comparison-field {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  overflow: hidden;
+}
+.task-comparison-field > h4 {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--paper-2);
+  font-size: 13px;
+}
+.task-comparison-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.task-comparison-columns > div {
+  padding: 12px;
+  min-width: 0;
+}
+.task-comparison-columns > div + div {
+  border-left: 1px solid var(--line-soft);
+}
+.task-comparison-columns h5 {
+  color: var(--ink-2);
+  font-size: 11px;
+  margin: 0 0 10px;
+}
+.comparison-text,
+.comparison-entries dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0;
+}
+.comparison-entries {
+  padding-left: 20px;
+  margin: 0;
+}
+.comparison-entries li + li {
+  margin-top: 14px;
+}
+.comparison-entries dl {
+  margin: 0;
+}
+.comparison-entries dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-block: 8px 3px;
+}
+.task-conflict-dialog .dialog-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .task-comparison-columns {
+    grid-template-columns: 1fr;
+  }
+  .task-comparison-columns > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .task-conflict-dialog .dialog-actions .button {
+    white-space: normal;
+  }
+}
+
+/* Onboarding instructions wrap inside the paper settings card, not the viewport. */
+.connection-help {
+  flex-basis: 100%;
+  width: 100%;
+  min-width: 0;
+  line-height: 1.65;
+}
+.connection-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.connection-help ol {
+  padding-left: 22px;
+}
+.connection-help li + li {
+  margin-top: 10px;
+}
+.playbook-clone-command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--paper-2);
+}
+
+/* One vertical review scroll surface; navigation keeps long reports workable. */
+.review-reading-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 12px;
+}
+.tab-panel {
+  min-width: 0;
+  width: 100%;
+  flex-basis: 100%;
+}
+.tab-panel > label {
+  margin-bottom: 10px;
+}
+/* Draw disclosure ink in CSS rather than relying on platform emoji markers. */
+:is(
+  .workflow-guide,
+  .execution-help,
+  .connection-help,
+  .ink-disclosure,
+  .agent-plan
+) > summary {
+  list-style: none;
+}
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )
+  > summary::-webkit-details-marker {
+  display: none;
+}
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )
+  > summary::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 10px;
+  margin-bottom: 1px;
+}
+:is(
+    .workflow-guide,
+    .execution-help,
+    .connection-help,
+    .ink-disclosure,
+    .agent-plan
+  )[open]
+  > summary::before {
+  transform: rotate(45deg);
+  margin-bottom: 3px;
+}
+
+/* Feedback cannot expand the virtual table's fixed-height header. */
+.table-inline-create {
+  padding: 12px;
+  border: var(--stroke) solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--card);
+}
+.table-inline-create .inline-task-form {
+  flex-wrap: wrap;
+}
+.table-inline-create .inline-task-form input {
+  min-width: 180px;
+}
+.table-inline-create p {
+  margin: 8px 0 0;
+}
+
+.board-overflow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 26px 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.board-overflow-controls .button {
+  min-height: 30px;
+  padding: 4px 9px;
+}
+.board-scroll:focus-visible {
+  outline-offset: -3px;
+}
+
+/* A newer blur during an older project save is visibly unsaved, never queued. */
+.settings-draft-field {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.settings-row-control .settings-draft-field > input {
+  width: 100%;
+  min-width: 0;
+}
+.settings-draft-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.settings-draft-actions small {
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.settings-draft-actions .button {
+  white-space: normal;
+}
+
+/* A label names the trigger, not every button in its custom listbox. */
+.asset-kind-field {
+  display: grid;
+  gap: 6px;
+}
+
+/* Code loading has no write to cancel: the ordinary drawer can always close. */
+.drawer-load-state {
+  padding: 24px;
+  line-height: 1.6;
+}
+
+/* Human descriptions stay primary; the unchanged agent schema is an inspection layer. */
+.agent-plan {
+  margin-block: 24px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.agent-plan > summary {
+  cursor: pointer;
+  padding: 16px 18px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.agent-plan-summary {
+  display: block;
+  margin-left: 18px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.agent-plan-content {
+  padding: 4px 20px 20px;
+}
+.agent-plan-explanation {
+  margin: 0 0 20px;
+  line-height: 1.7;
+}
+.agent-plan-content .markdown-field,
+.agent-plan-content > section,
+.agent-plan-content .brief-editor > section {
+  margin-block: 22px;
+}
+.agent-plan-content .list-editor-row,
+.task-form .agent-plan-content fieldset.list-editor-row {
+  padding: 16px;
+}
+.human-plan-preview {
+  margin-block: 16px 24px;
+  padding: 16px 18px;
+  background: var(--paper-2);
+  border-radius: var(--r-input);
+}
+.human-plan-preview h3 {
+  margin-top: 0;
+}
+.task-form .field-hint {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+@media (max-width: 600px) {
+  .agent-plan-content {
+    padding-inline: 14px;
+  }
+}
+
+.agent-plan-feedback {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.agent-plan-feedback > p {
+  margin: 0;
+}
+.agent-plan-feedback > button {
+  justify-self: start;
+}
+
+.handoff-content {
+  display: grid;
+  gap: 16px;
+}
+.handoff-content > p,
+.handoff-content > div > p {
+  margin: 0;
+}
+.handoff-content .field {
+  margin: 0;
+}
+.brain-handoff textarea[aria-label="What should change?"] {
+  min-height: 88px;
+  max-height: 180px;
+  font-family: inherit;
+}
+.handoff-identity {
+  margin-top: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.handoff-identity summary {
+  cursor: pointer;
+}
+
+/* Short, scannable explanations at the point where authority is chosen. */
+.execution-help-points,
+.connection-help-points {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  line-height: 1.6;
+}
+.execution-help-points li + li,
+.connection-help-points li + li {
+  margin-top: 8px;
+}

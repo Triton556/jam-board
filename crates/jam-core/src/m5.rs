@@ -82,6 +82,8 @@ pub struct ActivityQuery {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    pub project_id: Option<String>,
+    pub project_folder: Option<String>,
     pub color_by: String,
     pub estimates_enabled: bool,
     pub wip_limit: u32,
@@ -93,6 +95,8 @@ pub struct Settings {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub project_folder: Option<String>,
+    pub expected_project_id: Option<String>,
     pub color_by: Option<String>,
     pub estimates_enabled: Option<bool>,
     pub wip_limit: Option<u32>,
@@ -251,6 +255,13 @@ impl Store {
     /// Only an existing registered local image can be added to the desktop asset scope.
     pub fn asset_preview_path(&self, id: &str) -> Result<Option<std::path::PathBuf>> {
         let location = self.read(|c| {
+            let project = c
+                .query_row("SELECT jam_id FROM assets WHERE id=?", [id], |r| {
+                    r.get::<_, String>(0)
+                })
+                .optional()?
+                .ok_or_else(|| Error::NotFound("asset".into()))?;
+            crate::projects::ensure_scope(c, &project)?;
             c.query_row("SELECT location FROM assets WHERE id=?", [id], |r| {
                 r.get::<_, String>(0)
             })
@@ -317,6 +328,7 @@ impl Store {
         }
         self.write(|c| {
             require_human(c, actor)?;
+            crate::projects::ensure_member_scope(c, &input.id)?;
             let old = member(c, &input.id)?;
             if old.kind == "agent" && input.avatar.is_some() {
                 return Err(invalid(
@@ -373,12 +385,16 @@ impl Store {
         })
     }
     pub fn get_settings(&self) -> Result<Settings> {
-        let prefix = self
-            .app_state()?
-            .jam
-            .map(|j| format!("board.{}.", j.id))
+        let project_id = self.app_state()?.jam.map(|j| j.id);
+        let prefix = project_id
+            .as_ref()
+            .map(|id| format!("board.{id}."))
             .unwrap_or_default();
         Ok(Settings {
+            project_id,
+            project_folder: self
+                .setting(&format!("{prefix}project_folder"))?
+                .filter(|v| !v.is_empty()),
             color_by: self
                 .setting(&format!("{prefix}color_by"))?
                 .unwrap_or_else(|| "epic".into()),
@@ -402,6 +418,15 @@ impl Store {
         })
     }
     pub fn set_settings(&self, input: SettingsPatch) -> Result<Settings> {
+        if let Some(folder) = &input.project_folder {
+            let active = self.active_jam()?;
+            if input.expected_project_id.as_deref() != Some(active.id.as_str()) {
+                return Err(Error::Conflict);
+            }
+            if folder.len() > 4096 || folder.chars().any(char::is_control) {
+                return Err(invalid("projectFolder", "Choose a valid project folder"));
+            }
+        }
         if input
             .theme
             .as_deref()
@@ -437,7 +462,15 @@ impl Store {
             .map(|j| format!("board.{}.", j.id))
             .unwrap_or_default();
         self.write(|c| {
-            for (key,value) in [(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
+            if input.project_folder.is_some() {
+                let current = jam(c)?;
+                if input.expected_project_id.as_deref() != Some(current.id.as_str())
+                    || prefix != format!("board.{}.", current.id)
+                {
+                    return Err(Error::Conflict);
+                }
+            }
+            for (key,value) in [(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
                 if let Some(v)=value { c.execute("INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,v])?; }
             }
             Ok(())
@@ -445,10 +478,52 @@ impl Store {
         self.get_settings()
     }
     pub fn reset_jam(&self, actor: &str, confirm_name: &str) -> Result<AppState> {
-        self.write(|c|{require_human(c,actor)?;let j=jam(c)?;if confirm_name!=j.name{return Err(invalid("confirmName","Type the exact jam name"));}
-            let changed=c.execute("UPDATE tasks SET archived_at=?,updated_at=?,updated_by=? WHERE jam_id=? AND archived_at IS NULL",params![now(),now(),actor,j.id])?;
-            c.execute("UPDATE jams SET archived=1 WHERE id=?",[&j.id])?;
-            event(c,Some(&j.id),actor,"jam.archived",None,serde_json::json!({"name":j.name,"tasks":changed}))
+        self.archive_project(actor, &self.active_jam()?.id, confirm_name)
+    }
+    pub fn archive_project(
+        &self,
+        actor: &str,
+        expected_project: &str,
+        confirm_name: &str,
+    ) -> Result<AppState> {
+        self.write(|c| {
+            require_human(c, actor)?;
+            if crate::projects::bound_project(c)?.is_some() {
+                return Err(Error::Forbidden(
+                    "Only the desktop may archive projects".into(),
+                ));
+            }
+            let j = jam(c)?;
+            if j.id != expected_project { return Err(Error::Conflict); }
+            let running:i64=c.query_row("SELECT count(*) FROM tasks WHERE jam_id=? AND status='in_progress'",[&j.id],|r|r.get(0))?;
+            if running>0 { return Err(invalid("project",&format!("{running} tasks are still In progress, including archived tasks. Pause new work, then submit their reports or restore and release them before archiving."))); }
+            if confirm_name != j.name {
+                return Err(invalid("confirmName", "Type the exact project name"));
+            }
+            // Project archival must not erase individual task archive state.
+            crate::execution::revoke_project(c,actor,&j.id)?;
+            c.execute("UPDATE jams SET archived=1 WHERE id=?", [&j.id])?;
+            event(
+                c,
+                Some(&j.id),
+                actor,
+                "jam.archived",
+                None,
+                serde_json::json!({"name":j.name}),
+            )?;
+            let next = c
+                .query_row(
+                    "SELECT id FROM jams WHERE archived=0 ORDER BY created_at DESC,id DESC LIMIT 1",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()?;
+            if let Some(next) = next {
+                crate::projects::select(c, &next, Some(actor))?;
+            } else {
+                c.execute("DELETE FROM settings WHERE key='current_project_id'", [])?;
+            }
+            Ok(())
         })?;
         self.app_state()
     }

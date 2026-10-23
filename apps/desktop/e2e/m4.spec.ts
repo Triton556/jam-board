@@ -130,7 +130,12 @@ test("dirty guard and agent conflict preserve input then take theirs", async ({
   await expect(
     page.getByRole("dialog", { name: "Review changes", exact: true }),
   ).toContainText("Agent's new title");
-  await page.getByRole("button", { name: "Take theirs", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Discard my edits and use latest",
+      exact: true,
+    })
+    .click();
   await expect(title).toHaveValue("Agent's new title");
   await expect(page.getByRole("button", { name: /^Save/ })).toBeDisabled();
 });
@@ -175,6 +180,10 @@ test("archive with an omitted reason, URL archived flag and unarchive", async ({
   await expect(page.locator('[data-task-key="JB-7"]')).toHaveClass(/archived/);
   await page.locator('[data-task-key="JB-7"]').click();
   await page.getByRole("button", { name: "Unarchive", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Unarchive task", exact: true })
+    .getByRole("button", { name: "Unarchive", exact: true })
+    .click();
   await expect(page.getByRole("textbox", { name: "Task title" })).toBeEnabled();
 });
 test("table keyboard and live events preserve row focus and scroll", async ({

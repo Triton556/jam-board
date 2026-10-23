@@ -5,6 +5,7 @@ use tauri::Manager;
 use tauri_specta::Event;
 mod canvas_commands;
 pub mod commands;
+mod execution_commands;
 mod m5_commands;
 mod skill_commands;
 mod skill_runner;
@@ -29,12 +30,14 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
             canvas_commands::reference_canvas,canvas_commands::canvas_geometry,canvas_commands::canvas_archive,canvas_commands::reference_metadata,canvas_commands::update_ref_edge,canvas_commands::clipboard_reference,canvas_commands::fetch_reference_preview,canvas_commands::clear_reference_preview,canvas_commands::canvas_viewport,canvas_commands::reference_media,
             v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
             v2_commands::get_project,v2_commands::update_project,v2_commands::list_epics,v2_commands::get_epic,v2_commands::get_story,v2_commands::create_epic,v2_commands::update_epic,v2_commands::set_epic_status,v2_commands::create_story,v2_commands::update_story,v2_commands::set_story_status,v2_commands::update_task_brief,v2_commands::check_ready,v2_commands::mark_ready,v2_commands::answer_question,v2_commands::ask_user,v2_commands::withdraw_question,v2_commands::list_questions,v2_commands::review_task,v2_commands::submit_report,v2_commands::set_brain,v2_commands::list_changes_since,v2_commands::epic_journal,v2_commands::add_reference,v2_commands::list_references,v2_commands::update_reference,v2_commands::link_reference,v2_commands::unlink_reference,v2_commands::archive_reference,v2_commands::list_ref_frames,v2_commands::create_ref_frame,v2_commands::update_ref_frame,v2_commands::archive_ref_frame,v2_commands::list_ref_edges,v2_commands::create_ref_edge,v2_commands::archive_ref_edge,v2_commands::update_ref_geometry,
+            execution_commands::get_execution,execution_commands::list_execution,execution_commands::set_execution,execution_commands::list_execution_requests,execution_commands::resolve_execution_request,
+            commands::list_projects, commands::select_project, commands::restore_project,
             commands::app_ready, commands::app_state, commands::create_jam, commands::load_demo_jam,
             commands::set_current_member, commands::add_self, commands::get_board,
             commands::list_board_tasks, commands::get_task, commands::create_task,
             commands::move_task, commands::list_members, commands::list_activity,
             commands::set_theme, commands::list_tasks, commands::update_task,
-            commands::archive_task, commands::unarchive_task, commands::add_comment,
+            commands::release_task, commands::archive_task, commands::unarchive_task, commands::add_comment,
             m5_commands::attach_file,m5_commands::pick_files,m5_commands::list_assets,m5_commands::create_asset,m5_commands::update_asset,m5_commands::link_asset,m5_commands::unlink_asset,m5_commands::asset_preview,m5_commands::create_member,m5_commands::update_member,m5_commands::get_settings,m5_commands::set_settings,m5_commands::reset_jam,m5_commands::export_jam_json,m5_commands::import_jam_json,m5_commands::pick_file,m5_commands::mcp_status,m5_commands::set_mcp_http_enabled,m5_commands::regenerate_mcp_token,m5_commands::reveal_mcp_token,m5_commands::mcp_config_snippets,commands::list_tags, commands::runtime_info $(, commands::$extra)*
         ] };
     }
@@ -155,12 +158,15 @@ pub fn run() {
                         let _ = McpCallsChanged {}.emit(&handle);
                     }
                     let feed = feed.clone();
+                    let selected_store = store.clone();
                     let result = tokio::task::spawn_blocking(move || {
                         let mut f = feed
                             .lock()
                             .map_err(|_| std::io::Error::other("feed lock poisoned"))?;
                         if f.data_changed()? {
-                            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(f.poll()?)
+                            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+                                selected_store.selected_events(f.poll()?)?,
+                            )
                         } else {
                             Ok(Vec::new())
                         }

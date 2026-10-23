@@ -33,11 +33,11 @@ vi.mock("@tanstack/react-router", async (original) => ({
   useNavigate: () => vi.fn(),
 }));
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   mockApi.calls.length = 0;
   useUiStore.setState({ toasts: [], highlights: {}, readyRequest: null });
 });
-it("Keep mine merges only edited brief fields onto the latest version", async () => {
+it("Save my edits against latest merges only edited brief fields onto the latest version", async () => {
   const base = taskValues(await mockApi.getTask("JB-2"));
   const mine = structuredClone(base),
     theirs = structuredClone(base);
@@ -95,15 +95,25 @@ it("readiness override requires a trimmed reason of ten characters", async () =>
     title: "Explore",
     status: "backlog",
   });
-  useUiStore.setState({ readyRequest: { key: task.key, status: "ready" } });
+  useUiStore.setState({
+    readyRequest: {
+      key: task.key,
+      status: "ready",
+      expectedUpdatedAt: task.updatedAt,
+    },
+  });
   wrap(<ReadinessDialog />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Move anyway…" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Mark ready anyway…" }),
+  );
   await user.type(
     screen.getByRole("textbox", { name: "Override reason" }),
     " short ",
   );
-  expect(screen.getByRole("button", { name: "Move anyway" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Mark ready anyway" }),
+  ).toBeDisabled();
   expect(validOverride("1234567890")).toBe(true);
   expect(validOverride("  123456789  ")).toBe(false);
 });

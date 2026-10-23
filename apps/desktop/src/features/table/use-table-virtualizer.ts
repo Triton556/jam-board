@@ -35,7 +35,7 @@ export function tableRange(range: Range) {
   );
 }
 export function useTableVirtualizer(
-  scroll: RefObject<HTMLDivElement | null>,
+  scroll: RefObject<HTMLElement | null>,
   count: number,
   getItemKey: (index: number) => string | number,
 ) {
@@ -52,7 +52,7 @@ export function useTableVirtualizer(
     observeElementOffset,
     scrollToFn: elementScroll,
     onChange: (
-      instance: Virtualizer<HTMLDivElement, HTMLTableRowElement>,
+      instance: Virtualizer<HTMLElement, HTMLTableRowElement>,
       sync: boolean,
     ) => {
       // Avoid repainting a different hover stripe on every wheel event. The
@@ -67,7 +67,7 @@ export function useTableVirtualizer(
     },
   };
   const [instance] = useState(
-    () => new Virtualizer<HTMLDivElement, HTMLTableRowElement>(options),
+    () => new Virtualizer<HTMLElement, HTMLTableRowElement>(options),
   );
   instance.setOptions(options);
   // Use the same mount/update lifecycle as TanStack's React adapter.

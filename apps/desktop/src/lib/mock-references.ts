@@ -7,7 +7,10 @@ import type {
   RefFrame,
 } from "../bindings";
 import type { Epic } from "./planning-api";
-import type { ReferenceInput } from "./references-api";
+import type {
+  ReferenceContentExpectation,
+  ReferenceInput,
+} from "./references-api";
 import type { Asset, Member } from "./types";
 import { JamError } from "./types";
 
@@ -69,16 +72,31 @@ export class MockReferences {
     );
     this.c.save();
   }
-  async add(input: ReferenceInput, actor = this.c.human()) {
+  async add(input: ReferenceInput, actor = this.c.human(), untitled = false) {
     await this.c.call("add_reference", input);
+    if (untitled && (input.kind !== "note" || !!input.title))
+      throw new JamError(
+        "validation",
+        "Untitled mode requires a note without a heading",
+      );
     const d = this.c.data(),
       now = new Date().toISOString();
     if (!["asset", "note", "link"].includes(input.kind))
       throw new JamError("validation", "Choose asset, link or note");
     if (input.kind === "link" && !/^https?:\/\/\S+$/.test(input.url ?? ""))
       throw new JamError("validation", "Use an HTTP or HTTPS URL");
-    if (input.kind === "note" && !input.text?.trim())
-      throw new JamError("validation", "A note needs text");
+    if (input.kind === "note" && !input.text?.trim() && !input.title?.trim())
+      throw new JamError("validation", "A note needs text or a heading");
+    if (
+      input.kind === "note" &&
+      !untitled &&
+      input.title != null &&
+      (!input.title.trim() || [...input.title].length > 140)
+    )
+      throw new JamError(
+        "validation",
+        "Choose a nonblank heading up to 140 characters",
+      );
     let assetId: string | null = null;
     if (input.kind === "asset") {
       if (!input.filePath)
@@ -126,17 +144,20 @@ export class MockReferences {
       kind: input.kind,
       assetId,
       url: input.url ?? null,
-      title:
-        input.title ??
-        (input.kind === "note"
-          ? "Note"
-          : (input.filePath?.split(/[\\/]/).pop() ?? input.url ?? "Reference")),
+      title: untitled
+        ? ""
+        : (input.title ??
+          (input.kind === "note"
+            ? "Note"
+            : (input.filePath?.split(/[\\/]/).pop() ??
+              input.url ??
+              "Reference"))),
       captionMd: [input.text, input.caption].filter(Boolean).join("\n\n"),
       tags: input.tags ?? [],
       x: input.x ?? (frame ? 24 + (index % 3) * 280 : 0),
       y: input.y ?? (frame ? 60 + Math.floor(index / 3) * 240 : 0),
-      w: 260,
-      h: 200,
+      w: input.kind === "note" ? 240 : 260,
+      h: input.kind === "note" ? 180 : 200,
       z: 0,
       frameId: frame?.id ?? null,
       linkPreview: null,
@@ -147,9 +168,28 @@ export class MockReferences {
     this.change("reference.added", item.id, actor, epic?.id);
     return clone(item);
   }
-  async update(id: string, p: ReferencePatch_Serialize) {
-    await this.c.call("update_reference", p);
+  async update(
+    id: string,
+    p: ReferencePatch_Serialize,
+    expected?: ReferenceContentExpectation,
+  ) {
+    await this.c.call("update_reference", {
+      ...p,
+      ...(expected ? { itemId: id, expected } : {}),
+    });
     const i = this.item(id);
+    if (expected && i.archivedAt)
+      throw new JamError("validation", "Archived notes cannot be edited");
+    if (
+      expected &&
+      (expected.title !== i.title || expected.caption !== i.captionMd)
+    )
+      throw new JamError(
+        "conflict",
+        "This note changed. Read the latest content before deciding what to keep.",
+      );
+    if (p.title === "" && (!expected || i.kind !== "note"))
+      throw new JamError("validation", "Title must not be empty");
     if (typeof p.title === "string") i.title = p.title;
     if (typeof p.caption === "string") i.captionMd = p.caption;
     if (Array.isArray(p.tags)) i.tags = p.tags;

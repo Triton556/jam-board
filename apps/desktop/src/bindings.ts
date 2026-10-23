@@ -47,9 +47,12 @@ export const commands = {
 	setBrain: (input: BrainInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
 	listChangesSince: (input: ChangesInput) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_changes_since", { input })),
 	epicJournal: (epicKey: string, after: number) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("epic_journal", { epicKey, after })),
-	addReference: (input: AddReference) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input })),
+	addReference: (input: AddReference, untitled: boolean | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
 	listReferences: (input: ReferenceListInput) => typedError<RefItem[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
-	updateReference: (input: ReferenceEditInput_Deserialize) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input })),
+	updateReference: (input: ReferenceEditInput_Deserialize, expected: {
+	title: string,
+	caption: string,
+} | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input, expected })),
 	linkReference: (input: ReferenceLinkInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
 	unlinkReference: (input: ReferenceLinkInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("unlink_reference", { input })),
 	archiveReference: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_reference", { id })),
@@ -61,6 +64,14 @@ export const commands = {
 	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
 	archiveRefEdge: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_edge", { id })),
 	updateRefGeometry: (input: GeometryInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
+	getExecution: (scope: ExecutionScope) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("get_execution", { scope })),
+	listExecution: () => typedError<ExecutionState[], ApiError_Serialize>(__TAURI_INVOKE("list_execution")),
+	setExecution: (input: SetExecution) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("set_execution", { input })),
+	listExecutionRequests: (status: "pending" | "approved" | "declined" | "superseded" | null) => typedError<ExecutionRequest[], ApiError_Serialize>(__TAURI_INVOKE("list_execution_requests", { status })),
+	resolveExecutionRequest: (input: ResolveExecutionRequest) => typedError<ExecutionRequest, ApiError_Serialize>(__TAURI_INVOKE("resolve_execution_request", { input })),
+	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
+	selectProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("select_project", { projectId })),
+	restoreProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("restore_project", { projectId })),
 	/**  A local first-content-frame receipt for reproducible release measurements. */
 	appReady: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("app_ready")),
 	appState: () => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("app_state")),
@@ -78,6 +89,7 @@ export const commands = {
 	setTheme: (theme: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_theme", { theme })),
 	listTasks: (input: TaskQuery) => typedError<TaskListPage, ApiError_Serialize>(__TAURI_INVOKE("list_tasks", { input })),
 	updateTask: (input: TaskEditInput_Deserialize) => typedError<TaskDetail_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_task", { input })),
+	releaseTask: (input: ReleaseClaim) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("release_task", { input })),
 	archiveTask: (key: string, reason: string | null) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("archive_task", { key, reason })),
 	unarchiveTask: (key: string) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("unarchive_task", { key })),
 	addComment: (input: CommentInput) => typedError<Comment, ApiError_Serialize>(__TAURI_INVOKE("add_comment", { input })),
@@ -175,7 +187,7 @@ export type AnswerQuestion = {
 
 export type ApiError = ApiError_Serialize | ApiError_Deserialize;
 
-export type ApiErrorCode = "not_found" | "claim_conflict" | "validation" | "archived" | "conflict" | "not_ready" | "wrong_status" | "forbidden" | "internal";
+export type ApiErrorCode = "not_found" | "claim_conflict" | "stale_claim" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
 
 export type ApiError_Deserialize = {
 	code: ApiErrorCode,
@@ -478,6 +490,58 @@ export type EpicTree_Serialize = {
 	openQuestions: Question[],
 };
 
+export type ExecutionAction = "start" | "pause";
+
+export type ExecutionDecision = "approve" | "decline";
+
+export type ExecutionEffectiveState = "running" | "paused";
+
+export type ExecutionOwnState = "inherit" | "running" | "paused";
+
+export type ExecutionRequest = {
+	id: string,
+	projectId: string,
+	scope: ExecutionScope,
+	scopeKey: string,
+	scopeTitle: string,
+	requestedBy: string,
+	reason: string,
+	status: ExecutionRequestStatus,
+	revision: string,
+	createdAt: string,
+	resolvedBy: string | null,
+	resolvedAt: string | null,
+};
+
+export type ExecutionRequestStatus = "pending" | "approved" | "declined" | "superseded";
+
+export type ExecutionScope = {
+	type: ExecutionScopeType,
+	id: string,
+};
+
+export type ExecutionScopeType = "epic" | "story";
+
+export type ExecutionSource = "scope" | "epic" | "none";
+
+export type ExecutionState = {
+	projectId: string,
+	scope: ExecutionScope,
+	scopeKey: string,
+	scopeTitle: string,
+	ownState: ExecutionOwnState,
+	effectiveState: ExecutionEffectiveState,
+	source: ExecutionSource,
+	revision: string,
+	canStart: boolean,
+	blockedReason: string | null,
+	inProgressCount: number,
+	readyCount: number,
+	runningStoryCount: number,
+	changedBy: string | null,
+	changedAt: string | null,
+};
+
 export type ExportPath = {
 	path: string,
 };
@@ -553,6 +617,8 @@ export type LinkedTask = {
 export type McpCallsChanged = Record<string, never>;
 
 export type McpStatus = {
+	projectId: string | null,
+	projectKeyPrefix: string | null,
 	httpEnabled: boolean,
 	running: boolean,
 	port: number | null,
@@ -608,6 +674,7 @@ export type MemberWithStats = {
 
 export type MoveInput = {
 	key: string,
+	expectedUpdatedAt: string,
 	status: string,
 	beforeKey: string | null,
 	afterKey: string | null,
@@ -690,6 +757,13 @@ export type ProjectEditInput = {
 	timezone: string | null,
 };
 
+export type ProjectSummary = {
+	archived: boolean,
+	selected: boolean,
+	taskCount: number,
+	inProgressCount: number,
+} & Jam;
+
 export type Question = {
 	id: string,
 	jamId: string,
@@ -733,10 +807,12 @@ export type ReadinessIssue = {
 
 export type ReadyInput = {
 	key: string,
+	expectedUpdatedAt: string,
 	overrideReason: string | null,
 };
 
 export type RecentCall = {
+	projectId?: string | null,
 	at: string,
 	error: string | null,
 	agent: string,
@@ -798,6 +874,15 @@ export type ReferenceCanvas = {
 	links: RefLink[],
 };
 
+/**
+ *  Optional human-editor compare-and-set boundary. Kept separate from the MCP
+ *  ReferenceEditInput contract so existing agent clients remain unchanged.
+ */
+export type ReferenceContentExpectation = {
+	title: string,
+	caption: string,
+};
+
 export type ReferenceEditInput = ReferenceEditInput_Serialize | ReferenceEditInput_Deserialize;
 
 export type ReferenceEditInput_Deserialize = {
@@ -833,6 +918,12 @@ export type ReferencePatch_Serialize = {
 	title?: string | null,
 };
 
+/**  Human confirmation of a captured claim; neither actor nor destination is caller-controlled. */
+export type ReleaseClaim = {
+	key: string,
+	expectedUpdatedAt: string,
+};
+
 export type Report = {
 	id: string,
 	taskId: string,
@@ -858,6 +949,12 @@ export type ResetInput = {
 	confirmName: string,
 };
 
+export type ResolveExecutionRequest = {
+	id: string,
+	decision: ExecutionDecision,
+	expectedRevision: string,
+};
+
 export type Review = {
 	id: string,
 	taskId: string,
@@ -871,6 +968,8 @@ export type Review = {
 
 export type ReviewTask = {
 	key: string,
+	expectedReportId: string,
+	expectedReviewContextRevision: string,
 	verdict: string,
 	commentsMd: string,
 	failedTests: string[] | null,
@@ -886,7 +985,15 @@ export type Scope = {
 	id: string,
 };
 
+export type SetExecution = {
+	scope: ExecutionScope,
+	action: ExecutionAction,
+	expectedRevision: string,
+};
+
 export type Settings = {
+	projectId: string | null,
+	projectFolder: string | null,
 	colorBy: string,
 	estimatesEnabled: boolean,
 	wipLimit: number,
@@ -897,6 +1004,8 @@ export type Settings = {
 };
 
 export type SettingsPatch = {
+	projectFolder: string | null,
+	expectedProjectId: string | null,
 	colorBy: string | null,
 	estimatesEnabled: boolean | null,
 	wipLimit: number | null,
@@ -907,17 +1016,15 @@ export type SettingsPatch = {
 };
 
 export type SkillCheck = {
-	version: string | null,
-	python: string | null,
-	pythonVersion: string | null,
+	version: string,
+	destination: string | null,
+	status: string,
 	errors: string[],
 };
 
 export type SkillInput = {
-	playbook: string,
 	target: string,
 	client: string,
-	profile: string,
 };
 
 export type SkillOutput = {
@@ -985,6 +1092,7 @@ export type StoryTree = {
 
 export type SubmitReport = {
 	key: string,
+	expectedClaimGeneration: string,
 	summaryMd: string,
 	changedFiles: string[],
 	tests: ReportTest[],
@@ -1016,6 +1124,8 @@ export type TaskDetail_Deserialize = {
 	activity: ActivityEvent_Deserialize[],
 	history: ActivityEvent_Deserialize[],
 	brief: TaskBrief,
+	/**  Binds the current report to the task, story and epic versions reviewed. */
+	reviewContextRevision?: string | null,
 	ancestorQuestions?: Question[],
 	story: Story,
 	epic: Epic,
@@ -1030,6 +1140,8 @@ export type TaskDetail_Serialize = {
 	activity: ActivityEvent_Serialize[],
 	history: ActivityEvent_Serialize[],
 	brief: TaskBrief,
+	/**  Binds the current report to the task, story and epic versions reviewed. */
+	reviewContextRevision: string | null,
 	ancestorQuestions: Question[],
 	story: Story,
 	epic: Epic,
@@ -1134,6 +1246,8 @@ export type TaskSummary = {
 	changesRequested?: boolean,
 	needsInfo?: boolean,
 	reviewRound?: number,
+	/**  Opaque, task-bound lifecycle validator. Read again after a successful mutation. */
+	claimGeneration?: string,
 };
 
 /* Tauri Specta runtime */

@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Real native window and stdio MCP fixture, not an AI worker session.
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';

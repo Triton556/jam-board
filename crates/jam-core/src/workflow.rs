@@ -115,9 +115,20 @@ pub(crate) fn transition(
             ));
         }
     }
+    if target == "in_progress" && t.status != "in_progress" {
+        crate::execution::require_execution(c, &t.story_id)?;
+    }
     let mut overridden = false;
     if target == "done" {
-        require_privileged(c, actor, &e)?;
+        // Agent completion must pass the independent current-round report review.
+        // Checking only the current holder is insufficient: releasing a claim or
+        // assigning it away must not turn an author's own report into approvable work.
+        if member(c, actor)?.kind != "human" {
+            return Err(Error::Forbidden(
+                "Agents must use review_task with an independent current-round report to mark work Done; an agent cannot approve its own work".into(),
+            ));
+        }
+        // Humans retain explicit manual completion, without fabricating a review.
     }
     if target == "ready" && target != t.status {
         let r = readiness(c, &t.key)?;
@@ -165,10 +176,13 @@ pub(crate) fn scope(c: &Connection, s: &Scope) -> Result<(Scope, Option<String>,
             (s.audit.id, s.audit.jam_id, Some(s.epic_id), None)
         }
         "task" => {
-            let t = task(c, &s.id).or_else(|_| {
-                let key: String =
-                    c.query_row("SELECT key FROM tasks WHERE id=?", [&s.id], |r| r.get(0))?;
-                task(c, &key)
+            let t = task(c, &s.id).or_else(|error| match error {
+                Error::NotFound(_) => {
+                    let key: String =
+                        c.query_row("SELECT key FROM tasks WHERE id=?", [&s.id], |r| r.get(0))?;
+                    task(c, &key)
+                }
+                other => Err(other),
             })?;
             if t.archived_at.is_some() {
                 return Err(Error::Archived(t.key));
@@ -193,17 +207,25 @@ impl Store {
     pub fn check_ready(&self, key: &str) -> Result<Readiness> {
         self.read(|c| readiness(c, key))
     }
-    pub fn mark_ready(&self, actor: &str, key: &str, reason: Option<&str>) -> Result<TaskSummary> {
-        self.move_task_with_override(actor, key, "ready", None, None, reason)
+    pub fn mark_ready(
+        &self,
+        actor: &str,
+        key: &str,
+        reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
+    ) -> Result<TaskSummary> {
+        self.move_task_with_override(actor, key, "ready", None, None, reason, context)
     }
     pub fn update_task_brief(
         &self,
         actor: &str,
         key: &str,
         input: BriefPatch,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskDetail> {
         self.write(|c| {
             let t = crate::service::editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &t, context)?;
             let patch = serde_json::to_value(input)?;
             let mut merged = serde_json::to_value(brief(c, key)?)?;
             for (k, v) in patch.as_object().unwrap() {
@@ -225,7 +247,7 @@ impl Store {
     }
     pub fn submit_report(&self, actor: &str, input: SubmitReport) -> Result<Report> {
         self.write(|c|{
-        let t=crate::service::editable(c,&input.key,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
+        let t=task(c,&input.key)?;crate::context::check_claim(&t,&input.expected_claim_generation)?;member(c,actor)?;if t.assignee_id.as_deref()!=Some(actor){return Err(Error::Forbidden("Only the assignee may submit a report".into()));}
         if t.status!="in_progress"{return Err(Error::WrongStatus(format!("Expected in_progress, current status is {}",t.status)));}
         crate::m5::validate_name("summaryMd",&input.summary_md,20000)?;let mut names=std::collections::BTreeSet::new();for test in &input.tests{if test.name.trim().is_empty()||!names.insert(&test.name)||!["PASS","FAIL","NOT_RUN"].contains(&test.result.as_str()){return Err(invalid("tests","Each test needs a unique name and PASS, FAIL or NOT_RUN result"));}}
         let duplicate:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM reports WHERE task_id=? AND round=?)",params![t.id,t.review_round],|r|r.get(0))?;
@@ -236,11 +258,12 @@ impl Store {
     }
     pub fn review_task(&self, actor: &str, input: ReviewTask) -> Result<Review> {
         self.write(|c|{
-        let t=crate::service::editable(c,&input.key,actor)?;let e=task_epic(c,&t)?;require_privileged(c,actor,&e)?;
+        let t=task(c,&input.key)?;let e=task_epic(c,&t)?;require_privileged(c,actor,&e)?;
         if t.assignee_id.as_deref()==Some(actor){return Err(Error::Forbidden("A worker can never review its own task".into()));}
         let reports:Vec<Report>=records(c,"reports","task_id=? AND round=?",&[&t.id,&t.review_round])?;let report=reports.first().ok_or_else(||invalid("report",&format!("No report for round {}",t.review_round)))?;
         if report.author_id==actor{return Err(Error::Forbidden("A worker can never review its own report".into()));}
         if t.status!="review"{return Err(Error::WrongStatus(format!("Expected review, current status is {}",t.status)));}
+        if report.id != input.expected_report_id || crate::context::review_revision(c,&t)?.as_deref() != Some(input.expected_review_context_revision.as_str()) { return Err(Error::Conflict); }
         if !["accept","changes_requested"].contains(&input.verdict.as_str()){return Err(invalid("verdict","Choose accept or changes_requested"));}
         let failed=input.failed_tests.unwrap_or_default();for name in &failed{if !report.tests.iter().any(|t|t.name==*name){return Err(invalid("failedTests",&format!("Unknown report test {name}")));}}
         let review=Review{id:id(),task_id:t.id.clone(),round:t.review_round,reviewer_id:actor.into(),verdict:input.verdict.clone(),comments_md:input.comments_md,failed_tests:failed.clone(),created_at:now()};insert(c,"reviews",&review)?;
@@ -397,6 +420,6 @@ if input.answer_index.is_none()&&text.is_none(){return Err(invalid("answer","Cho
         if text.chars().count() > 120 {
             return Err(invalid("text", "Use at most 120 characters"));
         }
-        self.write(|c|{member(c,actor)?;let resolved=target.as_ref().map(|s|scope(c,s)).transpose()?;let normalized=resolved.as_ref().map(|(s,_,_)|serde_json::to_string(s)).transpose()?;let stamp=now();c.execute("UPDATE members SET status_text=?,status_scope_json=?,status_at=?,last_seen_at=? WHERE id=?",params![text,normalized,stamp,stamp,actor])?;v2_event(c,actor,resolved.as_ref().and_then(|x|x.1.as_deref()),"agent.status",resolved.as_ref().and_then(|x|x.2.as_deref()),json!({"text":text}))?;member(c,actor)})
+        self.write(|c|{member(c,actor)?;let resolved=target.as_ref().map(|s|scope(c,s)).transpose()?;let normalized=resolved.as_ref().map(|(s,_,_)|serde_json::to_string(s)).transpose()?;let stamp=now();let project=crate::service::jam(c)?.id;crate::projects::join_member(c,&project,actor)?;c.execute("UPDATE project_members SET status_text=?,status_scope_json=?,status_at=?,last_seen_at=? WHERE jam_id=? AND member_id=?",params![text,normalized,stamp,stamp,project,actor])?;v2_event(c,actor,resolved.as_ref().and_then(|x|x.1.as_deref()),"agent.status",resolved.as_ref().and_then(|x|x.2.as_deref()),json!({"text":text}))?;member(c,actor)})
     }
 }

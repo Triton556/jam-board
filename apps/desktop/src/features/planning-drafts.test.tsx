@@ -19,10 +19,11 @@ import { StoryDrawer } from "./plan/StoryDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useBlocker: () => ({}),
 }));
 beforeEach(async () => {
   vi.restoreAllMocks();
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 function deferred() {
   let resolve!: () => void;
@@ -101,9 +102,12 @@ it("a deferred Markdown save preserves newer typing, which can then be saved", a
   );
   await act(() => h.remote("A legitimate remote refresh"));
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Edit Goal" })).toHaveTextContent(
-      "A legitimate remote refresh",
-    ),
+    expect(
+      screen
+        .getByRole("button", { name: "Edit Goal" })
+        .closest(".markdown-field")
+        ?.querySelector(".markdown-field-view"),
+    ).toHaveTextContent("A legitimate remote refresh"),
   );
 });
 
@@ -173,9 +177,12 @@ it("Markdown errors preserve newer typing; Escape cancels only the open edit and
   fireEvent.keyDown(screen.getByRole("textbox", { name: "Goal" }), {
     key: "Escape",
   });
-  expect(screen.getByRole("button", { name: "Edit Goal" })).toHaveTextContent(
-    "Failed save",
-  );
+  expect(
+    screen
+      .getByRole("button", { name: "Edit Goal" })
+      .closest(".markdown-field")
+      ?.querySelector(".markdown-field-view"),
+  ).toHaveTextContent("Failed save");
   await user.click(screen.getByRole("button", { name: "Edit Goal" }));
   fireEvent.blur(screen.getByRole("textbox", { name: "Goal" }));
   await waitFor(() => expect(h.persisted()).toBe("Failed save"));
@@ -210,6 +217,7 @@ it.each(["acceptance", "outcomeMd"] as const)(
     const otherBefore = (await mockApi.getStory("JB-S2")).story;
     const { switchTo } = storyView();
     const user = userEvent.setup();
+    await userEvent.click(await screen.findByText("Agent plan"));
     await screen.findByRole("textbox", { name: "Criterion 1" });
     const submit = async (value: string) => {
       if (field === "acceptance") {
@@ -220,14 +228,19 @@ it.each(["acceptance", "outcomeMd"] as const)(
           screen.getByRole("button", { name: "Save acceptance" }),
         );
       } else {
-        await user.click(screen.getByRole("button", { name: "Edit Outcome" }));
-        fireEvent.change(screen.getByRole("textbox", { name: "Outcome" }), {
+        await user.click(
+          screen.getByRole("button", { name: "Edit Description" }),
+        );
+        fireEvent.change(screen.getByRole("textbox", { name: "Description" }), {
           target: { value },
         });
-        fireEvent.keyDown(screen.getByRole("textbox", { name: "Outcome" }), {
-          key: "s",
-          ctrlKey: true,
-        });
+        fireEvent.keyDown(
+          screen.getByRole("textbox", { name: "Description" }),
+          {
+            key: "s",
+            ctrlKey: true,
+          },
+        );
       }
     };
     await submit("First save for Story 1");
@@ -263,7 +276,10 @@ it.each(["acceptance", "outcomeMd"] as const)(
             screen.getByRole("textbox", { name: "Criterion 1" }),
           ).toHaveValue("Second save for Story 1")
         : expect(
-            screen.getByRole("button", { name: "Edit Outcome" }),
+            screen
+              .getByRole("button", { name: "Edit Description" })
+              .closest(".markdown-field")
+              ?.querySelector(".markdown-field-view"),
           ).toHaveTextContent("Second save for Story 1"),
     );
   },
@@ -271,17 +287,18 @@ it.each(["acceptance", "outcomeMd"] as const)(
 it("saving Outcome and background refresh preserve unsaved acceptance and newer intent", async () => {
   const { client } = storyView(),
     user = userEvent.setup();
+  await userEvent.click(await screen.findByText("Agent plan"));
   const field = await screen.findByRole("textbox", {
     name: "Criterion 1",
   });
   fireEvent.change(field, {
     target: { value: "New user criterion that is not saved yet" },
   });
-  await user.click(screen.getByRole("button", { name: "Edit Outcome" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Outcome" }), {
+  await user.click(screen.getByRole("button", { name: "Edit Description" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Description" }), {
     target: { value: "An unrelated saved outcome for the same story" },
   });
-  fireEvent.blur(screen.getByRole("textbox", { name: "Outcome" }));
+  fireEvent.blur(screen.getByRole("textbox", { name: "Description" }));
   await waitFor(async () =>
     expect((await mockApi.getStory("JB-S1")).story.outcomeMd).toBe(
       "An unrelated saved outcome for the same story",
@@ -315,6 +332,7 @@ it("saving Outcome and background refresh preserve unsaved acceptance and newer 
 });
 it("clean acceptance follows remote data, validates saves and retains dirty values on Story switch", async () => {
   const { client, switchTo, view } = storyView();
+  await userEvent.click(await screen.findByText("Agent plan"));
   await screen.findByRole("textbox", { name: "Criterion 1" });
   const current = (await mockApi.getStory("JB-S1")).story;
   await act(async () => {
@@ -374,12 +392,16 @@ it("an acceptance save error retains the draft for correction and retry", async 
   });
   storyView();
   const user = userEvent.setup();
+  await userEvent.click(await screen.findByText("Agent plan"));
   const field = await screen.findByRole("textbox", {
     name: "Criterion 1",
   });
   fireEvent.change(field, { target: { value: "Criteria to retry" } });
   await user.click(screen.getByRole("button", { name: "Save acceptance" }));
-  expect(await screen.findByText("Acceptance save rejected")).toBeVisible();
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Acceptance save rejected",
+  );
+  expect(screen.getByRole("alert")).toBeVisible();
   expect(field).toHaveValue("Criteria to retry");
   fireEvent.change(field, { target: { value: "Corrected retry" } });
   await user.click(screen.getByRole("button", { name: "Save acceptance" }));

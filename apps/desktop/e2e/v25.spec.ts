@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openAgentPlan } from "./assertions";
 
 test("Plan journal includes a labeled project interview before epic creation", async ({
   page,
@@ -11,6 +12,7 @@ test("Plan journal includes a labeled project interview before epic creation", a
       yourName: "Operator",
       timezone: "UTC",
       template: "gamedev",
+      theme: null,
       startsAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + 172800000).toISOString(),
     });
@@ -21,6 +23,8 @@ test("Plan journal includes a labeled project interview before epic creation", a
       question: {
         scope: { type: "project", id: state.jam.id },
         title: "Which sketch comes first?",
+        bodyMd: null,
+        roundLabel: null,
         options: [{ label: "Snowball", description: "A small rolling toy" }],
         recommendedIndex: 0,
         allowFreeText: true,
@@ -28,7 +32,11 @@ test("Plan journal includes a labeled project interview before epic creation", a
     });
     const question = (await window.__jamMock.listQuestions())[0];
     if (!question) throw new Error("Missing interview");
-    await window.__jamMock.answerQuestion({ id: question.id, answerIndex: 0 });
+    await window.__jamMock.answerQuestion({
+      id: question.id,
+      answerIndex: 0,
+      answerText: null,
+    });
     const epic = await window.__jamMock.createEpic({
       title: "The confirmed sketch",
     });
@@ -144,6 +152,7 @@ test("planning and Inbox polish preserve shared controls and readable placement"
     /\d+ of \d+ criteria mandatory/,
   );
   await page.goto("/board?task=JB-2");
+  await openAgentPlan(page);
   const required = page.getByRole("textbox", {
     name: "Change 1 required",
     exact: true,
@@ -166,7 +175,7 @@ test("planning and Inbox polish preserve shared controls and readable placement"
   expect(Math.abs(positions.left - positions.right)).toBeLessThanOrEqual(12);
 });
 
-test("canvas links fit content, frames are rough, handles stay quiet until needed", async ({
+test("canvas links fit content, frames have one rounded boundary, handles stay quiet until needed", async ({
   page,
 }) => {
   await page.goto("/");
@@ -220,12 +229,15 @@ test("canvas links fit content, frames are rough, handles stay quiet until neede
     "font-size",
     "16px",
   );
-  expect(
-    await frame
-      .locator(".reference-frame-outline path")
-      .first()
-      .getAttribute("d"),
-  ).toContain("C");
+  const boundary = frame.locator(".reference-frame-outline rect");
+  await expect(boundary).toHaveCount(1);
+  await expect(boundary).toBeVisible();
+  await expect(boundary).toHaveAttribute("rx", "12");
+  await expect(boundary).toHaveAttribute("vector-effect", "non-scaling-stroke");
+  await expect(frame.locator(".reference-frame-outline")).toHaveCSS(
+    "pointer-events",
+    "none",
+  );
   await page.mouse.move(80, 70);
   await expect(card.locator(".react-flow__handle").first()).toHaveCSS(
     "opacity",

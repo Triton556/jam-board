@@ -1,9 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import {
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,15 +20,17 @@ import {
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Switch } from "../../components/ui/m5";
 import { NewTaskButton } from "../../components/ui/NewTaskButton";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { agentWorking, useWorkingClock } from "../../lib/agent-working";
 import { api } from "../../lib/api";
 import { avatarInitials } from "../../lib/avatar-initials";
 import { epicsQuery, storiesQuery } from "../../lib/planning-queries";
 import { membersQuery, useBoardSettings } from "../../lib/queries";
-import type { Member, TaskSummary } from "../../lib/types";
+import type { Member, Status, TaskSummary } from "../../lib/types";
 import { labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
-import { StoryPicker } from "../plan/PlanningControls";
+import { useExplicitRead } from "../../lib/use-explicit-read";
+import { InlineTaskCreate } from "./InlineTaskCreate";
 import type { TableSearch } from "./search";
 import { nextSort, tableQuery } from "./search";
 import { TableRow } from "./TableRow";
@@ -40,9 +44,6 @@ const rowAt = (target: EventTarget) =>
   target instanceof Element
     ? target.closest<HTMLElement>("[data-task-key]")?.dataset.taskKey
     : undefined;
-const focusNewInput = (node: HTMLInputElement | null) => {
-  node?.focus();
-};
 
 const columns = [
   ["key", "Key"],
@@ -70,24 +71,28 @@ export function TaskTable({
   const { settings } = useBoardSettings();
   const epics = useQuery(epicsQuery),
     stories = useQuery(storiesQuery);
-  const [newStory, setNewStory] = useState(() => {
-    try {
-      return localStorage.getItem("jam.lastStory") ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const validStory = !!stories.data?.some((s) => s.key === newStory);
   const estimatesEnabled = settings?.estimatesEnabled ?? false;
   const query = tableQuery(search);
   if (!estimatesEnabled && query.sort?.field === "estimate")
     query.sort = undefined;
-  const client = useQueryClient();
   const [creating, setCreating] = useState(false),
-    [newTitle, setNewTitle] = useState(""),
-    [newStatus, setNewStatus] = useState("backlog"),
-    [newPriority, setNewPriority] = useState("medium");
+    [creationBusy, setCreationBusy] = useState(false);
+  const [receipt, setReceipt] = useState("");
+  const receiptRef = useRef<HTMLParagraphElement>(null),
+    root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (receipt) receiptRef.current?.focus();
+  }, [receipt]);
+  const beginCreate = useCallback(() => {
+    if (!creating) setReceipt("");
+    setCreating(true);
+    root.current
+      ?.querySelector<HTMLInputElement>('input[aria-label="New task title"]')
+      ?.focus();
+  }, [creating]);
   const [pinned, setPinned] = useState<TaskSummary[]>([]);
+  const [focusedTask, setFocusedTask] = useState<string | null>(null);
+  const rowFocusOwner = useRef<HTMLElement | null>(null);
   const filterKey = JSON.stringify([
     search.q,
     search.status,
@@ -106,42 +111,15 @@ export function TaskTable({
     setPinned([]);
   }, [filterKey]);
   useEffect(() => {
-    const handler = () => setCreating(true);
+    const handler = () => beginCreate();
     window.addEventListener("table-new-task", handler);
     return () => window.removeEventListener("table-new-task", handler);
-  }, []);
-  const create = useMutation({
-    mutationFn: () =>
-      api.createTask({
-        title: newTitle.trim(),
-        storyKey: newStory,
-        status: newStatus as "backlog",
-        priority: newPriority,
-      }),
-    onSuccess: (task) => {
-      setPinned((p) => [task, ...p]);
-      setNewTitle("");
-      setCreating(false);
-      useUiStore.setState((s) => ({
-        highlights: {
-          ...s.highlights,
-          [task.key]: {
-            color: "var(--coral)",
-            until: Date.now() + 2000,
-            action: "task.created",
-          },
-        },
-      }));
-      void client.invalidateQueries({ queryKey: ["tableTasks"] });
-      void client.invalidateQueries({ queryKey: ["boardTasks"] });
-      document.querySelector(".table-scroll")?.scrollTo({ top: 0 });
-    },
-    onError: (e) => useUiStore.getState().error(e.message),
-  });
+  }, [beginCreate]);
   const tasks = useQuery({
     queryKey: ["tableTasks", query],
     queryFn: () => api.listTasks(query),
   });
+  const read = useExplicitRead(JSON.stringify(["tableTasks", query]));
   const members = useQuery(membersQuery);
   const tags = useQuery({ queryKey: ["tags"], queryFn: () => api.listTags() });
   const [text, setText] = useState(search.q ?? "");
@@ -198,6 +176,7 @@ export function TaskTable({
     return () => window.removeEventListener("keydown", key);
   }, []);
   const matches = tasks.data?.tasks ?? [];
+  const total = tasks.data?.total ?? 0;
   const hiddenKeys = new Set(
     pinned
       .filter((t) => !matches.some((m) => m.key === t.key))
@@ -221,17 +200,21 @@ export function TaskTable({
   );
   const clear = () => change({ sort: search.sort, task: search.task });
   return (
-    <main className="table-page">
+    <main className="table-page" ref={root}>
       <div className="page-title">
         <div>
           <span className="eyebrow">A LITTLE ORDER FOR BIG IDEAS</span>
           <h1>Task table</h1>
         </div>
         <div className="button-row">
-          <span className="muted task-count">
-            {tasks.data?.total ?? 0} tasks
+          <span className="muted task-count" aria-live="polite">
+            {tasks.isPending
+              ? "Reading tasks…"
+              : tasks.error
+                ? "Count unavailable"
+                : `${total} ${total === 1 ? "task" : "tasks"}`}
           </span>
-          <NewTaskButton onClick={() => setCreating(true)} />
+          <NewTaskButton onClick={beginCreate} disabled={creationBusy} />
         </div>
       </div>
       <div className="table-filters">
@@ -368,160 +351,145 @@ export function TaskTable({
           Clear filters
         </Button>
       </div>
-      {tasks.error ? (
-        <p role="alert">{tasks.error.message}</p>
-      ) : tasks.isPending ? (
-        <p className="loading">Opening the task list…</p>
-      ) : (
-        <VirtualTaskTable
-          rows={rows}
-          estimatesEnabled={estimatesEnabled}
-          hiddenKeys={hiddenKeys}
-          members={members.data ?? []}
-          highlights={highlights}
-          open={open}
-          header={
-            <thead>
-              <tr>
-                {columns
-                  .filter(([field]) => field !== "estimate" || estimatesEnabled)
-                  .map(([field, label]) => {
-                    const [sorted, dir] = (
-                      search.sort ?? "updatedAt:desc"
-                    ).split(":");
-                    return (
-                      <th
-                        key={field}
-                        scope="col"
-                        aria-sort={
-                          sorted === field
-                            ? dir === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none"
-                        }
-                      >
-                        {["tags", "epic", "story", "ready", "flags"].includes(
-                          field,
-                        ) ? (
-                          label
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              change({
-                                ...search,
-                                sort: nextSort(
-                                  search.sort ?? "updatedAt:desc",
-                                  field,
-                                ),
-                              })
-                            }
-                          >
-                            {label}
-                            {sorted === field &&
-                              (dir === "asc" ? (
-                                <ArrowUp size={12} />
-                              ) : (
-                                <ArrowDown size={12} />
-                              ))}
-                          </button>
-                        )}
-                      </th>
-                    );
-                  })}
-              </tr>
-              <tr className="inline-create">
-                <td>
-                  {creating ? (
-                    // biome-ignore lint/a11y/noStaticElementInteractions: Enter/Escape are delegated from the inline creation controls.
-                    <div
-                      className="inline-task-form"
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          setCreating(false);
-                          setNewTitle("");
-                        }
-                        if (
-                          e.key === "Enter" &&
-                          !(e.target as HTMLElement).closest(
-                            '[role="combobox"],.custom-select',
-                          )
-                        ) {
-                          e.preventDefault();
-                          if (
-                            newTitle.trim() &&
-                            validStory &&
-                            !create.isPending
-                          )
-                            create.mutate();
-                        }
-                      }}
-                    >
-                      <input
-                        ref={focusNewInput}
-                        aria-label="New task title"
-                        placeholder="What needs making?"
-                        maxLength={140}
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                      />
-                      <StoryPicker
-                        label="New task story"
-                        value={newStory}
-                        onChange={setNewStory}
-                        remember
-                      />
-                      <Select
-                        aria-label="New task status"
-                        value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
-                      >
-                        {statuses.map((s) => (
-                          <option key={s} value={s}>
-                            {labels[s]}
-                          </option>
-                        ))}
-                      </Select>
-                      <Select
-                        aria-label="New task priority"
-                        value={newPriority}
-                        onChange={(e) => setNewPriority(e.target.value)}
-                      >
-                        {["low", "medium", "high", "critical"].map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </Select>
-                      <Button
-                        disabled={
-                          !newTitle.trim() || !validStory || create.isPending
-                        }
-                        onClick={() => create.mutate()}
-                      >
-                        Create
-                      </Button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="inline-create-trigger"
-                      onClick={() => setCreating(true)}
-                    >
-                      + New task
-                    </button>
-                  )}
-                </td>
-              </tr>
-            </thead>
-          }
+      {receipt && (
+        <p ref={receiptRef} role="status" tabIndex={-1}>
+          {receipt}
+        </p>
+      )}
+      {creating && (
+        <InlineTaskCreate
+          busy={setCreationBusy}
+          close={() => {
+            setCreating(false);
+            root.current
+              ?.querySelector<HTMLButtonElement>(".inline-create-trigger")
+              ?.focus();
+          }}
+          created={(task) => {
+            setPinned((previous) => [task, ...previous]);
+            setCreating(false);
+            setReceipt(
+              `Created ${task.key} in ${labels[task.status as Status]}.`,
+            );
+            useUiStore.setState((state) => ({
+              highlights: {
+                ...state.highlights,
+                [task.key]: {
+                  color: "var(--coral)",
+                  until: Date.now() + 2000,
+                  action: "task.created",
+                },
+              },
+            }));
+            root.current?.querySelector(".table-scroll")?.scrollTo({ top: 0 });
+          }}
         />
       )}
+      {tasks.error && (
+        <div className="table-read-error">
+          <p role="alert">
+            {tasks.error.message}{" "}
+            {tasks.data ? "Showing the last loaded task list." : ""}
+          </p>
+          <Button
+            onClick={() =>
+              void read.run(() => tasks.refetch({ cancelRefetch: false }))
+            }
+            disabled={read.pending || tasks.isFetching}
+            aria-busy={read.pending || tasks.isFetching}
+          >
+            {tasks.isFetching ? "Retrying…" : "Retry task list"}
+          </Button>
+        </div>
+      )}
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="task list"
+      />
+      {tasks.isPending && <p className="loading">Opening the task list…</p>}
+      <VirtualTaskTable
+        rows={tasks.isPending ? [] : rows}
+        loading={tasks.isPending}
+        focused={focusedTask}
+        setFocused={setFocusedTask}
+        focusOwner={rowFocusOwner}
+        estimatesEnabled={estimatesEnabled}
+        hiddenKeys={hiddenKeys}
+        members={members.data ?? []}
+        highlights={highlights}
+        open={open}
+        header={
+          <thead>
+            <tr>
+              {columns
+                .filter(([field]) => field !== "estimate" || estimatesEnabled)
+                .map(([field, label]) => {
+                  const [sorted, dir] = (search.sort ?? "updatedAt:desc").split(
+                    ":",
+                  );
+                  return (
+                    <th
+                      key={field}
+                      scope="col"
+                      aria-sort={
+                        sorted === field
+                          ? dir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      {["tags", "epic", "story", "ready", "flags"].includes(
+                        field,
+                      ) ? (
+                        label
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            change({
+                              ...search,
+                              sort: nextSort(
+                                search.sort ?? "updatedAt:desc",
+                                field,
+                              ),
+                            })
+                          }
+                        >
+                          {label}
+                          {sorted === field &&
+                            (dir === "asc" ? (
+                              <ArrowUp size={12} />
+                            ) : (
+                              <ArrowDown size={12} />
+                            ))}
+                        </button>
+                      )}
+                    </th>
+                  );
+                })}
+            </tr>
+            <tr className="inline-create">
+              <td>
+                <button
+                  type="button"
+                  className="inline-create-trigger"
+                  disabled={creationBusy}
+                  onClick={beginCreate}
+                >
+                  + New task
+                </button>
+              </td>
+            </tr>
+          </thead>
+        }
+      />
       {!tasks.isPending && !tasks.error && !rows.length && (
-        <EmptyState text="No tasks match these filters">
-          <Button onClick={clear}>Clear filters</Button>
+        <EmptyState
+          text={filtered ? "No tasks match these filters" : "No tasks to show"}
+        >
+          {filtered && <Button onClick={clear}>Clear filters</Button>}
         </EmptyState>
       )}
     </main>
@@ -530,6 +498,10 @@ export function TaskTable({
 
 function VirtualTaskTable({
   rows,
+  loading,
+  focused,
+  setFocused,
+  focusOwner,
   members,
   highlights,
   open,
@@ -538,6 +510,10 @@ function VirtualTaskTable({
   hiddenKeys,
 }: {
   rows: TaskSummary[];
+  loading: boolean;
+  focused: string | null;
+  setFocused(key: string): void;
+  focusOwner: RefObject<HTMLElement | null>;
   members: Member[];
   highlights: Record<string, Highlight>;
   open(key: string): void;
@@ -545,8 +521,7 @@ function VirtualTaskTable({
   estimatesEnabled: boolean;
   hiddenKeys: Set<string>;
 }) {
-  const scroll = useRef<HTMLDivElement>(null);
-  const [focused, setFocused] = useState<string | null>(null);
+  const scroll = useRef<HTMLElement>(null);
   const itemKey = useCallback(
     (index: number) => rows[index]?.key ?? index,
     [rows],
@@ -570,20 +545,120 @@ function VirtualTaskTable({
     [members],
   );
   const virtualItems = virtual.getVirtualItems();
+  const remembered = useRef(focused);
+  remembered.current = focused;
+  const indexes = useMemo(
+    () => new Map(rows.map((task, index) => [task.key, index])),
+    [rows],
+  );
+  const visibleEntry = (offset: number, height: number) => {
+    if (!rows.length) return undefined;
+    // An intersecting sliver is not a readable entry: prefer complete rows below
+    // the sticky 84px header. Overscan presence alone says nothing about visibility.
+    const top = Math.max(0, offset);
+    const usableHeight = Math.max(0, height - 84);
+    let first = Math.ceil(top / 44);
+    let last = Math.min(
+      rows.length - 1,
+      Math.floor((top + usableHeight) / 44) - 1,
+    );
+    if (first > last) {
+      // A very short viewport can fit no full row. Choose the row at its centre
+      // (the greatest available overlap), bounded during data/viewport changes.
+      first = Math.min(
+        rows.length - 1,
+        Math.floor((top + usableHeight / 2) / 44),
+      );
+      last = first;
+    }
+    const prior = indexes.get(remembered.current ?? "") ?? -1;
+    return prior >= first && prior <= last
+      ? remembered.current
+      : rows[first]?.key;
+  };
+  const entryKey = visibleEntry(
+    virtual.scrollOffset ?? 0,
+    virtual.scrollRect?.height ?? 0,
+  );
+  const pendingFocus = useRef<{ key: string; reveal: boolean } | null>(null);
   const focusRow = useCallback(
-    (index: number) => {
+    (index: number, reveal = true) => {
       const task = rows[index];
       if (!task) return;
+      pendingFocus.current = { key: task.key, reveal };
       setFocused(task.key);
-      virtual.scrollToIndex(index);
-      requestAnimationFrame(() =>
-        scroll.current
-          ?.querySelector<HTMLElement>(`[data-task-key="${task.key}"]`)
-          ?.focus(),
-      );
+      if (reveal) virtual.scrollToIndex(index);
     },
-    [rows, virtual],
+    [rows, virtual, setFocused],
   );
+  const onScroll = (event: React.UIEvent<HTMLElement>) => {
+    const container = event.currentTarget;
+    const key = visibleEntry(
+      container.scrollTop,
+      virtual.scrollRect?.height ?? container.clientHeight,
+    );
+    let entry: HTMLElement | undefined;
+    // Update only the at-most-60 mounted rows' tab stops when scrolling inside
+    // one render block. Do not rerender the table on every scroll pixel.
+    for (const row of container.querySelectorAll<HTMLElement>(
+      "[data-task-key]",
+    )) {
+      const next = row.dataset.taskKey === key ? 0 : -1;
+      if (row.tabIndex !== next) row.tabIndex = next;
+      if (next === 0) entry = row;
+    }
+    const owner = focusOwner.current;
+    if (entry && owner && document.activeElement === owner && owner !== entry) {
+      // Only relocate focus that already belongs to an off-screen row. Pointer
+      // scrolling must not snap back or steal focus from an input/filter.
+      entry.focus({ preventScroll: true });
+    }
+  };
+  const order = useMemo(() => rows.map((task) => task.key).join("\0"), [rows]);
+  const previousOrder = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const changed = previousOrder.current !== order;
+    previousOrder.current = order;
+    const owner = focusOwner.current;
+    if (
+      !loading &&
+      !pendingFocus.current &&
+      owner &&
+      ((!owner.isConnected && document.activeElement === document.body) ||
+        (document.activeElement === owner &&
+          owner.dataset.taskKey !== entryKey))
+    ) {
+      // Only recover focus that belonged to a removed row. An input/filter or
+      // another live control keeps its focus; scrolling never forces an old row
+      // back into view. Reordered data can still preserve the same task identity.
+      const preserved = changed
+        ? rows.findIndex((task) => task.key === focused)
+        : -1;
+      const fallback = rows.findIndex((task) => task.key === entryKey);
+      if (preserved >= 0 || fallback >= 0)
+        focusRow(preserved >= 0 ? preserved : fallback, preserved >= 0);
+      else {
+        scroll.current?.focus({ preventScroll: true });
+        focusOwner.current = scroll.current;
+      }
+    }
+    const target = pendingFocus.current;
+    if (!target) return;
+    const node = scroll.current?.querySelector<HTMLElement>(
+      `[data-task-key="${CSS.escape(target.key)}"]`,
+    );
+    if (node) {
+      pendingFocus.current = null;
+      node.focus({ preventScroll: true });
+      // The sticky 84px header must not cover an Arrow/Home/End destination.
+      if (target.reveal)
+        node.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+          behavior: "instant",
+        });
+    }
+  });
   const openRef = useRef(open);
   openRef.current = open;
   const onClickRow = useCallback(
@@ -594,14 +669,19 @@ function VirtualTaskTable({
         openRef.current(key);
       }
     },
-    [],
+    [setFocused],
   );
   const onFocusRow = useCallback(
     (event: React.FocusEvent<HTMLTableSectionElement>) => {
       const key = rowAt(event.target);
-      if (key) setFocused(key);
+      if (key) {
+        remembered.current = key;
+        setFocused(key);
+        focusOwner.current =
+          event.target.closest<HTMLElement>("[data-task-key]");
+      }
     },
-    [],
+    [setFocused, focusOwner],
   );
   const onKeyRow = useCallback(
     (event: React.KeyboardEvent<HTMLTableSectionElement>) => {
@@ -613,6 +693,9 @@ function VirtualTaskTable({
           rows.findIndex((task) => task.key === key) +
             (event.key === "ArrowDown" ? 1 : -1),
         );
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        focusRow(event.key === "Home" ? 0 : rows.length - 1);
       } else if (event.key === "Enter") {
         event.preventDefault();
         openRef.current(key);
@@ -621,7 +704,15 @@ function VirtualTaskTable({
     [rows, focusRow],
   );
   return (
-    <div className="table-scroll" ref={scroll} data-testid="table-scroll">
+    <section
+      className="table-scroll"
+      ref={scroll}
+      data-testid="table-scroll"
+      onScroll={onScroll}
+      tabIndex={-1}
+      aria-label="Task rows"
+      aria-busy={loading || undefined}
+    >
       <table
         className={`task-table ${estimatesEnabled ? "" : "no-estimates"}`}
         aria-label="Tasks"
@@ -635,6 +726,13 @@ function VirtualTaskTable({
           }}
           onClick={onClickRow}
           onFocus={onFocusRow}
+          onBlur={(event) => {
+            if (
+              event.target.isConnected &&
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              focusOwner.current = null;
+          }}
           onKeyDown={onKeyRow}
         >
           {virtualItems.map((item) => {
@@ -655,7 +753,7 @@ function VirtualTaskTable({
                 highlightUntil={glow?.until ?? 0}
                 highlightColor={glow?.color}
                 selected={focused === task.key}
-                tabStop={focused === task.key || (!focused && item.index === 0)}
+                tabStop={entryKey === task.key}
                 timeLabel={time?.label ?? ""}
                 exactTime={time?.exact ?? ""}
               />
@@ -678,6 +776,6 @@ function VirtualTaskTable({
           />
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }

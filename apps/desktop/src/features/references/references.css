@@ -21,10 +21,20 @@
 .references-page .react-flow__edgelabel-renderer {
   will-change: transform;
 }
-.reference-toolbar,
-.reference-filters {
+.reference-control-stack {
   position: absolute;
   z-index: 6;
+  inset: 16px 16px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+.reference-toolbar,
+.reference-filters {
+  position: relative;
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -35,8 +45,7 @@
   box-shadow: var(--shadow-card);
 }
 .reference-toolbar {
-  top: 16px;
-  left: 16px;
+  z-index: 1;
 }
 .reference-toolbar .button {
   height: 32px;
@@ -49,10 +58,11 @@
   text-align: center;
 }
 .reference-filters {
-  right: 16px;
-  top: 70px;
+  align-self: flex-end;
+  min-width: 0;
+  margin: 0;
   gap: 6px;
-  max-width: 70%;
+  max-width: 100%;
   flex-wrap: wrap;
 }
 .reference-filters button {
@@ -352,47 +362,112 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  fill: none;
-  stroke: var(--reference-color);
-  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--reference-color) 4%, transparent);
+  stroke: color-mix(in srgb, var(--reference-color) 22%, var(--line-soft));
+  stroke-width: 1;
   pointer-events: none;
 }
 .reference-frame-tab {
+  transform-origin: left bottom;
   position: absolute;
   left: 0;
-  top: -17px;
+  bottom: calc(100% + 4px);
   display: flex;
   align-items: center;
-  gap: 9px;
-  max-width: 100%;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  min-width: 200px;
+  box-sizing: border-box;
   background: var(--paper);
-  border: 1.5px solid var(--reference-color);
-  border-radius: 7px;
-  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 12px;
   pointer-events: auto;
+  color: var(--ink);
   font-family: "Fraunces Variable", serif;
   font-size: 16px;
+  line-height: 1.3;
   cursor: grab;
   white-space: nowrap;
 }
-.reference-frame-tab span {
+.reference-frame-tab:active {
+  cursor: grabbing;
+}
+.reference-frame-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.reference-frame-grip {
+  flex-shrink: 0;
+}
+.reference-frame-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.reference-frame-tab.compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.reference-frame-tab.compact .reference-frame-heading {
+  min-height: 32px;
+}
+.reference-frame-tab.compact .reference-frame-actions {
+  align-self: flex-end;
+}
+.reference-frame-title {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
 }
 .reference-frame-tab button {
-  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 3px;
   border: 0;
+  border-radius: 6px;
   background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.reference-frame-tab button:hover {
   color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
-.reference-frame-overview .reference-frame-outline {
-  visibility: hidden;
+.reference-frame-tab button:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
 }
-.reference-frame-overview .reference-frame-tab {
-  opacity: 0;
+.reference-frame:has(:where(.reference-frame-tab:hover))
+  .reference-frame-outline {
+  stroke: var(--ink-2);
+}
+.reference-frame-tab:hover,
+.reference-frame-tab:focus-within {
+  border-color: var(--line-soft);
+  background: var(--card);
+}
+.reference-frame.selected .reference-frame-outline,
+.references-page
+  .react-flow__node-frame:focus-visible
+  .reference-frame-outline {
+  stroke: var(--coral);
+  stroke-width: 2;
 }
 .reference-frame.collapsed .reference-frame-tab {
   top: 0;
+  bottom: auto;
+  transform-origin: left top;
 }
 .reference-frame .react-flow__resize-control {
   pointer-events: auto;
@@ -565,7 +640,229 @@
   .reference-toolbar .button {
     padding: 0 6px;
   }
-  .reference-filters {
-    top: 68px;
-  }
+}
+
+.reference-read-notice {
+  position: relative;
+  align-self: stretch;
+  pointer-events: auto;
+  margin: 0;
+  max-height: min(32vh, 240px);
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.reference-read-notice:empty {
+  display: none;
+}
+.reference-toolbar {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Frame interiors stay pointer-transparent; only the explicit header and resize controls capture gestures. */
+.reference-frame.selected .reference-frame-tab {
+  border-color: var(--coral);
+}
+.reference-frame .react-flow__resize-control.handle {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.reference-frame-grip {
+  flex-shrink: 0;
+  color: var(--ink-2);
+}
+/* Direct note paper: the content is the editor, not a labelled creation form. */
+.reference-note-draft {
+  z-index: 2100;
+  user-select: text;
+  position: absolute;
+  width: 240px;
+  min-height: 180px;
+  max-height: min(480px, 70vh);
+  overflow: auto;
+  pointer-events: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--butter) 35%, var(--card));
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+.sticky-paper-grip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 24px;
+  padding: 4px 10px;
+  color: var(--ink-2);
+  cursor: grab;
+  touch-action: none;
+}
+.sticky-editor {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 145px;
+  gap: 4px;
+  padding: 0 10px 8px;
+  user-select: text;
+}
+.sticky-editor-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 24px;
+}
+.sticky-editor-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink-2);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.sticky-editor-tools button:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.sticky-editor .sticky-heading-input,
+.sticky-editor .sticky-body-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  box-shadow: none;
+}
+.sticky-editor .sticky-heading-input {
+  font-weight: 650;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.sticky-editor .sticky-body-input {
+  min-height: 70px;
+  flex: 1;
+  resize: vertical;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.sticky-editor .sticky-heading-input:focus-visible,
+.sticky-editor .sticky-body-input:focus-visible {
+  outline: 0;
+}
+.reference-sticky-paper:focus-within,
+.reference-card.kind-note:has(.sticky-editor:focus-within) {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+.sticky-save-state {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 16px;
+}
+.sticky-save-detail {
+  margin: 2px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sticky-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sticky-latest {
+  width: 100%;
+  max-height: 160px;
+  overflow: auto;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
+  font-size: 12px;
+}
+.sticky-latest p {
+  margin: 4px 0;
+}
+.sticky-latest pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+.sticky-note-title {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+}
+.reference-card-header .sticky-kind-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.reference-note-placement {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 13px;
+  pointer-events: none;
+}
+.reference-placing-note .react-flow__pane {
+  cursor: crosshair;
+}
+
+.reference-read-notice > p:not(:empty) {
+  margin: 0;
+  padding: 12px;
+}
+
+/* Explicit receipts participate in the toolbar bounds used by new-note placement. */
+.reference-toolbar > .read-receipt:not(:empty) {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 2px 3px;
+  overflow-wrap: anywhere;
+}
+
+.sticky-paper-grip-saved {
+  cursor: default;
+}
+
+/* A compact existing paper stays a scrollable editor, never clips recovery/status. */
+.reference-card.kind-note .reference-content:has(.sticky-editor) {
+  overflow: auto;
+  padding: 8px 12px;
+}
+.reference-card.kind-note .sticky-editor {
+  min-height: 0;
+  padding: 0;
+  gap: 3px;
+}
+.reference-card.kind-note .sticky-body-input {
+  min-height: 52px;
+}
+.sticky-save-state {
+  position: sticky;
+  bottom: 0;
+  background: color-mix(
+    in srgb,
+    var(--reference-color, var(--butter)) 35%,
+    var(--card)
+  );
 }

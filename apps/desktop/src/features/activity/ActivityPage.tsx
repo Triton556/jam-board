@@ -83,15 +83,16 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
         if (
           entries.some((e) => e.isIntersecting) &&
           query.hasNextPage &&
-          !query.isFetchingNextPage
+          !query.isFetching &&
+          !query.error
         )
-          void query.fetchNextPage();
+          void query.fetchNextPage({ cancelRefetch: false });
       },
       { root: scroller.current, rootMargin: "180px" },
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
+  }, [query.hasNextPage, query.isFetching, query.error, query.fetchNextPage]);
   const visible = mergeEvents(
     frozen
       ? mergeEvents(
@@ -106,7 +107,10 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
   );
   return (
     <main className="feature-page activity-page">
-      <PageHeading title="Activity" note="a little progress, together">
+      <PageHeading
+        title="Activity"
+        note="Project updates, reports and decisions"
+      >
         <div className="journal-filters">
           <CustomSelect
             label="Activity epic"
@@ -173,7 +177,8 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
                 });
               }}
             >
-              {pending.length} new steps ↑
+              {pending.length} new {pending.length === 1 ? "update" : "updates"}{" "}
+              ↑
             </Button>
           )}
           <div
@@ -203,7 +208,7 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
                     </span>
                     <span>
                       {group.events.length}{" "}
-                      {group.events.length === 1 ? "step" : "steps"}
+                      {group.events.length === 1 ? "update" : "updates"}
                     </span>
                   </summary>
                   {group.events.map((e) => {
@@ -239,26 +244,48 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
                 </details>
               </section>
             ))}
-            {!visible.length && !query.isPending && (
-              <EmptyState text="The story of your jam starts here" />
+            {!groups.length && !query.isPending && !query.error && (
+              <EmptyState
+                text={
+                  member || kind
+                    ? "No matching activity in loaded updates"
+                    : "No activity yet"
+                }
+              />
             )}
             {query.isPending && <PaperSkeleton label="Loading activity" />}
             {query.error && (
               <QueryError
                 error={query.error}
-                retry={() => void query.refetch()}
+                busy={query.isFetching}
+                retry={() => {
+                  // A failed older page owns its retry; refetching page one
+                  // would silently discard the requested cursor.
+                  if (query.isFetching) return;
+                  if (query.isFetchNextPageError)
+                    void query.fetchNextPage({ cancelRefetch: false });
+                  else void query.refetch({ cancelRefetch: false });
+                }}
               />
             )}
             <div ref={sentinel} className="activity-sentinel">
               {query.isFetchingNextPage ? (
-                "Loading earlier events…"
-              ) : query.hasNextPage ? (
-                <Button onClick={() => void query.fetchNextPage()}>
-                  Load earlier events
-                </Button>
-              ) : (
-                "You’re all caught up"
-              )}
+                <span role="status">Loading earlier events…</span>
+              ) : query.isFetching && !query.isPending ? (
+                <span role="status">Checking activity…</span>
+              ) : !query.isPending && !query.error ? (
+                query.hasNextPage ? (
+                  <Button
+                    onClick={() =>
+                      void query.fetchNextPage({ cancelRefetch: false })
+                    }
+                  >
+                    Load earlier events
+                  </Button>
+                ) : (
+                  "End of loaded activity"
+                )
+              ) : null}
             </div>
           </div>
         </>

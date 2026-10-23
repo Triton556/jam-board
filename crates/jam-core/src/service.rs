@@ -5,36 +5,18 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn jam(c: &Connection) -> Result<Jam> {
-    c.query_row(
-        "SELECT id, name, theme, starts_at, ends_at, timezone, task_seq, key_prefix,
-created_at,template,milestone_at FROM jams WHERE archived=0 AND id=(SELECT id FROM jams ORDER BY created_at DESC,id DESC LIMIT 1)",
-        [],
-        |r| {
-            Ok(Jam {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                theme: r.get(2)?,
-                starts_at: r.get(3)?,
-                ends_at: r.get(4)?,
-                timezone: r.get(5)?,
-                task_seq: r.get(6)?,
-                key_prefix: r.get(7)?,
-                created_at: r.get(8)?,template:r.get(9)?,milestone_at:r.get(10)?,
-            })
-        },
-    )
-    .optional()?
-    .ok_or_else(|| Error::NotFound("active jam".into()))
+    crate::projects::selected_jam(c)
 }
 pub(crate) fn member(c: &Connection, id: &str) -> Result<Member> {
-    c.query_row(
+    let m = c.query_row(
         "SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
 FROM members WHERE id=?",
         [id],
         member_row,
     )
     .optional()?
-    .ok_or_else(|| Error::NotFound(format!("member {id}")))
+    .ok_or_else(|| Error::NotFound(format!("member {id}")))?;
+    crate::projects::project_member(c, m)
 }
 pub(crate) fn member_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Member> {
     Ok(Member {
@@ -88,13 +70,14 @@ pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
         ready: false,
         changes_requested: r.get(18)?,
         review_round: r.get(19)?,
+        claim_generation: format!("{}:{}", r.get::<_, String>(0)?, r.get::<_, i64>(20)?),
         epic_id: String::new(),
         epic_key: String::new(),
         epic_color: String::new(),
         needs_info: false,
     })
 }
-pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round";
+pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round,claim_generation";
 pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
     let mut t = c
         .query_row(
@@ -104,6 +87,15 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
         )
         .optional()?
         .ok_or_else(|| Error::NotFound(key.into()))?;
+    crate::projects::ensure_scope(c, &t.jam_id)?;
+    t.idempotency_key = c
+        .query_row(
+            "SELECT token FROM task_idempotency WHERE task_id=?",
+            [&t.id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .or(t.idempotency_key);
     t.tags = tags(c, &t.id)?;
     t.comment_count = c.query_row(
         "SELECT count(*) FROM comments WHERE task_id=?",
@@ -160,6 +152,9 @@ pub(crate) fn event(
     task_id: Option<&str>,
     payload: Value,
 ) -> Result<()> {
+    if let Some(project) = jam_id {
+        crate::projects::join_member(c, project, actor)?;
+    }
     let epic_id = if let Some(eid) = payload["epicId"].as_str() {
         Some(eid.to_string())
     } else if let Some(tid) = task_id {
@@ -260,13 +255,7 @@ pub(crate) fn touch(c: &Connection, id: &str, actor: &str) -> Result<()> {
     let previous: String = c.query_row("SELECT updated_at FROM tasks WHERE id=?", [id], |row| {
         row.get(0)
     })?;
-    let format = &time::format_description::well_known::Rfc3339;
-    let previous = time::OffsetDateTime::parse(&previous, format)
-        .map_err(|_| invalid("updatedAt", "Invalid stored version"))?;
-    let stamp = time::OffsetDateTime::now_utc()
-        .max(previous + time::Duration::nanoseconds(1))
-        .format(format)
-        .expect("UTC");
+    let stamp = crate::context::next_version(&previous)?;
     c.execute(
         "UPDATE tasks SET updated_at=?,updated_by=? WHERE id=?",
         params![stamp, actor, id],
@@ -279,7 +268,10 @@ impl Store {
         self.read(jam)
     }
     pub fn get_member(&self, id: &str) -> Result<Member> {
-        self.read(|c| member(c, id))
+        self.read(|c| {
+            crate::projects::ensure_member_scope(c, id)?;
+            member(c, id)
+        })
     }
     pub fn create_jam(
         &self,
@@ -344,6 +336,7 @@ number+=1;
 }
             c.execute("INSERT INTO jams(id, name, theme, starts_at, ends_at, timezone, key_prefix,
 created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params![jid,name,theme,starts_at,ends_at,timezone,prefix,stamp,template,milestone])?;
+            crate::projects::select(c,&jid,Some(&mid))?;
             event(c,Some(&jid),&mid,"jam.updated",None,json!({
 "name":[null,name],"created":true,"humanJoined":mid}
 ))?;
@@ -418,6 +411,7 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
                 "memberId":mid,"name":name}
                 ),
             )?;
+            crate::projects::join_member(c, &jid, &mid)?;
             member(c, &mid)
         })
     }
@@ -454,10 +448,22 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
                 if m.kind != "agent" {
                     return Err(invalid("agent", "handle belongs to a human"));
                 }
+                let j = jam(c)?;
+                let joined = crate::projects::join_member(c, &j.id, &mid)?;
                 c.execute(
-                    "UPDATE members SET last_seen_at=? WHERE id=?",
-                    params![now(), mid],
+                    "UPDATE project_members SET last_seen_at=? WHERE jam_id=? AND member_id=?",
+                    params![now(), j.id, mid],
                 )?;
+                if joined {
+                    event(
+                        c,
+                        Some(&j.id),
+                        &mid,
+                        "member.joined",
+                        None,
+                        json!({"name":name,"handle":handle}),
+                    )?;
+                }
                 return member(c, &mid);
             }
             let used = c
@@ -486,17 +492,24 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
                 "name":name,"handle":handle}
                 ),
             )?;
+            if let Ok(j) = jam(c) {
+                c.execute(
+                    "UPDATE project_members SET last_seen_at=? WHERE jam_id=? AND member_id=?",
+                    params![stamp, j.id, mid],
+                )?;
+            }
             member(c, &mid)
         })
     }
     pub fn create_task(&self, actor: &str, input: CreateTask) -> Result<TaskDetail> {
         let key = self.write(|c| {
             member(c, actor)?;
+            let j = jam(c)?;
             if let Some(token) = &input.idempotency_key
                 && let Some(key) = c
                     .query_row(
-                        "SELECT key FROM tasks WHERE created_by=? AND idempotency_key=?",
-                        [actor, token],
+                        "SELECT t.key FROM task_idempotency i JOIN tasks t ON t.id=i.task_id WHERE i.jam_id=? AND i.actor_id=? AND i.token=?",
+                        params![j.id, actor, token],
                         |r| r.get::<_, String>(0),
                     )
                     .optional()?
@@ -510,7 +523,6 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             priority(p)?;
             estimate(input.estimate)?;
             let due_at = utc_date(input.due_at.as_deref())?;
-            let j = jam(c)?;
             let parent = crate::planning::story(
                 c,
                 input
@@ -533,6 +545,14 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             }
             if parent.audit.jam_id != j.id {
                 return Err(invalid("storyKey", "Choose a story in the active project"));
+            }
+            if s == "done" && member(c, actor)?.kind != "human" {
+                return Err(Error::Forbidden(
+                    "Agents must create Backlog or Ready work and use review_task with an independent report to mark it Done".into(),
+                ));
+            }
+            if s == "in_progress" {
+                crate::execution::require_execution(c, &parent.audit.id)?;
             }
             crate::workflow::validate_brief(&input.brief)?;
             let key = format!("{}-{}", j.key_prefix, j.task_seq + 1);
@@ -559,10 +579,13 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     actor,
                     stamp,
                     stamp,
-                    input.idempotency_key,
+                    Option::<String>::None,
                     parent.audit.id
                 ],
             )?;
+            if let Some(token) = &input.idempotency_key {
+                c.execute("INSERT INTO task_idempotency(jam_id,actor_id,token,task_id) VALUES (?,?,?,?)", params![j.id, actor, token, tid])?;
+            }
             crate::planning::patch_record(c, "tasks", &tid, &serde_json::to_value(&input.brief)?)?;
             if s == "ready" {
                 let r = crate::workflow::readiness(c, &key)?;
@@ -600,6 +623,10 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             actor,
             &input.key,
             None,
+            Some(&TaskWriteContext {
+                expected_claim_generation: input.expected_claim_generation,
+                expected_updated_at: input.expected_updated_at,
+            }),
             TaskPatch {
                 title: input.title,
                 description_md: input.description,
@@ -616,10 +643,12 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         actor: &str,
         key: &str,
         expected: Option<&str>,
+        context: Option<&TaskWriteContext>,
         input: TaskPatch,
     ) -> Result<TaskDetail> {
         self.write(|c| {
  let old=editable(c,key,actor)?;
+ crate::context::check_write(c,actor,&old,context)?;
  if expected.is_some_and(|stamp| stamp != old.updated_at) { return Err(Error::Conflict); }
  let brief_fields = if let Some(b) = input.brief {
      crate::workflow::validate_brief(&b)?;
@@ -638,7 +667,10 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
  new.description_md=v;
  }
             if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
-            if let Some(v)=input.assignee_id { if let Some(id)=&v { member(c,id)?; } new.assignee_id=v; }
+            if let Some(v)=input.assignee_id {
+ if new.status=="in_progress" && v.is_some() && v!=old.assignee_id { crate::execution::require_execution(c,&old.story_id)?; }
+ if let Some(id)=&v { member(c,id)?; crate::projects::join_member(c,&old.jam_id,id)?; } new.assignee_id=v;
+ }
             if let Some(v)=input.priority {
  priority(&v)?;
  new.priority=v;
@@ -672,9 +704,11 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         target: &str,
         before: Option<&str>,
         after: Option<&str>,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
-        self.move_task_with_override(actor, key, target, before, after, None)
+        self.move_task_with_override(actor, key, target, before, after, None, context)
     }
+    #[allow(clippy::too_many_arguments)] // Position neighbors and readiness override are independent of freshness.
     pub fn move_task_with_override(
         &self,
         actor: &str,
@@ -683,10 +717,40 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         before: Option<&str>,
         after: Option<&str>,
         override_reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
+    ) -> Result<TaskSummary> {
+        self.move_task_checked(
+            actor,
+            key,
+            target,
+            before,
+            after,
+            override_reason,
+            context,
+            None,
+        )
+    }
+    #[allow(clippy::too_many_arguments)] // One transaction serves agent context and native-human version preconditions.
+    pub(crate) fn move_task_checked(
+        &self,
+        actor: &str,
+        key: &str,
+        target: &str,
+        before: Option<&str>,
+        after: Option<&str>,
+        override_reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
+        expected_updated_at: Option<&str>,
     ) -> Result<TaskSummary> {
         status(target)?;
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            // Compare the human's drag/modal snapshot before allocating a round,
+            // touching any neighbor position, recording an override or appending history.
+            if expected_updated_at.is_some_and(|expected| expected != old.updated_at) {
+                return Err(Error::Conflict);
+            }
+            crate::context::check_write(c, actor, &old, context)?;
             let overridden=crate::workflow::transition(c,actor,&old,target,override_reason)?;
             let mut rows = c
                 .prepare(
@@ -764,15 +828,24 @@ NULL AND key<>? ORDER BY position, key",
             task(c, key)
         })
     }
-    pub fn claim_task(&self, actor: &str, key: &str) -> Result<TaskDetail> {
+    pub fn claim_task(
+        &self,
+        actor: &str,
+        key: &str,
+        context: Option<&TaskWriteContext>,
+    ) -> Result<TaskDetail> {
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &old, context)?;
             if let Some(holder) = &old.assignee_id
                 && holder != actor
             {
                 return Err(Error::ClaimConflict {
                     holder: member(c, holder)?.name,
                 });
+            }
+            if old.status!="in_progress" || old.assignee_id.as_deref()!=Some(actor) {
+                crate::execution::require_execution(c,&old.story_id)?;
             }
             let human=member(c,actor)?.kind=="human";
             let brain=crate::planning::task_epic(c,&old)?.brain_member_id.as_deref()==Some(actor);
@@ -807,25 +880,65 @@ NULL AND key<>? ORDER BY position, key",
                 "assigneeId":[old.assignee_id,actor],"status":[old.status,s]}
                 ),
             )?;
-            Ok(())
-        })?;
-        self.get_task(key)
+            // Return the accepted claim snapshot before releasing the writer lock.
+            // A subsequent same-identity reclaim must never relabel this response
+            // with that newer generation between commit and a separate read.
+            detail(c, key)
+        })
     }
     pub fn release_task(
         &self,
         actor: &str,
         key: &str,
         target: Option<&str>,
+        expected_claim_generation: Option<&str>,
+    ) -> Result<TaskSummary> {
+        self.release_task_checked(actor, key, target, None, expected_claim_generation)
+    }
+    pub(crate) fn release_task_checked(
+        &self,
+        actor: &str,
+        key: &str,
+        target: Option<&str>,
+        expected_updated_at: Option<&str>,
+        expected_claim_generation: Option<&str>,
     ) -> Result<TaskSummary> {
         let target = target.unwrap_or("backlog");
         status(target)?;
         self.write(|c| {
-            let old = editable(c, key, actor)?;
-            if old.assignee_id.as_deref() != Some(actor) && member(c, actor)?.kind != "human" {
+            let old = task(c, key)?;
+            if let Some(expected) = expected_claim_generation {
+                crate::context::check_claim(&old, expected)?;
+            } else {
+                crate::context::require_human(c, actor)?;
+            }
+            // A confirmation is about this exact claim/version, not whichever
+            // worker happens to hold the card when a queued command is executed.
+            if let Some(expected) = expected_updated_at {
+                if old.updated_at != expected {
+                    return Err(Error::Conflict);
+                }
+                if old.assignee_id.is_none() && old.status != "in_progress" {
+                    return Err(Error::WrongStatus(
+                        "This task has no claim or active work to return to Backlog".into(),
+                    ));
+                }
+            }
+            let human = member(c, actor)?.kind == "human";
+            if old.assignee_id.as_deref() != Some(actor) && !human {
                 return Err(invalid(
                     "actor",
                     "only the holder or a human can release this task",
                 ));
+            }
+            // Giving back an existing claim is cancellation/recovery, not new work.
+            // Permit it even if a task or planning parent was archived after claim.
+            // Keep archive flags intact; readiness validation still applies to Ready.
+            let recovering_claim = (old.assignee_id.is_some()
+                || (human && old.status == "in_progress"))
+                && ["backlog", "ready"].contains(&target);
+            if !recovering_claim {
+                editable(c, key, actor)?;
             }
             crate::workflow::transition(c, actor, &old, target, None)?;
             let pos = if target != old.status {
@@ -864,6 +977,10 @@ NULL AND key<>? ORDER BY position, key",
             }
             if let Some(a) = assignee {
                 member(c, a)?;
+                if old.status == "in_progress" && old.assignee_id.as_deref() != Some(a) {
+                    crate::execution::require_execution(c, &old.story_id)?;
+                }
+                crate::projects::join_member(c, &old.jam_id, a)?;
             }
             c.execute(
                 "UPDATE tasks SET assignee_id=? WHERE id=?",
@@ -888,12 +1005,14 @@ NULL AND key<>? ORDER BY position, key",
         actor: &str,
         key: &str,
         reason: Option<&str>,
+        context: Option<&TaskWriteContext>,
     ) -> Result<TaskSummary> {
         if let Some(body) = reason {
             comment_body(body)?;
         }
         self.write(|c| {
             let old = editable(c, key, actor)?;
+            crate::context::check_write(c, actor, &old, context)?;
             let stamp = now();
             c.execute(
                 "UPDATE tasks SET archived_at=? WHERE id=?",
@@ -922,6 +1041,9 @@ NULL AND key<>? ORDER BY position, key",
                 return Err(invalid("actor", "only a human can unarchive"));
             }
             let old = task(c, key)?;
+            // Restore visibility only: keep the exact status, holder and review round.
+            // Existing work may be released/reported while paused; any later claim,
+            // new holder or transition into In progress still needs execution authority.
             c.execute("UPDATE tasks SET archived_at=NULL WHERE id=?", [&old.id])?;
             touch(c, &old.id, actor)?;
             event(
@@ -1063,25 +1185,8 @@ NULL AND key<>? ORDER BY position, key",
             .map_err(|_| invalid("cursor", "expected a non-negative offset"))?;
         self.read(|c| {
             let j = jam(c)?;
-            let mut rows = c
-                .prepare(&format!(
-                    "SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? ORDER BY position,key"
-                ))?
-                .query_map([&j.id], task_row)?
-                .collect::<std::result::Result<Vec<_>, _>>()?;
-            for t in &mut rows {
-                *t = task(c, &t.key)?;
-                t.tags = tags(c, &t.id)?;
-                t.comment_count = c.query_row(
-                    "SELECT count(*) FROM comments WHERE task_id=?",
-                    [&t.id],
-                    |r| r.get(0),
-                )?;
-            }
-            let members = c
-                .prepare("SELECT id,handle FROM members")?
-                .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-                .collect::<std::result::Result<BTreeMap<_, _>, _>>()?;
+            // Resolve explicit ancestors even when another filter would match no rows.
+            // Candidate selection and final hydration share this read transaction.
             let epic_id = filter
                 .epic
                 .as_deref()
@@ -1092,35 +1197,50 @@ NULL AND key<>? ORDER BY position, key",
                 .as_deref()
                 .map(|key| crate::planning::story(c, key).map(|s| s.audit.id))
                 .transpose()?;
-            let readiness = if filter.ready.is_some() {
-                rows.iter()
-                    .map(|t| Ok((t.key.clone(), crate::workflow::readiness(c, &t.key)?.ready)))
-                    .collect::<Result<BTreeMap<_, _>>>()?
+            let members = if filter.assignee.as_deref().is_some_and(|a| !["me", "unassigned"].contains(&a)) {
+                c.prepare("SELECT id,handle FROM members")?
+                    .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<std::result::Result<BTreeMap<_, _>, _>>()?
             } else {
                 BTreeMap::new()
             };
-            rows.retain(|t| {
-                if epic_id.as_ref().is_some_and(|id| t.epic_id != *id)
+            let story_epics = if epic_id.is_some() {
+                c.prepare("SELECT id,epic_id FROM stories WHERE jam_id=?")?
+                    .query_map([&j.id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<std::result::Result<BTreeMap<_, _>, _>>()?
+            } else {
+                BTreeMap::new()
+            };
+            let tagged = filter.tag.as_ref().map(|tag| -> Result<BTreeSet<String>> {
+                Ok(c.prepare("SELECT tt.task_id FROM task_tags tt JOIN tasks t ON t.id=tt.task_id WHERE t.jam_id=? AND tt.tag=?")?
+                    .query_map(params![j.id, tag.trim().to_lowercase()], |r| r.get::<_, String>(0))?
+                    .collect::<std::result::Result<BTreeSet<_>, _>>()?)
+            }).transpose()?;
+            let needs_info = if filter.needs_info.is_some() {
+                c.prepare("SELECT q.scope_id FROM questions q JOIN tasks t ON t.id=q.scope_id WHERE t.jam_id=? AND q.scope_type='task' AND q.status='open'")?
+                    .query_map([&j.id], |r| r.get::<_, String>(0))?
+                    .collect::<std::result::Result<BTreeSet<_>, _>>()?
+            } else {
+                BTreeSet::new()
+            };
+            let query = filter.query.as_ref().map(|q| q.to_lowercase());
+            let mut statement = c.prepare(&format!(
+                "SELECT {TASK_COLUMNS} FROM tasks WHERE jam_id=? ORDER BY position,key"
+            ))?;
+            let rows = statement.query_map([&j.id], task_row)?;
+            let mut skipped = 0usize;
+            let mut tasks = Vec::with_capacity(limit);
+            let mut next_cursor = None;
+            for row in rows {
+                let t = row?;
+                if epic_id.as_ref().is_some_and(|id| story_epics.get(&t.story_id) != Some(id))
                     || story_id.as_ref().is_some_and(|id| t.story_id != *id)
-                    || filter
-                        .ready
-                        .is_some_and(|ready| readiness.get(&t.key) != Some(&ready))
-                    || filter
-                        .changes_requested
-                        .is_some_and(|v| t.changes_requested != v)
-                    || filter.needs_info.is_some_and(|v| t.needs_info != v)
+                    || filter.changes_requested.is_some_and(|v| t.changes_requested != v)
+                    || filter.needs_info.is_some_and(|v| needs_info.contains(&t.id) != v)
+                    || (!filter.include_archived.unwrap_or(false) && t.archived_at.is_some())
+                    || filter.status.as_ref().is_some_and(|ss| !ss.contains(&t.status))
                 {
-                    return false;
-                }
-                if !filter.include_archived.unwrap_or(false) && t.archived_at.is_some() {
-                    return false;
-                }
-                if filter
-                    .status
-                    .as_ref()
-                    .is_some_and(|ss| !ss.contains(&t.status))
-                {
-                    return false;
+                    continue;
                 }
                 if let Some(a) = &filter.assignee {
                     let matches = match a.as_str() {
@@ -1129,43 +1249,42 @@ NULL AND key<>? ORDER BY position, key",
                         _ => t.assignee_id.as_ref().and_then(|id| members.get(id)) == Some(a),
                     };
                     if !matches {
-                        return false;
+                        continue;
                     }
                 }
-                if filter
-                    .tag
-                    .as_ref()
-                    .is_some_and(|tag| !t.tags.contains(&tag.trim().to_lowercase()))
+                if tagged.as_ref().is_some_and(|ids| !ids.contains(&t.id))
+                    || query.as_ref().is_some_and(|q| !t.title.to_lowercase().contains(q)
+                        && !t.description_md.to_lowercase().contains(q))
                 {
-                    return false;
+                    continue;
                 }
-                if let Some(q) = &filter.query {
-                    let q = q.to_lowercase();
-                    if !t.title.to_lowercase().contains(&q)
-                        && !t.description_md.to_lowercase().contains(&q)
-                    {
-                        return false;
-                    }
+                if let Some(ready) = filter.ready
+                    && crate::workflow::readiness_for(c, &t)?.ready != ready
+                {
+                    continue;
                 }
-                true
-            });
-            let next = if offset.saturating_add(limit) < rows.len() {
-                Some(offset.saturating_add(limit).to_string())
-            } else {
-                None
-            };
-            Ok(TaskPage {
-                tasks: rows.into_iter().skip(offset).take(limit).collect(),
-                next_cursor: next,
-            })
+                if skipped < offset {
+                    skipped += 1;
+                    continue;
+                }
+                if tasks.len() == limit {
+                    next_cursor = Some(offset.saturating_add(limit).to_string());
+                    break;
+                }
+                // Hydrate only the requested page; task() remains authoritative for
+                // all returned fields (including readiness, tags and claim context).
+                tasks.push(task(c, &t.key)?);
+            }
+            Ok(TaskPage { tasks, next_cursor })
         })
     }
     pub fn list_members(&self) -> Result<Vec<MemberStats>> {
         self.read(|c| {
 let j=jam(c).ok();
  let members=c.prepare("SELECT id, kind, name, handle, color, avatar, client, last_seen_at, created_at,status_text,status_scope_json,status_at
-FROM members ORDER BY created_at, id")?.query_map([],member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
+FROM members WHERE (?1 IS NULL OR id IN (SELECT member_id FROM project_members WHERE jam_id=?1)) ORDER BY created_at, id")?.query_map([j.as_ref().map(|j|&j.id)],member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
             members.into_iter().map(|m| {
+let m=crate::projects::project_member(c,m)?;
 let counts=c.prepare("SELECT status, count(*) FROM tasks WHERE assignee_id=? AND jam_id=? AND
 archived_at IS NULL GROUP BY status")?.query_map(params![m.id,j.as_ref().map(|j|&j.id)],|r|Ok((r.get::<_,String>(0)?,r.get::<_,i64>(1)?)))?.collect::<std::result::Result<BTreeMap<_,_>,_>>()?;
                 let working=c.prepare("SELECT key FROM tasks WHERE assignee_id=? AND jam_id=? AND status='in_progress'
@@ -1215,7 +1334,7 @@ BY position, key"))?.query_map([&j.id],task_row)?.collect::<std::result::Result<
             let seconds=deadline.as_deref().and_then(|s|time::OffsetDateTime::parse(s,&time::format_description::well_known::Rfc3339).ok()).map(|t|(t-time::OffsetDateTime::now_utc()).whole_seconds().max(0));
             Ok(json!({
 "jam":{
-"name":j.name,"theme":j.theme,"endsAt":deadline,"timeLeft":seconds,"template":j.template,"milestoneAt":j.milestone_at}
+"id":j.id,"keyPrefix":j.key_prefix,"name":j.name,"theme":j.theme,"endsAt":deadline,"timeLeft":seconds,"template":j.template,"milestoneAt":j.milestone_at}
 ,"columns":STATUSES.iter().map(|s|json!({
 "status":s,"count":ts.iter().filter(|t|&t.status==s).count()}
 )).collect::<Vec<_>>(),"inProgress":ts.iter().filter(|t|t.status=="in_progress").map(summarize).collect::<Vec<_>>(),"myTasks":ts.iter().filter(|t|actor.is_some()&&t.assignee_id.as_deref()==actor).map(summarize).collect::<Vec<_>>() }
@@ -1354,6 +1473,7 @@ task_id=? ORDER BY created_at, id",
     let activity = crate::db::activity(c, 0, Some(&t.id), Some(20))?;
     let history = crate::db::activity(c, 0, Some(&t.id), Some(50))?;
     Ok(TaskDetail {
+        review_context_revision: crate::context::review_revision(c, &t)?,
         ancestor_questions: crate::planning::records(
             c,
             "questions",

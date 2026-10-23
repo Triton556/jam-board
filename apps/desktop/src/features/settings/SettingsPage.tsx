@@ -1,17 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { Copy, Eye, FolderOpen, RefreshCw, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { version } from "../../../package.json";
 import wave from "../../assets/chibi/danil-wave-256.webp";
-import { Button, Dialog, IconButton, Select, Tabs } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  IconButton,
+  Select,
+  TabPanels,
+  Tabs,
+} from "../../components/ui";
 import { CodeBlock, PageHeading, Switch } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
 import { api } from "../../lib/api";
+import {
+  connectionPrompt,
+  projectConnectionPrompt,
+} from "../../lib/brain-handoff";
 import { makeSnippets } from "../../lib/mcp-config";
+import { acceptProjectSelection } from "../../lib/project-selection";
 import { appQuery } from "../../lib/queries";
 import { paperRustle } from "../../lib/sound";
 import type { ConfigSnippets, Theme } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { BrainHandoff, WorkflowGuide } from "../plan/BrainHandoff";
+import { BoardConnectSetup } from "./BoardConnectSetup";
 import { ProjectSettings } from "./ProjectSettings";
 import { SkillSetup } from "./SkillSetup";
 
@@ -27,8 +42,7 @@ const keys: (keyof ConfigSnippets)[] = [
   "claudeStdio",
   "claudeHttp",
 ];
-export const tryPrompt =
-  "Use the jam-board MCP server: call get_board, then take the highest-priority unassigned Ready task, read its brief, claim it, and submit_report when finished.";
+export const tryPrompt = connectionPrompt;
 export function archiveConfirmed(name: string, typed: string) {
   return name.length > 0 && name === typed;
 }
@@ -40,6 +54,15 @@ export function SettingsPage({
   const client = useQueryClient();
   const navigate = useNavigate();
   const app = useQuery(appQuery);
+  const projects = useQuery({
+    queryKey: ["projects", true],
+    queryFn: () => api.listProjects(true),
+    enabled: !!app.data?.hasJam,
+    staleTime: 0,
+  });
+  const workingCount =
+    projects.data?.find((project) => project.id === app.data?.jam?.id)
+      ?.inProgressCount ?? 0;
   const status = useQuery({
     queryKey: ["mcpStatus"],
     queryFn: () => api.mcpStatus(),
@@ -54,12 +77,42 @@ export function SettingsPage({
   const [tab, setTab] = useState(tabs[0] ?? "Codex · stdio");
   const [shown, setShown] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const configuration = useRef<HTMLElement>(null);
+  const configurationTabs = useId();
   const [confirm, setConfirm] = useState<"token" | "demo" | "archive" | null>(
     null,
   );
   const [typed, setTyped] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const runLock = useRef(false);
+  const mounted = useRef(true);
+  const copyGeneration = useRef(0);
+  const currentProject = useRef(app.data?.jam?.id);
+  currentProject.current = app.data?.jam?.id;
+  const [copyPending, setCopyPending] = useState(false);
+  useEffect(
+    () =>
+      client.getQueryCache().subscribe((event) => {
+        if (event.query.queryKey[0] !== "app") return;
+        const next = client.getQueryData<
+          Awaited<ReturnType<typeof api.appState>>
+        >(["app"])?.jam?.id;
+        if (next !== currentProject.current) {
+          currentProject.current = next;
+          copyGeneration.current += 1;
+        }
+      }),
+    [client],
+  );
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      copyGeneration.current += 1;
+    };
+  }, []);
+  useBlocker({ shouldBlockFn: () => busy, enableBeforeUnload: busy });
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -70,23 +123,47 @@ export function SettingsPage({
     setSection(initialSection === "MCP" ? "Agents" : initialSection);
   }, [initialSection]);
   const run = async (action: () => Promise<unknown>, message?: string) => {
+    if (runLock.current) return;
+    runLock.current = true;
     setBusy(true);
     setNotice("");
     try {
       await action();
-      if (message) setNotice(message);
+      if (message && mounted.current) setNotice(message);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      if (mounted.current)
+        setNotice(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
+      runLock.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ["mcpStatus"] });
   };
-  const copy = async (text: string, message = "Copied") => {
-    await navigator.clipboard.writeText(text);
-    setNotice(message);
+  const copy = async (
+    source: string | (() => Promise<string>),
+    message = "Copied",
+  ) => {
+    const generation = ++copyGeneration.current;
+    const projectId = currentProject.current;
+    const valid = () =>
+      mounted.current &&
+      generation === copyGeneration.current &&
+      projectId ===
+        client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])
+          ?.jam?.id;
+    setCopyPending(true);
+    try {
+      const text = typeof source === "string" ? source : await source();
+      if (!valid()) return;
+      await navigator.clipboard.writeText(text);
+      if (valid()) setNotice(message);
+    } catch (error) {
+      if (valid()) throw error;
+    } finally {
+      if (mounted.current) setCopyPending(false);
+    }
   };
   const show = async () => {
     const token = await api.revealMcpToken();
@@ -103,15 +180,23 @@ export function SettingsPage({
     },
   });
   const data = status.data;
+  const project = app.data?.jam;
+  const connectionReady =
+    !!project &&
+    data?.projectId === project.id &&
+    data?.projectKeyPrefix === project.keyPrefix;
+  const checkPrompt = project ? projectConnectionPrompt(project) : tryPrompt;
   const snippetKey = keys[tabs.indexOf(tab)] ?? "codexStdio";
   const masked = data ? makeSnippets(data, `••••${data.tokenTail}`) : null;
   const activate = async (
     state: Awaited<ReturnType<typeof api.appState>>,
     to: "/board" | "/welcome",
   ) => {
-    client.setQueryData(["app"], state);
-    await client.invalidateQueries();
-    await navigate({ to });
+    await acceptProjectSelection(client, state);
+    await navigate({
+      to: to === "/welcome" && state.hasJam ? "/projects" : to,
+      ignoreBlocker: true,
+    });
   };
   return (
     <main className="feature-page settings-page">
@@ -122,6 +207,7 @@ export function SettingsPage({
             (s) => (
               <Button
                 key={s}
+                disabled={busy}
                 aria-current={section === s ? "page" : undefined}
                 onClick={() => {
                   setSection(s);
@@ -138,6 +224,86 @@ export function SettingsPage({
           {section === "Project" && <ProjectSettings />}
           {section === "Agents" && (
             <>
+              {project && data && (
+                <BoardConnectSetup
+                  key={project.id}
+                  disabled={busy || !connectionReady}
+                  setup={{
+                    project,
+                    client: tab.startsWith("Codex") ? "codex" : "claude",
+                    transport: tab.endsWith("HTTP") ? "http" : "stdio",
+                    sidecarPath: data.sidecarPath,
+                    dataDir: data.dataDir,
+                    port: data.port,
+                  }}
+                />
+              )}
+              <WorkflowGuide />
+              <SettingsSection
+                title="Manual connection and role setup"
+                description="Optional alternative to the connection prompt above. Configure MCP yourself, verify the project, then choose a role. Jam Board does not launch a model or change your client configuration."
+              >
+                <SettingsRow
+                  label="Connection target"
+                  hint="The configuration and check below are for this project."
+                >
+                  {project ? (
+                    <strong>
+                      {project.name} · {project.keyPrefix}
+                    </strong>
+                  ) : (
+                    <span>Reading selected project…</span>
+                  )}
+                  <p className="small">
+                    Switching boards in Jam Board does not redirect an already
+                    connected agent.
+                  </p>
+                </SettingsRow>
+                <SettingsRow
+                  label="1 · Connect MCP"
+                  hint="Choose one transport below: stdio runs its own sidecar; HTTP needs Jam Board open."
+                >
+                  <span>
+                    Use the configuration for this project, then restart or
+                    reconnect your agent.
+                  </span>
+                  <Button onClick={() => configuration.current?.focus()}>
+                    Show configuration
+                  </Button>
+                </SettingsRow>
+                <SettingsRow
+                  label="2 · Check the connection"
+                  hint="The test prompt below only reads the board. It does not take a task."
+                >
+                  <Button
+                    disabled={busy || !connectionReady}
+                    onClick={() =>
+                      void run(() =>
+                        copy(
+                          checkPrompt,
+                          `Connection check copied for ${project?.name} · ${project?.keyPrefix}`,
+                        ),
+                      )
+                    }
+                  >
+                    Copy connection check
+                  </Button>
+                </SettingsRow>
+                <SettingsRow
+                  label="3 · Appoint a brain and plan"
+                  hint="In Plan, open an epic and choose its Brain. The connected agent appears after its first board call. Repeat for each epic it should coordinate."
+                >
+                  <BrainHandoff
+                    scope={{ type: "project" }}
+                    label="Prepare planning prompt"
+                    disabled={busy || !connectionReady}
+                  />
+                  <p className="small">
+                    No epic yet? Ask the connected agent to draft one first.
+                    Brain appointment and Ready are not Start permission.
+                  </p>
+                </SettingsRow>
+              </SettingsSection>
               <SettingsSection
                 title="Your AI teammates"
                 description="Connect locally. Your board stays on this computer."
@@ -172,19 +338,20 @@ export function SettingsPage({
                     {shown ?? `••••${data?.tokenTail ?? "••••"}`}
                   </p>
                   <div className="button-row">
-                    <Button onClick={() => void run(show)}>
+                    <Button disabled={busy} onClick={() => void run(show)}>
                       <Eye size={15} />
                       {shown ? "Shown for 30s" : "Show"}
                     </Button>
                     <IconButton
                       label="Copy token"
+                      disabled={busy}
                       onClick={() =>
-                        void run(async () => copy(await api.revealMcpToken()))
+                        void run(() => copy(() => api.revealMcpToken()))
                       }
                     >
                       <Copy size={16} />
                     </IconButton>
-                    <Button onClick={() => setConfirm("token")}>
+                    <Button disabled={busy} onClick={() => setConfirm("token")}>
                       <RefreshCw size={15} />
                       Regenerate
                     </Button>
@@ -194,6 +361,7 @@ export function SettingsPage({
                   <code className="path-value">{data?.sidecarPath}</code>
                   <IconButton
                     label="Copy sidecar path"
+                    disabled={busy}
                     onClick={() =>
                       void run(() => copy(data?.sidecarPath ?? ""))
                     }
@@ -202,35 +370,177 @@ export function SettingsPage({
                   </IconButton>
                 </SettingsRow>
               </SettingsSection>
-              <SettingsSection title="Connect the board">
+              <SettingsSection
+                title="Connect the board"
+                ref={configuration}
+                description="Copying shows or copies instructions only. Apply them yourself in the intended agent client, then restart or reconnect it."
+              >
+                <SettingsRow
+                  label="Which project?"
+                  hint="Each MCP session keeps its original project binding."
+                >
+                  <p>
+                    {project?.name ?? "Selected project"} ·{" "}
+                    {project?.keyPrefix ?? "…"}
+                  </p>
+                  <details className="connection-help">
+                    <summary>
+                      Connect another project or upgrade a client
+                    </summary>
+                    <ol>
+                      <li>
+                        Choose the other project in Projects, then return to
+                        Settings → Agents for its configuration.
+                      </li>
+                      <li>
+                        These snippets use the same jam-board connection name.
+                        Intentionally replace the old entry, or use a separate
+                        client configuration and session to keep both boards
+                        connected. Do not paste duplicate entries.
+                      </li>
+                      <li>
+                        Restart or reconnect the intended agent session. An
+                        existing session does not move when the UI selection
+                        changes.
+                      </li>
+                      <li>
+                        Run this project's read-only connection check. Confirm
+                        its name, key prefix and project ID before planning or
+                        writing.
+                      </li>
+                    </ol>
+                    <p>
+                      After upgrading Jam Board, refresh the client's tool
+                      schemas and reread task/report context before a new
+                      action. Old call examples may lack required fields. A
+                      stale error means reconcile the draft with current
+                      evidence, not automatically retry it with new validators.
+                    </p>
+                  </details>
+                </SettingsRow>
+                <SettingsRow
+                  label="Agent identity"
+                  hint="A stable board identity, not a process ID or an authorization credential."
+                >
+                  <p>
+                    Before applying a snippet, replace its default Codex or
+                    Claude name with a distinct stable name for each
+                    independently configured brain or worker, for example
+                    Planner and Worker-1. Use <code>JAM_AGENT_NAME</code> for
+                    stdio or <code>X-Jam-Agent</code> for HTTP, then reconnect
+                    the client.
+                  </p>
+                  <details className="connection-help">
+                    <summary>Several workers or inherited subagents?</summary>
+                    <ul className="connection-help-points">
+                      <li>
+                        <strong>One name, one member.</strong> Connections with
+                        matching names share one board member, tasks and
+                        activity. Capitalization or punctuation alone may not
+                        make names distinct. A new chat is not a new board
+                        identity.
+                      </li>
+                      <li>
+                        <strong>
+                          Separate workers need separate connections.
+                        </strong>{" "}
+                        Subagents that inherit an MCP connection also inherit
+                        its identity. Give independently tracked workers
+                        distinct names. Jam Board does not launch or reconfigure
+                        them.
+                      </li>
+                      <li>
+                        <strong>Reviews need another identity.</strong> An agent
+                        cannot independently review its own report using the
+                        same identity.
+                      </li>
+                      <li>
+                        <strong>Observe shared work.</strong> With shared
+                        identities, <code>excludeSelf=true</code> hides peers’
+                        events too. Use the documented{" "}
+                        <code>excludeSelf=false</code> observation policy. Each
+                        connection remains pinned to its project.
+                      </li>
+                    </ul>
+                  </details>
+                </SettingsRow>
                 <SettingsRow
                   label="Configuration"
                   hint={
                     tab.startsWith("Codex")
                       ? "Paste into ~/.codex/config.toml. HTTP uses JAM_BOARD_TOKEN."
-                      : "Run this command in your terminal."
+                      : "Run this PowerShell command, or adapt it for your shell before applying."
                   }
                 >
-                  <Tabs value={tab} onChange={setTab} items={tabs} />
-                  {masked && (
-                    <CodeBlock
-                      code={masked[snippetKey]}
-                      onCopy={() =>
-                        void run(async () => {
-                          const snippets = await api.mcpConfigSnippets();
-                          await copy(
-                            snippets[snippetKey],
-                            tab.includes("HTTP")
-                              ? "Copied with your token"
-                              : "Copied",
-                          );
-                        })
-                      }
-                    />
-                  )}
+                  <Tabs
+                    id={configurationTabs}
+                    label="Agent client and transport"
+                    disabled={busy}
+                    value={tab}
+                    onChange={setTab}
+                    items={tabs}
+                  />
+                  <TabPanels id={configurationTabs} value={tab} items={tabs}>
+                    {!connectionReady &&
+                      (status.isPending || app.isPending) && (
+                        <p role="status">
+                          Reading the selected project's connection settings…
+                        </p>
+                      )}
+                    {!connectionReady &&
+                      !status.isPending &&
+                      !app.isPending && (
+                        <>
+                          <p role="alert">
+                            Connection settings are unavailable or do not match
+                            the selected project. Reread them before copying a
+                            configuration.
+                          </p>
+                          <Button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(async () => {
+                                await Promise.all([
+                                  status.refetch(),
+                                  app.refetch(),
+                                ]);
+                              })
+                            }
+                          >
+                            Retry connection settings
+                          </Button>
+                        </>
+                      )}
+                    {masked && connectionReady && (
+                      <CodeBlock
+                        code={masked[snippetKey]}
+                        disabled={busy}
+                        pending={copyPending}
+                        onCopy={() =>
+                          void run(async () => {
+                            // Capture displayed settings before any asynchronous token read.
+                            const captured = data;
+                            const target = `${project?.name} · ${project?.keyPrefix}`;
+                            const http = tab.includes("HTTP");
+                            await copy(
+                              async () => {
+                                const token = http
+                                  ? await api.revealMcpToken()
+                                  : "";
+                                return makeSnippets(captured, token)[
+                                  snippetKey
+                                ];
+                              },
+                              `Configuration copied for ${target}${http ? " (includes your token; keep it private)" : ""}`,
+                            );
+                          })
+                        }
+                      />
+                    )}
+                  </TabPanels>
                 </SettingsRow>
               </SettingsSection>
-              <SkillSetup />
+              <SkillSetup disabled={busy} />
               <SettingsSection
                 title="Recent agent calls"
                 description="Last 20 calls · kept in memory while this window is open"
@@ -273,9 +583,19 @@ export function SettingsPage({
                     )}
                   </div>
                 </SettingsRow>
-                <SettingsRow label="Try it">
-                  <p>{tryPrompt}</p>
-                  <Button onClick={() => void run(() => copy(tryPrompt))}>
+                <SettingsRow label="Read-only connection check">
+                  <p>{checkPrompt}</p>
+                  <Button
+                    disabled={busy || !connectionReady}
+                    onClick={() =>
+                      void run(() =>
+                        copy(
+                          checkPrompt,
+                          `Connection check copied for ${project?.name} · ${project?.keyPrefix}`,
+                        ),
+                      )
+                    }
+                  >
                     Copy prompt
                   </Button>
                 </SettingsRow>
@@ -283,7 +603,7 @@ export function SettingsPage({
             </>
           )}
           {section === "Data" && (
-            <SettingsSection title="Your local sketchbook">
+            <SettingsSection title="Project data">
               <SettingsRow label="Database">
                 <p className="mono path-value">
                   {data?.dataDir}
@@ -299,8 +619,8 @@ export function SettingsPage({
                 </Button>
               </SettingsRow>
               <SettingsRow
-                label="Take your jam with you"
-                hint="Export a JSON snapshot, or import one into a new jam. Existing history stays here."
+                label="Export or import a project"
+                hint="Export this project as JSON. Import creates a separate project; it does not replace this one."
               >
                 <div className="button-row">
                   <Button
@@ -332,25 +652,27 @@ export function SettingsPage({
                 </div>
               </SettingsRow>
               <SettingsRow
-                label="A fresh page"
-                hint="A demo makes a new active jam. Your current jam stays in history."
+                label="Demo project"
+                hint="A demo creates a separate project. Your current board remains available under Your projects."
               >
                 <Button onClick={() => setConfirm("demo")}>
                   Load demo jam
                 </Button>
               </SettingsRow>
               <SettingsRow
-                label="Archive this jam"
-                hint="Archive every task and return to the welcome screen. Nothing is deleted."
+                label="Archive this project"
+                hint="Hide the project without changing its tasks or history. Restore it later under Your projects → Archived projects."
               >
                 <Button
                   variant="danger"
                   onClick={() => {
                     setTyped("");
+                    setNotice("");
+                    void projects.refetch();
                     setConfirm("archive");
                   }}
                 >
-                  Archive this jam
+                  Archive this project
                 </Button>
               </SettingsRow>
             </SettingsSection>
@@ -395,11 +717,11 @@ export function SettingsPage({
                 />
               </SettingsRow>
               <SettingsRow
-                label="In progress WIP limit"
-                hint="Shows the In progress counter in coral above this number"
+                label="In progress limit"
+                hint="Highlights In progress above this number, even when epic filters hide cards. Review is tracked separately."
               >
                 <input
-                  aria-label="WIP limit"
+                  aria-label="In progress limit"
                   type="number"
                   min={1}
                   max={99}
@@ -478,7 +800,7 @@ export function SettingsPage({
                 <img src={wave} width={72} height={72} alt="Danil waving" />
                 <div>
                   <h2>Jam Board</h2>
-                  <span className="mono muted">Version 0.2.0</span>
+                  <span className="mono muted">Version {version}</span>
                 </div>
               </header>
               <div className="settings-rows">
@@ -533,7 +855,7 @@ export function SettingsPage({
               ? "Regenerate MCP token?"
               : confirm === "demo"
                 ? "Load a demo jam?"
-                : "Archive this jam"
+                : "Archive this project"
           }
           onClose={() => setConfirm(null)}
         >
@@ -542,17 +864,37 @@ export function SettingsPage({
               <p>Existing HTTP connections will stop working.</p>
             ) : confirm === "demo" ? (
               <p>
-                A new demo jam will become active; your current jam stays in
-                history.
+                A separate demo project will become active. Your current board
+                remains available under Your projects.
               </p>
             ) : (
               <>
                 <p>
                   Type <strong>{app.data?.jam?.name}</strong> to archive this
-                  jam.
+                  project. Its tasks, reports and references are kept.
                 </p>
+                {workingCount > 0 && (
+                  <p className="notice" role="status">
+                    {workingCount} tasks are still In progress, including
+                    archived cards. Pause new work and let them report before
+                    archiving the project. To release an archived task,
+                    unarchive it first. Switching projects is safe without
+                    archiving.
+                  </p>
+                )}
+                {projects.isPending && (
+                  <p role="status">Checking running work…</p>
+                )}
+                {projects.error && (
+                  <p role="alert">
+                    Could not check running work.{" "}
+                    <Button onClick={() => void projects.refetch()}>
+                      Retry
+                    </Button>
+                  </p>
+                )}
                 <label>
-                  Jam name
+                  Project name
                   <input
                     value={typed}
                     onChange={(e) => setTyped(e.target.value)}
@@ -567,7 +909,10 @@ export function SettingsPage({
                 disabled={
                   busy ||
                   (confirm === "archive" &&
-                    !archiveConfirmed(app.data?.jam?.name ?? "", typed))
+                    (!archiveConfirmed(app.data?.jam?.name ?? "", typed) ||
+                      workingCount > 0 ||
+                      projects.isPending ||
+                      !!projects.error))
                 }
                 onClick={() =>
                   void run(async () => {
@@ -590,9 +935,10 @@ export function SettingsPage({
                   ? "Regenerate token"
                   : confirm === "demo"
                     ? "Load demo jam"
-                    : "Archive jam"}
+                    : "Archive project"}
               </Button>
             </div>
+            {notice && <p role="alert">{notice}</p>}
           </div>
         </Dialog>
       )}

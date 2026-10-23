@@ -12,12 +12,14 @@ import type {
 
 export type { RefEdge, ReferenceCanvas, RefFrame, RefItem };
 export type ReferenceInput = Pick<AddReference, "kind"> & Partial<AddReference>;
+export type ReferenceContentExpectation = { title: string; caption: string };
 export interface ReferencesApi {
   referenceCanvas(): Promise<ReferenceCanvas>;
-  addReference(input: ReferenceInput): Promise<RefItem>;
+  addReference(input: ReferenceInput, untitled?: boolean): Promise<RefItem>;
   updateReference(
     id: string,
     patch: ReferencePatch_Serialize,
+    expected?: ReferenceContentExpectation,
   ): Promise<RefItem>;
   linkReference(id: string, key: string): Promise<RefItem>;
   canvasGeometry(input: CanvasGeometry): Promise<RefItem>;

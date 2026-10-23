@@ -120,11 +120,15 @@ test("settings share aligned rows, responsive stacking and board synchronization
   await page.setViewportSize({ width: 860, height: 860 });
   const row = page.locator(".settings-form-row").first();
   expect(
-    await row.evaluate(
-      (e) =>
-        e.querySelector(".settings-row-control").getBoundingClientRect().y >
-        e.querySelector(".settings-row-label").getBoundingClientRect().y,
-    ),
+    await row.evaluate((e) => {
+      const control = e.querySelector(".settings-row-control"),
+        label = e.querySelector(".settings-row-label");
+      if (!control || !label)
+        throw new Error("Missing settings row control or label");
+      return (
+        control.getBoundingClientRect().y > label.getBoundingClientRect().y
+      );
+    }),
   ).toBe(true);
 });
 test("mouse actions leave no focus ring while keyboard focus stays visible", async ({

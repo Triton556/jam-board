@@ -78,7 +78,7 @@ export const AgentStatus = memo(function AgentStatus({
           <b>{member.name}</b>
           <AgentStatusLine member={member} />
           {!member.statusText && (
-            <p className="muted">Online and ready to help</p>
+            <p className="muted">No activity message reported</p>
           )}
           {scope && (
             <Button
@@ -112,7 +112,7 @@ export function InboxBadge({ count }: { count: number }) {
     <span
       className="inbox-badge"
       role="img"
-      aria-label={`${count} open questions`}
+      aria-label={`${count} open inbox items`}
     >
       <i />
       {count > 9 ? "9+" : count}

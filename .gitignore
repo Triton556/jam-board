@@ -1,5 +1,6 @@
 /target/
 /.dev-data/
+/test-visuals/
 **/node_modules/
 **/dist/
 **/test-results/
