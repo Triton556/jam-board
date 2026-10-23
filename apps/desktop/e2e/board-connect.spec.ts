@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("board connection prompt stays neutral, remembers its code folder and reports clipboard failure", async ({
@@ -90,4 +91,8 @@ test("board connection prompt stays neutral, remembers its code folder and repor
     section.getByRole("button", { name: "Copy agent connection prompt" }),
   ).toBeVisible();
   await expect(section.getByText(/No token is copied/)).toBeVisible();
+  await mkdir("../../test-visuals", { recursive: true });
+  await section.screenshot({
+    path: "../../test-visuals/readability-connect-agent.png",
+  });
 });
