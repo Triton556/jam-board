@@ -1,12 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { File, Link2, Plus, StickyNote } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button, Dialog } from "../../components/ui";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { api } from "../../lib/api";
+import { appQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
-import { useUiStore } from "../../lib/ui-store";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { AddReferenceDialog } from "./dialogs";
+import { referenceLabel } from "./model";
 import "./section.css";
 
 function Thumb({ assetId, title }: { assetId: string | null; title: string }) {
@@ -22,15 +25,21 @@ function Thumb({ assetId, title }: { assetId: string | null; title: string }) {
     <File size={24} />
   );
 }
-export function ReferencesSection({
+type SectionProps = { targetKey: string; epicKey: string; disabled?: boolean };
+export function ReferencesSection(props: SectionProps) {
+  const app = useQuery(appQuery);
+  return (
+    <ReferenceTargetSection
+      key={`${app.data?.jam?.id ?? "loading"}:${props.targetKey}`}
+      {...props}
+    />
+  );
+}
+function ReferenceTargetSection({
   targetKey,
   epicKey,
   disabled = false,
-}: {
-  targetKey: string;
-  epicKey: string;
-  disabled?: boolean;
-}) {
+}: SectionProps) {
   const data = useQuery({
       queryKey: ["references"],
       queryFn: () => api.referenceCanvas(),
@@ -46,6 +55,8 @@ export function ReferencesSection({
     }),
     client = useQueryClient(),
     navigate = useNavigate();
+  const write = useProjectWrite(`reference-picker:${targetKey}`);
+  const pickerContent = useRef<HTMLDivElement>(null);
   const [picker, setPicker] = useState(false),
     [search, setSearch] = useState(""),
     [add, setAdd] = useState<"link" | "note" | null>(null),
@@ -90,7 +101,6 @@ export function ReferencesSection({
       linkTo: targetKey,
     });
     await refresh();
-    setPicker(false);
   };
   return (
     <section className="task-section references-section">
@@ -113,68 +123,88 @@ export function ReferencesSection({
               void navigate({ to: "/references", search: { section: item.id } })
             }
           >
-            <Thumb assetId={item.assetId} title={item.title} />
-            <span>{item.title}</span>
+            <Thumb assetId={item.assetId} title={referenceLabel(item)} />
+            <span>{referenceLabel(item)}</span>
           </button>
         ))}
       </div>
       {!items.length && <p className="muted">No linked references yet.</p>}
       {picker && (
-        <Dialog title="Add reference" onClose={() => setPicker(false)}>
-          <div className="reference-picker-actions">
-            <Button
-              onClick={() =>
-                void api
-                  .pickFiles()
-                  .then(async (paths) => {
-                    for (const filePath of paths)
-                      await create({ kind: "asset", filePath });
-                  })
-                  .catch((e) => setError(String(e)))
-              }
-            >
-              <File size={16} />
-              New file…
-            </Button>
-            <Button onClick={() => setAdd("link")}>
-              <Link2 size={16} />
-              New link…
-            </Button>
-            <Button onClick={() => setAdd("note")}>
-              <StickyNote size={16} />
-              New note
-            </Button>
-          </div>
-          <label className="field">
-            Search canvas
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        <Dialog
+          title="Add reference"
+          busy={write.pending}
+          onClose={() => write.dismiss(() => setPicker(false))}
+        >
+          <div ref={pickerContent}>
+            <div className="reference-picker-actions">
+              <Button
+                disabled={!write.ready}
+                onClick={() =>
+                  void api
+                    .pickFiles()
+                    .then(async (paths) => {
+                      for (const filePath of paths)
+                        await create({ kind: "asset", filePath });
+                      if (paths.length) setPicker(false);
+                    })
+                    .catch((e) => setError(String(e)))
+                }
+              >
+                <File size={16} />
+                New file…
+              </Button>
+              <Button disabled={!write.ready} onClick={() => setAdd("link")}>
+                <Link2 size={16} />
+                New link…
+              </Button>
+              <Button disabled={!write.ready} onClick={() => setAdd("note")}>
+                <StickyNote size={16} />
+                New note
+              </Button>
+            </div>
+            <label className="field">
+              Search canvas
+              <input
+                autoFocus
+                data-write-focus
+                disabled={!write.ready}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            {error && <p role="alert">{error}</p>}
+            <ProjectWriteFeedback
+              write={write}
+              action="Linking reference"
+              form={pickerContent}
             />
-          </label>
-          {error && <p role="alert">{error}</p>}
-          <div className="reference-picker-grid">
-            {data.data?.items
-              .filter((i) =>
-                i.title.toLowerCase().includes(search.toLowerCase()),
-              )
-              .map((i) => (
-                <Button
-                  key={i.id}
-                  className="reference-picker-row"
-                  onClick={() =>
-                    void api
-                      .linkReference(i.id, targetKey)
-                      .then(refresh)
-                      .then(() => setPicker(false))
-                      .catch((e) => useUiStore.getState().error(String(e)))
-                  }
-                >
-                  <Thumb assetId={i.assetId} title={i.title} />
-                  {i.title}
-                </Button>
-              ))}
+            <div className="reference-picker-grid">
+              {data.data?.items
+                .filter((i) =>
+                  (i.title + (i.kind === "note" ? `\n${i.captionMd}` : ""))
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
+                )
+                .map((i) => (
+                  <Button
+                    key={i.id}
+                    className="reference-picker-row"
+                    disabled={!write.ready}
+                    onClick={() =>
+                      write.run(
+                        () => api.linkReference(i.id, targetKey),
+                        () => {
+                          void refresh();
+                          setPicker(false);
+                        },
+                      )
+                    }
+                  >
+                    <Thumb assetId={i.assetId} title={referenceLabel(i)} />
+                    {referenceLabel(i)}
+                  </Button>
+                ))}
+            </div>
           </div>
         </Dialog>
       )}
@@ -183,6 +213,7 @@ export function ReferencesSection({
           kind={add}
           close={() => setAdd(null)}
           save={create}
+          onSaved={() => setPicker(false)}
         />
       )}
     </section>

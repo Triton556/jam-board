@@ -1,18 +1,25 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 export function SettingsSection({
   title,
   description,
   children,
   className = "",
+  ref,
 }: {
   title: string;
   description?: string;
   className?: string;
+  ref?: Ref<HTMLElement>;
   children: ReactNode;
 }) {
   return (
-    <section className={`settings-card ${className}`}>
+    <section
+      className={`settings-card ${className}`}
+      ref={ref}
+      tabIndex={ref ? -1 : undefined}
+      aria-label={ref ? title : undefined}
+    >
       <h2>{title}</h2>
       {description && <p className="settings-description">{description}</p>}
       <div className="settings-rows">{children}</div>

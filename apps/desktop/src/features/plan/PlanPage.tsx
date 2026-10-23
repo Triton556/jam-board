@@ -19,17 +19,21 @@ import type { EpicTree, StoryTree } from "../../bindings";
 import {
   Avatar,
   Button,
-  Dialog,
   EmptyState,
   IconButton,
   SegmentedControl,
   Select,
   Stamp,
 } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { memberColors, WorkloadBar } from "../../components/ui/m5";
 import { api } from "../../lib/api";
+import { brainHandoff } from "../../lib/brain-handoff";
 import {
   epicsQuery,
   invalidatePlanning,
@@ -38,12 +42,14 @@ import {
 import { membersQuery, tasksQuery } from "../../lib/queries";
 import { statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { ExecutionControls } from "../execution/ExecutionControls";
 import { QuestionList } from "../inbox/InboxPage";
 import { ReferencesSection } from "../references/ReferencesSection";
+import { BrainHandoff, WorkflowGuide } from "./BrainHandoff";
 import { Journal } from "./Journal";
 import { epicProgress } from "./journal-model";
+import { NewPlanningDialog } from "./NewPlanningDialog";
 import {
-  NewTaskDialog,
   PlanningStatus,
   participationText,
   SavedMarkdown,
@@ -51,8 +57,7 @@ import {
 import { PlanningInput } from "./PlanningInput";
 import { intentFields } from "./StoryDrawer";
 import { TaskRows } from "./TaskRows";
-export const brainPrompt =
-  "Use the jam-board MCP server and its plan_epic prompt. Follow requirements-interview.md and task-brief-and-acceptance.md: interview me in rounds, play back Goal / Done when / Not included / Decided, then create an epic, stories and complete task briefs using brief-writing.md. Ask me to choose the worker model; mark only actionable tasks Ready and publish your scoped status.";
+export const brainPrompt = brainHandoff({ type: "project" });
 const overviewFields = [
   ["goalMd", "Goal and audience", "Who is this for, and what should change?"],
   ["doneWhenMd", "Done when", "What will you look at to call it done?"],
@@ -81,11 +86,9 @@ export function PlanPage({
     tasks = useQuery(tasksQuery),
     members = useQuery(membersQuery),
     questions = useQuery(questionsQuery);
-  const navigate = useNavigate(),
-    client = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState("active"),
-    [creating, setCreating] = useState(false),
-    [title, setTitle] = useState("");
+    [creating, setCreating] = useState(false);
   const selected = useQuery({
     queryKey: ["epic", epicKey],
     queryFn: () => api.getEpic(epicKey ?? ""),
@@ -112,16 +115,6 @@ export function PlanPage({
   useEffect(() => {
     if (search.create === "epic") setCreating(true);
   }, [search.create]);
-  const create = useMutation({
-    mutationFn: () => api.createEpic({ title: title.trim() }),
-    onSuccess: (e) => {
-      setCreating(false);
-      setTitle("");
-      setFilter("all");
-      invalidatePlanning(client);
-      choose(e.key);
-    },
-  });
   const visible = (epics.data ?? []).filter(
     (e) => filter === "all" || e.status === filter || e.key === epicKey,
   );
@@ -131,7 +124,7 @@ export function PlanPage({
         <PaperSkeleton label="Loading plan" />
       </main>
     );
-  if (epics.error)
+  if (epics.error && !epics.data)
     return (
       <main className="feature-page">
         <QueryError error={epics.error} retry={() => void epics.refetch()} />
@@ -152,6 +145,7 @@ export function PlanPage({
           </Button>
         </div>
         <div className="epic-filter">
+          <span className="small muted">Show epics</span>
           <Select
             aria-label="Epic filter"
             value={filter}
@@ -228,7 +222,8 @@ export function PlanPage({
                     )}
                   />
                   <p className="small muted">
-                    {progress.done} / {progress.total} tasks done
+                    {progress.done} / {progress.total}{" "}
+                    {progress.total === 1 ? "task" : "tasks"} done
                   </p>
                   <div className="epic-card-meta">
                     {brain && (
@@ -252,23 +247,42 @@ export function PlanPage({
         </div>
       </aside>
       <div className="plan-detail">
+        {epics.error && (
+          <QueryRefreshNotice
+            error={epics.error}
+            resource="epics"
+            busy={epics.isFetching}
+            retry={() => void epics.refetch()}
+          />
+        )}
+        {selected.error && selected.data && (
+          <QueryRefreshNotice
+            error={selected.error}
+            resource={`epic ${selected.data.epic.key}`}
+            busy={selected.isFetching}
+            retry={() => void selected.refetch()}
+          />
+        )}
+        <WorkflowGuide />
         {!epics.data?.length ? (
           <EmptyState image={duo} size={180} text="No epics yet">
-            <p>Ask your brain agent to plan an epic, or create one yourself.</p>
+            <p>
+              Start with a goal. Add stories for its features or outcomes, then
+              tasks for the work.
+            </p>
             <div className="button-row">
               <Button variant="primary" onClick={() => setCreating(true)}>
                 New epic
               </Button>
-              <Button
-                onClick={() => void navigator.clipboard.writeText(brainPrompt)}
-              >
-                Copy brain prompt
-              </Button>
+              <BrainHandoff
+                scope={{ type: "project" }}
+                label="Plan with brain"
+              />
             </div>
           </EmptyState>
         ) : selected.isPending ? (
           <PaperSkeleton label="Loading epic" />
-        ) : selected.error ? (
+        ) : selected.error && !selected.data ? (
           <QueryError
             error={selected.error}
             retry={() => void selected.refetch()}
@@ -291,36 +305,14 @@ export function PlanPage({
         ) : null}
       </div>
       {creating && (
-        <Dialog title="New epic" onClose={() => setCreating(false)}>
-          <form
-            className="planning-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (title.trim()) create.mutate();
-            }}
-          >
-            <label>
-              Title
-              <input
-                aria-label="Epic name"
-                maxLength={140}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </label>
-            {create.error && <p role="alert">{create.error.message}</p>}
-            <div className="dialog-actions">
-              <Button onClick={() => setCreating(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={!title.trim() || create.isPending}
-              >
-                Create epic
-              </Button>
-            </div>
-          </form>
-        </Dialog>
+        <NewPlanningDialog
+          target={{ kind: "epic" }}
+          close={() => setCreating(false)}
+          created={(key) => {
+            setFilter("all");
+            choose(key);
+          }}
+        />
       )}
     </main>
   );
@@ -341,12 +333,15 @@ function EpicDetail({
   createStory: boolean;
 }) {
   const e = tree.epic;
+  const taskCount = tree.stories.reduce(
+    (total, row) => total + row.tasks.length,
+    0,
+  );
   const members = useQuery(membersQuery),
     epics = useQuery(epicsQuery);
   const client = useQueryClient();
   const [menu, setMenu] = useState(false),
     [newStory, setNewStory] = useState(createStory),
-    [storyTitle, setStoryTitle] = useState(""),
     [taskStory, setTaskStory] = useState<string | null>(null);
   useEffect(() => {
     if (createStory) setNewStory(true);
@@ -359,16 +354,6 @@ function EpicDetail({
   const brain = useMutation({
     mutationFn: (handle: string | null) => api.setBrain(e.key, handle),
     onSuccess: () => invalidatePlanning(client),
-  });
-  const add = useMutation({
-    mutationFn: () =>
-      api.createStory({ epicKey: e.key, title: storyTitle.trim() }),
-    onSuccess: (s) => {
-      setNewStory(false);
-      setStoryTitle("");
-      invalidatePlanning(client);
-      openStory(s.key);
-    },
   });
   const archived = e.status === "archived";
   return (
@@ -413,32 +398,59 @@ function EpicDetail({
               />
             ))}
           </fieldset>
-          <CustomSelect
-            label="Epic brain"
-            value={
-              members.data?.find((m) => m.id === e.brainMemberId)?.handle ?? ""
-            }
-            onChange={(value) => brain.mutate(value || null)}
+          <div className="epic-brain-control">
+            <span className="small muted">Brain</span>
+            <CustomSelect
+              label="Epic brain"
+              value={
+                members.data?.find((m) => m.id === e.brainMemberId)?.handle ??
+                ""
+              }
+              onChange={(value) => brain.mutate(value || null)}
+              disabled={archived}
+              options={[
+                { value: "", label: "Unassigned" },
+                ...(members.data ?? [])
+                  .slice()
+                  .sort((a, b) =>
+                    a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1,
+                  )
+                  .map((m) => ({
+                    value: m.handle,
+                    label:
+                      m.kind === "agent"
+                        ? m.name
+                        : `${m.name} (brain must be an agent)`,
+                    disabled: m.kind !== "agent",
+                    group: m.kind === "agent" ? "Agents" : "Humans",
+                  })),
+              ]}
+            />
+          </div>
+          <BrainHandoff
+            scope={{ type: "epic", id: e.id, key: e.key }}
             disabled={archived}
-            options={[
-              { value: "", label: "Unassigned" },
-              ...(members.data ?? [])
-                .slice()
-                .sort((a, b) =>
-                  a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1,
-                )
-                .map((m) => ({
-                  value: m.handle,
-                  label:
-                    m.kind === "agent"
-                      ? m.name
-                      : `${m.name} (brain must be an agent)`,
-                  disabled: m.kind !== "agent",
-                  group: m.kind === "agent" ? "Agents" : "Humans",
-                })),
-            ]}
           />
         </div>
+        <nav className="scope-hierarchy" aria-label="Epic hierarchy">
+          <span>
+            Epic <strong>{e.key}</strong>
+          </span>
+          <span aria-hidden="true">→</span>
+          <Button onClick={() => setTab("Stories")}>
+            {tree.stories.length}{" "}
+            {tree.stories.length === 1 ? "story" : "stories"} · features &
+            outcomes
+          </Button>
+          <span aria-hidden="true">→</span>
+          <span>
+            {taskCount} {taskCount === 1 ? "task" : "tasks"}
+          </span>
+        </nav>
+        <ExecutionControls
+          key={`execution:${e.id}`}
+          scope={{ type: "epic", id: e.id }}
+        />
         {menu && (
           <div className="button-row">
             <Button
@@ -476,11 +488,6 @@ function EpicDetail({
         {tab === "Overview" ? (
           <div className="epic-overview">
             <div>
-              <ReferencesSection
-                targetKey={e.key}
-                epicKey={e.key}
-                disabled={archived}
-              />
               {overviewFields.map(([field, label, hint]) => (
                 <SavedMarkdown
                   key={`${e.id}:${field}`}
@@ -491,10 +498,15 @@ function EpicDetail({
                   save={(value) => api.updateEpic(e.key, { [field]: value })}
                 />
               ))}
+              <ReferencesSection
+                targetKey={e.key}
+                epicKey={e.key}
+                disabled={archived}
+              />
             </div>
             <aside className="epic-process">
-              <label htmlFor="participation">
-                Participation
+              <div className="epic-process-choice">
+                <label htmlFor="participation">Participation</label>
                 <Select
                   id="participation"
                   aria-label="Participation"
@@ -517,9 +529,9 @@ function EpicDetail({
                     ]
                   }
                 </small>
-              </label>
-              <label htmlFor="separate-reviewer">
-                Separate reviewer
+              </div>
+              <div className="epic-process-choice">
+                <label htmlFor="separate-reviewer">Separate reviewer</label>
                 <Select
                   id="separate-reviewer"
                   aria-label="Separate reviewer"
@@ -533,7 +545,7 @@ function EpicDetail({
                     </option>
                   ))}
                 </Select>
-              </label>
+              </div>
               <div className="field">
                 Worker model
                 <PlanningInput
@@ -563,6 +575,10 @@ function EpicDetail({
           </div>
         ) : tab === "Stories" ? (
           <>
+            <p className="muted">
+              A story describes a feature or outcome. Its tasks carry the
+              implementation briefs.
+            </p>
             <div className="section-heading">
               <h2>Stories</h2>
               <Button
@@ -589,40 +605,15 @@ function EpicDetail({
         )}
       </div>
       {newStory && (
-        <Dialog title="New story" onClose={() => setNewStory(false)}>
-          <form
-            className="planning-form"
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              if (storyTitle.trim()) add.mutate();
-            }}
-          >
-            <label>
-              Title
-              <input
-                aria-label="Story name"
-                maxLength={140}
-                value={storyTitle}
-                onChange={(ev) => setStoryTitle(ev.target.value)}
-              />
-            </label>
-            {add.error && <p role="alert">{add.error.message}</p>}
-            <div className="dialog-actions">
-              <Button onClick={() => setNewStory(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={!storyTitle.trim() || add.isPending}
-              >
-                Create story
-              </Button>
-            </div>
-          </form>
-        </Dialog>
+        <NewPlanningDialog
+          target={{ kind: "story", epicKey: e.key }}
+          close={() => setNewStory(false)}
+          created={openStory}
+        />
       )}
       {taskStory && (
-        <NewTaskDialog
-          storyKey={taskStory}
+        <NewPlanningDialog
+          target={{ kind: "task", storyKey: taskStory }}
           close={() => setTaskStory(null)}
           created={openTask}
         />

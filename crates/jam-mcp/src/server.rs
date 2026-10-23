@@ -3,11 +3,13 @@ use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestConte
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentCall {
+    #[serde(default)]
+    pub project_id: Option<String>,
     pub at: String,
     pub error: Option<String>,
     pub agent: String,
@@ -16,9 +18,27 @@ pub struct RecentCall {
 }
 pub type RecentCalls = Arc<Mutex<std::collections::VecDeque<RecentCall>>>;
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct SessionContext {
+    project_id: String,
+    key_prefix: String,
+    project_name: String,
+    /// Saved filesystem hint, not verified existence or filesystem permission.
+    project_folder: Option<String>,
+    binding: String,
+    can_switch_project: bool,
+    /// Project-filtered global activity high-water; capture before fresh baseline reads.
+    #[schemars(range(min = 0))]
+    latest_activity_cursor: i64,
+}
+
 #[derive(Clone)]
 pub struct JamServer {
     store: Arc<Store>,
+    session_store: Arc<OnceLock<Arc<Store>>>,
+    session_identity: Arc<OnceLock<(String, String)>>,
+    project_hint: Option<String>,
     agent_name: Option<String>,
     recent: RecentCalls,
     report_stdio: bool,
@@ -27,16 +47,69 @@ impl JamServer {
     pub fn new(store: Arc<Store>, agent_name: Option<String>, recent: RecentCalls) -> Self {
         Self {
             store,
+            session_store: Arc::new(OnceLock::new()),
+            session_identity: Arc::new(OnceLock::new()),
+            project_hint: None,
             agent_name,
             recent,
             report_stdio: false,
         }
+    }
+    pub fn with_project(mut self, project: Option<String>) -> Self {
+        self.project_hint = project;
+        self
+    }
+    fn session_store(&self) -> jam_core::Result<Arc<Store>> {
+        self.session_store.get().cloned().ok_or_else(|| {
+            jam_core::Error::Forbidden(
+                "Initialize this session with a project before making calls".into(),
+            )
+        })
+    }
+    async fn bind_project(&self, ctx: &RequestContext<RoleServer>) -> Result<(), ErrorData> {
+        let header = ctx
+            .extensions
+            .get::<axum::http::request::Parts>()
+            .and_then(|parts| parts.headers.get("X-Jam-Project"))
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let requested = header.or_else(|| self.project_hint.clone());
+        let base = self.store.clone();
+        let scoped = tokio::task::spawn_blocking(move || {
+            let selected = requested
+                .map(Ok)
+                .unwrap_or_else(|| base.active_jam().map(|j| j.id))?;
+            base.for_project(&selected).map(Arc::new)
+        })
+        .await
+        .map_err(internal)?
+        .map_err(|e| {
+            ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
+        })?;
+        if let Some(existing) = self.session_store.get() {
+            if existing.bound_project_id().map_err(internal)?
+                != scoped.bound_project_id().map_err(internal)?
+            {
+                return Err(ErrorData::invalid_params(
+                    "This session is already bound. Reconnect to change projects.",
+                    None,
+                ));
+            }
+        } else {
+            self.session_store
+                .set(scoped)
+                .map_err(|_| ErrorData::internal_error("Session binding raced", None))?;
+        }
+        Ok(())
     }
     pub fn report_stdio_calls(mut self) -> Self {
         self.report_stdio = true;
         self
     }
     fn identity(&self, ctx: &RequestContext<RoleServer>) -> (String, String) {
+        if let Some(identity) = self.session_identity.get() {
+            return identity.clone();
+        }
         let info = ctx
             .client_info()
             .map(|i| i.name)
@@ -64,18 +137,31 @@ impl JamServer {
     }
     async fn heartbeat(&self, ctx: &RequestContext<RoleServer>) -> Result<Member, ErrorData> {
         let (name, client) = self.identity(ctx);
-        let store = self.store.clone();
+        let store = self.session_store().map_err(internal)?;
         tokio::task::spawn_blocking(move || store.identify_agent(&name, &client))
             .await
             .map_err(internal)?
             .map_err(internal)
     }
     fn execute(&self, actor: &Member, name: &str, args: Value) -> jam_core::Result<Value> {
-        let store = &self.store;
-        if let Some(result) = crate::v2::execute(store, actor, name, args.clone()) {
+        let store = self.session_store()?;
+        if let Some(result) = crate::v2::execute(&store, actor, name, args.clone()) {
             return result;
         }
         match name {
+            "get_session_context" => {
+                parse::<Empty>(args)?;
+                let (project, latest_activity_cursor) = store.project_activity_context()?;
+                value(SessionContext {
+                    project_id: project.id,
+                    key_prefix: project.key_prefix,
+                    project_name: project.name,
+                    project_folder: store.get_settings()?.project_folder,
+                    binding: "session".into(),
+                    can_switch_project: false,
+                    latest_activity_cursor,
+                })
+            }
             "get_board" => {
                 parse::<Empty>(args)?;
                 store.board(Some(&actor.id))
@@ -93,12 +179,21 @@ impl JamServer {
                     a.before_key.as_deref(),
                     a.after_key.as_deref(),
                     a.override_reason.as_deref(),
+                    Some(&a.context()),
                 )?)
             }
-            "claim_task" => value(store.claim_task(&actor.id, &parse::<Key>(args)?.key)?),
+            "claim_task" => {
+                let a = parse::<Claim>(args)?;
+                value(store.claim_task(&actor.id, &a.key, Some(&a.context()))?)
+            }
             "release_task" => {
                 let a = parse::<Release>(args)?;
-                value(store.release_task(&actor.id, &a.key, a.status.as_deref())?)
+                value(store.release_task(
+                    &actor.id,
+                    &a.key,
+                    a.status.as_deref(),
+                    Some(&a.expected_claim_generation),
+                )?)
             }
             "add_comment" => {
                 let a = parse::<AddComment>(args)?;
@@ -106,7 +201,12 @@ impl JamServer {
             }
             "archive_task" => {
                 let a = parse::<Archive>(args)?;
-                value(store.archive_task(&actor.id, &a.key, a.reason.as_deref())?)
+                value(store.archive_task(
+                    &actor.id,
+                    &a.key,
+                    a.reason.as_deref(),
+                    Some(&a.context()),
+                )?)
             }
             "list_members" => {
                 parse::<Empty>(args)?;
@@ -212,7 +312,20 @@ pub(crate) fn tool<T: JsonSchema>(
             a.push(json!("storyKey"));
         }
     }
-    let mut result = Tool::new(name, description, input).with_annotations(
+    let freshness = match name {
+        "claim_task" | "move_task" | "mark_ready" | "archive_task" | "update_task"
+        | "update_task_brief" => {
+            " Required: expectedClaimGeneration and expectedUpdatedAt captured from get_task before deciding this mutation. On stale_claim/conflict, reread and reconcile; never blindly refresh validators and replay."
+        }
+        "release_task" | "submit_report" => {
+            " Required: expectedClaimGeneration from the claim you are returning/reporting, not a later same-identity claim. A stale_claim rejects the old payload without mutation; do not relabel it with a fresh validator."
+        }
+        "review_task" => {
+            " Required: expectedReportId and expectedReviewContextRevision captured from the exact current report and TaskDetail.reviewContextRevision you inspected. A changed report/task/story/epic context conflicts; reread evidence and reconsider the decision."
+        }
+        _ => "",
+    };
+    let mut result = Tool::new(name, format!("{description}{freshness}"), input).with_annotations(
         ToolAnnotations::new()
             .read_only(read_only)
             .destructive(false)
@@ -222,6 +335,9 @@ pub(crate) fn tool<T: JsonSchema>(
         "create_task" | "update_task" | "get_task" | "claim_task" => {
             Some(schema::<jam_core::TaskDetail>())
         }
+        "get_execution" => Some(schema::<jam_core::ExecutionState>()),
+        "request_execution" => Some(schema::<jam_core::ExecutionRequest>()),
+        "get_session_context" => Some(schema::<SessionContext>()),
         "list_tasks" => Some(schema::<jam_core::TaskPage>()),
         "move_task" | "release_task" | "archive_task" => Some(schema::<jam_core::TaskSummary>()),
         "add_comment" => Some(schema::<jam_core::Comment>()),
@@ -253,6 +369,11 @@ pub(crate) fn tool<T: JsonSchema>(
 fn tools() -> Vec<Tool> {
     let mut list = vec![
         tool::<Empty>(
+            "get_session_context",
+            "Read this session's pinned project identity and project-filtered latestActivityCursor in one snapshot. Capture the cursor before fresh current-state reads; never replace an unprocessed saved recovery cursor. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
+            true,
+        ),
+        tool::<Empty>(
             "get_board",
             "Read the active jam, column counts, in-progress work, your tasks, and online agents. timeLeft is seconds until the deadline, clamped to zero.",
             true,
@@ -269,7 +390,7 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<CreateTask>(
             "create_task",
-            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. Supply idempotencyKey to safely retry without creating duplicates.",
+            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. Supply idempotencyKey to safely retry without creating duplicates. Agents cannot create Done tasks; completion requires independent review_task evidence.",
             false,
         ),
         tool::<UpdateTask>(
@@ -279,17 +400,17 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<Move>(
             "move_task",
-            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
+            "Move a task to a status and optionally between adjacent neighbors. Workers must enter work with claim_task and Review with submit_report, and cannot move another holder's task. Humans and the appointed epic brain may plan statuses, but entry into In progress always requires a human-started story/epic. Agents cannot move directly to Done; use review_task with an independent report. afterKey precedes the moved task and beforeKey follows it; omit both to append.",
             false,
         ),
-        tool::<Key>(
+        tool::<Claim>(
             "claim_task",
-            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name.",
+            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name. New work requires a human-started story/epic; Ready alone is not execution permission.",
             false,
         ),
         tool::<Release>(
             "release_task",
-            "Release a task you hold and move it to backlog or the supplied status. Only the current holder or a human can release it.",
+            "Release a task you hold and move it to backlog or the supplied status. Only the current holder or a human can release it. Returning an existing claim to Backlog or Ready is allowed after task/parent archival without restoring or starting work; Ready still validates readiness. Agents cannot release directly to Done; use independent review_task.",
             false,
         ),
         tool::<AddComment>(
@@ -324,11 +445,13 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, ErrorData> {
         ctx.peer.set_peer_info(request.clone());
+        self.bind_project(&ctx).await?;
+        let _ = self.session_identity.set(self.identity(&ctx));
         self.heartbeat(&ctx).await?;
         self.negotiate_initialize(&request)
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Plan your game jam with your AI teammates. Use task keys such as JB-12. Claim a Ready task with claim_task before working, then submit_report with results and test evidence. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -352,7 +475,7 @@ impl ServerHandler for JamServer {
         let record_name = tool_name.clone();
         let args = Value::Object(request.arguments.unwrap_or_default());
         let result = tokio::task::spawn_blocking(move || {
-            let actor = this.store.identify_agent(&name, &client)?;
+            let actor = this.session_store()?.identify_agent(&name, &client)?;
             this.execute(&actor, &tool_name, args)
         })
         .await;
@@ -366,6 +489,10 @@ impl ServerHandler for JamServer {
         let ok = result.is_ok();
         let (agent, _) = self.identity(&ctx);
         let call = RecentCall {
+            project_id: self
+                .session_store()
+                .ok()
+                .and_then(|s| s.bound_project_id().ok().flatten()),
             at: jam_core::now(),
             error: result.as_ref().err().map(ToString::to_string),
             agent,
@@ -391,10 +518,12 @@ impl ServerHandler for JamServer {
                     jam_core::Error::NotFound(_) => "not_found",
                     jam_core::Error::ClaimConflict { .. } => "claim_conflict",
                     jam_core::Error::NotReady(_) => "not_ready",
+                    jam_core::Error::ExecutionRequired(_) => "execution_required",
                     jam_core::Error::WrongStatus(_) => "wrong_status",
                     jam_core::Error::Forbidden(_) => "forbidden",
                     jam_core::Error::Archived(_) => "archived",
                     jam_core::Error::Conflict => "conflict",
+                    jam_core::Error::StaleClaim => "stale_claim",
                     _ => "validation",
                 };
                 let message = e.to_string();
@@ -419,6 +548,10 @@ impl ServerHandler for JamServer {
         Ok(ListResourcesResult {
             resources: vec![
                 Resource::new("jam://board", "Active jam board").with_mime_type("text/markdown"),
+                Resource::new("jam://guide", "Jam Board agent guide")
+                    .with_mime_type("text/markdown"),
+                Resource::new("jam://guide/operations", "Jam Board operation examples")
+                    .with_mime_type("text/markdown"),
             ],
             ..Default::default()
         })
@@ -447,12 +580,22 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
         let actor = self.heartbeat(&ctx).await?;
-        let store = self.store.clone();
+        let store = self.session_store().map_err(internal)?;
         let uri = request.uri;
         let text = tokio::task::spawn_blocking({
             let uri = uri.clone();
             move || -> jam_core::Result<String> {
-                if uri == "jam://board" {
+                if uri == "jam://guide" {
+                    Ok(
+                        include_str!("../../../integrations/agent-skill/jam-board/SKILL.md")
+                            .replace("references/operations.md", "jam://guide/operations"),
+                    )
+                } else if uri == "jam://guide/operations" {
+                    Ok(include_str!(
+                        "../../../integrations/agent-skill/jam-board/references/operations.md"
+                    )
+                    .into())
+                } else if uri == "jam://board" {
                     let b = store.board(Some(&actor.id))?;
                     let mut md = format!(
                         "# {}\n\nTheme: {}\n\n| Status | Count |\n|---|---|\n",
@@ -478,7 +621,9 @@ impl ServerHandler for JamServer {
                             ));
                         }
                     }
-                    md.push_str("\n## Waiting as a brain\nRecover with list_changes_since at turn start, then call wait_for_changes (timeoutSeconds=60) for reports, answers and human edits. Handle events, save nextCursor even on timeout, and repeat. With epicKey, includeProject=true also observes project-wide human events.\n");
+                    md.push_str("\n## Waiting as a brain\n");
+                    md.push_str(crate::v2::OBSERVATION_GUIDANCE);
+                    md.push('\n');
                     Ok(md)
                 } else if let Some(key) = uri.strip_prefix("jam://epic/") {
                     Ok(crate::v2::epic_markdown(&store.get_epic(key)?))
@@ -507,7 +652,7 @@ impl ServerHandler for JamServer {
                 ("plan_epic", "Interview, plan and prepare an epic."),
                 (
                     "work_on_next_task",
-                    "Work on a Ready task and submit a report.",
+                    "Work on a Ready task within a human-started scope and submit a report.",
                 ),
                 (
                     "review_task",
@@ -579,15 +724,18 @@ pub(crate) struct Key {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Move {
     key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
     status: String,
     before_key: Option<String>,
     after_key: Option<String>,
     override_reason: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Release {
     key: String,
+    expected_claim_generation: String,
     status: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
@@ -597,9 +745,11 @@ struct AddComment {
     body: String,
 }
 #[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Archive {
     key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
     reason: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
@@ -608,3 +758,22 @@ struct Assets {
     kind: Option<String>,
     query: Option<String>,
 }
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Claim {
+    key: String,
+    expected_claim_generation: String,
+    expected_updated_at: String,
+}
+macro_rules! write_context {
+    ($($name:ty),+) => {$(impl $name {
+        fn context(&self) -> jam_core::TaskWriteContext {
+            jam_core::TaskWriteContext {
+                expected_claim_generation: self.expected_claim_generation.clone(),
+                expected_updated_at: self.expected_updated_at.clone(),
+            }
+        }
+    })+};
+}
+write_context!(Claim, Move, Archive);

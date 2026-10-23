@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import type { ActivityEvent, Member } from "./types";
+export type NoticeDetail = { label: string; text: string; note?: string };
+export type NoticeOptions = {
+  persistent?: boolean;
+  details?: NoticeDetail[];
+  hint?: string;
+};
 export type ToastMessage = {
+  details?: (NoticeDetail & { id: string })[];
+  hint?: string;
+  persistent?: boolean;
   id: string;
   text: string;
   taskKey?: string;
@@ -24,6 +33,8 @@ type UiState = {
   setQuickColumn(status: string | null): void;
   receive(events: ActivityEvent[]): void;
   error(text: string): void;
+  notify(text: string, options?: NoticeOptions): void;
+  dismissToast(id: string): void;
   tick(now: number): void;
   pauseToast(id: string, pause: boolean): void;
 };
@@ -126,6 +137,24 @@ export const useUiStore = create<UiState>((set) => ({
         { id: crypto.randomUUID(), text, until: Date.now() + 5000 },
       ].slice(-3),
     })),
+  notify: (text, options) =>
+    set((s) => ({
+      toasts: [
+        ...s.toasts,
+        {
+          id: crypto.randomUUID(),
+          text,
+          ...options,
+          details: options?.details?.map((detail) => ({
+            ...detail,
+            id: crypto.randomUUID(),
+          })),
+          until: options?.persistent ? Infinity : Date.now() + 5000,
+        },
+      ].slice(-3),
+    })),
+  dismissToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((toast) => toast.id !== id) })),
   tick: (now) =>
     set((s) => ({
       now,

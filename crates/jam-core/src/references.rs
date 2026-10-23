@@ -59,6 +59,31 @@ pub(crate) fn task_references(c: &Connection, t: &TaskSummary) -> Result<Vec<Ref
 }
 impl Store {
     pub fn add_reference(&self, actor: &str, input: AddReference) -> Result<RefItem> {
+        self.add_reference_with_title_mode(actor, input, false)
+    }
+    /// Native direct paper: retain an explicit no-heading choice without changing
+    /// the legacy/MCP default title contract. No empty new records are accepted.
+    pub fn add_reference_untitled(&self, actor: &str, mut input: AddReference) -> Result<RefItem> {
+        if input.kind != "note"
+            || input
+                .title
+                .as_deref()
+                .is_some_and(|title| !title.is_empty())
+        {
+            return Err(invalid(
+                "title",
+                "Untitled mode requires a note without a heading",
+            ));
+        }
+        input.title = Some(String::new());
+        self.add_reference_with_title_mode(actor, input, true)
+    }
+    fn add_reference_with_title_mode(
+        &self,
+        actor: &str,
+        input: AddReference,
+        untitled: bool,
+    ) -> Result<RefItem> {
         self.write(|c| {
             let a = audit(c, actor)?;
             if !["asset", "link", "note"].contains(&input.kind.as_str()) {
@@ -117,8 +142,10 @@ impl Store {
                 }
                 url = Some(value.into());
                 default_title = value.chars().take(140).collect();
-            } else if input.text.as_deref().is_none_or(|s| s.trim().is_empty()) {
-                return Err(invalid("text", "A note needs text"));
+            } else if input.text.as_deref().is_none_or(|s| s.trim().is_empty())
+                && input.title.as_deref().is_none_or(|s| s.trim().is_empty())
+            {
+                return Err(invalid("text", "A note needs text or a heading"));
             }
             let mut frame_id = None;
             let mut event_epic = None;
@@ -238,7 +265,9 @@ impl Store {
                     default_title
                 }
             });
-            crate::m5::validate_name("title", &title, 140)?;
+            if !untitled {
+                crate::m5::validate_name("title", &title, 140)?;
+            }
             let item = RefItem {
                 audit: a,
                 kind: input.kind,
@@ -307,12 +336,42 @@ impl Store {
         id: &str,
         input: ReferencePatch,
     ) -> Result<RefItem> {
+        self.update_reference_with_expectation(actor, id, input, None)
+    }
+
+    /// Human autosave checks the content it actually inspected in the same
+    /// immediate transaction as the patch. Geometry/tag-only changes are not
+    /// overwritten by this content patch and do not create spurious conflicts.
+    pub fn update_reference_checked(
+        &self,
+        actor: &str,
+        id: &str,
+        input: ReferencePatch,
+        expected: ReferenceContentExpectation,
+    ) -> Result<RefItem> {
+        self.update_reference_with_expectation(actor, id, input, Some(expected))
+    }
+
+    fn update_reference_with_expectation(
+        &self,
+        actor: &str,
+        id: &str,
+        input: ReferencePatch,
+        expected: Option<ReferenceContentExpectation>,
+    ) -> Result<RefItem> {
         self.write(|c| {
             crate::service::member(c, actor)?;
             let item: RefItem = fetch(c, "ref_items", "id", id)?;
             editable_audit(&item.audit)?;
+            if expected.as_ref().is_some_and(|expected| {
+                expected.title != item.title || expected.caption != item.caption_md
+            }) {
+                return Err(Error::Conflict);
+            }
             let mut patch = serde_json::to_value(input)?;
-            if let Some(title) = patch["title"].as_str() {
+            if let Some(title) = patch["title"].as_str()
+                && !(expected.is_some() && item.kind == "note" && title.is_empty())
+            {
                 crate::m5::validate_name("title", title, 140)?;
             }
             if let Some(tags) = patch.get("tags") {

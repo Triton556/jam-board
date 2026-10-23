@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
-import { useState } from "react";
-import type { Question } from "../../bindings";
+import { useEffect, useRef, useState } from "react";
+import type { AppState, Question } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import {
   Avatar,
@@ -14,6 +14,7 @@ import {
 } from "../../components/ui";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { PageHeading } from "../../components/ui/m5";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
@@ -21,8 +22,17 @@ import {
   questionsQuery,
   storiesQuery,
 } from "../../lib/planning-queries";
-import { membersQuery, tasksQuery } from "../../lib/queries";
-export function QuestionCard({ question: q }: { question: Question }) {
+import { appQuery, membersQuery, tasksQuery } from "../../lib/queries";
+import { useExplicitRead } from "../../lib/use-explicit-read";
+import { ExecutionRequests } from "../execution/ExecutionRequests";
+import { AnswerContinuation } from "./AnswerContinuation";
+export function QuestionCard({
+  question: q,
+  onDecision,
+}: {
+  question: Question;
+  onDecision?(question: Question): void;
+}) {
   const members = useQuery(membersQuery),
     epics = useQuery(epicsQuery),
     stories = useQuery(storiesQuery),
@@ -32,19 +42,44 @@ export function QuestionCard({ question: q }: { question: Question }) {
     [text, setText] = useState(""),
     [menu, setMenu] = useState(false);
   const client = useQueryClient();
+  const epoch = useRef(0);
+  const answerEpoch = useRef(0);
+  useEffect(() => {
+    let project = client.getQueryData<AppState>(["app"])?.jam?.id;
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.query.queryKey[0] !== "app") return;
+      const next = client.getQueryData<AppState>(["app"])?.jam?.id;
+      if (next !== project) {
+        project = next;
+        epoch.current++;
+      }
+    });
+    return () => {
+      epoch.current++;
+      unsubscribe();
+    };
+  }, [client]);
   const actor = members.data?.find((m) => m.id === q.askedBy);
   const answer = useMutation({
-    mutationFn: () =>
-      api.answerQuestion({
+    mutationFn: () => {
+      answerEpoch.current = epoch.current;
+      return api.answerQuestion({
         id: q.id,
         answerIndex: selected,
         answerText: text.trim() || null,
-      }),
-    onSuccess: () => invalidatePlanning(client),
+      });
+    },
+    onSuccess: (question) => {
+      if (answerEpoch.current === epoch.current) onDecision?.(question);
+      invalidatePlanning(client);
+    },
   });
   const withdraw = useMutation({
     mutationFn: () => api.withdrawQuestion(q.id),
-    onSuccess: () => invalidatePlanning(client),
+    onSuccess: (question) => {
+      onDecision?.(question);
+      invalidatePlanning(client);
+    },
   });
   const epic = epics.data?.find((e) => e.id === q.epicId),
     task = Object.values(tasks.data ?? {})
@@ -105,7 +140,12 @@ export function QuestionCard({ question: q }: { question: Question }) {
           <MoreHorizontal size={18} />
         </IconButton>
         {menu && pending && (
-          <Button onClick={() => withdraw.mutate()}>Withdraw</Button>
+          <Button
+            disabled={answer.isPending || withdraw.isPending}
+            onClick={() => withdraw.mutate()}
+          >
+            Withdraw
+          </Button>
         )}
       </div>
       <h3>{q.title}</h3>
@@ -143,7 +183,11 @@ export function QuestionCard({ question: q }: { question: Question }) {
           )}
           <Button
             variant="primary"
-            disabled={(selected === null && !text.trim()) || answer.isPending}
+            disabled={
+              (selected === null && !text.trim()) ||
+              answer.isPending ||
+              withdraw.isPending
+            }
             onClick={() => answer.mutate()}
           >
             Answer
@@ -158,42 +202,101 @@ export function QuestionCard({ question: q }: { question: Question }) {
           {q.answerText && <Markdown>{q.answerText}</Markdown>}
         </div>
       )}
+      <AnswerContinuation key={`${q.jamId}:${q.id}`} question={q} />
       {(answer.error || withdraw.error) && (
         <p role="alert">{(answer.error ?? withdraw.error)?.message}</p>
       )}
     </article>
   );
 }
-export function QuestionList({
+type QuestionListProps = { epicId?: string; status?: string };
+export function QuestionList(props: QuestionListProps) {
+  const app = useQuery(appQuery);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [decision, setDecision] = useState<Question | null>(null);
+  useEffect(() => {
+    if (decision) heading.current?.focus();
+  }, [decision]);
+  return (
+    <section aria-label="Questions">
+      <h2 ref={heading} tabIndex={-1}>
+        Questions
+      </h2>
+      {decision && decision.jamId === app.data?.jam?.id && (
+        <p role="status" className="execution-feedback">
+          {decision.status === "answered"
+            ? `Answer saved for “${decision.title}”. The connected brain can read it and update the plan; this does not start work.`
+            : `“${decision.title}” was withdrawn. No work was started.`}
+        </p>
+      )}
+      {(props.status ?? "open") === "open" &&
+        decision?.status === "answered" &&
+        decision.jamId === app.data?.jam?.id && (
+          <AnswerContinuation
+            key={`${decision.jamId}:${decision.id}`}
+            question={decision}
+          />
+        )}
+      <QuestionListContent {...props} onDecision={setDecision} />
+    </section>
+  );
+}
+function QuestionListContent({
   epicId,
   status = "open",
-}: {
-  epicId?: string;
-  status?: string;
+  onDecision,
+}: QuestionListProps & {
+  onDecision(question: Question): void;
 }) {
   const questions = useQuery(questionsQuery),
     epics = useQuery(epicsQuery);
+  const read = useExplicitRead(
+    JSON.stringify(["questions", epicId ?? null, status]),
+  );
+  const refresh = () =>
+    void read.run(() => questions.refetch({ cancelRefetch: false }));
   const filtered =
     questions.data?.filter(
       (q) => q.status === status && (!epicId || q.epicId === epicId),
     ) ?? [];
   if (questions.isPending) return <PaperSkeleton label="Loading questions" />;
-  if (questions.error)
+  if (questions.error && !questions.data)
     return (
-      <QueryError
-        error={questions.error}
-        retry={() => void questions.refetch()}
-      />
-    );
-  if (!filtered.length)
-    return (
-      <EmptyState text="No questions right now">
-        <Button onClick={() => void questions.refetch()}>Refresh</Button>
-      </EmptyState>
+      <>
+        <QueryError
+          error={questions.error}
+          retry={refresh}
+          busy={read.pending || questions.isFetching}
+        />
+        <ReadReceipt
+          checkedAt={read.checkedAt}
+          phase={read.phase}
+          resource="questions"
+        />
+      </>
     );
   const groups = [...new Set(filtered.map((q) => q.epicId ?? "project"))];
   return (
     <div className="question-groups">
+      <Button
+        onClick={refresh}
+        disabled={read.pending || questions.isFetching}
+        aria-busy={read.pending || questions.isFetching}
+      >
+        {read.pending ? "Checking questions…" : "Refresh"}
+      </Button>
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="questions"
+      />
+      {questions.error && (
+        <p role="alert">
+          Could not refresh questions. Showing the last loaded questions; your
+          answer draft is kept. {questions.error.message}
+        </p>
+      )}
+      {!filtered.length && <EmptyState text="No questions right now" />}
       {groups.map((id) => {
         const epic = epics.data?.find((e) => e.id === id);
         const rows = filtered.filter((q) => (q.epicId ?? "project") === id);
@@ -214,7 +317,11 @@ export function QuestionList({
                   {rows
                     .filter((q) => (q.roundLabel ?? "Questions") === round)
                     .map((q) => (
-                      <QuestionCard key={q.id} question={q} />
+                      <QuestionCard
+                        key={q.id}
+                        question={q}
+                        onDecision={onDecision}
+                      />
                     ))}
                 </section>
               ),
@@ -226,7 +333,48 @@ export function QuestionList({
   );
 }
 export function InboxPage() {
-  const [status, setStatus] = useState("open");
+  const search = useRouterState({
+    select: (state) => state.location.search,
+  }) as { question?: string; status?: string };
+  const [status, setStatus] = useState(
+    ["open", "answered", "withdrawn"].includes(search.status ?? "")
+      ? (search.status ?? "open")
+      : "open",
+  );
+  const questions = useQuery(questionsQuery);
+  const appliedQuestion = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!search.question) {
+      appliedQuestion.current = undefined;
+      return;
+    }
+    if (appliedQuestion.current === search.question) return;
+    const question = questions.data?.find((q) => q.id === search.question);
+    if (question) {
+      setStatus(question.status);
+      appliedQuestion.current = question.id;
+    }
+  }, [search.question, questions.data]);
+  const focusedQuestion = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!search.question) {
+      focusedQuestion.current = undefined;
+      return;
+    }
+    if (
+      focusedQuestion.current === search.question ||
+      !questions.data?.some(
+        (q) => q.id === search.question && q.status === status,
+      )
+    )
+      return;
+    const card = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-question-id]"),
+    ).find((node) => node.dataset.questionId === search.question);
+    card?.scrollIntoView({ block: "center" });
+    card?.focus();
+    if (card) focusedQuestion.current = search.question;
+  }, [search.question, questions.data, status]);
   return (
     <main className="feature-page inbox-page">
       <PageHeading title="Inbox" note="a good question is a useful next step">
@@ -241,7 +389,16 @@ export function InboxPage() {
           ]}
         />
       </PageHeading>
+      {search.question &&
+        questions.isSuccess &&
+        !questions.data.some((q) => q.id === search.question) && (
+          <p role="alert">
+            This question is no longer available in this project. Other Inbox
+            items are shown below.
+          </p>
+        )}
       <div className="inbox-scroll">
+        <ExecutionRequests status={status} />
         <QuestionList status={status} />
       </div>
     </main>

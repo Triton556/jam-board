@@ -1,18 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button, Drawer, Stamp } from "../../components/ui";
-import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import {
+  PaperSkeleton,
+  QueryError,
+  QueryRefreshNotice,
+} from "../../components/ui/AsyncState";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
   invalidatePlanning,
   questionsQuery,
 } from "../../lib/planning-queries";
+import { ExecutionControls } from "../execution/ExecutionControls";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
+import { AgentPlan } from "./AgentPlan";
+import { BrainHandoff } from "./BrainHandoff";
+import { NewPlanningDialog } from "./NewPlanningDialog";
 import {
-  NewTaskDialog,
+  type PlanningSaveState,
   PlanningStatus,
   SavedMarkdown,
 } from "./PlanningControls";
@@ -45,6 +53,20 @@ export function StoryDrawer({
   const client = useQueryClient(),
     navigate = useNavigate();
   const [newTask, setNewTask] = useState(false);
+  const [planSaves, setPlanSaves] = useState<Record<string, PlanningSaveState>>(
+    {},
+  );
+  const reportPlanSave = useCallback(
+    (identity: string, state: PlanningSaveState | null) => {
+      setPlanSaves((current) => {
+        const next = { ...current };
+        if (state) next[identity] = state;
+        else delete next[identity];
+        return next;
+      });
+    },
+    [],
+  );
   const story = query.data?.story,
     epic = epics.data?.find((e) => e.id === story?.epicId);
   const save = useMutation({
@@ -59,9 +81,17 @@ export function StoryDrawer({
   });
   return (
     <Drawer title={storyKey} onClose={close}>
+      {query.error && story && (
+        <QueryRefreshNotice
+          error={query.error}
+          resource={`story ${story.key}`}
+          busy={query.isFetching}
+          retry={() => void query.refetch()}
+        />
+      )}
       {query.isPending ? (
         <PaperSkeleton label="Loading story" />
-      ) : query.error ? (
+      ) : query.error && !query.data ? (
         <QueryError error={query.error} retry={() => void query.refetch()} />
       ) : (
         story && (
@@ -91,10 +121,29 @@ export function StoryDrawer({
                 disabled={story.status === "archived"}
               />
             </div>
+            <SavedMarkdown
+              key={`${story.id}:outcomeMd`}
+              identity={`${story.id}:outcomeMd`}
+              label="Description"
+              hint="Describe the outcome you want in your own words. The brain can refine the details."
+              value={story.outcomeMd}
+              save={(value) => api.updateStory(storyKey, { outcomeMd: value })}
+              disabled={story.status === "archived"}
+            />
             <PlanningStatus
               level="Story"
               entityKey={storyKey}
               value={story.status}
+            />
+            <div className="planning-tools">
+              <BrainHandoff
+                scope={{ type: "story", id: story.id, key: story.key }}
+                disabled={story.status === "archived"}
+              />
+            </div>
+            <ExecutionControls
+              key={`execution:${story.id}`}
+              scope={{ type: "story", id: story.id }}
             />
             {questions.data?.some(
               (q) =>
@@ -102,25 +151,45 @@ export function StoryDrawer({
                 q.scopeType === "story" &&
                 q.scopeId === story.id,
             ) && <Stamp className="needs-info">Needs info</Stamp>}
-            {intentFields.map(([field, label]) => (
-              <SavedMarkdown
-                key={`${story.id}:${field}`}
-                label={label}
-                value={story[field]}
-                save={(value) => api.updateStory(storyKey, { [field]: value })}
-                disabled={story.status === "archived"}
-              />
-            ))}
-            <AcceptanceDraft
+            <AgentPlan
               key={story.id}
-              identity={`${story.id}:acceptance`}
-              value={story.acceptance}
-              disabled={story.status === "archived"}
-              save={(acceptance) =>
-                save.mutateAsync({ key: storyKey, patch: { acceptance } })
-              }
-            />
-            {save.error && <p role="alert">{save.error.message}</p>}
+              readLatest={() => void query.refetch()}
+              reading={query.isFetching}
+              saveStates={[
+                ...Object.entries(planSaves)
+                  .filter(([identity]) => identity.startsWith(`${story.id}:`))
+                  .map(([, state]) => state),
+                {
+                  label: "Acceptance criteria",
+                  pending: save.isPending,
+                  error: save.error,
+                },
+              ]}
+              summary={`${story.acceptance.length} acceptance criteria · context and boundaries`}
+            >
+              {intentFields.slice(1).map(([field, label]) => (
+                <SavedMarkdown
+                  key={`${story.id}:${field}`}
+                  identity={`${story.id}:${field}`}
+                  onSaveState={reportPlanSave}
+                  label={label}
+                  value={story[field]}
+                  save={(value) =>
+                    api.updateStory(storyKey, { [field]: value })
+                  }
+                  disabled={story.status === "archived"}
+                />
+              ))}
+              <AcceptanceDraft
+                key={story.id}
+                identity={`${story.id}:acceptance`}
+                value={story.acceptance}
+                disabled={story.status === "archived"}
+                save={(acceptance) =>
+                  save.mutateAsync({ key: storyKey, patch: { acceptance } })
+                }
+              />
+            </AgentPlan>
             <div className="section-heading">
               <h2>Tasks</h2>
               <Button
@@ -137,8 +206,8 @@ export function StoryDrawer({
             />
             <TaskRows rows={query.data?.tasks ?? []} openTask={openTask} />
             {newTask && (
-              <NewTaskDialog
-                storyKey={story.key}
+              <NewPlanningDialog
+                target={{ kind: "task", storyKey: story.key }}
                 close={() => setNewTask(false)}
                 created={openTask}
               />

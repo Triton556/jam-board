@@ -1,24 +1,26 @@
-﻿import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import boardImage from "../../assets/chibi/duo-board-512.webp";
 import { Button } from "../../components/ui";
 import { api } from "../../lib/api";
+import { acceptProjectSelection } from "../../lib/project-selection";
 import {
   localDate,
   type Template,
   templateInfo,
   templates,
 } from "../../lib/project-template";
+import { appQuery } from "../../lib/queries";
 export const welcomeSchema = z
   .object({
     name: z
       .string()
       .trim()
-      .min(1, "Give your jam a name")
+      .min(1, "Give your project a name")
       .max(60, "Use at most 60 characters"),
     theme: z.string(),
     startsAt: z.string(),
@@ -53,6 +55,7 @@ type Fields = z.infer<typeof welcomeSchema>;
 export function Welcome() {
   const client = useQueryClient(),
     navigate = useNavigate();
+  const app = useQuery(appQuery);
   const [step, setStep] = useState(1),
     [template, setTemplate] = useState<Template>("game_jam");
   const {
@@ -68,14 +71,14 @@ export function Welcome() {
       startsAt: localDate(new Date().toISOString()),
       endsAt: localDate(new Date(Date.now() + 48 * 3600000).toISOString()),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      yourName: "",
+      yourName: app.data?.currentMember?.name ?? "",
       template: "game_jam",
       milestoneAt: "",
     },
   });
-  const finish = async () => {
-    await client.invalidateQueries();
-    await navigate({ to: "/board" });
+  const finish = async (state: Awaited<ReturnType<typeof api.appState>>) => {
+    await acceptProjectSelection(client, state);
+    await navigate({ to: "/board", ignoreBlocker: true });
   };
   const create = useMutation({
     mutationFn: (v: Fields) =>
@@ -98,6 +101,7 @@ export function Welcome() {
     onSuccess: finish,
   });
   const busy = create.isPending || demo.isPending;
+  useBlocker({ shouldBlockFn: () => busy, enableBeforeUnload: busy });
   const info = templateInfo(template);
   return (
     <main className={`welcome ${step === 1 ? "welcome-templates" : ""}`}>
@@ -119,6 +123,13 @@ export function Welcome() {
         <span className="hand-note">we'll keep the board tidy</span>
       </div>
       <div className="welcome-content">
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={() => void navigate({ to: "/projects" })}
+        >
+          ← Your projects
+        </Button>
         <span className="eyebrow">JAM BOARD · STEP {step} OF 2</span>
         <h1>
           {step === 1
@@ -223,7 +234,7 @@ export function Welcome() {
                 Your name
                 <input
                   {...register("yourName")}
-                  placeholder="How should we call you?"
+                  placeholder="What should we call you?"
                   aria-invalid={!!errors.yourName}
                 />
               </label>
@@ -234,7 +245,7 @@ export function Welcome() {
               )}
               <Button variant="primary" type="submit" disabled={busy}>
                 {create.isPending
-                  ? "Making room…"
+                  ? "Creating project…"
                   : template === "game_jam"
                     ? "Create jam"
                     : "Create project"}

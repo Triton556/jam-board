@@ -121,10 +121,22 @@ export function FileDropZone({
     </div>
   );
 }
-export function CodeBlock({ code, onCopy }: { code: string; onCopy(): void }) {
+export function CodeBlock({
+  code,
+  onCopy,
+  disabled = false,
+  pending = false,
+}: {
+  code: string;
+  onCopy(): void;
+  disabled?: boolean;
+  pending?: boolean;
+}) {
   return (
     <div className="code-block">
-      <Button onClick={onCopy}>Copy</Button>
+      <Button onClick={onCopy} disabled={disabled || pending}>
+        {pending ? "Copying…" : "Copy"}
+      </Button>
       <pre>
         <code>
           {code.split("\n").map((line) => (

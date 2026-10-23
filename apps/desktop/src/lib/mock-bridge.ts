@@ -4,12 +4,18 @@ import type { JamApi } from "./api";
 import fixture from "./demo-fixture.json";
 import { makeSnippets } from "./mcp-config";
 import {
+  emptyExecution,
+  MockExecution,
+  type MockExecutionData,
+} from "./mock-execution";
+import {
   MockPlanning,
   mockReadiness,
   type PlanData,
   validateBrief,
 } from "./mock-planning";
 import { emptyCanvas, MockReferences } from "./mock-references";
+import type { ProjectSummary } from "./project-api";
 import { tagSuggestions, templateInfo } from "./project-template";
 import type { ReferenceInput } from "./references-api";
 import type {
@@ -50,7 +56,8 @@ export type AgentSimulation = {
     | "agent.status"
     | "report.submitted"
     | "question.asked"
-    | "reference.added";
+    | "reference.added"
+    | "execution.requested";
   reference?: ReferenceInput;
   scope?: Scope;
   text?: string;
@@ -65,7 +72,107 @@ export type AgentSimulation = {
   patch?: Omit<UpdateInput, "key" | "expectedUpdatedAt">;
 };
 const clone = <T>(value: T): T => structuredClone(value);
+type MockProjectSnapshot = {
+  state: AppState;
+  tasks: TaskDetail[];
+  planData: PlanData;
+  executionData: MockExecutionData;
+  members: Member[];
+  assets: Asset[];
+  activity: ActivityEvent[];
+  canvasData: import("../bindings").ReferenceCanvas;
+  canvasViewportValue: string | null;
+  archived: boolean;
+};
 export class MockBridge implements JamApi {
+  private projects: Record<string, MockProjectSnapshot> = {};
+  private snapshot(archived = false): MockProjectSnapshot {
+    return clone({
+      state: this.state,
+      tasks: this.tasks,
+      planData: this.planData,
+      executionData: this.executionData,
+      members: this.members,
+      assets: this.assets,
+      activity: this.activity,
+      canvasData: this.canvasData,
+      canvasViewportValue: this.canvasViewportValue,
+      archived,
+    });
+  }
+  private stashProject(archived = false) {
+    if (this.state.jam)
+      this.projects[this.state.jam.id] = this.snapshot(archived);
+  }
+  private openProject(project: MockProjectSnapshot) {
+    const theme = this.state.theme;
+    const { archived: _archived, ...data } = clone(project);
+    Object.assign(this, data);
+    this.executionData = data.executionData ?? emptyExecution();
+    this.state.theme = theme;
+    this.state.hasJam = true;
+    if (this.state.jam) delete this.projects[this.state.jam.id];
+    this.checkpoint();
+  }
+  private nextProjectPrefix() {
+    const used = new Set([
+      this.state.jam?.keyPrefix,
+      ...Object.values(this.projects).map((p) => p.state.jam?.keyPrefix),
+    ]);
+    let suffix = 1;
+    while (used.has(suffix === 1 ? "JB" : `JB${suffix}`)) suffix++;
+    return suffix === 1 ? "JB" : `JB${suffix}`;
+  }
+  async listProjects(includeArchived = false): Promise<ProjectSummary[]> {
+    await this.call("list_projects", { includeArchived });
+    const snapshots = [
+      ...Object.values(this.projects),
+      ...(this.state.jam ? [this.snapshot()] : []),
+    ];
+    return snapshots
+      .flatMap((p) =>
+        p.state.jam && (includeArchived || !p.archived)
+          ? [
+              {
+                ...p.state.jam,
+                archived: p.archived,
+                selected: p.state.jam?.id === this.state.jam?.id,
+                taskCount: p.tasks.filter((t) => !t.archivedAt).length,
+                inProgressCount: p.tasks.filter(
+                  (t) => t.status === "in_progress",
+                ).length,
+              },
+            ]
+          : [],
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  async selectProject(projectId: string) {
+    await this.call("select_project", { projectId });
+    if (this.state.jam?.id === projectId) return clone(this.state);
+    const project = this.projects[projectId];
+    if (!project) throw new JamError("not_found", "Project not found");
+    if (project.archived)
+      throw new JamError("archived", "Restore this project first");
+    this.stashProject();
+    this.openProject(project);
+    return clone(this.state);
+  }
+  async restoreProject(projectId: string) {
+    await this.call("restore_project", { projectId });
+    if (this.state.jam?.id === projectId) return clone(this.state);
+    const project = this.projects[projectId];
+    if (!project) throw new JamError("not_found", "Project not found");
+    this.stashProject();
+    this.openProject(project);
+    return clone(this.state);
+  }
+  /** Unit-test fixture reset; unlike the product action this deliberately replaces all mock data. */
+  async resetDemo() {
+    this.projects = {};
+    this.state.jam = null;
+    return this.loadDemoJam();
+  }
   private canvasData = emptyCanvas();
   private canvas = new MockReferences({
     data: () => this.canvasData,
@@ -83,7 +190,8 @@ export class MockBridge implements JamApi {
     save: () => this.checkpoint(),
   });
   referenceCanvas = () => this.canvas.snapshot();
-  addReference: JamApi["addReference"] = (input) => this.canvas.add(input);
+  addReference: JamApi["addReference"] = (input, untitled) =>
+    this.canvas.add(input, undefined, untitled);
   updateReference: JamApi["updateReference"] = (...a) =>
     this.canvas.update(...a);
   linkReference: JamApi["linkReference"] = (...a) => this.canvas.link(...a);
@@ -205,6 +313,46 @@ export class MockBridge implements JamApi {
   };
   private tasks: TaskDetail[] = [];
   private planData: PlanData = { epics: [], stories: [], questions: [] };
+  private executionData = emptyExecution();
+  private execution = new MockExecution({
+    data: () => this.executionData,
+    plan: () => this.planData,
+    tasks: () => this.tasks,
+    project: () => this.state.jam,
+    human: () => this.human(),
+    call: (name, input) => this.call(name, input),
+    changed: (action, actor, scope) =>
+      this.event(
+        action,
+        actor,
+        undefined,
+        { scope },
+        scope.type === "epic"
+          ? scope.id
+          : this.planData.stories.find((story) => story.id === scope.id)
+              ?.epicId,
+      ),
+  });
+  getExecution: JamApi["getExecution"] = (scope) => this.execution.get(scope);
+  listExecution: JamApi["listExecution"] = () => this.execution.list();
+  setExecution: JamApi["setExecution"] = (input) => this.execution.set(input);
+  listExecutionRequests: JamApi["listExecutionRequests"] = (status) =>
+    this.execution.requests(status);
+  resolveExecutionRequest: JamApi["resolveExecutionRequest"] = (input) =>
+    this.execution.resolve(input);
+  /** Explicit human fixture actions for tests unrelated to the execution gate. */
+  async startAllDemoScopes() {
+    for (const epic of this.planData.epics.filter(
+      (epic) => !epic.archivedAt && epic.status !== "done",
+    )) {
+      const state = await this.getExecution({ type: "epic", id: epic.id });
+      await this.setExecution({
+        scope: state.scope,
+        action: "start",
+        expectedRevision: state.revision,
+      });
+    }
+  }
   private planning = new MockPlanning({
     data: () => this.planData,
     tasks: () => this.tasks,
@@ -214,8 +362,7 @@ export class MockBridge implements JamApi {
     call: (c, i) => this.call(c, i),
     checkpoint: () => this.checkpoint(),
     emit: (...args) => this.event(...args),
-    move: (key, overrideReason) =>
-      this.moveTask({ key, status: "ready", overrideReason }),
+    move: (input) => this.moveTask({ ...input, status: "ready" }),
   });
   listEpics = () => this.planning.listEpics();
   listStories = async () => {
@@ -276,7 +423,12 @@ export class MockBridge implements JamApi {
   private soundEnabled = false;
   private boardSettings: Record<
     string,
-    { colorBy: string; estimatesEnabled: boolean; wipLimit: number }
+    {
+      colorBy: string;
+      estimatesEnabled: boolean;
+      wipLimit: number;
+      projectFolder?: string | null;
+    }
   > = {};
   private assetsView = "grid";
   private collapsedAssetKinds: string[] = [];
@@ -344,10 +496,12 @@ export class MockBridge implements JamApi {
         sessionStorage.setItem(
           "jam.mock",
           JSON.stringify({
+            projects: this.projects,
             skillPath: this.skillPath,
             canvasData: this.canvasData,
             canvasViewportValue: this.canvasViewportValue,
             planData: this.planData,
+            executionData: this.executionData,
             state: this.state,
             tasks,
             contexts,
@@ -396,6 +550,25 @@ export class MockBridge implements JamApi {
     epicId?: string,
     sentence = "",
   ) {
+    if (action === "epic.status" || action === "story.status") {
+      const type = action === "epic.status" ? "epic" : "story";
+      const fields =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? payload
+          : {};
+      const entity = (
+        type === "epic" ? this.planData.epics : this.planData.stories
+      ).find((item) => item.key === fields.key);
+      this.execution.revokeClosed(
+        actor,
+        false,
+        fields.wasClosed && entity ? { type, id: entity.id } : undefined,
+      );
+    }
+    if (action === "jam.archived") this.execution.revokeClosed(actor, true);
+    if (task) this.planning.sync(task);
+    else if (action.startsWith("epic.") || action.startsWith("story."))
+      this.planning.sync();
     const event: ActivityEvent = {
       seq: (this.activity.at(-1)?.seq ?? 0) + 1,
       action,
@@ -438,16 +611,15 @@ export class MockBridge implements JamApi {
     input: import("../bindings").SkillInput,
   ): Promise<import("../bindings").SkillCheck> {
     await this.call("skill_check", input);
-    this.skillPath = input.playbook;
+    this.skillPath = input.target;
     this.checkpoint();
     return {
-      version: input.playbook ? "1.3.0" : null,
-      python: "py -3",
-      pythonVersion: "Python 3.14.5",
-      errors: [
-        ...(!input.playbook ? ["Choose a local agent-playbook folder"] : []),
-        ...(!input.target ? ["Choose an existing project folder"] : []),
-      ],
+      version: "0.3.0-alpha.41",
+      destination: input.target
+        ? `${input.target.replace(/[\\/]$/, "")}/${input.client === "claude" ? ".claude" : ".agents"}/skills/jam-board`
+        : null,
+      status: input.target ? "new" : "blocked",
+      errors: !input.target ? ["Choose an existing project folder"] : [],
     };
   }
   onSkillOutput(cb: (line: string) => void) {
@@ -463,7 +635,7 @@ export class MockBridge implements JamApi {
     await this.call("run_skill", { input, step });
     this.skillCancelled = false;
     for (const cb of this.skillListeners)
-      cb(`${step} ${input.client} ${input.profile}`);
+      cb(`${step} ${input.client} Jam Board skill → ${input.target}`);
     await new Promise((r) => setTimeout(r, 100));
     return {
       exitCode: this.skillCancelled ? null : 0,
@@ -528,7 +700,6 @@ export class MockBridge implements JamApi {
     return this.getProject();
   }
   async createJam(input: NewJamInput) {
-    this.canvasData = emptyCanvas();
     await this.call("create_jam", input);
     if (
       !input.name.trim() ||
@@ -542,6 +713,11 @@ export class MockBridge implements JamApi {
         "validation",
         "Check the jam name, your name and dates",
       );
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
+    this.canvasData = emptyCanvas();
+    this.canvasViewportValue = null;
+    this.assets = [];
     const now = new Date().toISOString();
     const human: Member = {
       id: crypto.randomUUID(),
@@ -557,6 +733,7 @@ export class MockBridge implements JamApi {
     this.members = [human];
     this.tasks = [];
     this.planData = { epics: [], stories: [], questions: [] };
+    this.executionData = emptyExecution();
     this.activity = [];
     this.state = {
       ...this.state,
@@ -577,7 +754,7 @@ export class MockBridge implements JamApi {
             ? (input.milestoneAt ?? null)
             : null,
         taskSeq: 0,
-        keyPrefix: "JB",
+        keyPrefix: prefix,
         createdAt: now,
       },
     };
@@ -586,13 +763,38 @@ export class MockBridge implements JamApi {
   }
   async loadDemoJam() {
     await this.call("load_demo_jam");
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
     // TypeScript infers optional `undefined` keys for heterogeneous JSON unions;
     // the Rust exporter guarantees the wire types and JSON has no undefined.
-    const data = clone(fixture) as unknown as {
+    const ids = new Map<string, string>();
+    for (const item of [
+      ...fixture.details,
+      ...fixture.epics,
+      ...fixture.stories,
+      ...fixture.questions,
+      ...fixture.assets,
+    ])
+      ids.set(item.id, crypto.randomUUID());
+    const remapDemo = (value: unknown): unknown => {
+      if (typeof value === "string")
+        return ids.get(value) ?? value.replace(/^JB(?=-[ES]?\d+$)/, prefix);
+      if (Array.isArray(value)) return value.map(remapDemo);
+      if (value && typeof value === "object")
+        return Object.fromEntries(
+          Object.entries(value).map(([key, v]) => [key, remapDemo(v)]),
+        );
+      return value;
+    };
+    const data = remapDemo(clone(fixture)) as {
       app: AppState;
       members: Member[];
       details: TaskDetail[];
       activity: ActivityEvent[];
+      assets: Asset[];
+      epics: PlanData["epics"];
+      stories: PlanData["stories"];
+      questions: PlanData["questions"];
     };
     const now = new Date().toISOString();
     const jamId = crypto.randomUUID();
@@ -600,7 +802,9 @@ export class MockBridge implements JamApi {
     this.state = {
       ...data.app,
       theme: this.state.theme,
-      jam: data.app.jam ? { ...data.app.jam, id: jamId } : null,
+      jam: data.app.jam
+        ? { ...data.app.jam, id: jamId, keyPrefix: prefix }
+        : null,
     };
     if (this.state.jam)
       this.state.jam.endsAt = new Date(Date.now() + 31 * 3600000).toISOString();
@@ -617,18 +821,19 @@ export class MockBridge implements JamApi {
       epic: { ...task.epic, jamId },
       assets: task.assets.map((asset) => ({ ...asset, jamId })),
     }));
-    this.assets = clone(fixture.assets).map((asset) => ({ ...asset, jamId }));
+    this.assets = data.assets.map((asset) => ({ ...asset, jamId }));
     for (const task of this.tasks) task.history ??= task.activity;
     this.planData = clone({
-      epics: fixture.epics,
-      stories: fixture.stories,
-      questions: fixture.questions,
+      epics: data.epics,
+      stories: data.stories,
+      questions: data.questions,
     }) as PlanData;
     for (const e of this.planData.epics) e.jamId = jamId;
     for (const e of this.planData.stories) e.jamId = jamId;
     for (const q of this.planData.questions) q.jamId = jamId;
     this.planning.sync();
     this.activity = data.activity;
+    this.executionData = emptyExecution();
     this.checkpoint();
     return clone(this.state);
   }
@@ -735,9 +940,9 @@ export class MockBridge implements JamApi {
   }
   async getTask(key: string) {
     await this.call("get_task", key);
-    this.planning.sync();
     const task = this.tasks.find((t) => t.key === key);
     if (!task) throw new JamError("not_found", `Task ${key} was not found`);
+    this.planning.sync(task);
     return clone({
       ...task,
       activity: this.activity.filter((e) => e.taskKey === key).slice(-20),
@@ -751,6 +956,11 @@ export class MockBridge implements JamApi {
   ) {
     const jam = this.state.jam;
     if (!jam) throw new JamError("not_found", "No active jam");
+    if (input.status === "done" && actor.kind !== "human")
+      throw new JamError(
+        "forbidden",
+        "Agents must use independent report review to mark Done",
+      );
     const title = input.title.trim();
     if (!title || title.length > 140)
       throw new JamError("validation", "Use 1–140 characters", "title");
@@ -867,13 +1077,16 @@ export class MockBridge implements JamApi {
       changesRequested: false,
       needsInfo: false,
       reviewRound: 0,
+      claimGeneration: crypto.randomUUID(),
+      reviewContextRevision: null,
     };
+    task.ready = mockReadiness(task).ready;
+    if (task.status === "ready") this.guardReady(task, actor);
+    if (task.status === "in_progress") this.execution.requireTaskStart(task);
     if (!this.planData.epics.some((e) => e.id === epic.id))
       this.planData.epics.push(epic);
     if (!this.planData.stories.some((s) => s.id === story.id))
       this.planData.stories.push(story);
-    task.ready = mockReadiness(task).ready;
-    if (task.status === "ready") this.guardReady(task, actor);
     jam.taskSeq += 1;
     this.tasks.push(task);
     this.event("task.created", actor, task, {
@@ -910,17 +1123,15 @@ export class MockBridge implements JamApi {
     const before = this.tasks.find((t) => t.key === input.beforeKey);
     if (task.archivedAt)
       throw new JamError("archived", "Unarchive this task first");
-    if (
-      input.status === "done" &&
-      actor.kind !== "human" &&
-      task.epic.brainMemberId !== actor.id
-    )
+    if (input.status === "done" && actor.kind !== "human")
       throw new JamError(
         "forbidden",
-        "Only a human or the epic's brain may set Done",
+        "Agents must use independent report review to mark Done",
       );
     if (input.status === "ready" && task.status !== "ready")
       this.guardReady(task, actor, input.overrideReason);
+    if (input.status === "in_progress" && task.status !== "in_progress")
+      this.execution.requireTaskStart(task);
     const after = this.tasks.find((t) => t.key === input.afterKey);
     task.position =
       before && after
@@ -953,8 +1164,46 @@ export class MockBridge implements JamApi {
   }
   async moveTask(input: MoveInput) {
     await this.call("move_task", input);
+    if (!input.expectedUpdatedAt?.trim())
+      throw new JamError(
+        "validation",
+        "A captured task version is required",
+        "expectedUpdatedAt",
+      );
+    if (this.find(input.key).updatedAt !== input.expectedUpdatedAt)
+      throw new JamError(
+        "conflict",
+        "This task changed after the move was prepared. Read the latest task before deciding again.",
+        "expectedUpdatedAt",
+      );
     return this.move(input, this.human());
   }
+  releaseTask: JamApi["releaseTask"] = async (input) => {
+    await this.call("release_task", input);
+    const actor = this.human(),
+      task = this.find(input.key);
+    if (task.updatedAt !== input.expectedUpdatedAt)
+      throw new JamError(
+        "conflict",
+        "This task changed. Review the latest claim before returning it.",
+      );
+    if (!task.assigneeId && task.status !== "in_progress")
+      throw new JamError(
+        "wrong_status",
+        "There is no current claim or In progress work to return",
+      );
+    const oldStatus = task.status,
+      oldHolder = task.assigneeId;
+    task.assigneeId = null;
+    task.status = "backlog";
+    this.touch(task, actor);
+    this.planning.sync();
+    this.event("task.released", actor, task, {
+      status: [oldStatus, "backlog"],
+      assigneeId: [oldHolder, null],
+    });
+    return clone(task);
+  };
   async listMembers() {
     await this.call("list_members");
     return clone(
@@ -1237,6 +1486,8 @@ export class MockBridge implements JamApi {
     return {
       theme: this.state.theme,
       soundEnabled: this.soundEnabled,
+      projectId: this.state.jam?.id ?? null,
+      projectFolder: null,
       colorBy: "epic",
       estimatesEnabled: false,
       wipLimit: 6,
@@ -1252,6 +1503,19 @@ export class MockBridge implements JamApi {
         throw new JamError("validation", "Invalid theme");
     }
     const id = this.state.jam?.id ?? "";
+    if (input.projectFolder != null && input.expectedProjectId !== id)
+      throw new JamError(
+        "conflict",
+        "The project changed before saving its folder",
+      );
+    if (
+      input.projectFolder != null &&
+      (input.projectFolder.length > 4096 ||
+        Array.from(input.projectFolder).some(
+          (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
+        ))
+    )
+      throw new JamError("validation", "Choose a valid project folder");
     if (
       input.colorBy != null &&
       !["none", "assignee", "epic"].includes(input.colorBy)
@@ -1278,6 +1542,10 @@ export class MockBridge implements JamApi {
     if (input.theme != null) this.state.theme = input.theme;
     if (input.soundEnabled != null) this.soundEnabled = input.soundEnabled;
     this.boardSettings[id] = {
+      projectFolder:
+        input.projectFolder != null
+          ? input.projectFolder.trim() || null
+          : (this.boardSettings[id]?.projectFolder ?? null),
       colorBy: input.colorBy ?? this.boardSettings[id]?.colorBy ?? "epic",
       estimatesEnabled:
         input.estimatesEnabled ??
@@ -1295,10 +1563,29 @@ export class MockBridge implements JamApi {
     await this.call("reset_jam", input);
     if (input.confirmName !== this.state.jam?.name)
       throw new JamError("validation", "Type the exact jam name");
-    for (const task of this.tasks) task.archivedAt ??= new Date().toISOString();
+    if (this.tasks.some((task) => task.status === "in_progress"))
+      throw new JamError(
+        "validation",
+        "Tasks are still in progress. Pause new work and let running tasks finish or release them before archiving.",
+      );
     this.event("jam.archived", this.human());
+    this.stashProject(true);
     this.state.hasJam = false;
     this.state.jam = null;
+    this.tasks = [];
+    this.planData = { epics: [], stories: [], questions: [] };
+    this.executionData = emptyExecution();
+    this.assets = [];
+    this.activity = [];
+    this.canvasData = emptyCanvas();
+    const next = Object.values(this.projects)
+      .filter((p) => !p.archived)
+      .sort((a, b) =>
+        (b.state.jam?.createdAt ?? "").localeCompare(
+          a.state.jam?.createdAt ?? "",
+        ),
+      )[0];
+    if (next) this.openProject(next);
     this.checkpoint();
     return clone(this.state);
   }
@@ -1322,7 +1609,8 @@ export class MockBridge implements JamApi {
     const snapshot = clone(this.exported),
       actor = this.human(),
       theme = this.state.theme;
-    const prefix = `JB${(Number(this.state.jam?.keyPrefix.match(/\d+/)?.[0]) || 1) + 1}`;
+    const prefix = this.nextProjectPrefix();
+    this.stashProject();
     const oldKeys = new Map(
       snapshot.tasks.map((t, i) => [t.key, `${prefix}-${i + 1}`]),
     );
@@ -1406,6 +1694,7 @@ export class MockBridge implements JamApi {
     });
     this.activity = snapshot.activity.map(remapEvent);
     this.planData = remap(snapshot.planData);
+    this.executionData = emptyExecution();
     this.canvasData = remap(snapshot.canvasData ?? emptyCanvas());
     this.tasks = snapshot.tasks.map((t) => ({
       ...t,
@@ -1419,6 +1708,8 @@ export class MockBridge implements JamApi {
       references: remap(t.references),
       key: oldKeys.get(t.key) ?? t.key,
       id: mapped(t.id),
+      claimGeneration: crypto.randomUUID(),
+      reviewContextRevision: null,
       jamId: jid,
       createdBy: mapped(t.createdBy),
       updatedBy: mapped(t.updatedBy),
@@ -1461,6 +1752,8 @@ export class MockBridge implements JamApi {
   async mcpStatus() {
     await this.call("mcp_status");
     return {
+      projectId: this.state.jam?.id ?? null,
+      projectKeyPrefix: this.state.jam?.keyPrefix ?? null,
       httpEnabled: this.httpEnabled,
       running: this.httpEnabled,
       port: 47321,
@@ -1532,6 +1825,7 @@ export class MockBridge implements JamApi {
       "report.submitted": "submit_report",
       "question.asked": "ask_user",
       "reference.added": "add_reference",
+      "execution.requested": "request_execution",
     };
     const call = {
       at: new Date().toISOString(),
@@ -1592,6 +1886,15 @@ export class MockBridge implements JamApi {
       this.event("member.joined", actor);
     }
     actor.lastSeenAt = input.lastSeenAt ?? new Date().toISOString();
+    if (input.action === "execution.requested") {
+      if (!input.scope || !["epic", "story"].includes(input.scope.type))
+        throw new JamError("validation", "Choose an epic or story to start");
+      return this.execution.request(
+        { type: input.scope.type as "epic" | "story", id: input.scope.id },
+        input.text ?? "The plan is ready for this scope.",
+        actor,
+      );
+    }
     if (input.action === "reference.added")
       return this.canvas.add(
         input.reference ?? {
@@ -1635,6 +1938,8 @@ export class MockBridge implements JamApi {
       return this.planning.submitReport(
         input.report ?? {
           key: input.key ?? "JB-12",
+          expectedClaimGeneration:
+            this.find(input.key ?? "JB-12").claimGeneration ?? "",
           summaryMd: "Implemented the lantern cue.",
           changedFiles: ["game/lantern.gd"],
           tests: [
@@ -1676,7 +1981,11 @@ export class MockBridge implements JamApi {
       );
     if (input.action === "task.moved")
       return this.move(
-        { key: task.key, status: input.status ?? "review" },
+        {
+          key: task.key,
+          expectedUpdatedAt: task.updatedAt,
+          status: input.status ?? "review",
+        },
         actor,
       );
     if (input.action === "task.claimed") {
@@ -1688,6 +1997,8 @@ export class MockBridge implements JamApi {
           `Expected ready, current status is ${task.status}`,
         );
       this.guardReady(task, actor);
+      if (task.status !== "in_progress" || task.assigneeId !== actor.id)
+        this.execution.requireTaskStart(task);
       task.assigneeId = actor.id;
       task.status = "in_progress";
     } else {
@@ -1739,14 +2050,10 @@ export class MockBridge implements JamApi {
       next.brief = clone(input.brief);
     }
     if (input.status != null) {
-      if (
-        input.status === "done" &&
-        actor.kind !== "human" &&
-        task.epic.brainMemberId !== actor.id
-      )
+      if (input.status === "done" && actor.kind !== "human")
         throw new JamError(
           "forbidden",
-          "Only a human or the epic's brain may set Done",
+          "Agents must use independent report review to mark Done",
         );
       if (input.status === "ready" && task.status !== "ready")
         this.guardReady(next, actor);
@@ -1792,6 +2099,12 @@ export class MockBridge implements JamApi {
             .filter((t) => t.status === next.status && !t.archivedAt)
             .map((t) => t.position ?? 0),
         ) + 1024;
+    if (
+      next.status === "in_progress" &&
+      (task.status !== "in_progress" ||
+        (!!next.assigneeId && next.assigneeId !== task.assigneeId))
+    )
+      this.execution.requireTaskStart(next);
     const payload = Object.fromEntries(
       Object.keys(input)
         .filter((k) => !["key", "expectedUpdatedAt"].includes(k))
@@ -1971,29 +2284,39 @@ export class MockBridge implements JamApi {
       sidecarPath: "C:\\Jam Board\\jam-board-mcp.exe",
     };
   }
-  async seedWorkingPresence(count = 50) {
+  async seedWorkingPresence(count = 50, taskScoped = false) {
     if (
       !(import.meta.env.DEV || import.meta.env.VITE_MOCK_BRIDGE === "1") ||
       count < 1 ||
-      count > 50
+      !Number.isInteger(count) ||
+      count > (taskScoped ? 5000 : 50) ||
+      (taskScoped && count > this.tasks.length)
     )
-      throw new JamError("validation", "Working fixture supports 1–50 agents");
-    await this.call("seed_working_presence", count);
+      throw new JamError(
+        "validation",
+        "Working fixture needs valid agents and one existing task per scoped agent",
+      );
+    await this.call("seed_working_presence", { count, taskScoped });
     const base = this.members.find((m) => m.kind === "agent");
     if (!base) throw new JamError("validation", "Seed bulk tasks first");
     const now = new Date().toISOString();
-    const workers = Array.from({ length: count }, (_, i) => ({
+    const workers: Member[] = Array.from({ length: count }, (_, i) => ({
       ...base,
       id: crypto.randomUUID(),
       name: `Worker ${i + 1}`,
       handle: `perf-worker-${i + 1}`,
       lastSeenAt: now,
       statusAt: now,
-      statusText: "implementing snow tiles",
-      statusScope: null,
+      statusText: "Synthetic QA activity — no real worker session",
+      statusScope: taskScoped
+        ? { type: "task", id: this.tasks[i]?.id ?? "" }
+        : null,
     }));
     this.members.push(...workers);
-    for (const [i, task] of this.tasks.entries()) {
+    // Explicit benchmark-only historical presence, never a grant of new work.
+    // A scoped actor reports activity on exactly one task, not every assignment.
+    const targets = taskScoped ? this.tasks.slice(0, count) : this.tasks;
+    for (const [i, task] of targets.entries()) {
       task.assigneeId = workers[i % workers.length]?.id ?? null;
       task.status = "in_progress";
     }
@@ -2061,18 +2384,20 @@ export class MockBridge implements JamApi {
         .filter((s) => s.status === "active")
         .slice(0, 20);
       for (let i = 0; i < n; i++) {
-        this.create(
+        const created = this.create(
           {
             title: `Bulk task ${i + 1}: polish the lantern village`,
             storyKey: bulkStories[i % bulkStories.length]?.key,
             tags: ["gameplay", i % 2 ? "polish" : "ui"],
             estimate: [1, 2, 3, 5, 8][i % 5],
-            status: statuses[i % 5] ?? "ready",
+            status: "backlog",
             priority: ["low", "medium", "high", "critical"][i % 4],
           },
           this.human(),
           true,
         );
+        // Synthetic historical benchmark data, not a grant of future work.
+        this.find(created.key).status = statuses[i % 5] ?? "ready";
         const task = this.tasks.at(-1);
         if (task)
           task.assigneeId =

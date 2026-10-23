@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  CatchBoundary,
   createRootRoute,
   createRoute,
   createRouter,
@@ -23,6 +24,7 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Boxes,
+  ChevronDown,
   Images,
   Inbox,
   LayoutDashboard,
@@ -43,13 +45,22 @@ import {
   Button,
   EmptyState,
   IconButton,
+  type ModalFocusReturn,
   Stamp,
   Tooltip,
 } from "./components/ui";
+import {
+  LazyDrawerBoundary,
+  LazyPageBoundary,
+} from "./components/ui/LazyBoundary";
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
+import { useBoardReturnFocus } from "./features/board/use-board-return-focus";
+import { NotificationBell } from "./features/notifications/NotificationBell";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
+import { executionRequestsQuery } from "./lib/execution-queries";
+import { useMemberPresenceRefresh } from "./lib/use-member-presence-refresh";
 
 const PlanPage = lazy(() =>
   import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage })),
@@ -85,11 +96,58 @@ const ReferencesPage = lazy(() =>
 
 import { Board } from "./features/board/Board";
 import { CommandCenter } from "./features/command/CommandCenter";
-import { Welcome } from "./features/onboarding/Welcome";
+
+const WelcomeModule = lazy(() =>
+  import("./features/onboarding/Welcome").then((module) => ({
+    default: module.Welcome,
+  })),
+);
+
+function WelcomeLoadError() {
+  return (
+    <main className="loading">
+      <h1>Could not open project setup</h1>
+      <p role="alert">
+        Reload the app to retry loading this screen, or open Projects. Unsaved
+        fields on this screen will be lost on reload.
+      </p>
+      <div className="button-row">
+        <Button onClick={() => window.location.reload()}>Reload app</Button>
+        <Link to="/projects" className="button secondary">
+          Open Projects
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+function Welcome() {
+  return (
+    <CatchBoundary
+      getResetKey={() => "welcome-module"}
+      errorComponent={WelcomeLoadError}
+    >
+      <Suspense
+        fallback={
+          <main className="loading">
+            <p role="status">Loading project setup…</p>
+          </main>
+        }
+      >
+        <WelcomeModule />
+      </Suspense>
+    </CatchBoundary>
+  );
+}
 
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((m) => ({
     default: m.SettingsPage,
+  })),
+);
+const ProjectsPage = lazy(() =>
+  import("./features/projects/ProjectsPage").then((m) => ({
+    default: m.ProjectsPage,
   })),
 );
 
@@ -102,11 +160,20 @@ const LazyTaskDrawer = lazy(() =>
   import("./features/task/TaskDrawer").then((m) => ({ default: m.TaskDrawer })),
 );
 
-function TaskDrawer(props: { taskKey: string; close(): void }) {
+function TaskDrawer(props: {
+  taskKey: string;
+  close(): void;
+  returnFocus?: ModalFocusReturn;
+}) {
   return (
-    <Suspense fallback={null}>
+    <LazyDrawerBoundary
+      title={props.taskKey}
+      kind="task"
+      close={props.close}
+      returnFocus={props.returnFocus}
+    >
       <LazyTaskDrawer {...props} />
-    </Suspense>
+    </LazyDrawerBoundary>
   );
 }
 const TeamPage = lazy(() =>
@@ -114,11 +181,13 @@ const TeamPage = lazy(() =>
 );
 
 import { api } from "./lib/api";
+import { FileDropSessionProvider } from "./lib/file-drop-batch";
 import { preparePaperGrain } from "./lib/grain";
 import { appQuery, boardQuery, membersQuery, tasksQuery } from "./lib/queries";
 import { paperRustle } from "./lib/sound";
 import type { Theme } from "./lib/types";
 import { useUiStore } from "./lib/ui-store";
+import { showReadyWindow } from "./lib/window-ready";
 
 const client = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, retry: false } },
@@ -145,6 +214,7 @@ function applyTheme(theme: string) {
     document.documentElement.dataset.theme;
 }
 function Root() {
+  useMemberPresenceRefresh();
   const app = useQuery(appQuery);
   const allMembers = useQuery({ ...membersQuery, enabled: !!app.data?.hasJam });
   const boardTasks = useQuery({ ...tasksQuery, enabled: !!app.data?.hasJam });
@@ -185,6 +255,7 @@ function Root() {
       }
       for (const queryKey of [
         ["project"],
+        ["projects"],
         ["boardTasks"],
         ["board"],
         ["activity"],
@@ -193,6 +264,8 @@ function Root() {
         ["assets"],
         ["references"],
         ["members"],
+        ["execution"],
+        ["executionRequests"],
         ["epics"],
         ["epic"],
         ["stories"],
@@ -230,34 +303,15 @@ function Root() {
     document.documentElement.dataset.ready = "true";
     if (!shown.current && isTauri()) {
       shown.current = true;
-      void new Promise<void>((resolve) => {
-        const wait = () =>
-          document.querySelector(
-            ".board-columns, .welcome, .identity, .feature-page, .table-page, [role=alert]",
-          )
-            ? resolve()
-            : requestAnimationFrame(wait);
-        wait();
-      })
-        .then(() => document.fonts.ready)
-        .then(
-          () =>
-            new Promise<void>((resolve) =>
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve()),
-              ),
-            ),
-        )
-        .then(() => getCurrentWindow().show())
-        .then(
-          () =>
-            new Promise<void>((resolve) =>
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve()),
-              ),
-            ),
-        )
-        .then(() => api.appReady());
+      void showReadyWindow({
+        fontsReady: document.fonts.ready,
+        show: () => getCurrentWindow().show(),
+        ready: () => api.appReady(),
+      }).catch((error) => {
+        useUiStore
+          .getState()
+          .error(`Could not finish opening the window: ${String(error)}`);
+      });
     }
     scheme.addEventListener("change", apply);
     return () => scheme.removeEventListener("change", apply);
@@ -348,8 +402,11 @@ function Shell() {
     onError: (error) => useUiStore.getState().error(error.message),
   });
   const questions = useQuery(questionsQuery);
+  const startRequests = useQuery(executionRequestsQuery);
   const questionCount =
-    questions.data?.filter((q) => q.status === "open").length ?? 0;
+    (questions.data?.filter((q) => q.status === "open").length ?? 0) +
+    (startRequests.data?.filter((request) => request.status === "pending")
+      .length ?? 0);
   const newTask = useCallback(() => {
     if (location === "/table") {
       window.dispatchEvent(new Event("table-new-task"));
@@ -378,7 +435,7 @@ function Shell() {
                 aria-label={name}
               >
                 <Icon size={20} />
-                {expanded && <span>{name}</span>}
+                <span className="nav-label">{name}</span>
                 {name === "Inbox" && <InboxBadge count={questionCount} />}
               </Link>
             </Tooltip>
@@ -410,13 +467,32 @@ function Shell() {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <div className="jam-name">
-            {board.data?.jam.name ?? app.data.jam?.name}
-          </div>
+          <Link
+            to="/projects"
+            className="project-switcher"
+            aria-label={`Switch project · ${app.data.jam?.name}`}
+            title={app.data.jam?.name}
+          >
+            <span className="project-switcher-label">
+              <small>Switch project</small>
+              <strong className="project-switcher-title">
+                {app.data.jam?.name}
+              </strong>
+            </span>
+            <ChevronDown size={16} />
+          </Link>
           {board.data?.jam.theme && (
             <Stamp className="theme-stamp">{board.data.jam.theme}</Stamp>
           )}
           <div className="topbar-space" />
+          {app.data.jam && (
+            <NotificationBell
+              key={`${app.data.jam.id}:${app.data.currentMember.id}`}
+              projectId={app.data.jam.id}
+              projectName={app.data.jam.name}
+              memberId={app.data.currentMember.id}
+            />
+          )}
           <IconButton label="New task · N" onClick={newTask}>
             <Plus size={17} />
           </IconButton>
@@ -466,6 +542,7 @@ function Shell() {
 }
 function BoardRoute() {
   const search = boardRoute.useSearch();
+  const returnFocus = useBoardReturnFocus(search.task);
   const navigate = useNavigate();
   const open = useCallback(
     (task: string) => {
@@ -489,7 +566,13 @@ function BoardRoute() {
         }
       />
       <Board open={open} epicKeys={search.epics?.split(",") ?? []} />
-      {search.task && <TaskDrawer taskKey={search.task} close={close} />}
+      {search.task && (
+        <TaskDrawer
+          taskKey={search.task}
+          close={close}
+          returnFocus={returnFocus}
+        />
+      )}
     </>
   );
 }
@@ -498,15 +581,17 @@ function TableRoute() {
   const navigate = useNavigate();
   return (
     <>
-      <TaskTable
-        search={search}
-        change={(value) => {
-          void navigate({ to: "/table", search: value });
-        }}
-        open={(task) => {
-          void navigate({ to: "/table", search: { ...search, task } });
-        }}
-      />
+      <LazyPageBoundary label="Table">
+        <TaskTable
+          search={search}
+          change={(value) => {
+            void navigate({ to: "/table", search: value });
+          }}
+          open={(task) => {
+            void navigate({ to: "/table", search: { ...search, task } });
+          }}
+        />
+      </LazyPageBoundary>
       {search.task && (
         <TaskDrawer
           taskKey={search.task}
@@ -538,27 +623,29 @@ function FeatureRoute({ name }: { name: string }) {
     void navigate({ to: path, search: { section: search.section, task } });
   return (
     <>
-      {name === "References" ? (
-        <ReferencesPage />
-      ) : name === "Inbox" ? (
-        <InboxPage />
-      ) : name === "Assets" ? (
-        <AssetsPage openTask={openTask} />
-      ) : name === "Team" ? (
-        <TeamPage
-          openTask={openTask}
-          connect={() =>
-            void navigate({
-              to: "/settings",
-              search: { section: "MCP", task: undefined },
-            })
-          }
-        />
-      ) : name === "Activity" ? (
-        <ActivityPage openTask={openTask} />
-      ) : (
-        <SettingsPage initialSection={search.section} />
-      )}
+      <LazyPageBoundary label={name}>
+        {name === "References" ? (
+          <ReferencesPage />
+        ) : name === "Inbox" ? (
+          <InboxPage />
+        ) : name === "Assets" ? (
+          <AssetsPage openTask={openTask} />
+        ) : name === "Team" ? (
+          <TeamPage
+            openTask={openTask}
+            connect={() =>
+              void navigate({
+                to: "/settings",
+                search: { section: "MCP", task: undefined },
+              })
+            }
+          />
+        ) : name === "Activity" ? (
+          <ActivityPage openTask={openTask} />
+        ) : (
+          <SettingsPage initialSection={search.section} />
+        )}
+      </LazyPageBoundary>
       {search.task && (
         <TaskDrawer
           taskKey={search.task}
@@ -576,12 +663,21 @@ function FeatureRoute({ name }: { name: string }) {
 function Toasts() {
   const toasts = useUiStore((s) => s.toasts);
   const navigate = useNavigate();
+  const container = useRef<HTMLElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   return (
-    <div
+    <section
+      ref={container}
       className="toast-stack"
-      role="status"
       aria-label="Notifications"
-      aria-live="polite"
+      tabIndex={-1}
+      onFocusCapture={(event) => {
+        if (
+          event.relatedTarget instanceof HTMLElement &&
+          !container.current?.contains(event.relatedTarget)
+        )
+          previousFocus.current = event.relatedTarget;
+      }}
     >
       {toasts.map((toast) => (
         // biome-ignore lint/a11y/useSemanticElements: Notifications contain no form fields; fieldset would imply a form.
@@ -595,7 +691,57 @@ function Toasts() {
           onBlur={() => useUiStore.getState().pauseToast(toast.id, false)}
         >
           {toast.actor && <Avatar member={toast.actor} size={32} />}
-          <span>{toast.text}</span>
+          <div className="toast-content">
+            <span role="status" aria-live="polite">
+              {toast.text}
+            </span>
+            {toast.details && (
+              <details className="toast-details" aria-live="off">
+                <summary>File details ({toast.details.length})</summary>
+                {toast.hint && <p>{toast.hint}</p>}
+                {toast.persistent && (
+                  <p>
+                    Kept in this app session only, among the latest three
+                    notices.
+                  </p>
+                )}
+                <ol>
+                  {toast.details.map((detail) => (
+                    <li key={detail.id}>
+                      <strong>{detail.label}</strong>:{" "}
+                      <code>{detail.text}</code>
+                      {detail.note && <p>{detail.note}</p>}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </div>
+          {toast.persistent && (
+            <Button
+              variant="ghost"
+              data-dismiss-receipt={toast.id}
+              onClick={() => {
+                const next = Array.from(
+                  container.current?.querySelectorAll<HTMLButtonElement>(
+                    "[data-dismiss-receipt]",
+                  ) ?? [],
+                ).find((button) => button.dataset.dismissReceipt !== toast.id);
+                useUiStore.getState().dismissToast(toast.id);
+                (
+                  next ??
+                  (previousFocus.current?.isConnected
+                    ? previousFocus.current
+                    : document.querySelector<HTMLElement>(
+                        ".project-switcher",
+                      )) ??
+                  container.current
+                )?.focus();
+              }}
+            >
+              Dismiss receipt
+            </Button>
+          )}
           {(toast.taskKey || toast.href) && (
             <Button
               variant="ghost"
@@ -613,7 +759,7 @@ function Toasts() {
           )}
         </div>
       ))}
-    </div>
+    </section>
   );
 }
 const rootRoute = createRootRoute({
@@ -638,6 +784,18 @@ const welcomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/welcome",
   component: Welcome,
+});
+function ProjectsRoute() {
+  return (
+    <LazyPageBoundary label="Projects">
+      <ProjectsPage />
+    </LazyPageBoundary>
+  );
+}
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
+  component: ProjectsRoute,
 });
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -672,7 +830,15 @@ const placeholders = navigation
       path: item.path,
       validateSearch: (
         search: Record<string, unknown>,
-      ): { task?: string; section?: string } => ({
+      ): {
+        task?: string;
+        section?: string;
+        question?: string;
+        status?: string;
+      } => ({
+        question:
+          typeof search.question === "string" ? search.question : undefined,
+        status: typeof search.status === "string" ? search.status : undefined,
         task: typeof search.task === "string" ? search.task : undefined,
         section:
           typeof search.section === "string" ? search.section : undefined,
@@ -696,18 +862,26 @@ function PlanRoute() {
   };
   return (
     <>
-      <PlanPage
-        epicKey={epicKey}
-        search={search}
-        openTask={(task) => update({ task })}
-        openStory={(story) => update({ story })}
-      />
-      {search.story && (
-        <StoryDrawer
-          storyKey={search.story}
-          close={() => update({ story: undefined })}
+      <LazyPageBoundary label="Plan">
+        <PlanPage
+          epicKey={epicKey}
+          search={search}
           openTask={(task) => update({ task })}
+          openStory={(story) => update({ story })}
         />
+      </LazyPageBoundary>
+      {search.story && (
+        <LazyDrawerBoundary
+          title={search.story}
+          kind="story"
+          close={() => update({ story: undefined })}
+        >
+          <StoryDrawer
+            storyKey={search.story}
+            close={() => update({ story: undefined })}
+            openTask={(task) => update({ task })}
+          />
+        </LazyDrawerBoundary>
       )}{" "}
       {search.task && (
         <TaskDrawer
@@ -760,6 +934,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     indexRoute,
     welcomeRoute,
+    projectsRoute,
     shellRoute.addChildren([
       planRoute,
       epicRoute,
@@ -777,7 +952,9 @@ declare module "@tanstack/react-router" {
 export function App() {
   return (
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <FileDropSessionProvider>
+        <RouterProvider router={router} />
+      </FileDropSessionProvider>
     </QueryClientProvider>
   );
 }

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AudioLines,
   ChevronDown,
@@ -12,7 +12,7 @@ import {
   Package,
   Type,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import {
@@ -23,13 +23,20 @@ import {
   SegmentedControl,
   Select,
   Stamp,
+  TabPanels,
   Tabs,
 } from "../../components/ui";
+import { QueryError } from "../../components/ui/AsyncState";
 import { FileDropZone, PageHeading } from "../../components/ui/m5";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
+import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
+import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
 import { useBoardSettings } from "../../lib/queries";
 import type { Asset, AssetWithTasks } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useExplicitRead } from "../../lib/use-explicit-read";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { useTableVirtualizer } from "../table/use-table-virtualizer";
 import { AssetLinkDialog } from "./AssetLinkDialog";
 import { assetKind, assetKinds, assetName, assetSchema } from "./model";
@@ -55,6 +62,7 @@ export function AssetDialog({
   asset?: Asset;
   close(): void;
 }) {
+  const locationTabs = useId();
   const client = useQueryClient();
   const form = useForm<z.infer<typeof assetSchema>>({
     resolver: zodResolver(assetSchema),
@@ -63,80 +71,127 @@ export function AssetDialog({
       name: asset?.name ?? "",
       location: asset?.location ?? "",
       notes: asset?.notes ?? "",
-      kind: (asset?.kind as (typeof assetKinds)[number]) ?? "sprite",
+      kind: (asset?.kind as (typeof assetKinds)[number]) ?? "other",
     },
   });
   const mode = form.watch("mode");
-  const save = useMutation({
-    mutationFn: async (v: z.infer<typeof assetSchema>) =>
-      asset
-        ? api.updateAsset({
+  const write = useProjectWrite(`asset:${asset?.id ?? "new"}`);
+  const formElement = useRef<HTMLFormElement>(null),
+    manuallyChosenKind = useRef(false);
+  const submit = () => {
+    if (write.isLocked()) return;
+    form.clearErrors();
+    const parsed = assetSchema.safeParse(form.getValues());
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0] as keyof z.infer<typeof assetSchema>;
+        form.setError(field, { message: issue.message });
+      }
+      const field = parsed.error.issues[0]?.path[0] as keyof z.infer<
+        typeof assetSchema
+      >;
+      if (field) form.setFocus(field);
+      return;
+    }
+    const v = parsed.data;
+    write.run(
+      async () => {
+        if (asset)
+          await api.updateAsset({
             id: asset.id,
             name: v.name,
             notes: v.notes,
             kind: v.kind,
-          })
-        : api.createAsset({
+          });
+        else
+          await api.createAsset({
             name: v.name,
             location: v.location,
             kind: v.kind,
             notes: v.notes || null,
-          }),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["assets"] });
-      close();
-    },
-  });
+          });
+      },
+      () => {
+        void client.invalidateQueries({ queryKey: ["assets"] });
+        close();
+      },
+    );
+  };
   const choose = async () => {
     const path = await api.pickFile(false);
     if (path) {
       form.setValue("location", path, { shouldValidate: true });
       form.setValue("name", assetName(path));
-      form.setValue("kind", assetKind(path));
+      if (!manuallyChosenKind.current) form.setValue("kind", assetKind(path));
     }
   };
   return (
-    <Dialog title={asset ? "Edit asset" : "Add asset"} onClose={close}>
+    <Dialog
+      title={asset ? "Edit asset" : "Add asset"}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
+    >
       <form
         className="m5-form"
-        onSubmit={form.handleSubmit((v) => save.mutate(v))}
+        ref={formElement}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
         noValidate
       >
         {!asset && (
           <Tabs
+            id={locationTabs}
+            label="Asset source"
+            disabled={!write.ready}
             value={mode}
             onChange={(v) => form.setValue("mode", v as "File" | "URL")}
             items={["File", "URL"]}
           />
         )}
-        <label>
-          {mode === "URL" ? "URL" : "File path"}
-          <input
-            aria-label="Asset location"
-            {...form.register("location")}
-            disabled={!!asset || mode === "File"}
-          />
-        </label>
-        {!asset && mode === "File" && (
-          <Button onClick={() => void choose()}>Choose file</Button>
-        )}
+        <TabPanels
+          id={locationTabs}
+          value={mode}
+          items={asset ? [] : ["File", "URL"]}
+        >
+          <label>
+            {mode === "URL" ? "URL" : "File path"}
+            <input
+              aria-label="Asset location"
+              {...form.register("location")}
+              disabled={!write.ready || !!asset || mode === "File"}
+            />
+          </label>
+          {!asset && mode === "File" && (
+            <Button disabled={!write.ready} onClick={() => void choose()}>
+              Choose file
+            </Button>
+          )}
+        </TabPanels>
         <label>
           Name
-          <input {...form.register("name")} />
+          <input
+            data-write-focus
+            disabled={!write.ready}
+            {...form.register("name")}
+          />
         </label>
-        <label htmlFor="asset-kind">
-          Kind
+        <div className="asset-kind-field">
+          <label htmlFor="asset-kind">Kind</label>
           <Select
             id="asset-kind"
+            disabled={!write.ready}
             aria-label="Kind"
             value={form.watch("kind")}
-            onChange={(e) =>
+            onChange={(e) => {
+              manuallyChosenKind.current = true;
               form.setValue(
                 "kind",
                 e.target.value as (typeof assetKinds)[number],
                 { shouldDirty: true, shouldValidate: true },
-              )
-            }
+              );
+            }}
           >
             {assetKinds.map((k) => (
               <option key={k} value={k}>
@@ -144,20 +199,26 @@ export function AssetDialog({
               </option>
             ))}
           </Select>
-        </label>
+        </div>
         <label>
           Notes
-          <textarea {...form.register("notes")} />
+          <textarea disabled={!write.ready} {...form.register("notes")} />
         </label>
         {Object.entries(form.formState.errors).map(([key, e]) => (
           <p role="alert" className="field-error" key={key}>
             {e.message}
           </p>
         ))}
-        {save.error && <p role="alert">{save.error.message}</p>}
+        <ProjectWriteFeedback
+          write={write}
+          action="Saving asset"
+          form={formElement}
+        />
         <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={save.isPending}>
+          <Button disabled={write.pending} onClick={() => write.dismiss(close)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={!write.ready}>
             Save asset
           </Button>
         </div>
@@ -292,11 +353,11 @@ function AssetCard({
 }
 export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const { settings, update } = useBoardSettings();
-  const client = useQueryClient();
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: () => api.listAssets(),
   });
+  const batch = useFileDropBatch("assets");
   const [kind, setKind] = useState("all");
   const [dragActive, setDragActive] = useState(false);
   const [text, setText] = useState("");
@@ -304,26 +365,28 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const [sort, setSort] = useState("createdAt:desc");
   const [edit, setEdit] = useState<Asset | true | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const read = useExplicitRead(
+    JSON.stringify(["assets", kind, text, linked, sort]),
+  );
+  const refresh = () =>
+    void read.run(() => assets.refetch({ cancelRefetch: false }));
   useEffect(
     () =>
       api.onFileDrop((paths) => {
         if (document.querySelector(".drawer")) return;
-        void (async () => {
-          let count = 0;
-          for (const location of paths) {
-            await api.createAsset({
+        void batch.run(
+          paths,
+          (location) =>
+            api.createAsset({
               name: assetName(location),
               kind: assetKind(location),
               location,
               notes: null,
-            });
-            count++;
-          }
-          await client.invalidateQueries({ queryKey: ["assets"] });
-          useUiStore.getState().error(`Added ${count} assets`);
-        })().catch((e) => useUiStore.getState().error(String(e)));
+            }),
+          [["assets"]],
+        );
       }, setDragActive),
-    [client],
+    [batch.run],
   );
   const filtered =
     assets.data
@@ -351,7 +414,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
       ) ?? [];
   return (
     <main className="feature-page">
-      <PageHeading title="Assets" note="everything the game is made of">
+      <PageHeading title="Assets" note="files and references your project uses">
         <div className="button-row">
           <SegmentedControl
             label="Assets view"
@@ -366,6 +429,13 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               { value: "list", label: <List size={18} />, title: "List view" },
             ]}
           />
+          <Button
+            disabled={read.pending || assets.isFetching}
+            aria-busy={read.pending || assets.isFetching}
+            onClick={refresh}
+          >
+            {read.pending ? "Checking assets…" : "Refresh assets"}
+          </Button>
           <Button variant="primary" onClick={() => setEdit(true)}>
             Add asset
           </Button>
@@ -382,7 +452,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               <span className="capitalize">{k}</span>{" "}
               <small>
                 {assets.data?.filter((a) => k === "all" || a.kind === k)
-                  .length ?? 0}
+                  .length ?? "—"}
               </small>
             </Button>
           ))}
@@ -403,9 +473,35 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           onChange={(e) => setText(e.target.value)}
         />
       </div>
-      {assets.error && <p role="alert">{assets.error.message}</p>}
+      <ReadReceipt
+        checkedAt={read.checkedAt}
+        phase={read.phase}
+        resource="assets"
+      />
+      {assets.error && (
+        <QueryError
+          error={assets.error}
+          retry={refresh}
+          busy={read.pending || assets.isFetching}
+        />
+      )}
+      {assets.error && assets.data && (
+        <p className="small muted">
+          Showing the last loaded asset list; retry to check for changes.
+        </p>
+      )}
+      {assets.isFetching && assets.data && !read.pending && (
+        <p className="small muted" role="status">
+          Refreshing assets… showing the last loaded list.
+        </p>
+      )}
+      <FileDropProgress progress={batch.progress} />
       <FileDropZone active={dragActive}>
-        {filtered.length ? (
+        {assets.isPending ? (
+          <p className="loading" role="status">
+            Reading assets…
+          </p>
+        ) : !assets.data ? null : filtered.length ? (
           settings?.assetsView === "list" ? (
             <AssetList
               assets={filtered}
@@ -416,7 +512,12 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
             />
           ) : (
             <div className="asset-groups">
-              {(kind === "all" ? assetKinds : [kind]).map((k) => (
+              {(kind === "all"
+                ? assetKinds.filter((k) =>
+                    filtered.some((asset) => asset.kind === k),
+                  )
+                : [kind]
+              ).map((k) => (
                 <section key={k} className="asset-group">
                   {kind === "all" && (
                     <button
@@ -477,8 +578,24 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               ))}
             </div>
           )
+        ) : assets.data.length ? (
+          <EmptyState text="No assets match these filters">
+            <Button
+              onClick={() => {
+                setKind("all");
+                setLinked("all");
+                setText("");
+              }}
+            >
+              Clear asset filters
+            </Button>
+          </EmptyState>
+        ) : assets.error ? (
+          <p className="muted">
+            The last loaded list was empty. Retry to check the current project.
+          </p>
         ) : (
-          <EmptyState text="No assets yet — drop in your first sprite" />
+          <EmptyState text="No assets yet — add a file or URL for your project" />
         )}
       </FileDropZone>
       {edit && (

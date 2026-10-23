@@ -1,4 +1,6 @@
+mod support;
 use jam_core::*;
+use support::FreshContext;
 fn setup() -> (tempfile::TempDir, Store) {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
     std::fs::create_dir_all(&base).unwrap();
@@ -29,7 +31,14 @@ fn desktop_identity_is_a_human_and_actor_cannot_be_supplied() {
         .member;
     s.set_current_member(&mira.id).unwrap();
     let moved = s
-        .move_current_task(&task.task.key, "review", None, None)
+        .move_current_task(
+            &task.task.key,
+            "review",
+            &task.task.updated_at,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(moved.updated_by, mira.id);
     assert_eq!(s.list_activity(None, Some(1)).unwrap()[0].actor.id, mira.id);
@@ -49,6 +58,39 @@ fn desktop_identity_is_a_human_and_actor_cannot_be_supplied() {
     let m = s.current_member().unwrap();
     assert_eq!(m.name, "New teammate");
     assert_eq!(m.kind, "human");
+}
+#[test]
+fn desktop_quick_capture_uses_unplanned_only_when_no_story_is_chosen() {
+    let (_d, s) = setup();
+    s.seed_demo().unwrap();
+    let default = s
+        .create_current_task(CreateTask {
+            title: "Rough default capture".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(default.story.title, "Unplanned work");
+    assert_eq!(default.epic.title, "Unplanned work");
+    assert_eq!(default.task.status, "backlog");
+    let again = s
+        .create_current_task(CreateTask {
+            title: "Another rough default capture".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(again.story.audit.id, default.story.audit.id);
+    assert_eq!(again.epic.audit.id, default.epic.audit.id);
+    let intended = s.get_task("JB-7").unwrap();
+    let planned = s
+        .create_current_task(CreateTask {
+            title: "Rough capture in an existing Story".into(),
+            story_key: Some(intended.story.key),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(planned.story.audit.id, intended.story.audit.id);
+    assert_eq!(planned.epic.audit.id, intended.epic.audit.id);
+    assert_eq!(planned.task.status, "backlog");
 }
 #[test]
 fn board_read_is_not_limited_to_the_mcp_page_size() {
@@ -98,7 +140,7 @@ fn all_board_tasks_are_grouped_ordered_and_have_counts() {
             .comment_count,
         1
     );
-    s.archive_task(&actor.id, &t.task.key, None).unwrap();
+    s.archive_task_fresh(&actor.id, &t.task.key, None).unwrap();
     assert_eq!(
         s.list_board_tasks()
             .unwrap()

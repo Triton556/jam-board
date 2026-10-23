@@ -1,13 +1,14 @@
 {
   "name": "jam-board-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0-alpha.41",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "check": "biome check src e2e vite.config.ts vitest.config.ts playwright.config.ts biome.json package.json tsconfig.json",
+    "check": "biome check src e2e vite.config.ts vitest.config.ts playwright.config.ts biome.json package.json tsconfig.json tsconfig.e2e.json",
     "typecheck": "tsc --noEmit",
+    "typecheck:e2e": "tsc --project tsconfig.e2e.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "tauri": "tauri",

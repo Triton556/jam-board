@@ -20,6 +20,18 @@ async function unwrap<T>(
   return result.data;
 }
 export const tauriApi: JamApi = {
+  releaseTask: (input) => unwrap(commands.releaseTask(input)),
+  getExecution: (scope) => unwrap(commands.getExecution(scope)),
+  listExecution: () => unwrap(commands.listExecution()),
+  setExecution: (input) => unwrap(commands.setExecution(input)),
+  listExecutionRequests: (status) =>
+    unwrap(commands.listExecutionRequests(status ?? null)),
+  resolveExecutionRequest: (input) =>
+    unwrap(commands.resolveExecutionRequest(input)),
+  listProjects: (includeArchived = false) =>
+    unwrap(commands.listProjects(includeArchived)),
+  selectProject: (projectId) => unwrap(commands.selectProject(projectId)),
+  restoreProject: (projectId) => unwrap(commands.restoreProject(projectId)),
   getProject: () => unwrap(commands.getProject()),
   updateProject: (input) =>
     unwrap(
@@ -55,25 +67,28 @@ export const tauriApi: JamApi = {
   },
 
   referenceCanvas: () => unwrap(commands.referenceCanvas()),
-  addReference: (input) =>
+  addReference: (input, untitled) =>
     unwrap(
-      commands.addReference({
-        filePath: null,
-        url: null,
-        text: null,
-        title: null,
-        caption: null,
-        tags: null,
-        frameEpicKey: null,
-        frameId: null,
-        linkTo: null,
-        x: null,
-        y: null,
-        ...input,
-      }),
+      commands.addReference(
+        {
+          filePath: null,
+          url: null,
+          text: null,
+          title: null,
+          caption: null,
+          tags: null,
+          frameEpicKey: null,
+          frameId: null,
+          linkTo: null,
+          x: null,
+          y: null,
+          ...input,
+        },
+        untitled ?? null,
+      ),
     ),
-  updateReference: (itemId, patch) =>
-    unwrap(commands.updateReference({ itemId, ...patch })),
+  updateReference: (itemId, patch, expected) =>
+    unwrap(commands.updateReference({ itemId, ...patch }, expected ?? null)),
   linkReference: (itemId, targetKey) =>
     unwrap(commands.linkReference({ itemId, targetKey })),
   canvasGeometry: (input) => unwrap(commands.canvasGeometry(input)),
@@ -181,8 +196,13 @@ export const tauriApi: JamApi = {
   updateTaskBrief: (key, patch) =>
     unwrap(commands.updateTaskBrief({ key, ...patch })),
   checkReady: (key) => unwrap(commands.checkReady(key)),
-  markReady: (key, overrideReason) =>
-    unwrap(commands.markReady({ key, overrideReason: overrideReason ?? null })),
+  markReady: (input) =>
+    unwrap(
+      commands.markReady({
+        ...input,
+        overrideReason: input.overrideReason ?? null,
+      }),
+    ),
   listQuestions: (status, scope) =>
     unwrap(
       commands.listQuestions({ status: status ?? null, scope: scope ?? null }),
@@ -235,6 +255,8 @@ export const tauriApi: JamApi = {
   setSettings: (input) =>
     unwrap(
       commands.setSettings({
+        projectFolder: null,
+        expectedProjectId: null,
         theme: null,
         soundEnabled: null,
         colorBy: null,

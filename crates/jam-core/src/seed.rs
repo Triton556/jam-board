@@ -266,15 +266,16 @@ impl Store {
             keys.push(task.task.key);
         }
         for index in [6, 8, 11] {
-            self.claim_task(&codex.id, &keys[index])?;
+            self.seed_in_progress_sample(&j.id, &codex.id, &keys[index])?;
         }
-        self.claim_task(&danil.id, &keys[12])?;
-        self.claim_task(&alex.id, &keys[13])?;
+        self.seed_in_progress_sample(&j.id, &danil.id, &keys[12])?;
+        self.seed_in_progress_sample(&j.id, &alex.id, &keys[13])?;
         for index in [6, 8] {
             self.submit_report(
                 &codex.id,
                 SubmitReport {
                     key: keys[index].clone(),
+                    expected_claim_generation: self.get_task(&keys[index])?.task.claim_generation,
                     summary_md: if index == 6 {
                         "The pickup effect exists, but repeated input spawns a second burst."
                     } else {
@@ -303,7 +304,8 @@ impl Store {
                 },
             )?;
         }
-        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),verdict:"changes_requested".into(),comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
+        let observed = self.get_task(&keys[6])?;
+        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),expected_report_id:observed.reports.last().unwrap().id.clone(),expected_review_context_revision:observed.review_context_revision.unwrap(),verdict:"changes_requested".into(),comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
         self.ask_user(&claude.id,AskUser{scope:Scope{kind:"epic".into(),id:lantern.key.clone()},title:"Should the safe tile cue stay steady?".into(),body_md:Some("A steady outline works without motion. A pulse needs an equivalent reduced-motion cue.".into()),options:Some(vec![QuestionOption{label:"Steady outline".into(),description:"Readable without movement; the smaller change.".into()},QuestionOption{label:"Gentle pulse".into(),description:"Adds motion with a steady fallback.".into()}]),recommended_index:Some(0),allow_free_text:Some(true),round_label:Some("Round 2".into())})?;
         self.ask_user(
             &codex.id,
@@ -387,5 +389,20 @@ impl Store {
             Ok(())
         })?;
         self.active_jam()
+    }
+}
+
+impl Store {
+    /// Populate historical, synthetic sample cards, not live work or authority.
+    /// This private fixture writer is used only while creating a brand-new demo.
+    /// The ordinary claim API always enforces the gate; the demo has no grants.
+    fn seed_in_progress_sample(&self, project: &str, actor: &str, key: &str) -> Result<()> {
+        self.write(|c| {
+            let t=crate::service::task(c,key)?;
+            if t.jam_id!=project {return Err(invalid("demo","A sample must belong to the newly created demo"));}
+            c.execute("UPDATE tasks SET assignee_id=?,status='in_progress',position=(SELECT coalesce(max(position),0)+1024 FROM tasks WHERE jam_id=? AND status='in_progress') WHERE id=?",params![actor,project,t.id])?;
+            crate::service::touch(c,&t.id,actor)?;
+            crate::service::event(c,Some(project),actor,"task.claimed",Some(&t.id),serde_json::json!({"assigneeId":[t.assignee_id,actor],"status":[t.status,"in_progress"]}))
+        })
     }
 }

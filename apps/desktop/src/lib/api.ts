@@ -1,4 +1,6 @@
+import type { ExecutionApi } from "./execution-api";
 import type { PlanningApi } from "./planning-api";
+import type { ProjectsApi } from "./project-api";
 import type { ReferencesApi } from "./references-api";
 import { tauriApi } from "./tauri-bridge";
 import type {
@@ -33,7 +35,11 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
-export interface JamApi extends PlanningApi, ReferencesApi {
+export interface JamApi
+  extends PlanningApi,
+    ReferencesApi,
+    ProjectsApi,
+    ExecutionApi {
   getProject(): Promise<import("../bindings").Project>;
   updateProject(
     input: Partial<import("../bindings").ProjectEditInput> & {
@@ -103,6 +109,7 @@ export interface JamApi extends PlanningApi, ReferencesApi {
   getTask(key: string): Promise<TaskDetail>;
   createTask(input: CreateInput): Promise<TaskDetail>;
   moveTask(input: MoveInput): Promise<TaskSummary>;
+  releaseTask(input: import("../bindings").ReleaseClaim): Promise<TaskSummary>;
   listMembers(): Promise<MemberWithStats[]>;
   listActivity(input?: Partial<ActivityQuery>): Promise<ActivityEvent[]>;
   setTheme(theme: Theme): Promise<void>;

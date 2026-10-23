@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Real debug desktop and independent stdio sessions; CDP captures no desktop cursor overlay.
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";

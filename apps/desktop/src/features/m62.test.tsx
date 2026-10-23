@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { Switch } from "../components/ui/m5";
 import { mockApi } from "../lib/mock-bridge";
@@ -10,8 +10,10 @@ import { AssetsPage } from "./assets/AssetsPage";
 import { TaskCard } from "./board/TaskCard";
 import { TaskTable } from "./table/TaskTable";
 
+vi.mock("@tanstack/react-router", () => ({ useBlocker: () => undefined }));
+
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   await mockApi.setSettings({ estimatesEnabled: false, colorBy: "none" });
 });
 it("loading a new mock demo uses fresh per-jam board preferences", async () => {
@@ -21,7 +23,7 @@ it("loading a new mock demo uses fresh per-jam board preferences", async () => {
     estimatesEnabled: true,
     wipLimit: 9,
   });
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   expect((await mockApi.appState()).jam?.id).not.toBe(before);
   expect(await mockApi.getSettings()).toMatchObject({
     colorBy: "epic",
@@ -151,7 +153,8 @@ it("table inline creation supports Enter, Escape and pinned filtered-out tasks",
     .click(await screen.findByRole("option", { name: /JB-S1/ }));
   const input = screen.getByRole("textbox", { name: "New task title" });
   fireEvent.change(input, { target: { value: "Inline lantern" } });
-  fireEvent.keyDown(input, { key: "Enter" });
+  input.focus();
+  await userEvent.setup().keyboard("{Enter}");
   await waitFor(() =>
     expect(
       mockApi.calls.some(

@@ -4,6 +4,11 @@ Story: JB-S1 · Safe bridge
 Epic: JB-E1 · Lantern levels
 Status: review
 
+Claim generation (opaque): `task-id:3`
+Task version (opaque): `task-version`
+
+Capture these validators before deciding a mutation. Do not silently refresh them to replay stale work.
+
 ## Goal
 
 Light the next safe tile.

@@ -1,4 +1,7 @@
-﻿// Uses the native WebView2 and Rust harness runner; folder picker results are injected.
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
+// Uses the native WebView2 and Rust harness runner; folder picker results are injected.
 // --install is only for a separately authorized write to the clone's private receipt store.
 import{spawn,execFileSync}from'node:child_process';
 import{createHash}from'node:crypto';

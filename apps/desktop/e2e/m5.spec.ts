@@ -87,9 +87,9 @@ test("Activity filters agents, loads earlier events and holds new events while r
     }),
   );
   await expect(
-    page.getByRole("button", { name: "1 new steps ↑" }),
+    page.getByRole("button", { name: "1 new update ↑" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "1 new steps ↑" }).click();
+  await page.getByRole("button", { name: "1 new update ↑" }).click();
   await expect(
     page
       .locator(".activity-entry")
@@ -105,6 +105,7 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
   await page.getByRole("tab", { name: "Claude Code · HTTP" }).click();
+  const captured = await page.evaluate(() => window.__jamMock.appState());
   const token = await page.evaluate(() => window.__jamMock.revealMcpToken());
   await expect(page.locator(".code-block").first()).not.toContainText(token);
   await page
@@ -112,12 +113,19 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
     .first()
     .getByRole("button", { name: "Copy", exact: true })
     .click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    token,
+  const configuration = await page.evaluate(() =>
+    navigator.clipboard.readText(),
   );
-  await expect(
-    page.getByRole("status").filter({ hasText: "Copied with your token" }),
-  ).toBeVisible();
+  expect(configuration).toContain(token);
+  expect(configuration).toContain(captured.jam?.id ?? "missing project");
+  const receipt = page
+    .getByRole("status")
+    .and(page.locator(".settings-notice"));
+  await expect(receipt).toBeVisible();
+  // This page-local status has implicit polite live semantics, not a toast.
+  await expect(receipt).toHaveText(
+    `Configuration copied for ${captured.jam?.name} · ${captured.jam?.keyPrefix} (includes your token; keep it private)`,
+  );
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
   await expect(
     page.getByText("Existing HTTP connections will stop working."),
@@ -129,21 +137,32 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
     .poll(() => page.evaluate(() => window.__jamMock.revealMcpToken()))
     .not.toBe(token);
 });
-test("Archiving a jam requires its exact name and returns to onboarding", async ({
+test("Archiving a project requires idle workers and its exact name, and keeps a restorable archive", async ({
   page,
 }) => {
   await demo(page);
+  await page.evaluate(async () => {
+    const tasks = await window.__jamMock.listBoardTasks();
+    for (const task of tasks.in_progress)
+      await window.__jamMock.moveTask({
+        key: task.key,
+        status: "backlog",
+        expectedUpdatedAt: task.updatedAt,
+      });
+  });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Data", exact: true }).click();
   await page
-    .getByRole("button", { name: "Archive this jam", exact: true })
+    .getByRole("button", { name: "Archive this project", exact: true })
     .click();
-  await page.getByRole("dialog").getByLabel("Jam name").fill("cozy jam 48");
+  await page.getByRole("dialog").getByLabel("Project name").fill("cozy jam 48");
   await expect(
-    page.getByRole("button", { name: "Archive jam", exact: true }),
+    page.getByRole("button", { name: "Archive project", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("dialog").getByLabel("Jam name").fill("Cozy Jam 48");
-  await page.getByRole("button", { name: "Archive jam", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Project name").fill("Cozy Jam 48");
+  await page
+    .getByRole("button", { name: "Archive project", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "What are we making?" }),
   ).toBeVisible();

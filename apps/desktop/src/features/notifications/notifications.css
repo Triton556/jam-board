@@ -1,0 +1,59 @@
+.notification-bell {
+  position: relative;
+}
+.notification-count {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  border-radius: 12px;
+  padding: 1px 4px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 10px;
+}
+.notification-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.notification-list {
+  list-style: none;
+  padding: 0;
+}
+.notification-list li {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.notification-list li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notification-list p {
+  margin: 0 0 5px;
+}
+.notification-list time {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.notification-new {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.notification-navigation-error {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  z-index: 50;
+  max-width: min(400px, calc(100vw - 40px));
+  padding: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}

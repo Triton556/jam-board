@@ -36,59 +36,43 @@ test("Web app onboarding, milestone and project template confirmation", async ({
     page.getByRole("heading", { name: /The project board/ }),
   ).toBeVisible();
 });
-test("Agents validates locally, copies exact commands and confirms install after plan", async ({
+test("Agents reviews a bundled project skill and confirms installation without an external playbook", async ({
   page,
-  context,
 }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await page
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   await page.evaluate(() => {
-    let n = 0;
-    window.__jamMock.pickFolder = async () =>
-      ++n === 1 ? "C:/temporary project" : "C:/playbook clone";
+    window.__jamMock.pickFolder = async () => "C:/temporary project";
   });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Choose project folder…", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Choose playbook folder…", exact: true })
-    .click();
-  await page.getByRole("combobox", { name: "Skill client" }).click();
-  await page.getByRole("option", { name: "Claude Code", exact: true }).click();
-  await expect(
-    page.getByText(
-      "Installing records a receipt in this playbook folder (.harness-state).",
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await page
-    .getByRole("radio", { name: "Whole agent-playbook", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Check setup", exact: true }).click();
-  await expect(page.getByText("Playbook 1.3.0")).toBeVisible();
   const card = page.locator(".settings-card").filter({
     has: page.getByRole("heading", {
-      name: "Give your agent the skill",
+      name: "Optional · Jam Board skill",
       exact: true,
     }),
   });
-  await card.getByRole("button", { name: "Copy", exact: true }).click();
-  expect(
-    (await page.evaluate(() => navigator.clipboard.readText())).replaceAll(
-      "\r\n",
-      "\n",
-    ),
-  ).toBe(
-    "& py -3 -B 'C:/playbook clone/harness.py' plan --client claude --target 'C:/temporary project' --profile full\n& py -3 -B 'C:/playbook clone/harness.py' install --client claude --target 'C:/temporary project' --profile full",
-  );
-  await page.getByRole("button", { name: "Run install", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "This adds files to that project.",
+  await expect(
+    card.getByRole("button", { name: "Review installation" }),
+  ).toBeDisabled();
+  await expect(
+    card.getByRole("button", { name: "Choose playbook folder…" }),
+  ).toHaveCount(0);
+  await expect(
+    card.getByRole("radio", { name: "Whole agent-playbook" }),
+  ).toHaveCount(0);
+  await card.getByRole("button", { name: "Choose project folder…" }).click();
+  await card.getByRole("combobox", { name: "Skill client" }).click();
+  await page.getByRole("option", { name: "Claude Code", exact: true }).click();
+  await expect(
+    card.getByText("C:/temporary project/.claude/skills/jam-board"),
+  ).toBeVisible();
+  await card.getByRole("button", { name: "Review installation" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(
+    "C:/temporary project/.claude/skills/jam-board",
   );
   expect(
     await page.evaluate(
@@ -96,12 +80,26 @@ test("Agents validates locally, copies exact commands and confirms install after
         window.__jamMock.calls.filter((c) => c.command === "run_skill").length,
     ),
   ).toBe(1);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Install", exact: true })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Installed · verified" }),
-  ).toBeVisible();
-  await expect(page.getByRole("log")).toContainText("Exit: 0");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        window.__jamMock.calls.filter((c) => c.command === "run_skill").length,
+    ),
+  ).toBe(1);
+  await card.getByRole("button", { name: "Review installation" }).click();
+  await dialog.getByRole("button", { name: "Install", exact: true }).click();
+  await expect(card.getByRole("status")).toContainText(
+    "Jam Board skill installed · files verified",
+  );
+  await card.getByText("Installation log", { exact: true }).click();
+  await expect(card.getByRole("log")).toContainText("Exit: 0");
+  expect(
+    await page.evaluate(() =>
+      window.__jamMock.calls
+        .filter((c) => c.command === "run_skill")
+        .map((c) => (c.input as { step: string }).step),
+    ),
+  ).toEqual(["plan", "plan", "install", "verify"]);
 });

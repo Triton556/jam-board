@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { markdownReadView, openAgentPlan } from "./assertions";
 
 for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
   test(`queued ${field} saves retain their entity target across SPA navigation`, async ({
@@ -14,7 +15,8 @@ for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
       .getByRole("button", { name: "Load demo jam", exact: true })
       .click();
     await page.goto(url());
-    const label = epic ? "Goal and audience" : "Outcome";
+    if (field === "acceptance") await openAgentPlan(page);
+    const label = epic ? "Goal and audience" : "Description";
     await page
       .getByRole("button", { name: `Edit ${label}`, exact: true })
       .waitFor();
@@ -130,13 +132,14 @@ for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
       window.dispatchEvent(new PopStateEvent("popstate"));
     }, url());
     if (field === "acceptance") {
+      await openAgentPlan(page);
       await expect(
         page.getByRole("textbox", { name: "Criterion 1", exact: true }),
       ).toHaveValue("Second submitted save");
     } else {
-      await expect(
-        page.getByRole("button", { name: `Edit ${label}`, exact: true }),
-      ).toContainText("Second submitted save");
+      await expect(markdownReadView(page, label)).toHaveText(
+        "Second submitted save",
+      );
     }
   });
 }
@@ -193,7 +196,7 @@ test("an earlier Markdown response preserves a newer draft and its subsequent sa
     )
     .toBe("New text typed while first save is pending");
   await page.reload();
-  await expect(edit).toContainText(
+  await expect(markdownReadView(page, "Goal and audience")).toHaveText(
     "New text typed while first save is pending",
   );
 });
@@ -206,13 +209,19 @@ test("saving Story Outcome preserves unsaved acceptance until its explicit save"
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   await page.goto("/plan/JB-E1?tab=Stories&story=JB-S1");
+  await openAgentPlan(page);
   const criterion = page.getByRole("textbox", {
     name: "Criterion 1",
     exact: true,
   });
   await criterion.fill("New user criterion that is not saved yet");
-  await page.getByRole("button", { name: "Edit Outcome", exact: true }).click();
-  const outcome = page.getByRole("textbox", { name: "Outcome", exact: true });
+  await page
+    .getByRole("button", { name: "Edit Description", exact: true })
+    .click();
+  const outcome = page.getByRole("textbox", {
+    name: "Description",
+    exact: true,
+  });
   await outcome.fill("An unrelated saved outcome for the same story");
   await outcome.press("Tab");
   await expect
@@ -238,6 +247,7 @@ test("saving Story Outcome preserves unsaved acceptance until its explicit save"
     )
     .toBe("New user criterion that is not saved yet");
   await page.reload();
+  await openAgentPlan(page);
   await expect(criterion).toHaveValue(
     "New user criterion that is not saved yet",
   );

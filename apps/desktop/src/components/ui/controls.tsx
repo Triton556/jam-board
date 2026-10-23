@@ -17,11 +17,51 @@ import type { Member } from "../../lib/types";
 import { CustomSelect } from "./CustomSelect";
 import { Button, Chip, IconButton } from "./index";
 
+/** Visible native tab stops, including disclosure summaries but not their hidden contents. */
+export function modalTabStops(root: HTMLElement) {
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),summary,[tabindex="0"]',
+    ),
+  ).filter((node) => {
+    if (node.matches("[tabindex]") && node.tabIndex < 0) return false;
+    if (node.matches('input[type="hidden"]')) return false;
+    for (
+      let parent: HTMLElement | null = node;
+      parent && root.contains(parent);
+      parent = parent.parentElement
+    ) {
+      if (
+        parent.hidden ||
+        parent.hasAttribute("inert") ||
+        parent.getAttribute("aria-hidden") === "true"
+      )
+        return false;
+      const style = getComputedStyle(parent);
+      if (
+        style.display === "none" ||
+        ["hidden", "collapse"].includes(style.visibility)
+      )
+        return false;
+      if (parent.matches("details:not([open])")) {
+        const summary = Array.from(parent.children).find(
+          (child) => child.tagName === "SUMMARY",
+        );
+        if (!summary?.contains(node)) return false;
+      }
+    }
+    return true;
+  });
+}
+
 const layers: symbol[] = [];
-export function useModal(onClose: () => void) {
+export type ModalFocusReturn = () => HTMLElement | null;
+export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
   const ref = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
+  const close = useRef(onClose),
+    restore = useRef(returnFocus);
   close.current = onClose;
+  restore.current = returnFocus;
   useEffect(() => {
     const token = Symbol();
     layers.push(token);
@@ -42,11 +82,7 @@ export function useModal(onClose: () => void) {
         close.current();
       }
       if (event.key !== "Tab") return;
-      const nodes = Array.from(
-        ref.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
-        ) ?? [],
-      ).filter((n) => !n.hidden && n.getAttribute("aria-hidden") !== "true");
+      const nodes = ref.current ? modalTabStops(ref.current) : [];
       const first = nodes[0],
         last = nodes.at(-1);
       if (!first) {
@@ -56,14 +92,16 @@ export function useModal(onClose: () => void) {
       if (
         event.shiftKey &&
         (document.activeElement === first ||
-          document.activeElement === ref.current)
+          document.activeElement === ref.current ||
+          !ref.current?.contains(document.activeElement))
       ) {
         event.preventDefault();
         last?.focus();
       } else if (
         !event.shiftKey &&
         (document.activeElement === last ||
-          document.activeElement === ref.current)
+          document.activeElement === ref.current ||
+          !ref.current?.contains(document.activeElement))
       ) {
         event.preventDefault();
         first.focus();
@@ -71,9 +109,39 @@ export function useModal(onClose: () => void) {
     };
     document.addEventListener("keydown", key, true);
     return () => {
+      const wasTop = layers.at(-1) === token;
       layers.splice(layers.indexOf(token), 1);
       document.removeEventListener("keydown", key, true);
-      previous?.focus();
+      // An older closing layer must not steal focus from a newer dialog.
+      if (!wasTop) return;
+      if (restore.current) {
+        const target = restore.current();
+        // Explicit null denies restoration (expired view/project); it must not
+        // fall back to a still-connected trigger from another selection epoch.
+        if (!target?.isConnected) return;
+        const parent = layers.length
+          ? Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[role="dialog"][aria-modal="true"]',
+              ),
+            ).at(-1)
+          : undefined;
+        if (parent) {
+          if (previous?.isConnected && parent.contains(previous))
+            previous.focus();
+          else parent.focus();
+        } else target.focus();
+        return;
+      }
+      if (previous?.isConnected && previous !== document.body) previous.focus();
+      else
+        Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '[role="dialog"][aria-modal="true"]',
+          ),
+        )
+          .at(-1)
+          ?.focus();
     };
   }, []);
   return ref;
@@ -83,13 +151,18 @@ export function Dialog({
   children,
   onClose,
   className = "",
+  busy = false,
 }: {
   title: string;
   children: ReactNode;
   onClose(): void;
   className?: string;
+  busy?: boolean;
 }) {
-  const ref = useModal(onClose);
+  const close = () => {
+    if (!busy) onClose();
+  };
+  const ref = useModal(close);
   const id = useId();
   return createPortal(
     // biome-ignore lint/a11y/noStaticElementInteractions: Only direct backdrop clicks close; Escape and the close button provide keyboard access.
@@ -97,20 +170,21 @@ export function Dialog({
       className="dialog-backdrop"
       role="presentation"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div
         className={`dialog ${className}`}
         role="dialog"
         aria-modal="true"
+        aria-busy={busy || undefined}
         aria-labelledby={id}
         tabIndex={-1}
         ref={ref}
       >
         <div className="dialog-heading">
           <h2 id={id}>{title}</h2>
-          <IconButton label={`Close ${title}`} onClick={onClose}>
+          <IconButton label={`Close ${title}`} onClick={close} disabled={busy}>
             <X />
           </IconButton>
         </div>
@@ -223,31 +297,6 @@ export function SegmentedControl<T extends string>({
           }}
         >
           {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-export function Tabs({
-  value,
-  onChange,
-  items,
-}: {
-  value: string;
-  onChange(v: string): void;
-  items: string[];
-}) {
-  return (
-    <div className="tabs" role="tablist">
-      {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          role="tab"
-          aria-selected={value === item}
-          onClick={() => onChange(item)}
-        >
-          {item}
         </button>
       ))}
     </div>

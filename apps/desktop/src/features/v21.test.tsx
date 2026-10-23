@@ -5,7 +5,7 @@ import { TaskCard } from "./board/TaskCard";
 import { ReadOnlyBrief } from "./task/ReadOnlyBrief";
 
 beforeEach(async () => {
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 it("new jams use epic colors and cards expose both workflow flags", async () => {
   expect((await mockApi.getSettings()).colorBy).toBe("epic");
@@ -42,13 +42,21 @@ it("incomplete human tasks stay in Backlog and Ready reports every missing item"
     status: "backlog",
   });
   await expect(
-    mockApi.moveTask({ key: task.key, status: "ready" }),
+    mockApi.moveTask({
+      key: task.key,
+      status: "ready",
+      expectedUpdatedAt: task.updatedAt,
+    }),
   ).rejects.toMatchObject({
     code: "not_ready",
     message: expect.stringContaining("goal: Goal is empty"),
   });
   await expect(
-    mockApi.moveTask({ key: task.key, status: "ready" }),
+    mockApi.moveTask({
+      key: task.key,
+      status: "ready",
+      expectedUpdatedAt: task.updatedAt,
+    }),
   ).rejects.toMatchObject({
     message: expect.stringContaining("story_active: The story is still draft"),
   });
@@ -56,6 +64,7 @@ it("incomplete human tasks stay in Backlog and Ready reports every missing item"
   await mockApi.moveTask({
     key: task.key,
     status: "ready",
+    expectedUpdatedAt: task.updatedAt,
     overrideReason: "Explore the existing scene before writing the brief",
   });
   expect((await mockApi.getTask(task.key)).status).toBe("ready");

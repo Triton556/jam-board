@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
-import { Button, Dialog } from "../../components/ui";
+import { useEffect, useId, useState } from "react";
+import { Button } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { MarkdownField } from "../../components/ui/MarkdownField";
 import { api } from "../../lib/api";
@@ -43,10 +43,12 @@ export function PlanningStatus({
     },
   });
   return (
-    <div>
+    <div className="planning-status">
+      <span className="planning-status-label small muted">Planning status</span>
       <CustomSelect
-        label={`${level} status`}
+        label={`${level} plan status`}
         value={value}
+        disabled={update.isPending}
         onChange={(status) => update.mutate({ status })}
         options={["draft", "active", "done", "archived"].map((value) => ({
           value,
@@ -79,20 +81,29 @@ export function PlanningStatus({
     </div>
   );
 }
+export type PlanningSaveState = {
+  label: string;
+  pending: boolean;
+  error: Error | null;
+};
 export function SavedMarkdown({
+  identity,
   label,
   value,
   save,
   hint,
+  onSaveState,
   disabled = false,
 }: {
+  identity?: string;
   label: string;
   value: string;
   save(value: string): Promise<unknown>;
   hint?: string;
+  onSaveState?(identity: string, state: PlanningSaveState | null): void;
   disabled?: boolean;
 }) {
-  const draft = usePlanningDraft(value);
+  const draft = usePlanningDraft(value, identity);
   const saveScope = useId();
   const client = useQueryClient();
   const mutation = useMutation({
@@ -104,6 +115,20 @@ export function SavedMarkdown({
       invalidatePlanning(client);
     },
   });
+  useEffect(() => {
+    if (identity)
+      onSaveState?.(identity, {
+        label,
+        pending: mutation.isPending,
+        error: mutation.error,
+      });
+  }, [identity, label, onSaveState, mutation.isPending, mutation.error]);
+  useEffect(
+    () => () => {
+      if (identity) onSaveState?.(identity, null);
+    },
+    [identity, onSaveState],
+  );
   return (
     <>
       <MarkdownField
@@ -118,7 +143,9 @@ export function SavedMarkdown({
         hint={hint}
         disabled={disabled}
       />
-      {mutation.error && <p role="alert">{mutation.error.message}</p>}
+      {!onSaveState && mutation.error && (
+        <p role="alert">{mutation.error.message}</p>
+      )}
     </>
   );
 }
@@ -127,21 +154,31 @@ export function StoryPicker({
   onChange,
   label = "Story",
   epicKey,
+  epicKeys,
+  disabled = false,
   remember = false,
 }: {
   value: string;
   onChange(key: string): void;
   label?: string;
   epicKey?: string;
+  epicKeys?: string[];
+  disabled?: boolean;
   remember?: boolean;
 }) {
   const stories = useQuery(storiesQuery),
     epics = useQuery(epicsQuery);
-  const selected = epics.data?.find((e) => e.key === epicKey);
+  const allowedKeys = epicKeys ?? (epicKey ? [epicKey] : []);
+  const allowedIds = new Set(
+    (epics.data ?? [])
+      .filter((epic) => allowedKeys.includes(epic.key))
+      .map((epic) => epic.id),
+  );
   return (
     <CustomSelect
       label={label}
       value={value}
+      disabled={disabled}
       searchable
       onChange={(key) => {
         onChange(key);
@@ -153,7 +190,7 @@ export function StoryPicker({
       options={[
         { value: "", label: "Choose a story" },
         ...(stories.data ?? [])
-          .filter((s) => !selected || s.epicId === selected.id)
+          .filter((s) => !allowedKeys.length || allowedIds.has(s.epicId))
           .map((s) => ({
             value: s.key,
             label: `${s.key} · ${s.title}`,
@@ -162,68 +199,5 @@ export function StoryPicker({
           })),
       ]}
     />
-  );
-}
-export function NewTaskDialog({
-  storyKey,
-  close,
-  created,
-}: {
-  storyKey?: string;
-  close(): void;
-  created(key: string): void;
-}) {
-  const [title, setTitle] = useState(""),
-    [story, setStory] = useState(storyKey ?? "");
-  const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: () =>
-      api.createTask({
-        title: title.trim(),
-        status: "backlog",
-        storyKey: story,
-      }),
-    onSuccess: (task) => {
-      invalidatePlanning(client);
-      close();
-      created(task.key);
-    },
-  });
-  return (
-    <Dialog title="New task" onClose={close}>
-      <form
-        className="planning-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (title.trim() && story) save.mutate();
-        }}
-      >
-        <label>
-          Title
-          <input
-            aria-label="New planned task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={140}
-          />
-        </label>
-        <label htmlFor="new-story-picker">Story</label>
-        <StoryPicker label="Task story" value={story} onChange={setStory} />
-        <p className="muted">
-          Start in Backlog, then write its brief and check readiness.
-        </p>
-        {save.error && <p role="alert">{save.error.message}</p>}
-        <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={!title.trim() || !story || save.isPending}
-          >
-            Create task
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   );
 }

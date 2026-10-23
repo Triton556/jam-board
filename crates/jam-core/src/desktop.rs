@@ -3,12 +3,22 @@ use rusqlite::OptionalExtension;
 
 impl Store {
     pub fn current_member(&self) -> Result<Member> {
-        let id = self.setting("current_member_id")?.ok_or_else(|| {
-            invalid(
-                "currentMember",
-                "Choose who you are before changing the board",
-            )
-        })?;
+        let key = self
+            .project_id
+            .as_ref()
+            .map(|id| format!("project.{id}.current_member_id"));
+        let id = key
+            .as_deref()
+            .map(|key| self.setting(key))
+            .transpose()?
+            .flatten()
+            .or(self.setting("current_member_id")?)
+            .ok_or_else(|| {
+                invalid(
+                    "currentMember",
+                    "Choose who you are before changing the board",
+                )
+            })?;
         let member = self.get_member(&id)?;
         if member.kind != "human" {
             return Err(invalid(
@@ -41,7 +51,23 @@ impl Store {
         if member.kind != "human" {
             return Err(invalid("memberId", "Choose a human member"));
         }
-        self.set_setting("current_member_id", id)?;
+        self.write(|c| {
+            let j = crate::service::jam(c)?;
+            crate::projects::join_member(c, &j.id, id)?;
+            // A delayed identity edit on a captured project must not change another
+            // project's currently displayed human identity.
+            let selected = c
+                .query_row(
+                    "SELECT value FROM settings WHERE key='current_project_id'",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()?;
+            if selected.as_deref() == Some(&j.id) {
+                crate::projects::put_setting(c, "current_member_id", id)?;
+            }
+            crate::projects::put_setting(c, &format!("project.{}.current_member_id", j.id), id)
+        })?;
         self.app_state()
     }
     pub fn join_as_human(&self, name: &str) -> Result<AppState> {
@@ -142,14 +168,53 @@ impl Store {
         }
         self.create_task(&self.current_member()?.id, input)
     }
+    /// Return the captured claim to Backlog without authorizing or stopping work.
+    pub fn release_current_task(&self, input: ReleaseClaim) -> Result<TaskSummary> {
+        self.release_task_checked(
+            &self.current_member()?.id,
+            &input.key,
+            Some("backlog"),
+            Some(&input.expected_updated_at),
+            None,
+        )
+    }
+    /// Apply only the native human intent captured at drag start or dialog open.
+    /// A fresh timestamp must never be substituted for a stale request on the server.
     pub fn move_current_task(
         &self,
         key: &str,
         status: &str,
+        expected_updated_at: &str,
         before: Option<&str>,
         after: Option<&str>,
+        override_reason: Option<&str>,
     ) -> Result<TaskSummary> {
-        self.move_task(&self.current_member()?.id, key, status, before, after)
+        if expected_updated_at.is_empty() {
+            return Err(invalid(
+                "expectedUpdatedAt",
+                "A captured task version is required",
+            ));
+        }
+        self.move_task_checked(
+            &self.current_member()?.id,
+            key,
+            status,
+            before,
+            after,
+            override_reason,
+            None,
+            Some(expected_updated_at),
+        )
+    }
+    pub fn mark_current_task_ready(&self, input: ReadyInput) -> Result<TaskSummary> {
+        self.move_current_task(
+            &input.key,
+            "ready",
+            &input.expected_updated_at,
+            None,
+            None,
+            input.override_reason.as_deref(),
+        )
     }
 }
 

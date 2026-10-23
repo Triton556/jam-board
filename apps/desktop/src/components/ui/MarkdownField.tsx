@@ -1,12 +1,13 @@
+import { Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "../Markdown";
-import { Button, Tooltip } from "./index";
+import { Tooltip } from "./index";
 export function MarkdownField({
   label,
   value,
   onChange,
   onSave,
-  hint = "Click to add a little context",
+  hint = "Add a little context using Edit",
   meaning,
   disabled = false,
   field,
@@ -14,7 +15,7 @@ export function MarkdownField({
   label: string;
   value: string;
   onChange(value: string): void;
-  onSave?(): void;
+  onSave?(nextFocus?: EventTarget | null): void;
   hint?: string;
   meaning?: string;
   disabled?: boolean;
@@ -22,27 +23,50 @@ export function MarkdownField({
 }) {
   const [editing, setEditing] = useState(false);
   const start = useRef(value),
-    input = useRef<HTMLTextAreaElement>(null);
+    input = useRef<HTMLTextAreaElement>(null),
+    edit = useRef<HTMLButtonElement>(null),
+    restoreEditFocus = useRef(false);
   const canceled = useRef(false);
   useEffect(() => {
     if (editing) input.current?.focus();
+    else if (restoreEditFocus.current) {
+      restoreEditFocus.current = false;
+      edit.current?.focus();
+    }
   }, [editing]);
   return (
     <section className="markdown-field" data-brief-field={field}>
       <div className="section-heading">
         <h3>{label}</h3>
-        {meaning && (
-          <Tooltip text={meaning}>
-            <button
-              type="button"
-              aria-label="Field help"
-              className="help-mark"
-              tabIndex={0}
-            >
-              ?
-            </button>
-          </Tooltip>
-        )}
+        <div className="markdown-field-actions">
+          {meaning && (
+            <Tooltip text={meaning}>
+              <button
+                type="button"
+                aria-label="Field help"
+                className="help-mark"
+                tabIndex={0}
+              >
+                ?
+              </button>
+            </Tooltip>
+          )}
+          <button
+            ref={edit}
+            type="button"
+            className="button ghost markdown-field-edit"
+            disabled={disabled || editing}
+            aria-label={`Edit ${label}`}
+            onClick={() => {
+              if (disabled || editing) return;
+              start.current = value;
+              canceled.current = false;
+              setEditing(true);
+            }}
+          >
+            <Pencil size={13} aria-hidden="true" /> Edit
+          </button>
+        </div>
       </div>
       {editing && !disabled ? (
         <textarea
@@ -51,9 +75,9 @@ export function MarkdownField({
           value={value}
           rows={Math.max(4, value.split("\n").length + 1)}
           onChange={(e) => onChange(e.target.value)}
-          onBlur={() => {
+          onBlur={(event) => {
             setEditing(false);
-            if (!canceled.current) onSave?.();
+            if (!canceled.current) onSave?.(event.relatedTarget);
             canceled.current = false;
           }}
           onKeyDown={(e) => {
@@ -62,34 +86,28 @@ export function MarkdownField({
               e.stopPropagation();
               canceled.current = true;
               onChange(start.current);
+              restoreEditFocus.current = true;
               setEditing(false);
             }
             if ((e.ctrlKey || e.metaKey) && e.key === "s") {
               e.preventDefault();
               e.stopPropagation();
               onSave?.();
+              restoreEditFocus.current = true;
               setEditing(false);
             }
           }}
         />
       ) : (
-        <Button
-          variant="ghost"
-          className="markdown-field-view"
-          disabled={disabled}
-          aria-label={`Edit ${label}`}
-          onClick={() => {
-            start.current = value;
-            canceled.current = false;
-            setEditing(true);
-          }}
-        >
+        <div className="markdown-field-view">
           {value ? (
             <Markdown>{value}</Markdown>
           ) : (
-            <span className="hand-note">{hint}</span>
+            <span className="hand-note">
+              {disabled ? "Not provided" : hint}
+            </span>
           )}
-        </Button>
+        </div>
       )}
     </section>
   );

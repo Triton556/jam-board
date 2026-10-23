@@ -23,7 +23,7 @@ const ago = (seconds: number) => new Date(now - seconds * 1000).toISOString();
 let member: Member, task: TaskSummary;
 beforeEach(async () => {
   motion.reduced = false;
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
   member = (await mockApi.listMembers()).find(
     (m) => m.kind === "agent",
   ) as Member;
@@ -39,12 +39,12 @@ beforeEach(async () => {
   };
   useUiStore.setState({ now, highlights: {} });
 });
-it("uses scoped status text and fresh unscoped fallback", () => {
+it("uses scoped status text and clearly unconfirmed unscoped presence", () => {
   expect(agentWorking(task, member, now)?.text).toBe(
     "Worker · implementing snow tiles",
   );
   expect(agentWorking(task, { ...member, statusScope: null }, now)?.text).toBe(
-    "Worker is working…",
+    "Worker · task activity unconfirmed",
   );
   expect(
     agentWorking(task, { ...member, statusAt: ago(1200) }, now)?.mode,
@@ -88,7 +88,7 @@ it("checks exact online/fresh/stale boundaries and ignores a stale cached online
       { ...member, statusScope: null, statusAt: ago(600) },
       now,
     )?.mode,
-  ).toBe("active");
+  ).toBe("quiet");
   expect(
     agentWorking(
       task,
@@ -130,7 +130,7 @@ it("reduced motion leaves readable working text, a static ring/pencil and drawn 
 });
 it("renders the fallback and does not change arrival highlight into a work glow", () => {
   render(<TaskCard task={task} members={[{ ...member, statusScope: null }]} />);
-  expect(screen.getByText("Worker is working…")).toBeVisible();
+  expect(screen.getByText("Worker · task activity unconfirmed")).toBeVisible();
   expect(screen.getByTestId("task-card")).toHaveAttribute(
     "data-highlighted",
     "false",
@@ -142,11 +142,16 @@ it("caches the rough underline by rounded width", () => {
   expect(workingUnderline(200)).toContain("C");
   expect(workingUnderline(200)).not.toEqual(workingUnderline(260));
 });
-it("expires through the application clock without a new event or card timer", () => {
+it("H-B01 / AG10: expires to explicit unconfirmed feedback through the shared clock", () => {
   render(<TaskCard task={task} members={[member]} />);
   expect(screen.getByTestId("working-line")).toBeVisible();
   act(() => useUiStore.getState().tick(now + 120001));
-  expect(screen.queryByTestId("working-line")).toBeNull();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.getByText("Worker · task activity unconfirmed")).toBeVisible();
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
 });
 it("a memoized table row updates active, quiet and cleared states without a task edit", () => {
   const active = agentWorking(task, member, now);
@@ -234,4 +239,52 @@ it("paints fifty table rings from one CSS rotor without per-row animations", () 
   expect(container.querySelector(".working-animated")).toHaveStyle({
     animation: "none",
   });
+});
+
+it("an agent's activity on another task never animates this assigned card as working", () => {
+  const state = agentWorking(
+    task,
+    { ...member, statusScope: { type: "task", id: "another-task" } },
+    now,
+  );
+  expect(state?.mode).toBe("quiet");
+  expect(state?.text).toBe("Worker · active elsewhere");
+  expect(state?.tooltip).toContain("belongs to another task");
+  expect(
+    agentWorking(
+      task,
+      { ...member, statusScope: null, statusAt: ago(2520) },
+      now,
+    ),
+  ).toBeNull();
+});
+
+it("H-B01 / AG10: Review shows waiting, never the old worker's active ring", () => {
+  render(<TaskCard task={{ ...task, status: "review" }} members={[member]} />);
+  expect(screen.getByText("Awaiting review")).toBeVisible();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
+  expect(screen.queryByText("Worker · implementing snow tiles")).toBeNull();
+});
+
+it("H-B01 / AG10: unassigned task shows a scoped brain report without claiming execution", () => {
+  render(
+    <TaskCard
+      task={{ ...task, assigneeId: null }}
+      members={[{ ...member, name: "Brain" }]}
+    />,
+  );
+  expect(
+    screen.getByText(
+      "Execution unconfirmed · Brain last reported 0 min ago: implementing snow tiles",
+    ),
+  ).toBeVisible();
+  expect(screen.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "quiet",
+  );
+  expect(screen.queryByTestId("working-avatar")).toBeNull();
 });

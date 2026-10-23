@@ -232,7 +232,7 @@ p {
 }
 .app-shell {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
@@ -256,7 +256,7 @@ p {
   font:
     600 22px "Fraunces Variable",
     serif;
-  margin-bottom: 34px;
+  margin-bottom: 24px;
   white-space: nowrap;
 }
 .brand-mark {
@@ -284,7 +284,10 @@ p {
 .sidebar nav {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 10px;
 }
 :where(.sidebar nav) > .tooltip-wrap {
   display: flex;
@@ -294,17 +297,29 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  height: 44px;
+  height: 56px;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
   width: 100%;
   border-radius: 10px;
   color: var(--ink-2);
   border: 1px solid transparent;
   font-weight: 650;
 }
+.nav-label {
+  font-size: 11px;
+  line-height: 1.2;
+}
 .expanded .nav-link {
+  flex-direction: row;
+  height: 44px;
+  gap: 14px;
   justify-content: flex-start;
   padding-left: 13px;
+}
+.expanded .nav-label {
+  font-size: 14px;
 }
 .nav-link:hover {
   background: var(--card);
@@ -322,6 +337,8 @@ p {
 }
 .sidebar-bottom {
   margin-top: auto;
+  padding-top: 12px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -402,7 +419,7 @@ p {
   color: var(--ink-2);
 }
 .countdown.ending {
-  color: var(--coral);
+  color: var(--coral-ink);
 }
 .topbar .button {
   height: 32px;
@@ -569,7 +586,7 @@ p {
   box-shadow: inset 3px 0 0 var(--agent-color);
 }
 [data-theme="dark"] .sticker-wrap {
-  --card-mix: 22%;
+  --card-mix: 16%;
 }
 [data-theme="dark"]
   :is([data-color-by="assignee"], [data-color-by="epic"])
@@ -593,7 +610,7 @@ p {
   color: var(--coral-ink);
 }
 .priority.critical {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .card-title {
   font-size: 14px;
@@ -808,6 +825,8 @@ p {
   flex-direction: column;
   gap: 10px;
   max-width: 490px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
 }
 .app-shell.expanded ~ .toast-stack {
   left: 240px;
@@ -825,8 +844,51 @@ p {
   font-size: 12px;
   animation: toast-in 200ms var(--ease);
 }
-.toast > span:not(.tooltip-wrap) {
+.toast-content {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-details {
+  margin-top: 6px;
+}
+.toast-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.toast-details[open] {
+  max-height: min(40vh, 260px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.toast-details ol {
+  padding-left: 20px;
+}
+.toast-details li + li {
+  margin-top: 8px;
+}
+.toast-details code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.toast:has(.toast-details) {
+  align-items: flex-start;
+  max-width: min(490px, calc(100vw - 110px));
+}
+.file-drop-progress {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--paper-2);
+  line-height: 1.6;
+}
+.references-page > .file-drop-progress {
+  position: absolute;
+  z-index: 8;
+  top: 60px;
+  left: 16px;
+  right: 16px;
 }
 .toast .button {
   height: 28px;
@@ -879,7 +941,7 @@ form label {
   margin-bottom: 14px;
 }
 input[aria-invalid="true"] {
-  border-color: var(--danger);
+  border-color: var(--danger-ink);
 }
 .form-row {
   display: flex;
@@ -909,7 +971,7 @@ input[aria-invalid="true"] {
   color: var(--ink-2);
 }
 .field-error {
-  color: var(--danger);
+  color: var(--danger-ink);
   font-size: 12px;
   margin: -7px 0 12px;
 }
@@ -962,7 +1024,7 @@ input[aria-invalid="true"] {
   color: var(--coral-ink);
 }
 .priority-critical svg {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .table-page {
   display: flex;
@@ -1012,13 +1074,11 @@ input[aria-invalid="true"] {
   padding: 0;
   border: 0;
   background: transparent;
-  opacity: 0.55;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
 }
 .status-filters button[aria-pressed="true"] {
-  opacity: 1;
   box-shadow: 0 0 0 1.5px var(--ink);
 }
 .status-filters .chip {
@@ -1106,7 +1166,10 @@ input[aria-invalid="true"] {
   width: 100%;
   will-change: transform;
 }
+/* Only body rows need clearance from the sticky 40px + 44px header.
+   A container-wide inset also excludes the sticky sort controls themselves. */
 .task-table tbody tr {
+  scroll-margin-top: 84px;
   content-visibility: auto;
   contain-intrinsic-block-size: 44px;
   position: relative;
@@ -1165,9 +1228,6 @@ input[aria-invalid="true"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.archived {
-  opacity: 0.55;
 }
 .drawer-backdrop {
   background: rgba(43, 38, 34, 0.18);
@@ -1404,7 +1464,7 @@ input[aria-invalid="true"] {
 .overdue {
   color: var(--ink) !important;
   background: color-mix(in srgb, var(--danger) 25%, var(--card));
-  border-color: var(--danger);
+  border-color: var(--danger-ink);
   align-self: flex-start;
 }
 .section-heading {
@@ -1585,31 +1645,6 @@ input[aria-invalid="true"] {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 24px;
-}
-.review-dialog {
-  width: 760px;
-}
-.comparison {
-  margin-top: 20px;
-  font-size: 12px;
-}
-.comparison-row {
-  display: grid;
-  grid-template-columns: 100px 1fr 1fr 1fr;
-  gap: 12px;
-  border-bottom: 1px solid var(--line-soft);
-  padding: 12px 0;
-}
-.comparison-row > * {
-  overflow-wrap: anywhere;
-  max-height: 150px;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-.comparison-head {
-  color: var(--ink-2);
-  font-size: 11px;
-  text-transform: uppercase;
 }
 kbd {
   display: inline-flex;
@@ -1933,8 +1968,23 @@ kbd {
   align-items: center;
   gap: 8px;
 }
-.active-option {
+.combo-popup [role="option"].active-option {
   background: var(--paper-2);
+}
+.combo-popup[data-presentation="top-layer"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  color: var(--ink);
+}
+.combo-popup::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.combo-popup[data-presentation="inline"] {
+  position: relative;
+  inset: auto;
+  margin-top: 4px;
 }
 .table-filters .custom-select {
   min-width: 150px;
@@ -1980,9 +2030,6 @@ kbd {
     sans-serif;
 }
 
-:root {
-  --st-ready: var(--st-todo);
-}
 .card-flags {
   display: flex;
   flex-wrap: wrap;
@@ -1990,7 +2037,7 @@ kbd {
   margin-top: 8px;
 }
 .flag-changes {
-  color: var(--danger);
+  color: var(--danger-ink);
   background: var(--card);
 }
 .flag-info {
@@ -2024,4 +2071,29 @@ kbd {
   display: block;
   white-space: pre-wrap;
   font-size: 12px;
+}
+
+.query-refresh-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.query-refresh-copy {
+  flex: 1 1 200px;
+  margin: 0;
+}
+.query-refresh-error-message {
+  display: block;
+  color: var(--ink-2);
+}
+.reference-read-notice .query-refresh-notice {
+  margin: 0;
 }

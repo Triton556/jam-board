@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 39);
+    assert_eq!(actual.len(), 44);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -143,4 +143,632 @@ async fn http_auth_origin_identity_port_and_tools() {
     client.cancel().await.unwrap();
     server.stop().await;
     drop(blocker);
+}
+
+#[tokio::test]
+async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
+    let d = tempfile::tempdir().unwrap();
+    let s = Arc::new(Store::open(d.path().join("projects.db")).unwrap());
+    let (first, h) = s
+        .create_jam("HTTP first", None, None, None, "UTC", "Human")
+        .unwrap();
+    let (second, second_human) = s
+        .create_jam("HTTP second", None, None, None, "UTC", "Other human")
+        .unwrap();
+    s.create_epic(
+        &second_human.id,
+        jam_core::NewEpic {
+            title: "Foreign pre-bootstrap event".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        s.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Project", first.key_prefix.parse().unwrap());
+    headers.insert("X-Jam-Agent", "Pinned HTTP worker".parse().unwrap());
+    let http = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+    let transport = StreamableHttpClientTransport::with_client(
+        http,
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-pin", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    let read = || {
+        CallToolRequestParams::new("get_session_context")
+            .with_arguments(serde_json::json!({}).as_object().unwrap().clone())
+    };
+    // First tool call may register the agent. Establish a later foreign event
+    // after that existing presence behavior, not before session initialization.
+    assert_ne!(client.call_tool(read()).await.unwrap().is_error, Some(true));
+    s.set_status(
+        &second_human.id,
+        "Fictional foreign project observation",
+        None,
+    )
+    .unwrap();
+    let result = client.call_tool(read()).await.unwrap();
+    let context = result.structured_content.unwrap();
+    assert_eq!(context["projectId"], first.id);
+    let expected = s
+        .for_project(&first.id)
+        .unwrap()
+        .list_changes_since(0, None)
+        .unwrap()
+        .last()
+        .map_or(0, |event| event.seq);
+    assert_eq!(context["latestActivityCursor"], expected);
+    assert!(expected < s.latest_seq().unwrap());
+    assert_session_context_compatibility(&context);
+    let tools = client.list_all_tools().await.unwrap();
+    let output = tools
+        .iter()
+        .find(|t| t.name == "get_session_context")
+        .unwrap()
+        .output_schema
+        .as_ref()
+        .unwrap();
+    let expected_properties: Vec<String> =
+        serde_json::from_str(include_str!("fixtures/session-context-properties.json")).unwrap();
+    let mut actual_properties = output["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    actual_properties.sort();
+    assert_eq!(actual_properties, expected_properties);
+    assert_eq!(
+        output["properties"]["latestActivityCursor"]["type"],
+        "integer"
+    );
+    assert_eq!(output["properties"]["latestActivityCursor"]["minimum"], 0);
+    assert!(
+        output["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("latestActivityCursor"))
+    );
+    assert_eq!(s.active_jam().unwrap().id, second.id);
+    s.select_project(&first.id).unwrap();
+    s.select_project(&second.id).unwrap();
+    let before = s.latest_seq().unwrap();
+    let result = client.call_tool(read()).await.unwrap();
+    assert_eq!(result.structured_content.unwrap(), context);
+    assert_eq!(
+        s.latest_seq().unwrap(),
+        before,
+        "context reads add no activity"
+    );
+    // Agent changes still land in the pinned first project.
+    let created = client
+        .call_tool(
+            CallToolRequestParams::new("create_epic").with_arguments(
+                serde_json::json!({"title":"Pinned epic"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.structured_content.unwrap()["jamId"], first.id);
+    assert_eq!(s.get_project().unwrap().epics, 1);
+    let pinned = s.for_project(&first.id).unwrap();
+    assert_eq!(pinned.get_project().unwrap().epics, 1);
+    let own_latest = pinned
+        .list_changes_since(0, None)
+        .unwrap()
+        .last()
+        .unwrap()
+        .seq;
+    assert!(own_latest > expected);
+    s.create_epic(
+        &second_human.id,
+        jam_core::NewEpic {
+            title: "Foreign post-bootstrap event".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(s.latest_seq().unwrap() > own_latest);
+    let advanced_context = client
+        .call_tool(read())
+        .await
+        .unwrap()
+        .structured_content
+        .unwrap();
+    assert_eq!(advanced_context["projectId"], first.id);
+    assert_eq!(advanced_context["latestActivityCursor"], own_latest);
+    assert!(
+        pinned
+            .list_members()
+            .unwrap()
+            .iter()
+            .any(|m| m.member.name == "Pinned HTTP worker")
+    );
+    assert!(
+        s.list_members()
+            .unwrap()
+            .iter()
+            .all(|m| m.member.name != "Pinned HTTP worker")
+    );
+    // Archival blocks an existing session until that exact project is restored.
+    s.select_project(&first.id).unwrap();
+    s.reset_jam(&h.id, &first.name).unwrap();
+    let result = client.call_tool(read()).await.unwrap();
+    assert_eq!(result.is_error, Some(true));
+    assert_eq!(result.structured_content.unwrap()["code"], "archived");
+    s.restore_project(&first.id).unwrap();
+    assert_eq!(
+        client
+            .call_tool(read())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["projectId"],
+        first.id
+    );
+    client.cancel().await.unwrap();
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence() {
+    use jam_core::*;
+    let d = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open(d.path().join("execution.db")).unwrap());
+    let (project, human) = store
+        .create_jam("HTTP execution", None, None, None, "UTC", "Human")
+        .unwrap();
+    let pinned = store.for_project(&project.id).unwrap();
+    let epic = pinned
+        .create_epic(
+            &human.id,
+            NewEpic {
+                title: "Exact epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let story = pinned
+        .create_story(
+            &human.id,
+            NewStory {
+                epic_key: epic.key.clone(),
+                title: "Exact story".into(),
+                outcome_md: Some("Verified outcome".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "a".into(),
+                    criterion: "Correct".into(),
+                    mandatory: true,
+                    check: "Tests".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    pinned
+        .set_story_status(&human.id, &story.key, "active", None)
+        .unwrap();
+    let task = pinned
+        .create_task(
+            &human.id,
+            CreateTask {
+                story_key: Some(story.key.clone()),
+                title: "Ready is not permission".into(),
+                status: Some("ready".into()),
+                brief: TaskBrief {
+                    goal_md: "Goal".into(),
+                    where_md: "src/feature".into(),
+                    result_md: "Report".into(),
+                    changes: vec![Change {
+                        title: "Change".into(),
+                        required: "Required".into(),
+                        ..Default::default()
+                    }],
+                    tests: vec![BriefTest {
+                        setup: "Run checks".into(),
+                        expected: "Pass".into(),
+                    }],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        store.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Project", project.id.parse().unwrap());
+    headers.insert("X-Jam-Agent", "HTTP brain".parse().unwrap());
+    let transport = StreamableHttpClientTransport::with_client(
+        reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap(),
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-gate", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    // Legacy workflow checks explicitly observe the pinned project immediately.
+    let call = |name: &'static str, mut args: serde_json::Value| {
+        if ["claim_task", "submit_report"].contains(&name) {
+            let observed = pinned.get_task(args["key"].as_str().unwrap()).unwrap();
+            args["expectedClaimGeneration"] = serde_json::json!(observed.task.claim_generation);
+            if name == "claim_task" {
+                args["expectedUpdatedAt"] = serde_json::json!(observed.task.updated_at);
+            }
+        }
+        CallToolRequestParams::new(name).with_arguments(args.as_object().unwrap().clone())
+    };
+    client
+        .call_tool(call("get_project", serde_json::json!({})))
+        .await
+        .unwrap();
+    let brain = pinned
+        .list_members()
+        .unwrap()
+        .into_iter()
+        .find(|m| m.member.name == "HTTP brain")
+        .unwrap()
+        .member;
+    pinned
+        .set_brain(&human.id, &epic.key, &brain.handle)
+        .unwrap();
+    let denied = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(
+        denied.structured_content.unwrap()["code"],
+        "execution_required"
+    );
+    let request = client.call_tool(call("request_execution", serde_json::json!({"scope":{"type":"story","id":story.key},"reason":"Start this exact reviewed story"}))).await.unwrap();
+    assert_ne!(request.is_error, Some(true));
+    let request: ExecutionRequest =
+        serde_json::from_value(request.structured_content.unwrap()).unwrap();
+    assert_eq!(request.project_id, project.id);
+    assert_eq!(request.scope.id, story.audit.id);
+    assert!(
+        !client
+            .list_all_tools()
+            .await
+            .unwrap()
+            .iter()
+            .any(|t| matches!(
+                t.name.as_ref(),
+                "set_execution" | "resolve_execution_request"
+            ))
+    );
+    let (other, _) = store
+        .create_jam("Unrelated project", None, None, None, "UTC", "Other human")
+        .unwrap();
+    pinned
+        .resolve_execution_request(
+            &human.id,
+            ResolveExecutionRequest {
+                id: request.id,
+                decision: ExecutionDecision::Approve,
+                expected_revision: request.revision,
+            },
+        )
+        .unwrap();
+    assert_eq!(store.active_jam().unwrap().id, other.id);
+    let claim = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_ne!(claim.is_error, Some(true));
+    let scope = ExecutionScope {
+        kind: ExecutionScopeType::Story,
+        id: story.audit.id,
+    };
+    pinned
+        .set_execution(
+            &human.id,
+            SetExecution {
+                expected_revision: pinned.get_execution(&scope).unwrap().revision,
+                scope: scope.clone(),
+                action: ExecutionAction::Pause,
+            },
+        )
+        .unwrap();
+    let report = client.call_tool(call("submit_report", serde_json::json!({"key":task.task.key,"summaryMd":"Existing round evidence survives pause","changedFiles":["src/feature"],"tests":[{"name":"check","command":"check","expected":"Pass","actual":"Pass","result":"PASS"}]}))).await.unwrap();
+    assert_ne!(report.is_error, Some(true));
+    pinned
+        .review_task(
+            &human.id,
+            ReviewTask {
+                expected_report_id: pinned
+                    .get_task(&task.task.key)
+                    .unwrap()
+                    .reports
+                    .last()
+                    .unwrap()
+                    .id
+                    .clone(),
+                expected_review_context_revision: pinned
+                    .get_task(&task.task.key)
+                    .unwrap()
+                    .review_context_revision
+                    .unwrap(),
+                key: task.task.key.clone(),
+                verdict: "changes_requested".into(),
+                comments_md: "Another round".into(),
+                failed_tests: None,
+            },
+        )
+        .unwrap();
+    let denied = client
+        .call_tool(call("claim_task", serde_json::json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(
+        denied.structured_content.unwrap()["code"],
+        "execution_required"
+    );
+    assert_eq!(store.get_project().unwrap().tasks, 0);
+    assert_eq!(pinned.get_task(&task.task.key).unwrap().reports.len(), 1);
+    client.cancel().await.unwrap();
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn http_rejects_old_generation_after_same_identity_reclaim_and_never_fills_missing_context() {
+    use jam_core::*;
+    use serde_json::json;
+    let d = tempfile::tempdir().unwrap();
+    let s = Arc::new(Store::open(d.path().join("http-context.db")).unwrap());
+    let (_, h) = s
+        .create_jam("HTTP context", None, None, None, "UTC", "Human")
+        .unwrap();
+    let e = s
+        .create_epic(
+            &h.id,
+            NewEpic {
+                title: "Epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let story = s
+        .create_story(
+            &h.id,
+            NewStory {
+                epic_key: e.key,
+                title: "Story".into(),
+                outcome_md: Some("Outcome".into()),
+                acceptance: Some(vec![Acceptance {
+                    id: "a".into(),
+                    criterion: "Correct".into(),
+                    mandatory: true,
+                    check: "Tests".into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    s.set_story_status(&h.id, &story.key, "active", None)
+        .unwrap();
+    let scope = ExecutionScope {
+        kind: ExecutionScopeType::Story,
+        id: story.audit.id.clone(),
+    };
+    s.set_execution(
+        &h.id,
+        SetExecution {
+            expected_revision: s.get_execution(&scope).unwrap().revision,
+            scope: scope.clone(),
+            action: ExecutionAction::Start,
+        },
+    )
+    .unwrap();
+    let task = s
+        .create_task(
+            &h.id,
+            CreateTask {
+                title: "Task".into(),
+                story_key: Some(story.key),
+                status: Some("ready".into()),
+                brief: TaskBrief {
+                    goal_md: "Goal".into(),
+                    where_md: "src/feature".into(),
+                    changes: vec![Change {
+                        title: "Change".into(),
+                        required: "Correct".into(),
+                        ..Default::default()
+                    }],
+                    tests: vec![BriefTest {
+                        setup: "Run check".into(),
+                        expected: "Pass".into(),
+                    }],
+                    result_md: "Report".into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let bearer = token(d.path()).unwrap();
+    let server = start_http(
+        s.clone(),
+        bearer.clone(),
+        Arc::new(Mutex::new(Default::default())),
+    )
+    .await
+    .unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
+    headers.insert("X-Jam-Agent", "HTTP context worker".parse().unwrap());
+    headers.insert("X-Jam-Project", task.task.jam_id.parse().unwrap());
+    let transport = StreamableHttpClientTransport::with_client(
+        reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap(),
+        StreamableHttpClientTransportConfig::with_uri(format!(
+            "http://127.0.0.1:{}/mcp",
+            server.port
+        )),
+    );
+    let client = ClientConfig::new(
+        ClientCapabilities::default(),
+        Implementation::new("codex-http-context", "1"),
+    )
+    .serve(transport)
+    .await
+    .unwrap();
+    let call = |name: &'static str, args: serde_json::Value| {
+        CallToolRequestParams::new(name).with_arguments(args.as_object().unwrap().clone())
+    };
+    let denied = client
+        .call_tool(call("claim_task", json!({"key":task.task.key})))
+        .await
+        .unwrap();
+    assert_eq!(denied.structured_content.unwrap()["code"], "validation");
+    let claimed=client.call_tool(call("claim_task",json!({"key":task.task.key,"expectedClaimGeneration":task.task.claim_generation,"expectedUpdatedAt":task.task.updated_at}))).await.unwrap();
+    assert_ne!(claimed.is_error, Some(true));
+    let claimed = claimed.structured_content.unwrap();
+    s.release_current_task(ReleaseClaim {
+        key: task.task.key.clone(),
+        expected_updated_at: claimed["updatedAt"].as_str().unwrap().into(),
+    })
+    .unwrap();
+    s.mark_ready(&h.id, &task.task.key, None, None).unwrap();
+    let observed = s.get_task(&task.task.key).unwrap();
+    let reclaimed=client.call_tool(call("claim_task",json!({"key":task.task.key,"expectedClaimGeneration":observed.task.claim_generation,"expectedUpdatedAt":observed.task.updated_at}))).await.unwrap();
+    assert_ne!(reclaimed.is_error, Some(true));
+    let reclaimed = reclaimed.structured_content.unwrap();
+    let before = serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap();
+    let seq = s.latest_seq().unwrap();
+    for (name, args) in [
+        (
+            "submit_report",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"],"summaryMd":"Delayed old report","changedFiles":[],"tests":[]}),
+        ),
+        (
+            "release_task",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"]}),
+        ),
+        (
+            "update_task_brief",
+            json!({"key":task.task.key,"expectedClaimGeneration":claimed["claimGeneration"],"expectedUpdatedAt":claimed["updatedAt"],"goalMd":"Delayed overwrite"}),
+        ),
+    ] {
+        let result = client.call_tool(call(name, args)).await.unwrap();
+        assert_eq!(
+            result.structured_content.unwrap()["code"],
+            "stale_claim",
+            "{name}"
+        );
+    }
+    assert_eq!(s.latest_seq().unwrap(), seq);
+    assert_eq!(
+        serde_json::to_value(s.get_task(&task.task.key).unwrap()).unwrap(),
+        before
+    );
+    s.set_execution(
+        &h.id,
+        SetExecution {
+            expected_revision: s.get_execution(&scope).unwrap().revision,
+            scope,
+            action: ExecutionAction::Pause,
+        },
+    )
+    .unwrap();
+    let report=client.call_tool(call("submit_report",json!({"key":task.task.key,"expectedClaimGeneration":reclaimed["claimGeneration"],"summaryMd":"Current evidence after Pause","changedFiles":[],"tests":[]}))).await.unwrap();
+    assert_ne!(report.is_error, Some(true));
+    client.cancel().await.unwrap();
+    server.stop().await;
+}
+
+// Compatibility is a client boundary, not a promise that every cached old schema accepts additions.
+fn assert_session_context_compatibility(context: &serde_json::Value) {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct TolerantOldContext {
+        project_id: String,
+    }
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    #[allow(dead_code)]
+    struct StrictOldContext {
+        project_id: String,
+        key_prefix: String,
+        project_name: String,
+        binding: String,
+        can_switch_project: bool,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CrossVersionContext {
+        latest_activity_cursor: Option<i64>,
+    }
+    let tolerant: TolerantOldContext = serde_json::from_value(context.clone()).unwrap();
+    assert_eq!(tolerant.project_id, context["projectId"]);
+    let strict = serde_json::from_value::<StrictOldContext>(context.clone()).unwrap_err();
+    assert!(strict.to_string().contains("latestActivityCursor"));
+    let mut older_server = context.clone();
+    older_server
+        .as_object_mut()
+        .unwrap()
+        .remove("latestActivityCursor");
+    // A cached pre-alpha41 strict client must refresh its output schema too.
+    let strict_folder =
+        serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap_err();
+    assert!(strict_folder.to_string().contains("projectFolder"));
+    older_server
+        .as_object_mut()
+        .unwrap()
+        .remove("projectFolder");
+    serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap();
+    assert!(
+        serde_json::from_value::<CrossVersionContext>(older_server)
+            .unwrap()
+            .latest_activity_cursor
+            .is_none()
+    );
+    let mut empty_project = context.clone();
+    empty_project["latestActivityCursor"] = serde_json::json!(0);
+    assert_eq!(
+        serde_json::from_value::<CrossVersionContext>(empty_project)
+            .unwrap()
+            .latest_activity_cursor,
+        Some(0)
+    );
 }

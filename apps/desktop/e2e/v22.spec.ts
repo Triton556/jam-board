@@ -1,4 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
+import {
+  expectPoliteNotice,
+  markdownReadView,
+  openAgentPlan,
+} from "./assertions";
 
 async function select(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label, exact: true }).click();
@@ -11,9 +16,7 @@ async function writeBlock(page: Page, label: string, text: string) {
   const input = page.getByRole("textbox", { name: label, exact: true });
   await input.fill(text);
   await input.press("Tab");
-  await expect(
-    page.getByRole("button", { name: `Edit ${label}`, exact: true }),
-  ).toContainText(text);
+  await expect(markdownReadView(page, label)).toHaveText(text);
 }
 async function emptyPlan(page: Page) {
   await page.goto("/");
@@ -54,9 +57,9 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     "Done when",
     "The bridge playtest passes with keyboard controls.",
   );
-  await select(page, "Epic status", "Active");
+  await select(page, "Epic plan status", "Active");
   await expect(
-    page.getByRole("combobox", { name: "Epic status" }),
+    page.getByRole("combobox", { name: "Epic plan status" }),
   ).toContainText("Active");
   await page.getByRole("radio", { name: "Stories", exact: true }).click();
   await page.getByRole("button", { name: "New story", exact: true }).click();
@@ -64,7 +67,8 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     .getByRole("textbox", { name: "Story name" })
     .fill("Readable bridge");
   await page.getByRole("button", { name: "Create story", exact: true }).click();
-  await writeBlock(page, "Outcome", "The next safe tile is obvious.");
+  await writeBlock(page, "Description", "The next safe tile is obvious.");
+  await openAgentPlan(page);
   await page
     .getByRole("button", { name: "Add criterion", exact: true })
     .click();
@@ -77,9 +81,9 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
   await page
     .getByRole("button", { name: "Save acceptance", exact: true })
     .click();
-  await select(page, "Story status", "Active");
+  await select(page, "Story plan status", "Active");
   await expect(
-    page.getByRole("combobox", { name: "Story status" }),
+    page.getByRole("combobox", { name: "Story plan status" }),
   ).toContainText("Active");
   await page.getByRole("button", { name: "Close task", exact: true }).click();
   await page
@@ -90,6 +94,7 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
     .getByRole("textbox", { name: "New planned task title" })
     .fill("Light one safe tile");
   await page.getByRole("button", { name: "Create task", exact: true }).click();
+  await openAgentPlan(page);
   for (const [label, text] of [
     ["Goal", "Show the safe next step."],
     ["Where", "game/lantern.gd"],
@@ -129,17 +134,32 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
   const ready = page.getByRole("dialog", { name: "Not ready · JB-2" });
   await expect(ready).toContainText("At least one test");
   await ready
-    .getByRole("button", { name: "Move anyway…", exact: true })
+    .getByRole("button", { name: "Mark ready anyway…", exact: true })
     .click();
   await ready.getByRole("textbox", { name: "Override reason" }).fill("short");
   await expect(
-    ready.getByRole("button", { name: "Move anyway", exact: true }),
+    ready.getByRole("button", { name: "Mark ready anyway", exact: true }),
   ).toBeDisabled();
   await ready
     .getByRole("textbox", { name: "Override reason" })
     .fill("Explore the existing route before narrowing the test.");
-  await ready.getByRole("button", { name: "Move anyway", exact: true }).click();
+  await ready
+    .getByRole("button", { name: "Mark ready anyway", exact: true })
+    .click();
   await expect(ready).not.toBeVisible();
+  await page.getByRole("button", { name: "Close task", exact: true }).click();
+  // Ready describes the brief, not permission. The human starts this exact story.
+  const planned = await page.evaluate(() => window.__jamMock.getTask("JB-1"));
+  await page.goto(`/plan/${planned.epic.key}?story=${planned.story.key}`);
+  await page.getByRole("button", { name: "Start story", exact: true }).click();
+  const start = page.getByRole("dialog", {
+    name: `Start ${planned.story.key}?`,
+  });
+  await expect(start).toContainText("does not launch");
+  await start
+    .getByRole("button", { name: `Start ${planned.story.key}`, exact: true })
+    .click();
+  await expect(start).not.toBeVisible();
   await page.getByRole("button", { name: "Close task", exact: true }).click();
   await page.evaluate(async () => {
     await window.__jamMock.simulateAgent({
@@ -151,6 +171,11 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
       key: "JB-1",
     });
   });
+  const storiesTab = page
+    .getByRole("radiogroup", { name: "Epic tabs" })
+    .getByRole("radio", { name: "Stories", exact: true });
+  await storiesTab.click();
+  await expect(storiesTab).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: /JB-1 Light one safe tile/ }).click();
   await expect(
     page.getByRole("region", { name: "Latest report", exact: true }),
@@ -183,9 +208,7 @@ test("human plans, edits briefs, overrides readiness, reviews and answers a work
       title: "Which lantern color?",
     }),
   );
-  await expect(
-    page.getByRole("status", { name: "Notifications" }),
-  ).toContainText("Codex asked: Which lantern color?");
+  await expectPoliteNotice(page, "Codex asked: Which lantern color?");
   await page.getByRole("link", { name: "Board", exact: true }).click();
   await expect(page.locator('[data-key="JB-1"]')).toContainText("Needs info");
   await expect(page.locator('[data-key="JB-1"]')).toContainText(
@@ -309,6 +332,7 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
     }),
   );
   await page.goto("/board?task=JB-1");
+  await openAgentPlan(page);
   for (const label of ["Change", "Test"]) {
     const first = page.getByRole("button", {
       name: `Drag ${label} 1`,
@@ -348,7 +372,17 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
   await page.keyboard.press("p");
   await expect(page).toHaveURL(/\/plan/);
   await page.setViewportSize({ width: 1100, height: 700 });
-  await expect(page.locator(".epic-rail")).toHaveCSS("width", "64px");
+  await expect(page.locator(".epic-rail")).toHaveCSS("width", "220px");
+  await expect(
+    page.getByRole("combobox", { name: "Epic filter" }),
+  ).toBeVisible();
+  await expect(page.locator(".epic-card h2").first()).toBeVisible();
+  await select(page, "Epic filter", "Draft");
+  await expect(
+    page.locator(".epic-card").filter({ hasText: "JB-E2" }),
+  ).toBeVisible();
+  await select(page, "Epic filter", "All");
+  await expect(page.locator(".epic-card")).toHaveCount(2);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -359,7 +393,7 @@ test("brief lists reorder by pointer and Alt arrows; Plan fits the minimum windo
   await expect(page).toHaveURL(/\/inbox/);
 });
 
-test("brief conflict compares fields and Keep mine preserves the agent's other edits", async ({
+test("brief conflict compares fields and Save my edits against latest preserves the agent's other edits", async ({
   page,
 }) => {
   await page.goto("/");
@@ -367,6 +401,7 @@ test("brief conflict compares fields and Keep mine preserves the agent's other e
     .getByRole("button", { name: "Load demo jam", exact: true })
     .click();
   await page.goto("/board?task=JB-2");
+  await openAgentPlan(page);
   const required = page.getByRole("textbox", {
     name: "Change 1 required",
     exact: true,
@@ -397,12 +432,49 @@ test("brief conflict compares fields and Keep mine preserves the agent's other e
     exact: true,
   });
   await expect(dialog).toContainText("game/bridge/next-tile.gd");
-  await dialog.getByRole("button", { name: "Keep mine", exact: true }).click();
+  await page.evaluate(async () => {
+    const task = await window.__jamMock.getTask("JB-2");
+    await window.__jamMock.simulateAgent({
+      action: "task.brief_updated",
+      key: task.key,
+      patch: {
+        brief: {
+          ...task.brief,
+          contextMd: "A newer context arrived while comparing.",
+        },
+      },
+    });
+  });
+  await expect(
+    dialog.getByRole("button", {
+      name: "Save my edits against latest",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(dialog).not.toContainText(
+    "A newer context arrived while comparing.",
+  );
+  await dialog
+    .getByRole("button", { name: "Read latest comparison", exact: true })
+    .click();
+  await expect(dialog).toContainText(
+    "A newer context arrived while comparing.",
+  );
+  await expect(
+    dialog.getByRole("heading", { name: "Compared task · JB-2", exact: true }),
+  ).toBeFocused();
+  await expect(dialog).toContainText("Entries are not merged individually");
+  await dialog
+    .getByRole("button", { name: "Save my edits against latest", exact: true })
+    .click();
   await expect(
     page.getByText("All changes saved", { exact: true }),
   ).toBeVisible();
   const saved = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
   expect(saved.brief.goalMd).toBe("The agent clarified the route goal.");
+  expect(saved.brief.contextMd).toBe(
+    "A newer context arrived while comparing.",
+  );
   expect(saved.brief.whereMd).toBe("game/bridge/next-tile.gd");
   expect(saved.brief.changes?.[0]?.required).toBe(
     "Keep exactly one neighboring safe tile illuminated.",
@@ -431,6 +503,11 @@ test("brief conflict compares fields and Keep mine preserves the agent's other e
   await page
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
-  await page.getByRole("button", { name: "Take theirs", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Discard my edits and use latest",
+      exact: true,
+    })
+    .click();
   await expect(required).toHaveValue("Use the newly reviewed tile boundary.");
 });

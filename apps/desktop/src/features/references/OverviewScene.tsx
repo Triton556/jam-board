@@ -10,8 +10,8 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import type { ReferenceCanvas } from "../../bindings";
 import { api } from "../../lib/api";
 import { decodedThumbnail } from "./Media";
-import { referenceKind, worldPosition } from "./model";
-import { roughFramePaths, roughPaths } from "./rough";
+import { referenceKind, referenceLabel, worldPosition } from "./model";
+import { roughPaths } from "./rough";
 // At overview scale a cached raster avoids repainting hundreds of text/card layers
 // on every zoom frame. Real React Flow nodes remain the interactive/accessible model.
 export const OverviewScene = memo(function OverviewScene({
@@ -97,37 +97,15 @@ export const OverviewScene = memo(function OverviewScene({
       const c = element.getContext("2d");
       if (!c) return;
       const ink = style.getPropertyValue("--ink").trim(),
-        card = style.getPropertyValue("--card").trim(),
-        paper = style.getPropertyValue("--paper").trim();
+        card = style.getPropertyValue("--card").trim();
       c.resetTransform();
       c.clearRect(0, 0, element.width, element.height);
       c.scale(scale, scale);
       c.translate(-left, -top);
       c.lineWidth = 1.5;
       const lookup = new Map(data.items.map((i) => [i.id, i]));
-      for (const f of frames) {
-        if (excludedIds.has(f.id)) continue;
-        c.strokeStyle = f.epicId
-          ? color(targets.find((t) => t.id === f.epicId)?.color ?? f.color)
-          : ink;
-        if (!f.collapsed) {
-          c.save();
-          c.translate(f.x ?? 0, f.y ?? 0);
-          for (const path of roughFramePaths(f.w ?? 800, f.h ?? 600))
-            c.stroke(new Path2D(path));
-          c.restore();
-        }
-        c.fillStyle = paper;
-        c.fillRect(
-          f.x ?? 0,
-          (f.y ?? 0) - 20,
-          Math.min(f.w ?? 800, f.title.length * 11 + 28),
-          33,
-        );
-        c.fillStyle = ink;
-        c.font = '600 20px "Fraunces Variable"';
-        c.fillText(f.title, (f.x ?? 0) + 10, (f.y ?? 0) + 3);
-      }
+      // Frame boundaries and titles stay live DOM at every zoom. Painting them
+      // here too creates a second title and a mismatched legacy outline.
       for (const e of data.edges) {
         if (excludedIds.has(e.fromItem) || excludedIds.has(e.toItem)) continue;
         const a = lookup.get(e.fromItem),
@@ -212,7 +190,7 @@ export const OverviewScene = memo(function OverviewScene({
         }
         c.fillStyle = ink;
         c.font = '600 16px "Manrope Variable"';
-        c.fillText(item.title, p.x + 10, p.y + 22, w - 20);
+        c.fillText(referenceLabel(item), p.x + 10, p.y + 22, w - 20);
         const highlight = highlights[item.id];
         if (highlight) {
           c.strokeStyle = color(highlight.color);

@@ -15,11 +15,12 @@ import { StoryDrawer } from "./plan/StoryDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useBlocker: () => ({}),
   useRouterState: () => "/plan/JB-E1",
 }));
 beforeEach(async () => {
   vi.restoreAllMocks();
-  await mockApi.loadDemoJam();
+  await mockApi.resetDemo();
 });
 function fixture(kind: "epic" | "story") {
   const client = new QueryClient({
@@ -249,3 +250,22 @@ it.each([
     );
   },
 );
+
+it("epic overview puts purpose and acceptance before optional references and labels its brain", async () => {
+  fixture("epic");
+  const goal = await screen.findByText("Goal and audience", { selector: "h3" });
+  const done = screen.getByText("Done when", { selector: "h3" });
+  const references = screen.getByRole("heading", { name: /^References/ });
+  expect(
+    goal.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    done.compareDocumentPosition(references) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(document.querySelector(".epic-brain-control")).toHaveTextContent(
+    "Brain",
+  );
+  expect(
+    screen.getByRole("button", { name: "Refine with brain" }),
+  ).toBeVisible();
+});

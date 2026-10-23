@@ -1,0 +1,205 @@
+{
+  "repository": "Triton556/jam-board",
+  "branch": "rumi/project-workflow-ux",
+  "note": "Source and published commit metadata differ; each row identifies the same Git tree. This map covers development history through the alpha28 test/docs correction, not the closing documentation commit containing this map. The map alone does not establish branch reachability, CI, installation or release; those outcomes are verified separately.",
+  "commits": [
+    {
+      "source_commit": "b4910faf03be97792d9103f57cd7823e3098d738",
+      "published_commit": "3bbc4fb6c9be10f9fddcccf415248013af45f256",
+      "tree": "d9272074f35f351f19ef2a3dd2aa8b64069992f7",
+      "subject": "feat(projects): pin boards and clarify planning workflow (0.3.0-alpha.1)"
+    },
+    {
+      "source_commit": "d86da929865f6ffa391c45657169970840023d95",
+      "published_commit": "50d4d8b81ffcfcaf148853ec769a89ad64df221e",
+      "tree": "e464dab8fcd2f2056323226fe1cc19cb35478bd3",
+      "subject": "feat(workflow): authorize story and epic work explicitly (0.3.0-alpha.2)"
+    },
+    {
+      "source_commit": "156a27dc5ce7eb2a9467e66bf20a660bc7b39b88",
+      "published_commit": "73cc19f2617f3dac21788878c0292920ec0ca0b8",
+      "tree": "ab4db6c4522cecca6091f86706e6d0bda84dee8e",
+      "subject": "fix(workflow): close review bypasses and reveal navigation (0.3.0-alpha.3)"
+    },
+    {
+      "source_commit": "caa1f8c68de4f7986c96a3090b356ca5d6657dde",
+      "published_commit": "c548cb3bebae3e6aeac947a17635ffabab80bd15",
+      "tree": "81731701acca2d2e921d86d6a4774585bf89ca6b",
+      "subject": "feat(recovery): return stale claims to planning safely (0.3.0-alpha.4)"
+    },
+    {
+      "source_commit": "67e7a86859c3543c233343d0efa6a97de844d59b",
+      "published_commit": "130c6442d3e4b61273ef05afb0095633090cb463",
+      "tree": "91055cdbf781372aebd4045ba1ec86e037e36d2b",
+      "subject": "feat(concurrency): fence stale claims and freeze review evidence (0.3.0-alpha.5)"
+    },
+    {
+      "source_commit": "88999b0ec16558d661c952638fcd05fc23a40f21",
+      "published_commit": "44f2616f936ca1c0a684d5bda38d8e0604533bd4",
+      "tree": "91dd80da5a74b16df2feee23d47bd71716a29002",
+      "subject": "fix(review): keep complete evidence and recovery inside dialogs (0.3.0-alpha.6)"
+    },
+    {
+      "source_commit": "eeec80c08d1e7d240e8465da6b6b62c3191b14bd",
+      "published_commit": "20f8784f750c6136c35a96bcbb9dfa841b28726f",
+      "tree": "c7cdf6ef48c554375bcc9fdcf8b495946dae7ca1",
+      "subject": "fix(concurrency): preserve human move and readiness intent (0.3.0-alpha.7)"
+    },
+    {
+      "source_commit": "be14609abaeeed9ffe0492bc6bfe8a2c7fcdaf25",
+      "published_commit": "523060c6ca6d613760d5e31f64674afc6af69808",
+      "tree": "7b9512bed78ef9dbc2bf73e1e79b1209751ad76c",
+      "subject": "fix(editor): reconcile drafts against inspected task versions (0.3.0-alpha.8)"
+    },
+    {
+      "source_commit": "98b61480dbf5ff0259559f11405536fc81023c97",
+      "published_commit": "a168213a3e24db3eee1171142449be13c3fe5b3d",
+      "tree": "9871339a90cac4b9b4915f0938db347e4e5ab0c3",
+      "subject": "feat(onboarding): explain pinned projects and brain setup (0.3.0-alpha.9)"
+    },
+    {
+      "source_commit": "7f7c6a26e6712dcd974bae57534f41fa1c61862b",
+      "published_commit": "4b10f8d9ca6cc18aa71011a6954b41f1fe555f34",
+      "tree": "381e057298cfb76eeae3610372be3d7b67b750ee",
+      "subject": "fix(ui): order setup copies and clarify evidence navigation (0.3.0-alpha.10)"
+    },
+    {
+      "source_commit": "353dc2e33612fa68bff9bd947921c2d2b1fb7ea9",
+      "published_commit": "ee9564e6f8c2b1e2c8b8924f0ac91d14f64f25fa",
+      "tree": "787e93cf6466f5599caebccefa430c0a39da3cfa",
+      "subject": "perf(board): preserve task context while paging before hydration (0.3.0-alpha.11)"
+    },
+    {
+      "source_commit": "b0ebcd7c1adb4cd2009e27b1c539a4745a258e9b",
+      "published_commit": "e5f4371db96fc555170217352fa5a1cbfaf52d58",
+      "tree": "d7b09b0fad32ace8af825b566e8eea22e7bc2963",
+      "subject": "fix(plan): keep pending creations explicit and scoped (0.3.0-alpha.12)"
+    },
+    {
+      "source_commit": "f92c92ff3b116d2dfd1a815e0452c81d1e6e8dd0",
+      "published_commit": "77a0b2ab2e4b34f6aac59cf9e09e7a7b4cb60c1b",
+      "tree": "dc9f1200a09a167dccab438edbc14415aa074011",
+      "subject": "feat: make project navigation and virtual table recovery explicit"
+    },
+    {
+      "source_commit": "55ff3671c3e54eefa1250aa230b47178516729eb",
+      "published_commit": "6b0df3352585243e8baded4890bdb55e20e613e3",
+      "tree": "d05d2069b60db4b2cfebe38555053f95002b0db2",
+      "subject": "fix: preserve capture and settings drafts through slow writes (alpha14)"
+    },
+    {
+      "source_commit": "b2469e739856dde31b66c8e79b1beb5ffe530edc",
+      "published_commit": "f17a01987aef7d1476d8b3d6c22760953218f39d",
+      "tree": "73476abf80247b0642bd40c6e46ffbd56a76c685",
+      "subject": "feat: add scoped bootstrap cursor and bounded recovery guidance (alpha15)"
+    },
+    {
+      "source_commit": "b14d587decfd1e51a0f819cd7f1d5c54dcb29413",
+      "published_commit": "33a0213ac3093218c75824fdfa57916dab39d109",
+      "tree": "044560e499e9ec630b8f71641dc4bf9ced04d293",
+      "subject": "fix(ui): separate Markdown reading and project asset intent"
+    },
+    {
+      "source_commit": "b3796f599daa1c2368a60f5c3574602a5bc265eb",
+      "published_commit": "a27c13b409e53181f46caa8ed5af8b6eed839182",
+      "tree": "4b377cb225e011b99e29a6f3daf2441e5f4014bc",
+      "subject": "fix: label Plan choices and align prerelease guidance (alpha17)"
+    },
+    {
+      "source_commit": "576816d8d504f7ac83c2df4b50f0aaf1f4d63f8b",
+      "published_commit": "8560ac058d72d3139cc2aca3705366f140226bc3",
+      "tree": "a189f9a7ae0b2bd6a6c39c24ff3a174025d6c074",
+      "subject": "fix: keep lazy screens navigable and drawers dismissible (alpha18)"
+    },
+    {
+      "source_commit": "6806de50b37f9d72898db53fdbfe585562eba8ad",
+      "published_commit": "6974f8aa345e479dbdd07309bdd31a04521e8222",
+      "tree": "7e88e62c84cedd93ea4f47ba344c3a5c9781f8b7",
+      "subject": "fix(ui): keep table entry readable and widen story permissions"
+    },
+    {
+      "source_commit": "cac425c673a1a50e764bf9e5a83a2620e98c1dc9",
+      "published_commit": "bce39c9bddb6887854d37199f655d46a37db9fc9",
+      "tree": "6131635f649846296ac9f7392cdad3cb904f83c0",
+      "subject": "fix: fence file batches and report partial outcomes (alpha.20)"
+    },
+    {
+      "source_commit": "9de84f8f218a9bbd83265c5e9ef909f770d20ef5",
+      "published_commit": "efd005f44baa416e5e2dac27e92cc2ebefe60f51",
+      "tree": "23afbd834755de01ff04193744ffbe551e359dca",
+      "subject": "fix: unify pinned agent setup and readable table states (alpha.21)"
+    },
+    {
+      "source_commit": "c7e1e71dbd57294aea2c3111faa7e7e766dd5696",
+      "published_commit": "9130e454a815a360aa73b07ace7c24c6c3f66ab3",
+      "tree": "85df4f96a36557eb82d2fe7ce0a08922efc86616",
+      "subject": "fix: preserve cached drafts and expose read recovery (alpha.22)"
+    },
+    {
+      "source_commit": "c9b63f5e99479bb76db3b05a8fd652afbbece647",
+      "published_commit": "f4efe14bf60363bc1d75544f1051c300d5801dcb",
+      "tree": "cf004abb4ca9926e2a21cb72d756b734f067e2a7",
+      "subject": "fix: retain planning detail drafts during read failures (alpha.23)"
+    },
+    {
+      "source_commit": "458f12b8b1e1bee8b202bc2fe42983ad7f9c5a5c",
+      "published_commit": "bf0379c1fe89371862eaba65496cb977e7cf19f0",
+      "tree": "4277f7790796d368fadeb4aa63ed3cbfa8f88d75",
+      "subject": "fix: fence prepared clipboard images to their captured project (alpha.24)"
+    },
+    {
+      "source_commit": "819ffdb263dd17de0da10c9511e98c40050f3df9",
+      "published_commit": "269f2c470e77ccbd291f44e21f1d191183466e7c",
+      "tree": "8ea563347b8e3ce16d5b0b06a4bc41820005282e",
+      "subject": "fix: clarify Story placement when capturing drafts (alpha.25)"
+    },
+    {
+      "source_commit": "31d3679a2e687d636ac3b17d969b1d9e63dd6b4c",
+      "published_commit": "4aa39b8de087e98ffbccf9f9960ee8e36669c4ea",
+      "tree": "d0e537f188e33abe7436c135daaa78f8ee1c8d0f",
+      "subject": "docs: distinguish uncertain save results from idempotent retry"
+    },
+    {
+      "source_commit": "4b5b57b4ac6f3e3dafd07ba8c11a54f59cfa31de",
+      "published_commit": "0b11eaf4db9e9f17d5a8ae74aa3b1fa3e440bb0c",
+      "tree": "d9ef1302c5e3b83723e5544148150cf93785d406",
+      "subject": "docs: record exact alpha25 native capture acceptance"
+    },
+    {
+      "source_commit": "98bbeee3aa73fee48dd8238202cd045a9f7731d3",
+      "published_commit": "f450bf5468062ff5867ec4d72908be7b3286f3d0",
+      "tree": "4d00e3f90b6393579545400bd11a44c67795bc6f",
+      "subject": "fix: scope move recovery without speculative rollback (alpha.26)"
+    },
+    {
+      "source_commit": "fb4cd9ef6d141798c379bd8bb43b1252b6655d95",
+      "published_commit": "ba6b1dfd2c3d8d1d8cc5cc306bde9059b0c0a6ab",
+      "tree": "ad23fdd71cec9cbf02d58116061a3ab2487c64dc",
+      "subject": "docs: record alpha26 acceptance and source publication map"
+    },
+    {
+      "source_commit": "db1fcf5353a97f0598dbadec93262216a4b955ec",
+      "published_commit": "7172a047b1763674fea03330415fd35f23ed853c",
+      "tree": "88b88cef4fea4b299825cf0daefc28b1a450d141",
+      "subject": "test: canonicalize owned smoke fixture without weakening path guards"
+    },
+    {
+      "source_commit": "4cc0c567ba78f70ee3f287ab8cb301993b88e1f8",
+      "published_commit": "96f22e37450bd57c3ad15b70effa9f3ee5695f26",
+      "tree": "70acfd527a49b13a966843541fb03f97bae47f0b",
+      "subject": "feat(board): remove keyboard dragging and verify current browser contracts"
+    },
+    {
+      "source_commit": "2cdc51f4c0f0676242e4294d7fbe5263295f5d50",
+      "published_commit": "d899fc4f2fd4e2f684be4582ec0e1587ae85b191",
+      "tree": "b5eb04f65a33d488f97b10c6407e3cf99adc9b6c",
+      "subject": "fix: preserve moved-task focus and keyboard option feedback (alpha28)"
+    },
+    {
+      "source_commit": "4aafa4ae82373c37fd1586c6bf58dc7256a15fe3",
+      "published_commit": "9f9114a7d1cb715cc49f8abbab2196ee0b5a7dae",
+      "tree": "eabb536ab57435e3fc68b0488ae1d500e95d0626",
+      "subject": "test: measure preview cancellation at the transfer boundary"
+    }
+  ]
+}

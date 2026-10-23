@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Prepare and crop actual Tauri WebView2 states; native frame captures use sky.
 import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";

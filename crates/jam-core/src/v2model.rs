@@ -173,6 +173,7 @@ record!(Report {id:String,task_id:String,round:i64,author_id:String,summary_md:S
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SubmitReport {
     pub key: String,
+    pub expected_claim_generation: String,
     pub summary_md: String,
     pub changed_files: Vec<String>,
     pub tests: Vec<ReportTest>,
@@ -185,6 +186,8 @@ record!(Review {id:String,task_id:String,round:i64,reviewer_id:String,verdict:St
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReviewTask {
     pub key: String,
+    pub expected_report_id: String,
+    pub expected_review_context_revision: String,
     pub verdict: String,
     pub comments_md: String,
     pub failed_tests: Option<Vec<String>>,
@@ -286,6 +289,14 @@ pub struct AddReference {
     pub y: Option<f64>,
 }
 patch!(ReferencePatch {caption:String,tags:Vec<String>,title:String});
+/// Optional human-editor compare-and-set boundary. Kept separate from the MCP
+/// ReferenceEditInput contract so existing agent clients remain unchanged.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReferenceContentExpectation {
+    pub title: String,
+    pub caption: String,
+}
 record!(ReferenceCanvas {items:Vec<RefItem>,frames:Vec<RefFrame>,edges:Vec<RefEdge>,links:Vec<RefLink>});
 record!(CanvasGeometry {id:String,x:f64,y:f64,w:f64,h:f64,z:f64,frame_id:Option<String>});
 record!(CanvasArchive {
@@ -331,7 +342,7 @@ macro_rules! input {
     };
 }
 input!(PlanningStatusInput{key:String,status:String,override_reason:Option<String>});
-input!(ReadyInput{key:String,override_reason:Option<String>});
+input!(ReadyInput{key:String,expected_updated_at:String,override_reason:Option<String>});
 input!(BrainInput {
     epic_key: String,
     member_handle: String

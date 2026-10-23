@@ -10,11 +10,10 @@ import {
   Package,
   Type,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Markdown } from "../../components/Markdown";
 import {
-  Avatar,
   Button,
   Combobox,
   DateTimeInput,
@@ -22,15 +21,18 @@ import {
   Drawer,
   IconButton,
   Kbd,
+  type ModalFocusReturn,
   SegmentedControl,
   Select,
   Stamp,
+  TabPanels,
   Tabs,
   TagInput,
 } from "../../components/ui";
 import { WorkingPill } from "../../components/ui/AgentWorking";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { Priority, priorities } from "../../components/ui/Priority";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { RoughLine } from "../../components/ui/RoughLine";
 import { useAgentWorking } from "../../lib/agent-working";
 import { api } from "../../lib/api";
@@ -38,16 +40,24 @@ import { invalidatePlanning } from "../../lib/planning-queries";
 import { appQuery, membersQuery, useBoardSettings } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
 import type { TaskDetail, UpdateInput } from "../../lib/types";
-import { labels, statuses } from "../../lib/types";
+import { JamError, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
+import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
+import { AgentPlan } from "../plan/AgentPlan";
+import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
-import { ReadinessStrip } from "./Readiness";
+import { announceReady, ReadinessStrip } from "./Readiness";
+import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
+import { TaskComments } from "./TaskComments";
+import { TaskConflictDialog } from "./TaskConflictDialog";
 import type { TaskFields } from "./task-form";
 import {
+  briefSchema,
   equalValue,
   fieldNames,
   taskPatch,
@@ -58,18 +68,27 @@ import {
 export function TaskDrawer({
   taskKey,
   close,
+  returnFocus,
 }: {
   taskKey: string;
   close(): void;
+  returnFocus?: ModalFocusReturn;
 }) {
   const task = useQuery({
     queryKey: ["task", taskKey],
     queryFn: () => api.getTask(taskKey),
   });
   if (task.data)
-    return <TaskEditor key={taskKey} task={task.data} close={close} />;
+    return (
+      <TaskEditor
+        key={taskKey}
+        task={task.data}
+        close={close}
+        returnFocus={returnFocus}
+      />
+    );
   return (
-    <Drawer onClose={close} title={taskKey}>
+    <Drawer onClose={close} title={taskKey} returnFocus={returnFocus}>
       {task.error ? (
         <QueryError error={task.error} retry={() => void task.refetch()} />
       ) : (
@@ -81,9 +100,11 @@ export function TaskDrawer({
 export function TaskEditor({
   task,
   close,
+  returnFocus,
 }: {
   task: TaskDetail;
   close(): void;
+  returnFocus?: ModalFocusReturn;
 }) {
   const { settings } = useBoardSettings();
   const navigate = useNavigate();
@@ -99,16 +120,46 @@ export function TaskEditor({
   const app = useQuery(appQuery);
   const tags = useQuery({ queryKey: ["tags"], queryFn: () => api.listTags() });
   const client = useQueryClient();
+  // A detached editor must not refill another project/entity view on completion.
+  const saveOwner = useRef({ mounted: true, invalidated: false });
+  useEffect(() => {
+    saveOwner.current.mounted = true;
+    const check = () => {
+      const selected = client.getQueryData<
+        Awaited<ReturnType<typeof api.appState>>
+      >(["app"])?.jam?.id;
+      if (selected && selected !== task.jamId)
+        saveOwner.current.invalidated = true;
+    };
+    check();
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.query.queryKey[0] === "app") check();
+    });
+    return () => {
+      saveOwner.current.mounted = false;
+      unsubscribe();
+    };
+  }, [client, task.jamId]);
+  const ownsSave = () =>
+    saveOwner.current.mounted &&
+    !saveOwner.current.invalidated &&
+    client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])?.jam
+      ?.id === task.jamId;
   const [base, setBase] = useState(task);
   const seenVersions = useRef(new Set([task.updatedAt]));
   const [latest, setLatest] = useState<TaskDetail | null>(null);
   const [review, setReview] = useState(false);
+  const [reviewError, setReviewError] = useState<Error | null>(null);
   const [assetLink, setAssetLink] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuRoot = useRef<HTMLDivElement>(null);
   const [archive, setArchive] = useState(false);
   const [reason, setReason] = useState("");
   const [tab, setTab] = useState("Write");
-  const [comment, setComment] = useState("");
+  const notesTabs = useId();
+  const [markPending, setMarkPending] = useState(false);
+  const markLock = useRef(false);
+  const [saveNotice, setSaveNotice] = useState("");
   const changes = useUiStore((s) => s.taskChanges[task.key]);
   const form = useForm<TaskFields>({
     resolver: zodResolver(taskSchema),
@@ -137,6 +188,7 @@ export function TaskEditor({
     reset(taskValues(value));
     setLatest(null);
     setReview(false);
+    setReviewError(null);
   };
   const resetRef = useRef(resetTask);
   resetRef.current = resetTask;
@@ -164,36 +216,160 @@ export function TaskEditor({
     ])
       void client.invalidateQueries({ queryKey });
   };
+  const conflictRead = useMutation({
+    mutationFn: async () => {
+      if (!ownsSave())
+        throw new Error("The editor target changed before rereading.");
+      const fresh = await api.getTask(task.key);
+      if (fresh.id !== task.id || fresh.jamId !== task.jamId)
+        throw new Error(
+          "The project or task changed. Your draft was not retargeted.",
+        );
+      return fresh;
+    },
+    onSuccess: (fresh) => {
+      if (!ownsSave()) return;
+      client.setQueryData(["task", task.key], fresh);
+      setLatest(fresh);
+      setReviewError(null);
+      setReview(true);
+    },
+  });
   const save = useMutation({
-    mutationFn: (input: UpdateInput) => api.updateTask(input),
-    onMutate: () => structuredClone(getValues()),
+    mutationFn: (input: UpdateInput) => {
+      if (!ownsSave())
+        throw new Error("The editor target changed before this save was sent.");
+      return api.updateTask(input);
+    },
+    onMutate: (input) => {
+      setSaveNotice("");
+      setReviewError(null);
+      const values = structuredClone(getValues());
+      const baseline = taskValues(base);
+      return {
+        values,
+        fromReview: review,
+        retained: fieldNames.filter(
+          (field) =>
+            !(field in input) && !equalValue(values[field], baseline[field]),
+        ),
+      };
+    },
     onSuccess: (value, _input, submitted) => {
+      if (!ownsSave()) return;
       const current = getValues();
       client.setQueryData(["task", task.key], value);
       resetTask(value);
-      // Preserve typing made while the previous section's blur-save was in flight.
+      // A section autosave acknowledges only its submitted fields. Preserve
+      // unrelated human drafts AND typing made while that save was in flight.
       for (const field of fieldNames) {
-        if (submitted && !equalValue(current[field], submitted[field]))
+        if (
+          submitted &&
+          (submitted.retained.includes(field) ||
+            !equalValue(current[field], submitted.values[field]))
+        )
           form.setValue(field, current[field], {
             shouldDirty: true,
             shouldValidate: true,
           });
       }
       invalidate();
+      if (submitted?.fromReview)
+        useUiStore
+          .getState()
+          .notify("Edits saved against the reviewed version.");
     },
-    onError: async (error) => {
+    onError: async (error, input, submitted) => {
+      if (!ownsSave()) return;
+      if (submitted?.fromReview) {
+        setReviewError(error);
+        if ("code" in error && error.code === "conflict") {
+          try {
+            const fresh = await api.getTask(task.key);
+            if (ownsSave()) setLatest(fresh);
+          } catch {
+            /* The captured comparison and error remain; explicit reread can retry. */
+          }
+        }
+        return;
+      }
       if ("code" in error && error.code === "not_ready") {
         form.setValue("status", base.status as TaskFields["status"], {
           shouldDirty: true,
         });
-        useUiStore.setState({
-          readyRequest: { key: task.key, status: "ready" },
-        });
+        const remaining = taskPatch(taskValues(base), getValues());
+        if (Object.keys(remaining).some((field) => field !== "status"))
+          setSaveNotice(
+            "The brief is not ready. Your edits remain unsaved. Save them without changing status, then choose Mark ready to review the saved brief.",
+          );
+        else
+          useUiStore.setState({
+            readyRequest: {
+              key: task.key,
+              status: "ready",
+              expectedUpdatedAt: input.expectedUpdatedAt,
+            },
+          });
       } else if ("code" in error && error.code === "conflict") {
-        const fresh = await api.getTask(task.key);
-        setLatest(fresh);
-        setReview(true);
+        conflictRead.mutate();
       } else useUiStore.getState().error(error.message);
+    },
+  });
+  // Track the whole save/check/Ready operation so project switching waits for it.
+  const markOperation = useMutation({
+    mutationFn: async (capturedTask: TaskDetail) => {
+      let captured = capturedTask;
+      let checking = false;
+      try {
+        if (isDirty) {
+          const parsed = taskSchema.safeParse(getValues());
+          if (!parsed.success) return;
+          const patch = taskPatch(taskValues(base), {
+            ...parsed.data,
+            status: base.status as TaskFields["status"],
+          });
+          if (Object.keys(patch).length)
+            captured = await save.mutateAsync({
+              key: captured.key,
+              expectedUpdatedAt: base.updatedAt,
+              ...patch,
+            });
+        }
+        if (!ownsSave()) return;
+        checking = true;
+        const check = await api.checkReady(captured.key);
+        if (!ownsSave()) return;
+        if (check.ready) {
+          await api.markReady({
+            key: captured.key,
+            expectedUpdatedAt: captured.updatedAt,
+          });
+          invalidate();
+          announceReady(captured.key);
+        } else
+          useUiStore.setState({
+            readyRequest: {
+              key: captured.key,
+              status: "ready",
+              expectedUpdatedAt: captured.updatedAt,
+            },
+          });
+      } catch (error) {
+        if (checking && error instanceof JamError && error.code === "conflict")
+          useUiStore.setState({
+            readyRequest: {
+              key: captured.key,
+              status: "ready",
+              expectedUpdatedAt: captured.updatedAt,
+            },
+          });
+        else if (checking) useUiStore.getState().error(String(error));
+        // Save failures already preserve the editor and show their own recovery.
+      }
+    },
+    onSettled: () => {
+      markLock.current = false;
+      setMarkPending(false);
     },
   });
   const submit = (values: TaskFields, version = base.updatedAt) => {
@@ -206,9 +382,47 @@ export function TaskEditor({
       save.mutate({ key: task.key, expectedUpdatedAt: version, ...patch });
     else resetTask(latest ?? base);
   };
+  const saveBrief = (nextFocus?: EventTarget | null) => {
+    // Do not preempt the explicit form Save with a competing blur autosave.
+    if (
+      nextFocus instanceof HTMLButtonElement &&
+      nextFocus.type === "submit" &&
+      nextFocus.form?.id === "task-form"
+    )
+      return;
+    if (
+      task.archivedAt ||
+      save.isPending ||
+      conflictRead.isPending ||
+      markLock.current ||
+      review ||
+      !ownsSave()
+    )
+      return;
+    const brief = structuredClone(getValues("brief"));
+    if (equalValue(brief, taskValues(base).brief)) return;
+    const parsed = briefSchema.safeParse(brief);
+    if (!parsed.success) {
+      void form.trigger("brief");
+      return;
+    }
+    save.mutate({
+      key: task.key,
+      expectedUpdatedAt: base.updatedAt,
+      brief: parsed.data,
+    });
+  };
   const submitRef = useRef(() => {});
   submitRef.current = () => {
-    if (isDirty && !task.archivedAt && !save.isPending)
+    if (
+      isDirty &&
+      !task.archivedAt &&
+      !save.isPending &&
+      !conflictRead.isPending &&
+      !markLock.current &&
+      !review &&
+      !archive
+    )
       void handleSubmit((values) => submit(values))();
   };
   useEffect(() => {
@@ -221,29 +435,65 @@ export function TaskEditor({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, []);
-  const commentMutation = useMutation({
-    mutationFn: () => api.addComment({ key: task.key, bodyMd: comment }),
-    onSuccess: () => {
-      setComment("");
-      invalidate();
-    },
-    onError: (error) => useUiStore.getState().error(error.message),
-  });
-  const archiveMutation = useMutation({
-    mutationFn: () =>
-      task.archivedAt
-        ? api.unarchiveTask(task.key)
-        : api.archiveTask(task.key, reason.trim() || undefined),
-    onSuccess: async () => {
-      const fresh = await api.getTask(task.key);
-      client.setQueryData(["task", task.key], fresh);
-      resetTask(fresh);
-      setArchive(false);
-      setReason("");
-      invalidate();
-    },
-    onError: (error) => useUiStore.getState().error(error.message),
-  });
+  const archiveWrite = useProjectWrite(`archive-task:${task.id}`, task.jamId);
+  const archiveActions = useRef<HTMLDivElement>(null);
+  const [archiveRefreshError, setArchiveRefreshError] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (archiveRefreshError)
+      archiveActions.current
+        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+        ?.focus();
+  }, [archiveRefreshError]);
+  const archiveDispatched = useRef(false);
+  const submitArchive = () => {
+    if (archiveWrite.error || archiveRefreshError || archiveWrite.isLocked())
+      return;
+    archiveDispatched.current = false;
+    const key = task.key,
+      archiveReason = reason.trim() || undefined;
+    archiveWrite.run(
+      async () => {
+        archiveDispatched.current = true;
+        if (task.archivedAt) await api.unarchiveTask(key);
+        else await api.archiveTask(key, archiveReason);
+        if (!ownsSave()) return { stale: true };
+        // The write is confirmed. A subsequent read failure is not a failed write.
+        try {
+          return { fresh: await api.getTask(key) };
+        } catch (error) {
+          return {
+            refreshError: `Saved, but could not refresh the task: ${String(error)}. Close the task drawer and reopen it to inspect the saved task; do not repeat the write.`,
+          };
+        }
+      },
+      (result) => {
+        if (result.stale) return;
+        if (result.fresh) {
+          client.setQueryData(["task", key], result.fresh);
+          resetTask(result.fresh);
+          setArchive(false);
+          setReason("");
+          invalidate();
+        } else
+          setArchiveRefreshError(
+            result.refreshError ??
+              "Saved; close the task drawer and reopen it to refresh.",
+          );
+      },
+    );
+  };
+
+  const dismissDrawer = () => {
+    if (archiveWrite.isLocked()) return;
+    if (menu) {
+      setMenu(false);
+      menuRoot.current
+        ?.querySelector<HTMLButtonElement>('[aria-label="Task actions"]')
+        ?.focus();
+    } else close();
+  };
   const attach = async (paths: string[]) => {
     for (const path of paths) await api.attachFile(task.key, path);
     invalidate();
@@ -287,7 +537,8 @@ export function TaskEditor({
   };
   return (
     <Drawer
-      onClose={close}
+      onClose={dismissDrawer}
+      returnFocus={returnFocus}
       title={task.key}
       leading={
         <IconButton label="Copy key" onClick={() => copy(task.key)}>
@@ -295,8 +546,12 @@ export function TaskEditor({
         </IconButton>
       }
       actions={
-        <div className="task-menu">
-          <IconButton label="Task actions" onClick={() => setMenu(!menu)}>
+        <div className="task-menu" ref={menuRoot}>
+          <IconButton
+            label="Task actions"
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+          >
             <MoreHorizontal />
           </IconButton>
           {menu && (
@@ -333,9 +588,13 @@ export function TaskEditor({
       {readonly && (
         <div className="notice">
           Archived ·{" "}
-          <Button variant="ghost" onClick={() => archiveMutation.mutate()}>
+          <Button variant="ghost" onClick={() => setArchive(true)}>
             Unarchive
           </Button>
+          <p className="small">
+            Restoring this card only makes it visible. It does not start or
+            resume its story; existing work can report or be released.
+          </p>
         </div>
       )}
       {latest && (
@@ -346,12 +605,23 @@ export function TaskEditor({
           </button>
         </div>
       )}
+      <div className="planning-tools">
+        <BrainHandoff
+          scope={{ type: "task", id: task.id, key: task.key }}
+          disabled={readonly}
+        />
+        <span className="small muted">
+          Save your description before asking the brain to read it.
+        </span>
+      </div>
+      {!readonly && <TaskExecutionNotice task={task} />}
+      <ReleaseClaim task={task} hasUnsavedEdits={isDirty} />
       <form
         id="task-form"
         onSubmit={handleSubmit((value) => submit(value))}
         className="task-form"
       >
-        <fieldset disabled={readonly || save.isPending}>
+        <fieldset disabled={readonly || save.isPending || markPending}>
           <div className="task-breadcrumb">
             <Button
               variant="ghost"
@@ -399,30 +669,62 @@ export function TaskEditor({
           {errors.title && (
             <p className="field-error">{errors.title.message}</p>
           )}
+          <div className="section-heading">
+            <h2>Description</h2>
+            <Tabs
+              id={notesTabs}
+              label="Description editor mode"
+              value={tab}
+              onChange={setTab}
+              items={["Write", "Preview"]}
+            />
+          </div>
+          <p className="field-hint">
+            Describe what you want in your own words. Add wishes, context or
+            corrections; the brain can turn them into a plan.
+          </p>
+          <TabPanels id={notesTabs} value={tab} items={["Write", "Preview"]}>
+            {tab === "Write" ? (
+              <textarea
+                aria-label="Description"
+                className="description-input"
+                placeholder="What should this task do, and what matters to you?"
+                {...register("descriptionMd")}
+              />
+            ) : (
+              <Markdown>
+                {watch("descriptionMd") || "*No description yet.*"}
+              </Markdown>
+            )}
+          </TabPanels>
+          {!values.descriptionMd.trim() && values.brief.goalMd.trim() && (
+            <section
+              className="human-plan-preview"
+              aria-label="Existing planned outcome"
+            >
+              <h3>From the agent plan</h3>
+              <p className="small muted">
+                Existing goal, shown for context. It has not been copied into
+                your description.
+              </p>
+              <Markdown>{values.brief.goalMd}</Markdown>
+            </section>
+          )}
+          <TaskComments
+            task={task}
+            members={members.data ?? []}
+            changed={invalidate}
+          />
           {readiness.data && (
             <ReadinessStrip
               readiness={readiness.data}
               status={task.status}
+              pending={markPending}
               onMark={() => {
-                void (async () => {
-                  if (isDirty) {
-                    const parsed = taskSchema.safeParse(getValues());
-                    if (!parsed.success) return;
-                    await save.mutateAsync({
-                      key: task.key,
-                      expectedUpdatedAt: base.updatedAt,
-                      ...taskPatch(taskValues(base), parsed.data),
-                    });
-                  }
-                  const check = await api.checkReady(task.key);
-                  if (check.ready) {
-                    await api.markReady(task.key);
-                    invalidate();
-                  } else
-                    useUiStore.setState({
-                      readyRequest: { key: task.key, status: "ready" },
-                    });
-                })().catch((e) => useUiStore.getState().error(String(e)));
+                if (markLock.current) return;
+                markLock.current = true;
+                setMarkPending(true);
+                markOperation.mutate(task);
               }}
             />
           )}
@@ -543,39 +845,62 @@ export function TaskEditor({
               />
             </div>
           </div>
-          <Controller
-            name="brief"
-            control={control}
-            render={({ field }) => (
-              <BriefEditor
-                value={field.value}
-                onChange={field.onChange}
-                onSave={() => submitRef.current()}
-                disabled={readonly}
-              />
-            )}
-          />
-          {errors.brief && (
-            <p role="alert">
-              Complete required Change and Test fields before saving.
-            </p>
-          )}
-          <div className="section-heading">
-            <h2>Notes</h2>
-            <Tabs value={tab} onChange={setTab} items={["Write", "Preview"]} />
-          </div>
-          {tab === "Write" ? (
-            <textarea
-              aria-label="Notes"
-              className="description-input"
-              {...register("descriptionMd")}
-            />
-          ) : (
-            <Markdown>{watch("descriptionMd") || "*No notes yet.*"}</Markdown>
-          )}
         </fieldset>
+        <AgentPlan
+          summary={`${values.brief.changes.length} ${values.brief.changes.length === 1 ? "change" : "changes"} · ${values.brief.tests.length} ${values.brief.tests.length === 1 ? "check" : "checks"}`}
+        >
+          <fieldset disabled={readonly || save.isPending || markPending}>
+            <Controller
+              name="brief"
+              control={control}
+              render={({ field }) => (
+                <BriefEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  onSave={saveBrief}
+                  disabled={readonly}
+                />
+              )}
+            />
+          </fieldset>
+        </AgentPlan>
+        {errors.brief && (
+          <p role="alert">
+            Open Agent plan and complete required Change and Test fields before
+            saving.
+          </p>
+        )}
       </form>
-      <Rounds task={task} members={members.data ?? []} />
+      {saveNotice && (
+        <p role="alert" className="notice">
+          {saveNotice}
+        </p>
+      )}
+      {conflictRead.isPending && (
+        <p role="status">
+          The task changed. Reading the latest saved version; your edits are
+          kept…
+        </p>
+      )}
+      {conflictRead.error && (
+        <div className="notice">
+          <p role="alert">
+            The task changed, but its latest version could not be read:{" "}
+            {conflictRead.error.message}. Your edits are kept.
+          </p>
+          <Button
+            disabled={conflictRead.isPending}
+            onClick={() => conflictRead.mutate()}
+          >
+            Read latest version
+          </Button>
+        </div>
+      )}
+      <Rounds
+        task={task}
+        members={members.data ?? []}
+        hasUnsavedEdits={isDirty}
+      />
       {(task.ancestorQuestions?.length ?? 0) > 0 && (
         <details className="task-section">
           <summary>Open questions above this task</summary>
@@ -657,52 +982,6 @@ export function TaskEditor({
           </div>
         ))}
       </section>
-      <section className="task-section">
-        <h2>
-          Comments <span className="muted">{task.comments.length}</span>
-        </h2>
-        {!task.comments.length && <p className="muted">No comments yet.</p>}
-        {task.comments.map((item) => {
-          const author = members.data?.find((m) => m.id === item.authorId);
-          return (
-            <article className="comment" key={item.id}>
-              <div className="comment-author">
-                {author && <Avatar member={author} />}
-                <strong>{author?.name ?? "Teammate"}</strong>
-                {author?.kind === "agent" && <Stamp>agent</Stamp>}
-                <time dateTime={item.createdAt}>
-                  {relativeTime(item.createdAt)}
-                </time>
-              </div>
-              <Markdown>{item.bodyMd}</Markdown>
-            </article>
-          );
-        })}
-        {!readonly && (
-          <div className="comment-compose">
-            <textarea
-              aria-label="Write a comment"
-              placeholder="Leave a note for your teammates…"
-              maxLength={4000}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  if (comment.trim() && !commentMutation.isPending)
-                    commentMutation.mutate();
-                }
-              }}
-            />
-            <Button
-              disabled={!comment.trim() || commentMutation.isPending}
-              onClick={() => commentMutation.mutate()}
-            >
-              Add comment <Kbd>Ctrl ↵</Kbd>
-            </Button>
-          </div>
-        )}
-      </section>
       <details className="task-section history">
         <summary>
           History <span className="muted">{task.history.length}</span>
@@ -726,7 +1005,14 @@ export function TaskEditor({
           type="submit"
           form="task-form"
           variant="primary"
-          disabled={!isDirty || !isValid || save.isPending || readonly}
+          disabled={
+            !isDirty ||
+            !isValid ||
+            save.isPending ||
+            conflictRead.isPending ||
+            markPending ||
+            readonly
+          }
         >
           Save <Kbd>Ctrl+S</Kbd>
         </Button>
@@ -751,111 +1037,115 @@ export function TaskEditor({
       {archive && (
         <Dialog
           title={readonly ? "Unarchive task" : "Archive task"}
-          onClose={() => setArchive(false)}
+          busy={archiveWrite.pending}
+          onClose={() => archiveWrite.dismiss(() => setArchive(false))}
         >
-          {!readonly && (
-            <>
-              <p>Keep this task in the archive. You can bring it back later.</p>
-              <label>
-                Reason (optional)
-                <textarea
-                  aria-label="Archive reason"
-                  maxLength={4000}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
-              {isDirty && (
-                <p className="notice">
-                  Unsaved edits will be discarded when archived.
+          <div className="m5-form" ref={archiveActions}>
+            {!readonly && (
+              <>
+                <p>
+                  Keep this task in the archive. You can bring it back later.
                 </p>
-              )}
-            </>
-          )}
-          <div className="dialog-actions">
-            <Button onClick={() => setArchive(false)}>Cancel</Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                archiveMutation.mutate();
-              }}
-            >
-              {readonly ? "Unarchive" : "Archive"}
-            </Button>
+                <label>
+                  Reason (optional)
+                  <textarea
+                    aria-label="Archive reason"
+                    disabled={archiveWrite.pending || archiveWrite.checking}
+                    readOnly={
+                      !archiveWrite.ready ||
+                      !!archiveWrite.error ||
+                      !!archiveRefreshError
+                    }
+                    maxLength={4000}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+                {isDirty && (
+                  <p className="notice">
+                    Unsaved edits will be discarded when archived.
+                  </p>
+                )}
+              </>
+            )}
+            <ProjectWriteFeedback
+              write={archiveWrite}
+              form={archiveActions}
+              action="Saving archive change"
+            />
+            {archiveWrite.error && archiveDispatched.current && (
+              <p role="alert">
+                Could not confirm whether the archive change was saved. Your
+                reason is kept. Close the task drawer and reopen it to check the
+                task before trying again; this request will not be sent again
+                automatically.
+              </p>
+            )}
+            {archiveRefreshError && <p role="alert">{archiveRefreshError}</p>}
+            <div className="dialog-actions">
+              <Button
+                disabled={archiveWrite.pending}
+                onClick={() => archiveWrite.dismiss(() => setArchive(false))}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={
+                  !archiveWrite.ready ||
+                  !!archiveWrite.error ||
+                  !!archiveRefreshError
+                }
+                onClick={submitArchive}
+              >
+                {readonly ? "Unarchive" : "Archive"}
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}
       {review && latest && (
-        <Dialog
-          title="Review changes"
-          onClose={() => setReview(false)}
-          className="review-dialog"
-        >
-          <p>{actor} saved a newer version. Compare it with your edits.</p>
-          <div className="comparison">
-            <div className="comparison-row comparison-head">
-              <strong>Field</strong>
-              <strong>Was</strong>
-              <strong>Theirs</strong>
-              <strong>Yours</strong>
-            </div>
-            {fieldNames
-              .filter((field) => field !== "brief")
-              .filter(
-                (field) =>
-                  !equalValue(
-                    taskValues(base)[field],
-                    taskValues(latest)[field],
-                  ) || !equalValue(taskValues(base)[field], values[field]),
-              )
-              .map((field) => (
-                <div className="comparison-row" key={field}>
-                  <strong>{field}</strong>
-                  {[
-                    taskValues(base)[field],
-                    taskValues(latest)[field],
-                    values[field],
-                  ].map((value, index) => (
-                    <span key={["was", "theirs", "yours"][index]}>
-                      {Array.isArray(value)
-                        ? value.join(", ")
-                        : String(value ?? "–")}
-                    </span>
-                  ))}
-                </div>
-              ))}
-            {Object.keys(values.brief)
-              .filter((key) => {
-                const k = key as keyof typeof values.brief;
-                return (
-                  !equalValue(base.brief[k], latest.brief[k]) ||
-                  !equalValue(base.brief[k], values.brief[k])
-                );
-              })
-              .map((key) => (
-                <div className="comparison-row" key={key}>
-                  <strong>{key}</strong>
-                  {[base.brief, latest.brief, values.brief].map((b, i) => (
-                    <span key={["was", "theirs", "yours"][i]}>
-                      {JSON.stringify(b[key as keyof typeof values.brief])}
-                    </span>
-                  ))}
-                </div>
-              ))}
-          </div>
-          <div className="dialog-actions">
-            <Button onClick={() => resetTask(latest)}>Take theirs</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                const parsed = taskSchema.safeParse(getValues());
-                if (parsed.success) submit(parsed.data, latest.updatedAt);
-              }}
-            >
-              Keep mine
-            </Button>
-          </div>
-        </Dialog>
+        <TaskConflictDialog
+          base={base}
+          latest={latest}
+          yours={values}
+          live={task}
+          members={members.data ?? []}
+          actor={actor}
+          pending={save.isPending}
+          error={reviewError}
+          close={() => {
+            setReview(false);
+            setReviewError(null);
+          }}
+          read={(fresh) => {
+            setLatest(fresh);
+            setReviewError(null);
+            client.setQueryData(["task", task.key], fresh);
+          }}
+          discard={(fresh) => {
+            resetTask(fresh);
+            useUiStore
+              .getState()
+              .notify(
+                "Local edits discarded. Loaded the reviewed saved version.",
+              );
+          }}
+          save={(snapshot) => {
+            const patch = taskPatch(
+              taskValues(snapshot.base),
+              snapshot.yours,
+              taskValues(snapshot.remote),
+            );
+            if (Object.keys(patch).length)
+              save.mutate({
+                key: snapshot.remote.key,
+                expectedUpdatedAt: snapshot.remote.updatedAt,
+                ...patch,
+              });
+            else resetTask(snapshot.remote);
+          }}
+        />
       )}
     </Drawer>
   );

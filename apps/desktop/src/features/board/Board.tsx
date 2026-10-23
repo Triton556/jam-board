@@ -1,13 +1,8 @@
-import type {
-  Announcements,
-  DragEndEvent,
-  KeyboardCoordinateGetter,
-} from "@dnd-kit/core";
+import type { Announcements, DragEndEvent } from "@dnd-kit/core";
 import {
   closestCorners,
   DndContext,
   DragOverlay,
-  KeyboardSensor,
   PointerSensor,
   useDroppable,
   useSensor,
@@ -15,7 +10,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -24,9 +18,15 @@ import { Plus, X } from "lucide-react";
 import { LayoutGroup } from "motion/react";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Button, EmptyState, IconButton } from "../../components/ui";
+import { Button, IconButton } from "../../components/ui";
+import { QueryRefreshNotice } from "../../components/ui/AsyncState";
 import { RoughLine } from "../../components/ui/RoughLine";
 import { api } from "../../lib/api";
+import {
+  epicsQuery,
+  invalidatePlanning,
+  storiesQuery,
+} from "../../lib/planning-queries";
 import {
   membersQuery,
   moveInput,
@@ -38,38 +38,76 @@ import {
 import type { ColorBy, Member, Status, TaskSummary } from "../../lib/types";
 import { emptyBoard, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
+import { StoryPicker } from "../plan/PlanningControls";
+import { BoardOverflow } from "./BoardOverflow";
 import { TaskCard } from "./TaskCard";
 
-function QuickCreate({ status }: { status: Status }) {
+function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
   const [title, setTitle] = useState("");
+  const [storyKey, setStoryKey] = useState("");
+  const stories = useQuery(storiesQuery),
+    epics = useQuery(epicsQuery);
+  const filtered = epicKeys.length > 0;
+  const allowedEpicIds = new Set(
+    (epics.data ?? [])
+      .filter((epic) => epicKeys.includes(epic.key))
+      .map((epic) => epic.id),
+  );
+  const selectedStory = stories.data?.find(
+    (story) =>
+      filtered && story.key === storyKey && allowedEpicIds.has(story.epicId),
+  );
+  const canAdd = !!title.trim() && (!filtered || !!selectedStory);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const opener = useRef(
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   useEffect(() => {
     ref.current?.focus();
+    return () => {
+      if (opener.current?.isConnected && opener.current !== document.body)
+        opener.current.focus();
+      else
+        document
+          .querySelector<HTMLElement>('[aria-label="Add task to Backlog"]')
+          ?.focus();
+    };
   }, []);
   const client = useQueryClient();
   const create = useMutation({
-    mutationFn: () => api.createTask({ title: title.trim(), status }),
+    mutationFn: () =>
+      api.createTask({
+        title: title.trim(),
+        status: "backlog",
+        storyKey: selectedStory?.key,
+      }),
     onSuccess: () => {
       setTitle("");
-      void client.invalidateQueries({ queryKey: ["boardTasks"] });
+      invalidatePlanning(client);
       ref.current?.focus();
     },
     onError: (error) => useUiStore.getState().error(error.message),
   });
+  useEffect(() => {
+    if (create.isSuccess && !create.isPending) ref.current?.focus();
+  }, [create.isSuccess, create.isPending]);
   function keydown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !create.isPending) {
       event.preventDefault();
       useUiStore.getState().setQuickColumn(null);
     }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (title.trim() && !create.isPending) create.mutate();
+      if (canAdd && !create.isPending) create.mutate();
     }
   }
   return (
     <div className="quick-create">
       <textarea
-        aria-label={`New task in ${labels[status]}`}
+        aria-label="New task in Backlog"
+        disabled={create.isPending}
         placeholder="What needs making?"
         maxLength={140}
         ref={ref}
@@ -77,16 +115,40 @@ function QuickCreate({ status }: { status: Status }) {
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={keydown}
       />
-      <div>
+      {filtered && (
+        <div className="quick-create-story">
+          <StoryPicker
+            label="Story for new draft"
+            value={selectedStory?.key ?? ""}
+            onChange={setStoryKey}
+            epicKeys={epicKeys}
+            disabled={create.isPending}
+          />
+          <p className="small muted">Choose the Story for this draft.</p>
+        </div>
+      )}
+      {!filtered && (
+        <p className="small muted">
+          This draft goes to Unplanned work. Filter by Epic first to choose a
+          Story.
+        </p>
+      )}
+      <p className="small muted">
+        Choose the Story carefully: it cannot be changed later. Prepare the task
+        details before moving it to Ready.
+      </p>
+      {create.error && <p role="alert">{create.error.message}</p>}
+      <div className="quick-create-actions">
         <span>Enter to add · Esc to close</span>
         <Button
-          disabled={!title.trim() || create.isPending}
+          disabled={!canAdd || create.isPending}
           onClick={() => create.mutate()}
         >
-          Add
+          {create.isPending ? "Adding…" : "Add"}
         </Button>
         <IconButton
           label="Cancel new task"
+          disabled={create.isPending}
           onClick={() => useUiStore.getState().setQuickColumn(null)}
         >
           <X size={16} />
@@ -98,26 +160,22 @@ function QuickCreate({ status }: { status: Status }) {
 function SortableCard({
   task,
   members,
+  storyTitle,
   open,
 }: {
   task: TaskSummary;
   members: Member[];
+  storyTitle?: string;
   open(key: string): void;
 }) {
   const { settings } = useBoardSettings();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    isDragging,
-    isOver,
-    transform,
-    transition,
-  } = useSortable({ id: task.key, data: { status: task.status } });
+  const { listeners, setNodeRef, isDragging, isOver, transform, transition } =
+    useSortable({ id: task.key, data: { status: task.status } });
   return (
     <button
       type="button"
       ref={setNodeRef}
+      data-board-task-key={task.key}
       className={`card-button ${isDragging ? "dragging" : ""}`}
       style={{
         transform: transform
@@ -125,13 +183,16 @@ function SortableCard({
           : undefined,
         transition,
       }}
-      {...attributes}
       {...listeners}
-      aria-label={`Open ${task.key}: ${task.title}`}
-      onClick={() => open(task.key)}
+      aria-label={`Open ${task.key}: ${task.title}${storyTitle ? ` · Story: ${storyTitle}` : ""}`}
+      onClick={(event) => {
+        event.currentTarget.focus();
+        open(task.key);
+      }}
     >
       <TaskCard
         task={task}
+        storyTitle={storyTitle}
         members={members}
         colorBy={settings?.colorBy as ColorBy}
         estimatesEnabled={settings?.estimatesEnabled}
@@ -143,12 +204,18 @@ function SortableCard({
 function Column({
   status,
   tasks,
+  totalCount,
   members,
+  storyTitles,
+  epicKeys,
   open,
 }: {
   status: Status;
   tasks: TaskSummary[];
+  totalCount: number;
   members: Member[];
+  storyTitles: Map<string, string>;
+  epicKeys: string[];
   open(key: string): void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -156,29 +223,51 @@ function Column({
     data: { status, column: true },
   });
   const { settings } = useBoardSettings();
-  const quick = useUiStore((s) => s.quickColumn === status);
+  const quick = useUiStore(
+    (s) => status === "backlog" && s.quickColumn === status,
+  );
   return (
     <section
       className={`board-column ${isOver ? "drop-over" : ""}`}
       ref={setNodeRef}
       data-column={status}
+      tabIndex={-1}
       aria-label={`${labels[status]} column`}
     >
       <header className="column-heading">
         <h2>{labels[status]}</h2>
         <span
-          className={`column-count ${status === "in_progress" && tasks.length > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
+          className={`column-count ${status === "in_progress" && totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
         >
           {tasks.length}
         </span>
-        <IconButton
-          label={`Add task to ${labels[status]}`}
-          onClick={() => useUiStore.getState().setQuickColumn(status)}
-        >
-          <Plus size={17} />
-        </IconButton>
+        {status === "backlog" && (
+          <IconButton
+            label={`Add task to ${labels[status]}`}
+            onClick={() => useUiStore.getState().setQuickColumn(status)}
+          >
+            <Plus size={17} />
+          </IconButton>
+        )}
         <RoughLine color={`var(--st-${status})`} />
       </header>
+      <p
+        className={`column-policy ${status === "in_progress" && totalCount > (settings?.wipLimit ?? 6) ? "over-wip" : ""}`}
+      >
+        {status === "in_progress" ? (
+          <>
+            {totalCount} / {settings?.wipLimit ?? 6} Doing across board
+            {tasks.length !== totalCount && ` · ${tasks.length} shown`}
+          </>
+        ) : (
+          {
+            backlog: "Draft ideas",
+            ready: "Prepared briefs",
+            review: "Reports to review",
+            done: "Completed tasks",
+          }[status]
+        )}
+      </p>
       <div className="column-cards">
         <SortableContext
           items={tasks.map((t) => t.key)}
@@ -188,22 +277,31 @@ function Column({
             <SortableCard
               key={task.key}
               task={task}
+              storyTitle={storyTitles.get(task.storyKey ?? "")}
               members={members}
               open={open}
             />
           ))}
         </SortableContext>
-        {quick && <QuickCreate status={status} />}
-        {tasks.length === 0 && !quick && <EmptyState />}
+        {quick && <QuickCreate epicKeys={epicKeys} />}
+        {tasks.length === 0 && !quick && (
+          <p className="column-empty">
+            {epicKeys.length && totalCount
+              ? "No matching tasks"
+              : "No tasks yet"}
+          </p>
+        )}
         {isOver && <RoughLine frame />}
       </div>
-      <button
-        type="button"
-        className="column-add"
-        onClick={() => useUiStore.getState().setQuickColumn(status)}
-      >
-        <Plus size={15} /> Add task
-      </button>
+      {status === "backlog" && (
+        <button
+          type="button"
+          className="column-add"
+          onClick={() => useUiStore.getState().setQuickColumn(status)}
+        >
+          <Plus size={15} /> Add draft
+        </button>
+      )}
     </section>
   );
 }
@@ -217,8 +315,13 @@ export function Board({
   const { settings } = useBoardSettings();
   const tasks = useQuery(tasksQuery);
   const members = useQuery(membersQuery);
+  const stories = useQuery(storiesQuery);
+  const storyTitles = new Map(
+    (stories.data ?? []).map((story) => [story.key, story.title]),
+  );
   const move = useMoveTask();
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const dragIntent = useRef<{ key: string; updatedAt: string } | null>(null);
   const source = tasks.data ?? emptyBoard();
   const board = epicKeys.length
     ? (Object.fromEntries(
@@ -228,67 +331,8 @@ export function Board({
         ]),
       ) as typeof source)
     : source;
-  const boardRef = useRef(board);
-  boardRef.current = board;
-  const destination = useRef<{ status: Status; index: number } | null>(null);
-  // Horizontal keyboard movement explicitly selects the adjacent column. Vertical
-  // movement keeps dnd-kit's sortable coordinate behavior and announcements.
-  const coordinates: KeyboardCoordinateGetter = (event, args) => {
-    const slotCoordinates = (status: Status, index: number) => {
-      const items = boardRef.current[status];
-      const next = items[index];
-      const previous = items[index - 1];
-      const nextRect = next
-        ? args.context.droppableRects.get(next.key)
-        : undefined;
-      if (nextRect) return { x: nextRect.left, y: nextRect.top };
-      const previousRect = previous
-        ? args.context.droppableRects.get(previous.key)
-        : undefined;
-      if (previousRect)
-        return { x: previousRect.left, y: previousRect.bottom + 15 };
-      const columnRect = args.context.droppableRects.get(status);
-      return columnRect
-        ? { x: columnRect.left + 3, y: columnRect.top + 66 }
-        : undefined;
-    };
-    if (event.code === "ArrowRight" || event.code === "ArrowLeft") {
-      const current =
-        destination.current?.status ??
-        (args.context.active?.data.current?.status as Status);
-      const next =
-        statuses[
-          statuses.indexOf(current) + (event.code === "ArrowRight" ? 1 : -1)
-        ];
-      if (next) {
-        event.preventDefault();
-        destination.current = {
-          status: next,
-          index: boardRef.current[next].length,
-        };
-        return slotCoordinates(next, destination.current.index);
-      }
-    }
-    if (
-      destination.current &&
-      (event.code === "ArrowUp" || event.code === "ArrowDown")
-    ) {
-      event.preventDefault();
-      const dest = destination.current;
-      dest.index = Math.max(
-        0,
-        Math.min(
-          boardRef.current[dest.status].length,
-          dest.index + (event.code === "ArrowDown" ? 1 : -1),
-        ),
-      );
-      return slotCoordinates(dest.status, dest.index);
-    }
-    return sortableKeyboardCoordinates(event, args);
-  };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: coordinates }),
   );
   const active = statuses
     .flatMap((s) => board[s])
@@ -302,15 +346,10 @@ export function Board({
       : null;
   }
   function finish(event: DragEndEvent) {
-    const keyboard = event.activatorEvent.type === "keydown";
-    const target =
-      keyboard && destination.current
-        ? destination.current
-        : event.over
-          ? locate(String(event.over.id))
-          : null;
-    if (target) {
-      const key = String(event.active.id);
+    const target = event.over ? locate(String(event.over.id)) : null;
+    const intent = dragIntent.current;
+    if (target && intent && intent.key === String(event.active.id)) {
+      const key = intent.key;
       const items = board[target.status].filter((t) => t.key !== key);
       const index =
         target.index < 0 ? items.length : Math.min(target.index, items.length);
@@ -325,10 +364,10 @@ export function Board({
           ? full.findIndex((t) => t.key === after.key) + 1
           : full.length;
       const next = relocate(source, key, target.status, fullIndex);
-      move.mutate(moveInput(next, key, target.status));
+      move.mutate(moveInput(next, key, target.status, intent.updatedAt));
     }
     setActiveKey(null);
-    destination.current = null;
+    dragIntent.current = null;
   }
   const announcements: Announcements = {
     onDragStart: ({ active }) => {
@@ -338,19 +377,19 @@ export function Board({
         : undefined;
     },
     onDragOver: ({ active, over }) => {
-      const pos =
-        destination.current ?? (over ? locate(String(over.id)) : null);
+      const pos = over ? locate(String(over.id)) : null;
       return pos
         ? `${active.id}. Column ${labels[pos.status]}, position ${Math.max(0, pos.index) + 1}.`
         : undefined;
     },
     onDragEnd: ({ active, over }) =>
-      `Dropped ${active.id}${over ? ` in ${labels[destination.current?.status ?? locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
+      `Dropped ${active.id}${over ? ` in ${labels[locate(String(over.id))?.status ?? "ready"]}` : ""}.`,
     onDragCancel: ({ active }) => `Cancelled dragging ${active.id}.`,
   };
+  const backgroundError = tasks.error ?? members.error;
   if (tasks.isPending || members.isPending)
-    return <div className="loading">Opening your sketchbook…</div>;
-  if (tasks.error || members.error)
+    return <div className="loading">Loading board…</div>;
+  if ((tasks.error && !tasks.data) || (members.error && !members.data))
     return (
       <div role="alert" className="page-error">
         {(tasks.error ?? members.error)?.message}
@@ -366,6 +405,12 @@ export function Board({
     );
   return (
     <LayoutGroup>
+      {move.isPending && (
+        <p role="status" className="small muted">
+          Saving move and refreshing the board… Positions show the last read or
+          event, not a speculative move.
+        </p>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -373,37 +418,58 @@ export function Board({
           announcements,
           screenReaderInstructions: {
             draggable:
-              "Press Space to pick up a task. Use arrow keys to move, Space to drop, or Escape to cancel.",
+              "Board dragging uses a pointer. Open a task to change its status with the keyboard.",
           },
         }}
         onDragStart={({ active }) => {
-          setActiveKey(String(active.id));
-          destination.current = null;
+          const key = String(active.id);
+          const captured = Object.values(source)
+            .flat()
+            .find((task) => task.key === key);
+          dragIntent.current = captured
+            ? { key, updatedAt: captured.updatedAt }
+            : null;
+          setActiveKey(key);
         }}
         onDragEnd={finish}
         onDragCancel={() => {
           setActiveKey(null);
-          destination.current = null;
+          dragIntent.current = null;
         }}
       >
-        <div className="board-scroll">
+        {backgroundError && (
+          <QueryRefreshNotice
+            error={backgroundError}
+            resource="board or team"
+            busy={tasks.isFetching || members.isFetching}
+            retry={() => {
+              void tasks.refetch();
+              void members.refetch();
+            }}
+          />
+        )}
+        <BoardOverflow>
           <div className="board-columns">
             {statuses.map((status) => (
               <Column
                 key={status}
                 status={status}
                 tasks={board[status]}
+                totalCount={source[status].length}
+                storyTitles={storyTitles}
+                epicKeys={epicKeys}
                 members={members.data ?? []}
                 open={open}
               />
             ))}
           </div>
-        </div>
+        </BoardOverflow>
         <DragOverlay dropAnimation={null}>
           {active && (
             <div className="drag-overlay">
               <TaskCard
                 task={active}
+                storyTitle={storyTitles.get(active.storyKey ?? "")}
                 members={members.data ?? []}
                 overlay
                 colorBy={settings?.colorBy as ColorBy}

@@ -3,15 +3,20 @@ use rusqlite::{Connection, OptionalExtension};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
 
-pub struct Store {
-    pub(crate) writer: Mutex<Connection>,
+struct Connections {
+    writer: Mutex<Connection>,
     readers: [Mutex<Connection>; 2],
     next_reader: AtomicUsize,
+}
+#[derive(Clone)]
+pub struct Store {
+    connections: Arc<Connections>,
+    pub(crate) project_id: Option<String>,
     pub path: PathBuf,
 }
 
@@ -37,7 +42,8 @@ pub fn resolve_db_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
 pub(crate) fn connect(path: &Path) -> Result<Connection> {
     let c = Connection::open(path)?;
     c.busy_timeout(std::time::Duration::from_millis(5000))?;
-    c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")?;
+    c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;
+CREATE TEMP TABLE jam_project_context(project_id TEXT); INSERT INTO jam_project_context VALUES (NULL);")?;
     Ok(c)
 }
 impl Store {
@@ -61,24 +67,39 @@ impl Store {
             rusqlite_migration::M::up(
                 "ALTER TABLE ref_items ADD COLUMN metadata TEXT; ALTER TABLE ref_frames ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0 CHECK(collapsed IN (0,1));",
             ),
+            rusqlite_migration::M::up(include_str!("migration_v5.sql")),
+            rusqlite_migration::M::up(include_str!("migration_v6.sql")),
+            rusqlite_migration::M::up(include_str!("migration_v7.sql")),
         ]);
         writer.pragma_update(None, "foreign_keys", "OFF")?;
         let migrated = migrations.to_latest(&mut writer);
         writer.pragma_update(None, "foreign_keys", "ON")?;
         migrated?;
         Ok(Self {
-            writer: Mutex::new(writer),
-            readers: [Mutex::new(connect(path)?), Mutex::new(connect(path)?)],
-            next_reader: AtomicUsize::new(0),
+            connections: Arc::new(Connections {
+                writer: Mutex::new(writer),
+                readers: [Mutex::new(connect(path)?), Mutex::new(connect(path)?)],
+                next_reader: AtomicUsize::new(0),
+            }),
+            project_id: None,
             path: path.into(),
         })
     }
     pub(crate) fn read<T>(&self, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        let i = self.next_reader.fetch_add(1, Ordering::Relaxed) % 2;
-        let c = self.readers[i]
+        let i = self.connections.next_reader.fetch_add(1, Ordering::Relaxed) % 2;
+        let c = self.connections.readers[i]
             .lock()
             .map_err(|_| invalid("database", "reader lock poisoned"))?;
+        // The connection mutex covers context installation and the entire transaction.
+        // Every borrower resets it, including unbound readers; no task/thread-local state.
+        c.execute(
+            "UPDATE temp.jam_project_context SET project_id=?",
+            [&self.project_id],
+        )?;
         let tx = c.unchecked_transaction()?;
+        if self.project_id.is_some() {
+            crate::projects::selected_jam(&tx)?;
+        }
         let value = f(&tx)?;
         tx.commit()?;
         Ok(value)
@@ -88,10 +109,18 @@ impl Store {
         f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
         let mut c = self
+            .connections
             .writer
             .lock()
             .map_err(|_| invalid("database", "writer lock poisoned"))?;
+        c.execute(
+            "UPDATE temp.jam_project_context SET project_id=?",
+            [&self.project_id],
+        )?;
         let tx = c.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        if self.project_id.is_some() {
+            crate::projects::selected_jam(&tx)?;
+        }
         let value = f(&tx)?;
         tx.commit()?;
         Ok(value)
@@ -112,6 +141,13 @@ impl Store {
     }
     pub fn activity_count(&self) -> Result<i64> {
         self.read(|c| Ok(c.query_row("SELECT count(*) FROM activity", [], |r| r.get(0))?))
+    }
+    /// Project identity and its activity high-water from one read snapshot.
+    /// The cursor is a global sequence value filtered to this exact project, not
+    /// a per-project counter or database-generation identifier. A saved wait
+    /// cursor may legitimately be larger after scanning foreign events.
+    pub fn project_activity_context(&self) -> Result<(Jam, i64)> {
+        self.read(project_activity_context)
     }
     pub fn latest_seq(&self) -> Result<i64> {
         self.read(|c| {
@@ -207,4 +243,43 @@ pub(crate) fn activity_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEv
         epic_id: r.get(10)?,
         sentence,
     })
+}
+
+fn project_activity_context(c: &Connection) -> Result<(Jam, i64)> {
+    let project = crate::projects::selected_jam(c)?;
+    let cursor = c.query_row(
+        "SELECT coalesce(max(seq),0) FROM activity WHERE jam_id=?",
+        [&project.id],
+        |row| row.get(0),
+    )?;
+    Ok((project, cursor))
+}
+
+#[cfg(test)]
+mod context_snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn identity_and_cursor_share_the_read_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path().join("fictional.db")).unwrap();
+        let (project, human) = store
+            .create_jam("Fictional snapshot", None, None, None, "UTC", "Human")
+            .unwrap();
+        let pinned = store.for_project(&project.id).unwrap();
+        let before = pinned.project_activity_context().unwrap().1;
+        pinned
+            .read(|c| {
+                // Establish identity in this WAL snapshot, then commit a concurrent
+                // writer before the cursor query. Both reads must stay on the old snapshot.
+                assert_eq!(crate::projects::selected_jam(c)?.id, project.id);
+                pinned.set_status(&human.id, "Committed during snapshot", None)?;
+                let (identity, cursor) = project_activity_context(c)?;
+                assert_eq!(identity.id, project.id);
+                assert_eq!(cursor, before);
+                Ok(())
+            })
+            .unwrap();
+        assert!(pinned.project_activity_context().unwrap().1 > before);
+    }
 }

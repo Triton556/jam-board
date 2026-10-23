@@ -7,6 +7,8 @@ pub use logging::init_logging;
 pub use server::{JamServer, RecentCall, RecentCalls};
 
 mod runtime;
-pub use runtime::{ConfigSnippets, McpRuntime, McpStatus, config_snippets};
+pub use runtime::{
+    ConfigSnippets, McpRuntime, McpStatus, config_snippets, project_config_snippets,
+};
 
 mod v2;

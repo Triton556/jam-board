@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import hello from "../../assets/chibi/duo-hello-256.webp";
 import { Avatar, Button, Dialog, EmptyState, Stamp } from "../../components/ui";
 import {
@@ -8,10 +8,12 @@ import {
   PageHeading,
   WorkloadBar,
 } from "../../components/ui/m5";
+import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { api } from "../../lib/api";
 import { membersQuery } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
 import type { Member } from "../../lib/types";
+import { useProjectWrite } from "../../lib/use-project-write";
 import { AgentStatusLine } from "./AgentStatus";
 export function MemberDialog({
   member,
@@ -21,54 +23,73 @@ export function MemberDialog({
   close(): void;
 }) {
   const client = useQueryClient();
+  const form = useRef<HTMLFormElement>(null);
   const [name, setName] = useState(member?.name ?? "");
   const [color, setColor] = useState(
     member?.color ?? memberColors[0] ?? "#5B8DEF",
   );
   const [avatar, setAvatar] = useState(member?.avatar ?? "");
   const valid = !!name.trim() && name.length <= 40 && avatar.length <= 16;
-  const save = useMutation({
-    mutationFn: () =>
-      member
-        ? api.updateMember({
-            id: member.id,
-            name: name.trim(),
-            color,
-            avatar: member.kind === "agent" ? null : avatar,
-          })
-        : api.createMember({
-            name: name.trim(),
-            color,
-            avatar: avatar || null,
-          }),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["members"] });
-      close();
-    },
-  });
+  const write = useProjectWrite(`member:${member?.id ?? "new"}`);
+  const dispatched = useRef(false);
+  const submit = () => {
+    if (!valid || write.error || write.isLocked()) return;
+    dispatched.current = false;
+    const input = { name: name.trim(), color, avatar: avatar || null };
+    write.run(
+      () => {
+        dispatched.current = true;
+        return member
+          ? api.updateMember({
+              ...input,
+              id: member.id,
+              avatar: member.kind === "agent" ? null : input.avatar,
+            })
+          : api.createMember(input);
+      },
+      () => {
+        void client.invalidateQueries({ queryKey: ["members"] });
+        close();
+      },
+    );
+  };
   return (
-    <Dialog title={member ? "Edit teammate" : "Add human"} onClose={close}>
+    <Dialog
+      title={member ? "Edit teammate" : "Add human"}
+      busy={write.pending}
+      onClose={() => write.dismiss(close)}
+    >
       <form
         className="m5-form"
+        ref={form}
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid) save.mutate();
+          submit();
         }}
       >
         <label>
           Name
           <input
+            disabled={write.pending || write.checking}
+            readOnly={!write.ready || !!write.error}
             value={name}
             maxLength={40}
             required
             onChange={(e) => setName(e.target.value)}
           />
         </label>
-        <ColorSwatches value={color} onChange={setColor} />
+        <fieldset
+          disabled={!write.ready || !!write.error}
+          style={{ border: 0, padding: 0, margin: 0 }}
+        >
+          <ColorSwatches value={color} onChange={setColor} />
+        </fieldset>
         {member?.kind !== "agent" && (
           <label>
             Emoji avatar <span className="muted">optional</span>
             <input
+              disabled={write.pending || write.checking}
+              readOnly={!write.ready || !!write.error}
               value={avatar}
               maxLength={16}
               onChange={(e) => setAvatar(e.target.value)}
@@ -76,13 +97,26 @@ export function MemberDialog({
             />
           </label>
         )}
-        {save.error && <p role="alert">{save.error.message}</p>}
+        <ProjectWriteFeedback
+          write={write}
+          form={form}
+          action="Saving teammate"
+        />
+        {write.error && dispatched.current && (
+          <p role="alert">
+            Could not confirm whether the teammate was saved. Your text is kept.
+            Close and check the team before submitting again; this request will
+            not be sent again automatically.
+          </p>
+        )}
         <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
+          <Button disabled={write.pending} onClick={() => write.dismiss(close)}>
+            Cancel
+          </Button>
           <Button
             type="submit"
             variant="primary"
-            disabled={!valid || save.isPending}
+            disabled={!valid || !write.ready || !!write.error}
           >
             Save teammate
           </Button>

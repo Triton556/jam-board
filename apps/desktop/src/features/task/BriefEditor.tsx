@@ -224,7 +224,7 @@ export function BriefEditor({
 }: {
   value: TaskBrief;
   onChange(v: TaskBrief): void;
-  onSave(): void;
+  onSave(nextFocus?: EventTarget | null): void;
   disabled?: boolean;
 }) {
   const field = (key: keyof typeof briefMeanings, label: string) => (

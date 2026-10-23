@@ -3,6 +3,11 @@ use crate::*;
 use rusqlite::OptionalExtension;
 use rusqlite::{params_from_iter, types::Value};
 
+// SQLite's default trim removes only ASCII spaces. Keep the authoritative Rust
+// str::trim whitespace semantics for every required readiness field. The unit
+// test below detects changes to Rust's Unicode whitespace table.
+const RUST_WHITESPACE: &str = "\u{0009}\u{000a}\u{000b}\u{000c}\u{000d}\u{0020}\u{0085}\u{00a0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}";
+
 impl Store {
     pub fn query_tasks(&self, input: TaskQuery) -> Result<TaskListPage> {
         let mut filters = vec!["t.jam_id=?".to_string()];
@@ -19,15 +24,18 @@ impl Store {
                 input.needs_info,
                 "EXISTS(SELECT 1 FROM questions q WHERE q.scope_type='task' AND q.scope_id=t.id AND q.status='open')",
             ),
-            (
-                input.ready,
-                "(length(trim(t.goal_md))>0 AND length(trim(t.where_md))>0 AND length(trim(t.result_md))>0 AND s.status='active' AND EXISTS(SELECT 1 FROM json_each(t.changes_json) j WHERE length(trim(json_extract(j.value,'$.title')))>0 AND length(trim(json_extract(j.value,'$.required')))>0) AND EXISTS(SELECT 1 FROM json_each(t.tests_json) j WHERE length(trim(json_extract(j.value,'$.setup')))>0 AND length(trim(json_extract(j.value,'$.expected')))>0))",
-            ),
         ] {
             if let Some(value) = value {
                 filters.push(format!("({expression})=?"));
                 values.push(Value::Integer(i64::from(value)));
             }
+        }
+        // SQLite length(text) stops at NUL; accepted Rust strings do not.
+        // Compare trimmed content directly rather than introducing validation.
+        if let Some(ready) = input.ready {
+            filters.push("(trim(t.goal_md,?)<>'' AND trim(t.where_md,?)<>'' AND trim(t.result_md,?)<>'' AND s.status='active' AND EXISTS(SELECT 1 FROM json_each(t.changes_json) j WHERE trim(json_extract(j.value,'$.title'),?)<>'' AND trim(json_extract(j.value,'$.required'),?)<>'') AND EXISTS(SELECT 1 FROM json_each(t.tests_json) j WHERE trim(json_extract(j.value,'$.setup'),?)<>'' AND trim(json_extract(j.value,'$.expected'),?)<>''))=?".into());
+            values.extend((0..7).map(|_| Value::Text(RUST_WHITESPACE.into())));
+            values.push(Value::Integer(i64::from(ready)));
         }
         if !input.include_archived.unwrap_or(false) {
             filters.push("t.archived_at IS NULL".into());
@@ -100,6 +108,12 @@ impl Store {
         };
         self.read(|connection| {
             let jam = crate::service::jam(connection)?;
+            if let Some(key) = input.epic.as_deref().filter(|v| !v.is_empty()) {
+                crate::planning::epic(connection, key)?;
+            }
+            if let Some(key) = input.story.as_deref().filter(|v| !v.is_empty()) {
+                crate::planning::story(connection, key)?;
+            }
             values.insert(0, Value::Text(jam.id));
             let from = format!(
                 "FROM tasks t JOIN stories s ON s.id=t.story_id JOIN epics e ON e.id=s.epic_id LEFT JOIN members m ON m.id=t.assignee_id WHERE {}",
@@ -138,11 +152,12 @@ impl Store {
             &self.current_member()?.id,
             &input.key,
             Some(&input.expected_updated_at),
+            None,
             input.patch,
         )
     }
     pub fn archive_current_task(&self, key: &str, reason: Option<&str>) -> Result<TaskSummary> {
-        self.archive_task(&self.current_member()?.id, key, reason)
+        self.archive_task(&self.current_member()?.id, key, reason, None)
     }
     pub fn unarchive_current_task(&self, key: &str) -> Result<TaskSummary> {
         self.unarchive_task(&self.current_member()?.id, key)
@@ -169,5 +184,18 @@ impl Store {
             )?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sqlite_readiness_whitespace_matches_every_rust_unicode_scalar() {
+        let rust = (0..=char::MAX as u32)
+            .filter_map(char::from_u32)
+            .filter(|c| c.is_whitespace())
+            .collect::<String>();
+        assert_eq!(super::RUST_WHITESPACE, rust);
+        assert!(super::RUST_WHITESPACE.contains('\u{0085}'));
     }
 }

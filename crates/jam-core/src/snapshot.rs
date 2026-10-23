@@ -52,7 +52,7 @@ impl Store {
         let j=jam(c)?;
         let keys=c.prepare("SELECT key FROM tasks WHERE jam_id=? ORDER BY created_at,key")?.query_map([&j.id],|r|r.get::<_,String>(0))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let tasks=keys.iter().map(|key|task(c,key)).collect::<Result<Vec<_>>>()?;
-        let members=c.prepare("SELECT id,kind,name,handle,color,avatar,client,last_seen_at,created_at,status_text,status_scope_json,status_at FROM members ORDER BY created_at,id")?.query_map([],crate::service::member_row)?.collect::<std::result::Result<Vec<_>,_>>()?;
+        let members=c.prepare("SELECT id,kind,name,handle,color,avatar,client,last_seen_at,created_at,status_text,status_scope_json,status_at FROM members WHERE id IN (SELECT member_id FROM project_members WHERE jam_id=?) ORDER BY created_at,id")?.query_map([&j.id],crate::service::member_row)?.collect::<std::result::Result<Vec<_>,_>>()?.into_iter().map(|m|crate::projects::project_member(c,m)).collect::<Result<Vec<_>>>()?;
         let assets=crate::service::all_assets(c,&j.id)?;
         let tags=tasks.iter().flat_map(|t|t.tags.iter().map(|tag|TaskTagRow{task_id:t.id.clone(),tag:tag.clone()})).collect();
         let links=c.prepare("SELECT l.task_id,l.asset_id FROM task_assets l JOIN tasks t ON t.id=l.task_id WHERE t.jam_id=?")?.query_map([&j.id],|r|Ok(TaskAssetRow{task_id:r.get(0)?,asset_id:r.get(1)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
@@ -95,7 +95,7 @@ impl Store {
             let fallback_story=crate::snapshot_v2::prepare(c,snapshot.planning.as_ref(),actor,&jid,&prefix,&mut ids,&mut keys)?;
             let mapped=|old:&str|ids.get(old).cloned().ok_or_else(||invalid("file","Unresolved object reference"));
             for t in tasks {
-                c.execute(&format!("INSERT INTO tasks({TASK_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"),params![mapped(&t.id)?,jid,keys[&t.key],t.title,t.description_md,t.status,t.priority,t.estimate,t.due_at,t.position,t.assignee_id.as_deref().map(mapped).transpose()?,mapped(&t.created_by)?,mapped(&t.updated_by)?,t.created_at,t.updated_at,t.archived_at,Option::<String>::None,if snapshot.planning.is_some(){mapped(&t.story_id)?}else{fallback_story.clone()},t.changes_requested,t.review_round])?;
+                c.execute(&format!("INSERT INTO tasks({TASK_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"),params![mapped(&t.id)?,jid,keys[&t.key],t.title,t.description_md,t.status,t.priority,t.estimate,t.due_at,t.position,t.assignee_id.as_deref().map(mapped).transpose()?,mapped(&t.created_by)?,mapped(&t.updated_by)?,t.created_at,t.updated_at,t.archived_at,Option::<String>::None,if snapshot.planning.is_some(){mapped(&t.story_id)?}else{fallback_story.clone()},t.changes_requested,t.review_round,0_i64])?;
             }
             for tag in &snapshot.tags{c.execute("INSERT INTO task_tags VALUES (?,?)",params![mapped(&tag.task_id)?,tag.tag])?;}
             for a in &snapshot.assets{c.execute("INSERT INTO assets(id,jam_id,kind,name,location,notes,created_by,created_at,role) VALUES (?,?,?,?,?,?,?,?,?)",params![mapped(&a.id)?,jid,a.kind,a.name,a.location,a.notes,mapped(&a.created_by)?,a.created_at,a.role])?;}
@@ -106,6 +106,8 @@ impl Store {
                 let task_id=e.task_key.as_deref().map(|key|snapshot.tasks.iter().find(|t|t.key==key).ok_or_else(||invalid("activity","Unknown task key")).and_then(|t|mapped(&t.id))).transpose()?;
                 c.execute("INSERT INTO activity(id,jam_id,actor_id,action,task_id,payload,created_at,epic_id) VALUES (?,?,?,?,?,?,?,?)",params![id(),jid,mapped(&e.actor.id)?,e.action,task_id,remap_payload(&e.payload,&ids,&keys).to_string(),e.created_at,e.epic_id.as_deref().map(mapped).transpose()?])?;
             }
+            for mid in ids.values() { if c.query_row("SELECT EXISTS(SELECT 1 FROM members WHERE id=?)",[mid],|r|r.get::<_,bool>(0))? { crate::projects::join_member(c,&jid,mid)?; } }
+            crate::projects::select(c,&jid,Some(actor))?;
             event(c,Some(&jid),actor,"jam.imported",None,serde_json::json!({"name":snapshot.jam.name,"tasks":snapshot.tasks.len()}))?;
             c.execute("INSERT INTO settings VALUES ('current_member_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[actor])?;
             Ok(())

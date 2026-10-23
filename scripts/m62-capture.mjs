@@ -1,3 +1,6 @@
+import { assertHistoricalCapture } from "./historical-capture-guard.mjs";
+assertHistoricalCapture(import.meta.url);
+
 // Capture the actual release WebView; CDP excludes system cursor overlays.
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";

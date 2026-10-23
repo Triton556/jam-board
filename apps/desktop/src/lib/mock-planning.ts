@@ -15,7 +15,7 @@ import type {
   SubmitReport,
   TaskBrief,
 } from "../bindings";
-import type { EpicInput, StoryInput } from "./planning-api";
+import type { EpicInput, ReadyTaskInput, StoryInput } from "./planning-api";
 import {
   type ActivityEvent,
   JamError,
@@ -37,24 +37,31 @@ export const emptyBrief = (): Required<TaskBrief> => ({
   resultMd: "",
   userQuotesMd: "",
 });
+// Rust char::is_whitespace / str::trim, not ECMAScript trim (NEL/BOM differ).
+export const hasRustText = (value: string) => /\P{White_Space}/u.test(value);
+
 export function mockReadiness(
   t: Pick<TaskDetail, "brief" | "story">,
 ): Readiness {
   const b = { ...emptyBrief(), ...t.brief };
   const missing = [
-    ["goal", "Goal is empty", !b.goalMd.trim()],
-    ["where", "Where is empty", !b.whereMd.trim()],
+    ["goal", "Goal is empty", !hasRustText(b.goalMd)],
+    ["where", "Where is empty", !hasRustText(b.whereMd)],
     [
       "change",
       "At least one change with a Required text",
-      !(b.changes ?? []).some((c) => c.title.trim() && c.required.trim()),
+      !(b.changes ?? []).some(
+        (c) => hasRustText(c.title) && hasRustText(c.required),
+      ),
     ],
     [
       "test",
       "At least one test with setup and expected result",
-      !(b.tests ?? []).some((c) => c.setup.trim() && c.expected.trim()),
+      !(b.tests ?? []).some(
+        (c) => hasRustText(c.setup) && hasRustText(c.expected),
+      ),
     ],
-    ["result", "Result (report format) is empty", !b.resultMd.trim()],
+    ["result", "Result (report format) is empty", !hasRustText(b.resultMd)],
     ["story_active", "The story is still draft", t.story.status !== "active"],
   ]
     .filter((c) => c[2])
@@ -62,13 +69,21 @@ export function mockReadiness(
   return { ready: missing.length === 0, missing };
 }
 export function validateBrief(b: TaskBrief) {
-  if ((b.changes ?? []).some((c) => !c.title.trim() || !c.required.trim()))
+  if (
+    (b.changes ?? []).some(
+      (c) => !hasRustText(c.title) || !hasRustText(c.required),
+    )
+  )
     throw new JamError(
       "validation",
       "Each change needs title and required text",
       "changes",
     );
-  if ((b.tests ?? []).some((t) => !t.setup.trim() || !t.expected.trim()))
+  if (
+    (b.tests ?? []).some(
+      (t) => !hasRustText(t.setup) || !hasRustText(t.expected),
+    )
+  )
     throw new JamError(
       "validation",
       "Each test needs setup and expected result",
@@ -91,11 +106,13 @@ type Host = {
     epicId?: string,
     sentence?: string,
   ): void;
-  move(key: string, reason?: string): Promise<unknown>;
+  move(input: ReadyTaskInput): Promise<unknown>;
 };
 const copy = <T>(v: T): T => structuredClone(v);
 const now = () => new Date().toISOString();
 export class MockPlanning {
+  private claims = new Map<string, string>();
+  private reviewContexts = new Map<string, string>();
   constructor(private h: Host) {}
   epic(key: string) {
     const e = this.h.data().epics.find((e) => e.key === key || e.id === key);
@@ -112,8 +129,13 @@ export class MockPlanning {
     if (!t) throw new JamError("not_found", "Task not found");
     return t;
   }
-  sync() {
-    for (const t of this.h.tasks()) {
+  sync(only?: TaskDetail) {
+    for (const t of only ? [only] : this.h.tasks()) {
+      const claim = JSON.stringify([t.assigneeId, t.status, t.reviewRound]);
+      const previous = this.claims.get(t.id);
+      if (!t.claimGeneration || (previous !== undefined && previous !== claim))
+        t.claimGeneration = crypto.randomUUID();
+      this.claims.set(t.id, claim);
       const story = this.h.data().stories.find((s) => s.id === t.storyId);
       if (story) t.story = copy(story);
       const epic = this.h.data().epics.find((e) => e.id === t.story.epicId);
@@ -139,6 +161,27 @@ export class MockPlanning {
           ),
       );
       t.ready = mockReadiness(t).ready;
+      const report = t.reports.find((item) => item.round === t.reviewRound);
+      if (t.status === "review" && report) {
+        const context = JSON.stringify([
+          t.id,
+          t.updatedAt,
+          report.id,
+          t.brief,
+          t.story,
+          t.epic,
+        ]);
+        const previousContext = this.reviewContexts.get(t.id);
+        if (
+          !t.reviewContextRevision ||
+          (previousContext !== undefined && previousContext !== context)
+        )
+          t.reviewContextRevision = crypto.randomUUID();
+        this.reviewContexts.set(t.id, context);
+      } else {
+        t.reviewContextRevision = null;
+        this.reviewContexts.delete(t.id);
+      }
     }
   }
   private audit() {
@@ -300,10 +343,11 @@ export class MockPlanning {
         "validation",
         "Finish every story or provide overrideReason",
       );
+    const wasClosed = !!e.archivedAt || ["done", "archived"].includes(e.status);
     e.status = status;
     e.archivedAt = status === "archived" ? now() : null;
     e.updatedAt = now();
-    this.event("epic.status", key, e.id, { status });
+    this.event("epic.status", key, e.id, { status, wasClosed });
     return copy(e);
   }
   async setBrain(key: string, handle: string | null) {
@@ -392,10 +436,11 @@ export class MockPlanning {
         "validation",
         "Finish every task or provide overrideReason",
       );
+    const wasClosed = !!s.archivedAt || ["done", "archived"].includes(s.status);
     s.status = status;
     s.archivedAt = status === "archived" ? now() : null;
     s.updatedAt = now();
-    this.event("story.status", key, s.epicId, { status });
+    this.event("story.status", key, s.epicId, { status, wasClosed });
     return copy(s);
   }
   async reorderStory(key: string, beforeKey?: string) {
@@ -422,10 +467,10 @@ export class MockPlanning {
     this.sync();
     return mockReadiness(this.task(key));
   }
-  async markReady(key: string, reason?: string) {
-    await this.h.call("mark_ready", { key, reason });
-    await this.h.move(key, reason);
-    return copy(this.task(key));
+  async markReady(input: ReadyTaskInput) {
+    await this.h.call("mark_ready", input);
+    await this.h.move(input);
+    return copy(this.task(input.key));
   }
   async updateTaskBrief(key: string, patch: BriefPatch_Serialize) {
     await this.h.call("update_task_brief", { key, ...patch });
@@ -555,7 +600,13 @@ export class MockPlanning {
     return copy(q);
   }
   async submitReport(input: SubmitReport, actor: Member) {
+    this.sync();
     const t = this.task(input.key);
+    if (input.expectedClaimGeneration !== t.claimGeneration)
+      throw new JamError(
+        "stale_claim",
+        "This claim changed. Read the task and reconcile this report before submitting again.",
+      );
     if (t.assigneeId !== actor.id)
       throw new JamError("forbidden", "Only the assignee may submit a report");
     if (t.status !== "in_progress")
@@ -588,9 +639,20 @@ export class MockPlanning {
   }
   async reviewTask(input: ReviewTask) {
     await this.h.call("review_task", input);
+    this.sync();
     const t = this.task(input.key),
       actor = this.h.human(),
       report = t.reports.find((r) => r.round === t.reviewRound);
+    if (
+      !input.expectedReportId ||
+      input.expectedReportId !== report?.id ||
+      !input.expectedReviewContextRevision ||
+      input.expectedReviewContextRevision !== t.reviewContextRevision
+    )
+      throw new JamError(
+        "conflict",
+        "The report or task/story/epic context changed. Read the latest evidence and reconcile your review.",
+      );
     if (!report)
       throw new JamError("validation", `No report for round ${t.reviewRound}`);
     if (t.assigneeId === actor.id || report.authorId === actor.id)
