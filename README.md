@@ -23,7 +23,7 @@ Historical Snowball dogfood recording in the real desktop app (not current-prere
 > alpha5 intentionally requires captured validators on task writes and reviews.
 > Alpha15 adds `latestActivityCursor` to session context; strict/cached output
 > schemas also need updating. Missing on an older server does not mean zero.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.29.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.41.md).
 
 ## Features
 
