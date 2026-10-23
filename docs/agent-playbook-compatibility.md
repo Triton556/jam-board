@@ -1,3 +1,36 @@
+# Standalone board skill and migration — alpha41
+
+Jam Board now owns `integrations/agent-skill/jam-board`. The exact bundled files
+are also MCP resources `jam://guide` and `jam://guide/operations`. The skill has no
+agent-playbook, dev-plan or you-are-brain dependency. Universal orchestration can
+use this board like another integration; board hierarchy and execution rules stay
+here. The JSON example in operations is exercised through disposable real stdio.
+
+Settings installs the selected project-scoped skill for Codex or Claude. It does
+not download a repository, execute Python, change global agent configuration,
+launch models or grant board execution. The source version follows the app.
+
+## Existing installations
+
+- New app-owned installation: review target/client and confirm. Verify reads back
+  managed content against the installed receipt and private app ownership record.
+- App-owned upgrade: unchanged owned files can update with an outside-catalog
+  backup; user neighbors remain. Modified files or missing/mismatched ownership
+  stop before overwrite. Preserve backups and review before manual recovery.
+- Legacy playbook-owned skill: migrate/remove using its original trusted installer
+  receipt first. Do not delete all client settings, overwrite modified files, or
+  adopt a foreign skill under the app's ownership. An old and a new global/project
+  skill can both be discovered by the client; inspect its actual catalog.
+- Moving machines or losing private app receipts requires explicit reconciliation;
+  a directory name alone is not evidence of ownership.
+
+Refresh MCP schemas after upgrades. The current connection prompt verifies exact
+project identity before reads. Installation alone does not appoint a role or
+prove a model followed the guide. Native installation, model compliance and
+browser/mock results are separate evidence classes.
+
+## Historical audit, 2026-10-21 (superseded, not current installation advice)
+
 # Optional agent-playbook guidance and current MCP — 2026-10-21
 
 Jam Board's live MCP schemas, server instructions and current [MCP contract](mcp.md)
@@ -43,3 +76,9 @@ not completed integration evidence.
 - A successful file-install verification is not a live client smoke test. No model
   compliance, OS worker launch, user environment setup or spending permission is
   established by installing the optional skill.
+
+### Alpha41 session schema refresh
+
+`get_session_context` adds nullable `projectFolder`, scoped to the session's pinned project. Reconnect and refresh cached output schemas; strict clients
+using an older schema can reject the added property. It is a path hint, not a
+permission to create or modify files. No other project settings are exposed.

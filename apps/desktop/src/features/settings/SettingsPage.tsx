@@ -26,6 +26,7 @@ import { paperRustle } from "../../lib/sound";
 import type { ConfigSnippets, Theme } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { BrainHandoff, WorkflowGuide } from "../plan/BrainHandoff";
+import { BoardConnectSetup } from "./BoardConnectSetup";
 import { ProjectSettings } from "./ProjectSettings";
 import { SkillSetup } from "./SkillSetup";
 
@@ -223,10 +224,24 @@ export function SettingsPage({
           {section === "Project" && <ProjectSettings />}
           {section === "Agents" && (
             <>
+              {project && data && (
+                <BoardConnectSetup
+                  key={project.id}
+                  disabled={busy || !connectionReady}
+                  setup={{
+                    project,
+                    client: tab.startsWith("Codex") ? "codex" : "claude",
+                    transport: tab.endsWith("HTTP") ? "http" : "stdio",
+                    sidecarPath: data.sidecarPath,
+                    dataDir: data.dataDir,
+                    port: data.port,
+                  }}
+                />
+              )}
               <WorkflowGuide />
               <SettingsSection
-                title="Set up in three steps"
-                description="Connect your agent, verify the project, then appoint a planning brain. Jam Board does not launch a model or change your client configuration."
+                title="Manual connection and role setup"
+                description="Optional alternative to the connection prompt above. Configure MCP yourself, verify the project, then choose a role. Jam Board does not launch a model or change your client configuration."
               >
                 <SettingsRow
                   label="Connection target"

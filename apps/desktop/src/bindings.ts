@@ -992,6 +992,8 @@ export type SetExecution = {
 };
 
 export type Settings = {
+	projectId: string | null,
+	projectFolder: string | null,
 	colorBy: string,
 	estimatesEnabled: boolean,
 	wipLimit: number,
@@ -1002,6 +1004,8 @@ export type Settings = {
 };
 
 export type SettingsPatch = {
+	projectFolder: string | null,
+	expectedProjectId: string | null,
 	colorBy: string | null,
 	estimatesEnabled: boolean | null,
 	wipLimit: number | null,
@@ -1012,17 +1016,15 @@ export type SettingsPatch = {
 };
 
 export type SkillCheck = {
-	version: string | null,
-	python: string | null,
-	pythonVersion: string | null,
+	version: string,
+	destination: string | null,
+	status: string,
 	errors: string[],
 };
 
 export type SkillInput = {
-	playbook: string,
 	target: string,
 	client: string,
-	profile: string,
 };
 
 export type SkillOutput = {

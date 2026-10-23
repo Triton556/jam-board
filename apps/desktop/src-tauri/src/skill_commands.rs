@@ -44,7 +44,7 @@ pub async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>> {
 #[specta::specta]
 pub async fn skill_saved_path(state: State<'_, DesktopState>) -> Result<Option<String>> {
     let store = state.store.clone();
-    tokio::task::spawn_blocking(move || store.setting("agent_playbook_path"))
+    tokio::task::spawn_blocking(move || store.setting("jam_skill_target"))
         .await
         .map_err(internal)?
         .map_err(Into::into)
@@ -52,16 +52,13 @@ pub async fn skill_saved_path(state: State<'_, DesktopState>) -> Result<Option<S
 #[tauri::command]
 #[specta::specta]
 pub async fn skill_check(input: SkillInput, state: State<'_, DesktopState>) -> Result<SkillCheck> {
-    let result = skill_runner::check(&input).await;
-    if result.version.is_some() {
-        let store = state.store.clone();
-        tokio::task::spawn_blocking(move || {
-            store.set_setting("agent_playbook_path", &input.playbook)
-        })
-        .await
-        .map_err(internal)??;
-    }
-    Ok(result)
+    let trust = state
+        .store
+        .path
+        .parent()
+        .ok_or_else(|| internal("Missing app data path"))?
+        .join("skill-receipts");
+    Ok(skill_runner::check(&input, &trust).await)
 }
 #[tauri::command]
 #[specta::specta]
@@ -78,7 +75,14 @@ pub async fn run_skill(
     step: String,
     runtime: State<'_, SkillRuntime>,
     app: tauri::AppHandle,
+    state: State<'_, DesktopState>,
 ) -> Result<SkillResult> {
+    let trust = state
+        .store
+        .path
+        .parent()
+        .ok_or_else(|| internal("Missing app data path"))?
+        .join("skill-receipts");
     let cancel = Arc::new(AtomicBool::new(false));
     {
         let mut active = runtime.active.lock().map_err(internal)?;
@@ -90,6 +94,7 @@ pub async fn run_skill(
     let result = skill_runner::run(
         input,
         &step,
+        trust,
         cancel,
         Duration::from_secs(120),
         move |line| {

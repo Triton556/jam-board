@@ -309,3 +309,50 @@ fn attachment_is_atomic_and_has_one_event() {
     assert_eq!(s.latest_seq().unwrap(), seq + 1);
     assert!(s.attach_file(&actor, "JB-1", "relative.png").is_err());
 }
+
+#[test]
+fn project_folder_hint_is_scoped_persistent_clearable_and_rejects_stale_target() {
+    let (_d, s, _) = setup();
+    let first = s.active_jam().unwrap();
+    assert_eq!(s.get_settings().unwrap().project_folder, None);
+    s.set_settings(SettingsPatch {
+        project_folder: Some("C:\\Projects\\Example".into()),
+        expected_project_id: Some(first.id.clone()),
+        ..Default::default()
+    })
+    .unwrap();
+    assert_eq!(
+        Store::open(&s.path)
+            .unwrap()
+            .get_settings()
+            .unwrap()
+            .project_folder
+            .as_deref(),
+        Some("C:\\Projects\\Example")
+    );
+    s.seed_demo().unwrap();
+    let second = s.active_jam().unwrap();
+    assert_ne!(first.id, second.id);
+    assert_eq!(s.get_settings().unwrap().project_folder, None);
+    assert!(matches!(
+        s.set_settings(SettingsPatch {
+            project_folder: Some("C:\\Wrong".into()),
+            expected_project_id: Some(first.id.clone()),
+            ..Default::default()
+        }),
+        Err(Error::Conflict)
+    ));
+    assert_eq!(s.get_settings().unwrap().project_folder, None);
+    s.select_project(&first.id).unwrap();
+    assert_eq!(
+        s.get_settings().unwrap().project_folder.as_deref(),
+        Some("C:\\Projects\\Example")
+    );
+    s.set_settings(SettingsPatch {
+        project_folder: Some(String::new()),
+        expected_project_id: Some(first.id),
+        ..Default::default()
+    })
+    .unwrap();
+    assert_eq!(s.get_settings().unwrap().project_folder, None);
+}

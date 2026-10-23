@@ -64,7 +64,7 @@ Legend: `D0` base route; `D1` revealed editor/menu/modal; `D2+` nested layers. E
 | M02 | Team → agent task/status / Connect | Task drawer or Settings; status details | No members, stale heartbeat, agent working different task; do not imply streaming or running work from presence alone | `team/TeamPage.tsx`; `AgentStatus.tsx` |
 | H01 | `/activity` → filters | Member/action dropdowns; session disclosure; linked task → drawer | Empty results/read retry, long event payload, changing active filters; return scroll; not interchangeable with notification receipts | `activity/ActivityPage.tsx`; `EventWords.tsx` |
 | S01 | `/settings` → Agents / connection tabs | Token reveal/copy; Regenerate token confirmation; connection-help disclosures; config tabs | Masking, copy failure visible, stale project context, token action consequences; never reproduce secret in audit | `settings/SettingsPage.tsx:293–580` |
-| S02 | Settings → optional workflow guidance | Missing-playbook help; preview/results; Install into target confirmation | Long path heading wraps, preview/error/reset states, cancel, repeated install; installs files but does not connect/start agent | `settings/SkillSetup.tsx:140+,336+` |
+| S02 | Settings → bundled Jam Board skill | Client/project picker → review → exact destination confirmation → install/verify → optional log | Pending/double-click/cancel/error/current/upgrade; preserve edited or foreign skills; backup outside catalog; no global config or model launch | `settings/SkillSetup.tsx` |
 | S03 | Settings → Project data | Native export/import/file actions; Load demo confirmation; Archive project typed-name confirmation | Cancel OS picker, invalid import, pending/late errors; running-work check pending/error prevents unsafe archive; correct project receipt | `settings/SettingsPage.tsx:582+,828+` |
 | S04 | Settings → Your project | Template dropdown → Switch template? dialog | Cancel retains settings; text explains preservation; long titles/buttons; success/error/local receipt | `settings/ProjectSettings.tsx:188+,301+` |
 | S05 | Settings → Your board / Paper | Controls, theme/accent/sound and local actions | Read/write errors; disabled controls distinguish pending; theme change all open overlays; reduce-motion | `settings/SettingsPage.tsx:657–820`; `components/ui/SettingsForm.tsx` |
@@ -187,3 +187,12 @@ and does not call an error empty/caught-up; H-T01 distinguishes no shown tasks
 from filtered results. H-M02 missing status is not availability. H-B01 motion
 occurs only on actual pickup/confirmed creation and is disabled for reduced
 motion. No agent action/schema/authority or canvas transform behavior changed.
+
+## Alpha41 connection and standalone skill delta
+
+S01 adds the neutral **Connect agent to board** copy flow and a project-scoped
+folder hint. Check copied exact ID, missing connection/restart path, token absence,
+copy failure, role-neutral completion and stale-project folder save rejection.
+S02 replaces external-playbook/Python installation with bundled standalone guidance.
+The interaction has an explicit preview/confirmation and truthful pending/error/
+verified states. File install is not connection, appointment or execution.

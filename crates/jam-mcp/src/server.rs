@@ -24,6 +24,8 @@ struct SessionContext {
     project_id: String,
     key_prefix: String,
     project_name: String,
+    /// Saved filesystem hint, not verified existence or filesystem permission.
+    project_folder: Option<String>,
     binding: String,
     can_switch_project: bool,
     /// Project-filtered global activity high-water; capture before fresh baseline reads.
@@ -154,6 +156,7 @@ impl JamServer {
                     project_id: project.id,
                     key_prefix: project.key_prefix,
                     project_name: project.name,
+                    project_folder: store.get_settings()?.project_folder,
                     binding: "session".into(),
                     can_switch_project: false,
                     latest_activity_cursor,
@@ -448,7 +451,7 @@ impl ServerHandler for JamServer {
         self.negotiate_initialize(&request)
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -545,6 +548,10 @@ impl ServerHandler for JamServer {
         Ok(ListResourcesResult {
             resources: vec![
                 Resource::new("jam://board", "Active jam board").with_mime_type("text/markdown"),
+                Resource::new("jam://guide", "Jam Board agent guide")
+                    .with_mime_type("text/markdown"),
+                Resource::new("jam://guide/operations", "Jam Board operation examples")
+                    .with_mime_type("text/markdown"),
             ],
             ..Default::default()
         })
@@ -578,7 +585,17 @@ impl ServerHandler for JamServer {
         let text = tokio::task::spawn_blocking({
             let uri = uri.clone();
             move || -> jam_core::Result<String> {
-                if uri == "jam://board" {
+                if uri == "jam://guide" {
+                    Ok(
+                        include_str!("../../../integrations/agent-skill/jam-board/SKILL.md")
+                            .replace("references/operations.md", "jam://guide/operations"),
+                    )
+                } else if uri == "jam://guide/operations" {
+                    Ok(include_str!(
+                        "../../../integrations/agent-skill/jam-board/references/operations.md"
+                    )
+                    .into())
+                } else if uri == "jam://board" {
                     let b = store.board(Some(&actor.id))?;
                     let mut md = format!(
                         "# {}\n\nTheme: {}\n\n| Status | Count |\n|---|---|\n",

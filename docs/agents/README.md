@@ -116,3 +116,13 @@ restrained pickup/reduced motion and narrow Light/Dark guidance. See the
 [terminal evidence](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
 This supersedes the browser-pending checkpoint statements for the tested runtime,
 not the separate unrun native, real-agent or exhaustive visual cases.
+
+## Alpha41 standalone board guidance and connection
+
+The app now owns its optional skill and serves the same source through MCP guide
+resources. Settings has a neutral **Connect agent to board** copy flow; setup does
+not appoint a brain or start work. The folder hint is scoped to the board and is
+not its identity. The legacy full-playbook installer is replaced by a bundled
+project-scope install with review, preservation checks and outside-catalog backup.
+See [alpha41 verification](../verification/0.3.0-alpha.41.md) for actual results and
+blocked browser/native checks; do not transfer alpha40 pixel acceptance.

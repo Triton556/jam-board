@@ -52,7 +52,7 @@ test("agent setup distinguishes connection, skill and planning without starting 
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
   await expect(
-    page.getByText("Set up in three steps", { exact: true }),
+    page.getByText("Manual connection and role setup", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText(

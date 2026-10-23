@@ -5,11 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { brainHandoff, projectConnectionPrompt } from "../lib/brain-handoff";
 import { mockApi } from "../lib/mock-bridge";
 import { SettingsPage } from "./settings/SettingsPage";
-import {
-  playbookCloneCommand,
-  playbookRepository,
-  SkillSetup,
-} from "./settings/SkillSetup";
+import { SkillSetup } from "./settings/SkillSetup";
 
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
@@ -56,7 +52,7 @@ it("names the bound project, separates connection/appointment/permission and doe
   ).toBeVisible();
   expect(
     screen.getByText(
-      /Installation verification checks files, not protocol compatibility/,
+      /No separate playbook, Python or universal brain skill is required/,
     ),
   ).toBeVisible();
   await userEvent
@@ -190,38 +186,20 @@ it("unmatched project settings do not offer a configuration or a misleading conn
   );
   expect(connectionCard().getByRole("button", { name: "Copy" })).toBeVisible();
 });
-it("optional acquisition is user-triggered, copy-only and has honest browser failure recovery", async () => {
-  const user = userEvent.setup();
-  const open = vi
-    .spyOn(mockApi, "openUrl")
-    .mockRejectedValueOnce(Error("offline"));
+it("bundled skill setup does not acquire an external playbook or alter configuration on open", () => {
+  const open = vi.spyOn(mockApi, "openUrl");
+  const check = vi.spyOn(mockApi, "skillCheck");
   wrap(<SkillSetup />);
+  expect(
+    screen.getByRole("heading", { name: "Optional · Jam Board skill" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Review installation" }),
+  ).toBeDisabled();
+  expect(screen.queryByText("I don't have agent-playbook yet")).toBeNull();
   expect(open).not.toHaveBeenCalled();
-  await user.click(screen.getByText("I don't have agent-playbook yet"));
-  await user.click(screen.getByRole("button", { name: "Copy clone command" }));
-  expect(await navigator.clipboard.readText()).toBe(playbookCloneCommand);
-  expect(screen.getByRole("status")).toHaveTextContent("Run it yourself");
+  expect(check).not.toHaveBeenCalled();
   expect(mockApi.calls.some((c) => c.command === "run_skill")).toBe(false);
-  await user.click(
-    screen.getByRole("button", { name: "Open playbook instructions ↗" }),
-  );
-  expect(open).toHaveBeenCalledWith(`${playbookRepository}#quick-start`);
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    "nothing was installed",
-  );
-});
-it("optional acquisition keeps a selectable command after clipboard failure", async () => {
-  const user = userEvent.setup();
-  vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(
-    Error("denied"),
-  );
-  wrap(<SkillSetup />);
-  await user.click(screen.getByText("I don't have agent-playbook yet"));
-  await user.click(screen.getByRole("button", { name: "Copy clone command" }));
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    "Clipboard unavailable",
-  );
-  expect(screen.getByText(playbookCloneCommand)).toBeVisible();
 });
 it("planning prompts defer to live schemas and preserve the separate per-epic appointment", () => {
   const prompt = brainHandoff(
