@@ -5,7 +5,14 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.42] - 2026-10-26
+
+Brain dock, local voice input, canvas linking and feedback, and fixes from the
+interaction walk.
+
 ### Added
+- Local voice input through an on-demand whisper.cpp sidecar, with resumable
+  downloads, digest checks, CPU/CUDA selection and idle unloading.
 - Explicit frame links to epics/stories/tasks, inherited reference provenance and
   MCP unlink_reference (52 tools total); human Keep / Not this verdicts, archive
   attribution and computed note feedback links in get_canvas. Asset references
@@ -43,11 +50,11 @@ All notable changes to Jam Board are documented here. The format follows
   display, Shantell Sans for notes/handwriting and JetBrains Mono for monospace.
 
 ### Verification boundary
-- This is an unreleased source increment, without a version bump. Interaction
-  inventory and functional/visual acceptance are mapped in
-  [the agent docs](docs/agents/README.md) and [brain-dock contract](docs/brain-dock.md).
-  Browser/native QA, real adapters/providers and packaged-app process cleanup
-  remain pending; transcripts are in memory only, with no app-restart resume.
+- Round-5 final gates passed after the recorded fixes; mock-browser UI evidence
+  and native voice-process QA have separate boundaries. See
+  [alpha42 verification](docs/verification/0.3.0-alpha.42.md) for results and
+  unrun native/live-provider cases. Dock transcripts remain in memory only,
+  with no app-restart resume.
 
 ## [0.3.0-alpha.41] - 2026-10-23
 

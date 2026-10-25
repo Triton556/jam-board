@@ -17,15 +17,20 @@ A cozy local project board for humans and AI teammates. Plan a game jam, a longe
 
 Historical Snowball dogfood recording in the real desktop app (not current-prerelease acceptance): a brain agent asks questions in Inbox, a simulated human operator answers, and the plan and journal update.
 
-> Development prerelease: **0.3.0-alpha.41**. Project-pinned sessions and human-authorized
+> Development prerelease: **0.3.0-alpha.42**. Project-pinned sessions and human-authorized
 > story/epic work are implemented. Ready alone never grants execution permission.
 > Upgrading an MCP connection: refresh its tool schemas and reread task context;
 > alpha5 intentionally requires captured validators on task writes and reviews.
 > Alpha15 adds `latestActivityCursor` to session context; strict/cached output
 > schemas also need updating. Missing on an older server does not mean zero.
-> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.41.md).
+> See the [changelog](CHANGELOG.md) and [verification notes](docs/verification/0.3.0-alpha.42.md).
 
 ## Features
+
+- Brain dock: project-pinned ACP chat, terminal sessions and built-in API chat.
+  Configure connections in Settings → Agents; sending a message does not grant Start.
+- Voice input: local transcription with an on-demand whisper.cpp runtime and model
+  download, CPU/CUDA support and idle unloading. See [brain dock setup](docs/brain-dock.md).
 
 - 📝 Epics → stories → tasks, complete briefs and a live five-column board.
 - ▶️ Start an agreed story or epic, then let its brain organize workers within that scope. Pause blocks new work without discarding reports.
