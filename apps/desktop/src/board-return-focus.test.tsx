@@ -10,9 +10,11 @@ vi.mock("./lib/api", async () => {
   return { api };
 });
 vi.mock("./lib/grain", () => ({ preparePaperGrain: () => Promise.resolve() }));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+vi.mock("@tauri-apps/plugin-opener", () => import("./test/mock-opener"));
 
 import { App, router } from "./app";
+// This suite exercises save/focus recovery. Cold imports have their own gated suites.
+import "./features/task/TaskDrawer";
 import { api } from "./lib/api";
 
 it("closing after a keyboard Status save focuses the same task's replacement Board card", async () => {
@@ -21,14 +23,13 @@ it("closing after a keyboard Status save focuses the same task's replacement Boa
   const original = await screen.findByRole("button", { name: /^Open JB-2:/ });
   original.focus();
   await user.keyboard("{Enter}");
-  await screen.findByRole("textbox", { name: "Task title" });
-  screen.getByRole("combobox", { name: "Status" }).focus();
+  const status = await screen.findByRole("combobox", { name: "Status" });
+  await user.click(status);
+  await screen.findByRole("option", { name: "Backlog" });
   await user.keyboard("{Home}{Enter}");
   await user.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
-  await waitFor(async () =>
-    expect((await api.getTask("JB-2")).status).toBe("backlog"),
-  );
   await screen.findByText("All changes saved");
+  expect((await api.getTask("JB-2")).status).toBe("backlog");
   await waitFor(() => expect(original.isConnected).toBe(false));
   await user.keyboard("{Escape}");
   await waitFor(() =>
@@ -49,7 +50,7 @@ it("closing immediately after save uses a stable Board entry while its list read
   await act(async () => router.navigate({ to: "/board", search: {} }));
   const original = await screen.findByRole("button", { name: /^Open JB-4:/ });
   await user.click(original);
-  await screen.findByRole("textbox", { name: "Task title" });
+  await screen.findByRole("combobox", { name: "Status" });
   const originalRead = api.listBoardTasks.bind(api);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
@@ -60,7 +61,8 @@ it("closing immediately after save uses a stable Board entry while its list read
     return originalRead();
   });
   try {
-    screen.getByRole("combobox", { name: "Status" }).focus();
+    await user.click(screen.getByRole("combobox", { name: "Status" }));
+    await screen.findByRole("option", { name: "Backlog" });
     await user.keyboard("{Home}{Enter}");
     await user.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
     await screen.findByText("All changes saved");

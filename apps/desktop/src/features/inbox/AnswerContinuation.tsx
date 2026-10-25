@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AppState, Question } from "../../bindings";
 import { Button } from "../../components/ui";
 import { appQuery } from "../../lib/queries";
+import { useBrainDock } from "../brain/brain-store";
 import "./answer-continuation.css";
 
 /** IDs only: the saved board answer remains the source of truth. */
@@ -10,10 +11,11 @@ export function answerContinuationPrompt(q: Question) {
   return `Read my saved answer to question ${q.id} in exact project ID ${q.jamId} (${q.scopeType} scope ID ${q.scopeId}${q.epicId ? `; epic ID ${q.epicId}` : ""}). Verify get_session_context.projectId first; on mismatch stop and ask. Freshly read the question, its original answer and relevant scope; preserve the answer and reconcile it with current context. Verify the current appointed epic brain before continuing; do not appoint yourself or transfer a role. For a project-scoped question, clarify the intended brain/scope if not already established. Continue only the previously requested phase within its currently authorized scope. This answer is information, not Start approval, a new execution grant, or permission to launch workers. If paused, finished, reassigned or unclear, report the next step instead of starting work. Use the language of the original human notes or latest human request; if unclear, ask rather than translating or guessing.`;
 }
 
-/** A copy-only fallback, deliberately not a session launcher or delivery receipt. */
+/** Stage the saved-answer prompt in chat, with the existing copy-only fallback. */
 export function AnswerContinuation({ question }: { question: Question }) {
   const client = useQueryClient();
   const app = useQuery(appQuery);
+  const dock = useBrainDock();
   const [preview, setPreview] = useState(false);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
@@ -71,8 +73,30 @@ export function AnswerContinuation({ question }: { question: Question }) {
         finished chat is not automatically awakened. You can find this prompt
         again in Inbox → Answered.
       </p>
-      <Button onClick={() => setPreview(!preview)} aria-expanded={preview}>
-        {preview ? "Hide continuation prompt" : "Continue in brain chat"}
+      <Button
+        variant="primary"
+        onClick={() => {
+          if (selected.current === question.jamId)
+            dock.compose({ text: prompt, context: [] });
+        }}
+      >
+        Continue in brain chat
+      </Button>
+      <Button
+        disabled={pending}
+        onClick={() => {
+          setPreview(true);
+          void copy();
+        }}
+      >
+        {pending ? "Copying…" : "Copy continuation prompt"}
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={() => setPreview(!preview)}
+        aria-expanded={preview}
+      >
+        {preview ? "Hide continuation prompt" : "Show continuation prompt"}
       </Button>
       {preview && (
         <div className="answer-continuation-preview">
@@ -85,9 +109,6 @@ export function AnswerContinuation({ question }: { question: Question }) {
               rows={6}
             />
           </label>
-          <Button disabled={pending} onClick={() => void copy()}>
-            {pending ? "Copying…" : "Copy continuation prompt"}
-          </Button>
           {notice && <p role="status">{notice}</p>}
         </div>
       )}

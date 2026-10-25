@@ -1,10 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import {
-  WorkingLine,
-  WorkingRing,
-  workingUnderline,
-} from "../components/ui/AgentWorking";
+import { WorkingLine, WorkingRing } from "../components/ui/AgentWorking";
+import { workingUnderline } from "../components/ui/WorkingUnderline";
 import { agentWorking } from "../lib/agent-working";
 import { mockApi } from "../lib/mock-bridge";
 import type { Member, TaskSummary } from "../lib/types";

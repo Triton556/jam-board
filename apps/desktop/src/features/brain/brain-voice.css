@@ -1,0 +1,92 @@
+.brain-voice-percent {
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.brain-voice-anchor {
+  position: relative;
+  flex: 0 0 28px;
+}
+.brain-voice-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  position: relative;
+}
+.brain-voice-button.recording {
+  color: var(--coral);
+  background: var(--paper-2);
+}
+.brain-voice-progress {
+  position: absolute;
+  inset: 0;
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: var(--coral);
+  stroke-width: 2px;
+  transform: rotate(-90deg);
+}
+.brain-voice-popover {
+  left: -32px;
+  right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.brain-voice-popover p {
+  margin: 0;
+  font-size: 12px;
+}
+.brain-voice-popover > .button {
+  display: inline-flex;
+  align-items: center;
+  text-align: center;
+}
+.brain-voice-take {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  max-height: 124px;
+  overflow: auto;
+  padding: 8px 0 0;
+}
+.brain-voice-take > div {
+  min-width: 0;
+}
+.brain-voice-take p {
+  margin: 4px 0;
+}
+.brain-voice-take > .tooltip-wrap {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.brain-voice-take meter {
+  width: 48px;
+  height: 12px;
+  accent-color: var(--coral);
+}
+.brain-voice-recording-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--coral);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.brain-voice-models {
+  display: grid;
+  gap: 12px;
+}
+.brain-voice-model {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.brain-voice-model button[aria-pressed="true"] {
+  border-color: var(--coral);
+}
+.brain-voice-recommended {
+  font-size: 12px;
+  color: var(--ink-2);
+}

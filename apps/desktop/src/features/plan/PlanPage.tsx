@@ -13,7 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import duo from "../../assets/chibi/duo-board-256.webp";
 import type { EpicTree, StoryTree } from "../../bindings";
 import {
@@ -24,6 +24,7 @@ import {
   SegmentedControl,
   Select,
   Stamp,
+  Tooltip,
 } from "../../components/ui";
 import {
   PaperSkeleton,
@@ -32,6 +33,7 @@ import {
 } from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { memberColors, WorkloadBar } from "../../components/ui/m5";
+import { useDismissible } from "../../components/ui/useDismissible";
 import { api } from "../../lib/api";
 import { brainHandoff } from "../../lib/brain-handoff";
 import {
@@ -145,8 +147,11 @@ export function PlanPage({
           </Button>
         </div>
         <div className="epic-filter">
-          <span className="small muted">Show epics</span>
+          <label className="small muted" htmlFor="epic-filter">
+            Show epics
+          </label>
           <Select
+            id="epic-filter"
             aria-label="Epic filter"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -199,7 +204,6 @@ export function PlanPage({
                 key={e.key}
                 className={`epic-card ${e.key === epicKey ? "selected" : ""}`}
                 aria-label={`Open epic ${e.key}: ${e.title}`}
-                title={`${e.key} · ${e.title}`}
                 style={
                   { "--epic-color": `var(--${e.color})` } as React.CSSProperties
                 }
@@ -343,6 +347,15 @@ function EpicDetail({
   const [menu, setMenu] = useState(false),
     [newStory, setNewStory] = useState(createStory),
     [taskStory, setTaskStory] = useState<string | null>(null);
+  const { root: menuRoot } = useDismissible(menu, () => setMenu(false));
+  const menuId = useId();
+  const openingAt = useRef(0);
+  useEffect(() => {
+    if (!menu) return;
+    const items =
+      menuRoot.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    items?.[openingAt.current < 0 ? items.length - 1 : 0]?.focus();
+  }, [menu, menuRoot]);
   useEffect(() => {
     if (createStory) setNewStory(true);
   }, [createStory]);
@@ -369,9 +382,87 @@ function EpicDetail({
             }{" "}
             open questions
           </span>
-          <IconButton label="Epic menu" onClick={() => setMenu(!menu)}>
-            <MoreHorizontal size={18} />
-          </IconButton>
+          <div ref={menuRoot} className="epic-menu">
+            <IconButton
+              label="Epic menu"
+              aria-haspopup="menu"
+              aria-controls={menuId}
+              aria-expanded={menu}
+              onClick={() => {
+                openingAt.current = 0;
+                setMenu(!menu);
+              }}
+              onKeyDown={(event) => {
+                if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+                event.preventDefault();
+                openingAt.current = event.key === "ArrowUp" ? -1 : 0;
+                setMenu(true);
+              }}
+            >
+              <MoreHorizontal size={18} />
+            </IconButton>
+            {menu && (
+              <div
+                id={menuId}
+                className="popover-menu"
+                role="menu"
+                aria-label="Epic actions"
+                onKeyDown={(event) => {
+                  if (
+                    !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)
+                  )
+                    return;
+                  event.preventDefault();
+                  const items = Array.from(
+                    event.currentTarget.querySelectorAll<HTMLElement>(
+                      '[role="menuitem"]',
+                    ),
+                  );
+                  const index = items.indexOf(
+                    document.activeElement as HTMLElement,
+                  );
+                  const next =
+                    event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? items.length - 1
+                        : (index +
+                            (event.key === "ArrowDown" ? 1 : -1) +
+                            items.length) %
+                          items.length;
+                  items[next]?.focus();
+                }}
+              >
+                <Button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    menuRoot.current?.querySelector("button")?.focus();
+                    setMenu(false);
+                    void api
+                      .setEpicStatus(e.key, "archived")
+                      .then(() => invalidatePlanning(client))
+                      .catch((err) => useUiStore.getState().error(String(err)));
+                  }}
+                >
+                  Archive
+                </Button>
+                <Button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    menuRoot.current?.querySelector("button")?.focus();
+                    setMenu(false);
+                    void navigator.clipboard
+                      .writeText(`jam://epic/${e.key}`)
+                      .catch((err) => useUiStore.getState().error(String(err)));
+                  }}
+                >
+                  Copy MCP reference
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
         <PlanningInput
           key={`${e.id}:title`}
@@ -387,20 +478,24 @@ function EpicDetail({
           <PlanningStatus level="Epic" entityKey={e.key} value={e.status} />
           <fieldset className="epic-swatches" aria-label="Epic color">
             {memberColors.map((color, i) => (
-              <button
-                type="button"
-                key={color}
-                aria-label={`Epic color ${i + 1}`}
-                aria-pressed={e.color === `m${i + 1}`}
-                disabled={archived}
-                style={{ background: color }}
-                onClick={() => patch.mutate({ color: `m${i + 1}` })}
-              />
+              <Tooltip key={color} text={`Epic color ${i + 1}`}>
+                <button
+                  type="button"
+                  aria-label={`Epic color ${i + 1}`}
+                  aria-pressed={e.color === `m${i + 1}`}
+                  disabled={archived}
+                  style={{ background: color }}
+                  onClick={() => patch.mutate({ color: `m${i + 1}` })}
+                />
+              </Tooltip>
             ))}
           </fieldset>
           <div className="epic-brain-control">
-            <span className="small muted">Brain</span>
+            <label className="small muted" htmlFor="epic-brain">
+              Brain
+            </label>
             <CustomSelect
+              id="epic-brain"
               label="Epic brain"
               value={
                 members.data?.find((m) => m.id === e.brainMemberId)?.handle ??
@@ -451,27 +546,6 @@ function EpicDetail({
           key={`execution:${e.id}`}
           scope={{ type: "epic", id: e.id }}
         />
-        {menu && (
-          <div className="button-row">
-            <Button
-              onClick={() =>
-                void api
-                  .setEpicStatus(e.key, "archived")
-                  .then(() => invalidatePlanning(client))
-                  .catch((err) => useUiStore.getState().error(String(err)))
-              }
-            >
-              Archive
-            </Button>
-            <Button
-              onClick={() =>
-                void navigator.clipboard.writeText(`jam://epic/${e.key}`)
-              }
-            >
-              Copy MCP reference
-            </Button>
-          </div>
-        )}
         {(patch.error || brain.error) && (
           <p role="alert">{(patch.error ?? brain.error)?.message}</p>
         )}
@@ -546,11 +620,12 @@ function EpicDetail({
                   ))}
                 </Select>
               </div>
-              <div className="field">
-                Worker model
+              <div className="epic-process-choice">
+                <label htmlFor="worker-model">Worker model</label>
                 <PlanningInput
                   key={`${e.id}:workerModel`}
                   label="Worker model"
+                  id="worker-model"
                   identity={`${e.id}:workerModel`}
                   list="worker-models"
                   value={e.workerModel ?? ""}
@@ -579,7 +654,7 @@ function EpicDetail({
               A story describes a feature or outcome. Its tasks carry the
               implementation briefs.
             </p>
-            <div className="section-heading">
+            <div className="section-heading stories-heading">
               <h2>Stories</h2>
               <Button
                 variant="primary"
@@ -718,15 +793,17 @@ function StoryCard({
       }}
     >
       <header>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Reorder ${s.key}`}
-          {...sortable.attributes}
-          {...sortable.listeners}
-        >
-          <GripVertical size={16} />
-        </button>
+        <Tooltip text={`Reorder ${s.key} / Alt+ArrowUp / Alt+ArrowDown`}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Reorder ${s.key}`}
+            {...sortable.attributes}
+            {...sortable.listeners}
+          >
+            <GripVertical size={16} />
+          </button>
+        </Tooltip>
         <Button
           variant="ghost"
           className="story-open"

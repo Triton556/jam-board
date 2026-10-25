@@ -1,6 +1,18 @@
 * {
   box-sizing: border-box;
 }
+/* Shared native scrollbars follow the active theme, including nested scrollers. */
+:where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-2) var(--paper);
+}
+/* These vertical surfaces gain/lose overflow as their content changes. */
+.settings-page,
+.inbox-scroll,
+.drawer,
+.toast-details[open] {
+  scrollbar-gutter: stable;
+}
 html,
 body,
 #root {
@@ -15,9 +27,7 @@ html:not([data-ready]) #root {
   visibility: hidden;
 }
 body {
-  font:
-    14px / 1.45 "Manrope Variable",
-    sans-serif;
+  font: 14px / 1.45 var(--font-sans);
 }
 body::after {
   content: "";
@@ -51,6 +61,7 @@ button:disabled {
 input,
 textarea,
 select {
+  font-weight: 400;
   border: 1.5px solid var(--line-soft);
   border-radius: var(--r-input);
   background: var(--card);
@@ -67,13 +78,9 @@ svg {
 h1,
 h2,
 h3 {
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-weight: 600;
   line-height: 1.15;
-  font-optical-sizing: auto;
-  font-variation-settings:
-    "SOFT" 100,
-    "WONK" 0;
 }
 h1 {
   font-size: 28px;
@@ -107,13 +114,12 @@ p {
   gap: 8px;
   background: var(--card);
   font-size: 13px;
-  font-weight: 650;
-  transition:
-    transform var(--t-fast),
-    box-shadow var(--t-fast);
+  font-weight: 400;
+  transition: transform var(--motion-fast) var(--ease-out);
   white-space: nowrap;
 }
 .button.primary {
+  font-weight: 700;
   background: var(--primary);
   color: var(--on-primary);
   border-color: var(--primary);
@@ -159,7 +165,7 @@ p {
   border-radius: var(--r-chip);
   padding: 2px 8px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   transform: rotate(-2deg);
@@ -225,9 +231,7 @@ p {
 .empty-state p,
 .hand-note,
 .board-hint {
-  font:
-    500 22px / 1.2 "Caveat",
-    cursive;
+  font: 500 22px / 1.2 var(--font-hand);
   color: var(--ink-2);
 }
 .app-shell {
@@ -253,9 +257,7 @@ p {
   justify-content: center;
   gap: 12px;
   text-decoration: none;
-  font:
-    600 22px "Fraunces Variable",
-    serif;
+  font: 600 22px var(--font-display);
   margin-bottom: 24px;
   white-space: nowrap;
 }
@@ -269,9 +271,7 @@ p {
   transform: rotate(-7deg);
   display: grid;
   place-items: center;
-  font:
-    500 32px "Caveat",
-    cursive;
+  font: 500 32px var(--font-hand);
   position: relative;
   box-shadow: 2px 2px 0 var(--line-soft);
 }
@@ -305,7 +305,7 @@ p {
   border-radius: 10px;
   color: var(--ink-2);
   border: 1px solid transparent;
-  font-weight: 650;
+  font-weight: 400;
 }
 .nav-label {
   font-size: 11px;
@@ -325,6 +325,7 @@ p {
   background: var(--card);
 }
 .nav-link.selected {
+  font-weight: 700;
   background: var(--card);
   color: var(--ink);
   border-color: var(--line-soft);
@@ -353,13 +354,6 @@ p {
   height: 36px;
   padding: 10px;
 }
-.theme-control select {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-}
 .theme-control:has(:focus-visible) {
   outline: 2px solid var(--coral);
   outline-offset: 2px;
@@ -376,12 +370,6 @@ p {
 }
 .expanded .theme-control {
   width: 184px;
-}
-.expanded :where(.theme-control) select {
-  position: static;
-  opacity: 1;
-  border: 0;
-  background: transparent;
 }
 .workspace {
   min-width: 0;
@@ -455,15 +443,15 @@ p {
   position: absolute;
   bottom: 0;
   right: 0;
-  animation: pulse 1s ease infinite;
+  animation: pulse calc(var(--motion-slow) * 4) var(--ease-out) infinite;
 }
 @keyframes pulse {
   50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--leaf) 20%, transparent);
+    opacity: 0.4;
   }
 }
 .board-intro {
-  padding: 25px 28px 22px;
+  padding: 24px 28px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -471,7 +459,7 @@ p {
 .eyebrow {
   color: var(--ink-2);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.14em;
 }
 .board-intro h1 {
@@ -493,7 +481,7 @@ p {
 .board-scroll {
   flex: 1;
   overflow: auto;
-  padding: 2px 26px 28px;
+  padding: 4px 28px 28px;
 }
 .board-columns {
   display: flex;
@@ -516,7 +504,7 @@ p {
   gap: 9px;
   position: relative;
   height: 48px;
-  margin: 0 1px 18px;
+  margin: 0 0 16px;
 }
 .column-heading h2 {
   font-size: 18px;
@@ -572,7 +560,6 @@ p {
   position: relative;
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card);
-  transition: box-shadow 600ms var(--ease);
 }
 .sticker-wrap.lifted {
   box-shadow: var(--shadow-lift);
@@ -581,7 +568,7 @@ p {
   border-radius: var(--r-card);
   border: var(--stroke) solid var(--card-border);
   background: var(--card-fill);
-  padding: 15px 16px 12px;
+  padding: 16px;
   position: relative;
   box-shadow: inset 3px 0 0 var(--agent-color);
 }
@@ -726,7 +713,7 @@ p {
 }
 .drawer-backdrop {
   position: fixed;
-  inset: 0;
+  inset: 56px 0 0;
   background: #2b262240;
   z-index: 50;
   display: flex;
@@ -740,13 +727,8 @@ p {
   overflow-y: auto;
   border-left: 1.5px solid var(--line);
   box-shadow: -16px 0 60px #0000001a;
-  animation: drawer-in 240ms var(--ease);
 }
-@keyframes drawer-in {
-  from {
-    transform: translateX(100%);
-  }
-}
+
 .drawer-heading {
   display: flex;
   justify-content: space-between;
@@ -842,7 +824,7 @@ p {
   border-radius: 12px;
   box-shadow: var(--shadow-lift);
   font-size: 12px;
-  animation: toast-in 200ms var(--ease);
+  animation: toast-in var(--motion-base) var(--ease-out);
 }
 .toast-content {
   flex: 1;
@@ -859,7 +841,6 @@ p {
 .toast-details[open] {
   max-height: min(40vh, 260px);
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 .toast-details ol {
   padding-left: 20px;
@@ -1240,16 +1221,8 @@ input[aria-invalid="true"] {
   background: var(--card);
   width: 520px;
   box-shadow: var(--shadow-lift);
-  animation: drawer-in 240ms var(--ease);
 }
-@keyframes drawer-in {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
+
 .drawer-heading {
   position: sticky;
   top: 0;
@@ -1266,8 +1239,79 @@ input[aria-invalid="true"] {
 .drawer-heading-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-left: auto;
+}
+.drawer.entering,
+.drawer.closing {
+  will-change: transform, opacity;
+}
+body .drawer-backdrop.non-modal {
+  background: transparent;
+  pointer-events: none;
+}
+.drawer-backdrop.non-modal > .drawer:is(.entering, .open) {
+  pointer-events: auto;
+}
+.drawer-backdrop.closed {
+  visibility: hidden;
+  pointer-events: none;
+}
+.drawer.closed {
+  content-visibility: hidden;
+}
+.drawer.entering {
+  animation: drawer-in var(--motion-slow) var(--ease-out) both;
+}
+.drawer.closing {
+  animation: drawer-out var(--motion-slow) var(--ease-in) both;
+  pointer-events: none;
+}
+.drawer-backdrop.entering {
+  animation: drawer-backdrop-in var(--motion-slow) var(--ease-out) both;
+}
+.drawer-backdrop.closing {
+  animation: drawer-backdrop-out var(--motion-slow) var(--ease-in) both;
+}
+.task-drawer-skeleton {
+  min-height: calc(100% - 56px);
+  padding-block: 24px;
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes drawer-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+@keyframes drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes drawer-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 .task-menu {
   position: relative;
@@ -1298,7 +1342,7 @@ input[aria-invalid="true"] {
   min-width: 0;
 }
 .task-title-input {
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 600;
   line-height: 1.15;
@@ -1308,6 +1352,7 @@ input[aria-invalid="true"] {
   width: 100%;
   resize: none;
   min-height: 50px;
+  max-height: 160px;
 }
 .title-count {
   display: block;
@@ -1317,8 +1362,8 @@ input[aria-invalid="true"] {
 .task-field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 16px;
-  margin: 20px 0;
+  gap: 16px;
+  margin: 24px 0;
 }
 .task-field-grid > .field {
   text-transform: uppercase;
@@ -1362,7 +1407,7 @@ input[aria-invalid="true"] {
   gap: 6px;
   color: var(--ink-2);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   white-space: nowrap;
 }
 .segmented button[aria-checked="false"]:hover {
@@ -1372,7 +1417,7 @@ input[aria-invalid="true"] {
   background: var(--card);
   box-shadow: 0 1px 2px rgba(43, 38, 34, 0.12);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
 }
 .segmented-large button {
   height: 40px;
@@ -1381,6 +1426,7 @@ input[aria-invalid="true"] {
   position: relative;
 }
 .input-like {
+  font-weight: 400;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1449,6 +1495,8 @@ input[aria-invalid="true"] {
 .tag-input :where(.chip) button {
   border: 0;
   padding: 0;
+  min-width: 28px;
+  min-height: 28px;
   background: transparent;
   line-height: 1;
 }
@@ -1471,7 +1519,7 @@ input[aria-invalid="true"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 26px;
+  margin-top: 24px;
 }
 .drawer h2 {
   font-size: 18px;
@@ -1482,6 +1530,8 @@ input[aria-invalid="true"] {
   gap: 4px;
 }
 .tabs button {
+  min-height: 28px;
+  font-weight: 400;
   border: 0;
   background: transparent;
   font-size: 12px;
@@ -1490,6 +1540,7 @@ input[aria-invalid="true"] {
   color: var(--ink-2);
 }
 .tabs button[aria-selected="true"] {
+  font-weight: 700;
   background: var(--paper-2);
   color: var(--ink);
 }
@@ -1499,7 +1550,7 @@ input[aria-invalid="true"] {
   font-family: inherit;
   font-size: 14px;
   line-height: 1.45;
-  resize: vertical;
+  resize: none;
 }
 .task-section {
   padding: 16px 0;
@@ -1537,9 +1588,22 @@ input[aria-invalid="true"] {
 }
 .comment-compose textarea {
   width: 100%;
-  min-height: 86px;
+  min-height: 88px;
   font-family: inherit;
   margin: 8px 0;
+  max-height: min(320px, 40vh);
+}
+textarea.autosize-textarea {
+  field-sizing: content;
+  resize: none;
+  overflow-y: auto;
+  max-height: min(480px, 50vh);
+}
+textarea.autosize-textarea.task-title-input {
+  max-height: 160px;
+}
+.comment-compose textarea.autosize-textarea {
+  max-height: min(320px, 40vh);
 }
 .comment-compose .button {
   margin-left: auto;
@@ -1550,8 +1614,12 @@ input[aria-invalid="true"] {
 }
 .history summary {
   cursor: pointer;
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-size: 18px;
+}
+.drawer :is(.task-status-why, .task-section, .agent-plan) summary {
+  min-height: 28px;
+  padding-block: 4px;
 }
 .task-savebar {
   position: sticky;
@@ -1565,7 +1633,7 @@ input[aria-invalid="true"] {
   z-index: 5;
   margin-top: 20px;
 }
-.task-savebar > span {
+.task-savebar > .muted {
   margin-right: auto;
   font-size: 11px;
 }
@@ -1583,7 +1651,7 @@ input[aria-invalid="true"] {
   text-decoration: underline;
   padding: 0;
   color: inherit;
-  font-weight: 650;
+  font-weight: 400;
 }
 .dialog-backdrop {
   position: fixed;
@@ -1608,7 +1676,7 @@ input[aria-invalid="true"] {
   border-radius: var(--r-card);
   box-shadow: var(--shadow-lift);
   padding: 22px;
-  animation: dialog-in 160ms var(--ease);
+  animation: dialog-in var(--motion-slow) var(--ease-out);
 }
 @keyframes dialog-in {
   from {
@@ -1779,7 +1847,7 @@ kbd {
   background: var(--paper-2);
   padding: 3px 6px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1844,7 +1912,7 @@ kbd {
   line-height: 1;
   width: 20px;
   height: 20px;
-  font-family: "Manrope Variable", sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
 }
 .board-actions {
@@ -1877,9 +1945,7 @@ kbd {
 }
 .table-filters {
   align-items: center;
-  font:
-    14px "Manrope Variable",
-    sans-serif;
+  font: 14px var(--font-sans);
 }
 .table-filters .tag-input,
 .table-search,
@@ -1927,9 +1993,7 @@ kbd {
   position: relative;
   min-width: 0;
   text-transform: none;
-  font:
-    14px "Manrope Variable",
-    sans-serif;
+  font: 14px var(--font-sans);
 }
 /* biome-ignore lint/style/noDescendingSpecificity: The drawer deliberately overrides this shared 40px control with its 48px variant. */
 .custom-select .input-like {
@@ -2025,9 +2089,7 @@ kbd {
   padding: 8px;
 }
 .task-count {
-  font:
-    13px "Manrope Variable",
-    sans-serif;
+  font: 13px var(--font-sans);
 }
 
 .card-flags {
@@ -2096,4 +2158,25 @@ kbd {
 }
 .reference-read-notice .query-refresh-notice {
   margin: 0;
+}
+.theme-control .custom-select {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+}
+.theme-control :where(.custom-select > button) {
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 36px;
+}
+:where(.expanded) .theme-control .custom-select {
+  position: static;
+  flex: 1;
+}
+:where(.expanded) .theme-control :where(.custom-select > button) {
+  opacity: 1;
+  border: 0;
+  background: transparent;
+  padding: 4px;
 }

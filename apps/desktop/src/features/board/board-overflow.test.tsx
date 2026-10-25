@@ -57,35 +57,42 @@ it("overflow has visible direction cues and controls that stop at both real boun
   const user = userEvent.setup();
   const region = screen.getByRole("region", { name: "Board columns" });
   expect(region).toHaveAttribute("tabindex", "0");
-  expect(region).toHaveAccessibleDescription(/More columns to the right/);
+  expect(region).toHaveAccessibleDescription(/Left\/Right or Home\/End/);
   expect(
-    screen.getByRole("button", { name: "Scroll board left" }),
-  ).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "Scroll board right" }));
+    screen.queryByRole("button", { name: "Scroll columns left" }),
+  ).toBeNull();
+  const right = screen.getByRole("button", { name: "Scroll columns right" });
+  expect(right).toHaveTextContent("");
+  await user.hover(right);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Left/Right or Home/End",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Scroll columns right" }),
+  );
   expect(region.scrollLeft).toBe(400);
-  expect(region).toHaveAccessibleDescription(/on both sides/);
+  expect(region).toHaveFocus();
   expect(
-    screen.getByRole("button", { name: "Scroll board left" }),
+    screen.getByRole("button", { name: "Scroll columns left" }),
   ).toBeEnabled();
   region.focus();
   await user.keyboard("{End}");
   expect(region.scrollLeft).toBe(900);
   expect(
-    screen.getByRole("button", { name: "Scroll board right" }),
-  ).toBeDisabled();
-  expect(region).toHaveAccessibleDescription(/to the left/);
+    screen.queryByRole("button", { name: "Scroll columns right" }),
+  ).toBeNull();
   await user.keyboard("{Home}");
   expect(region.scrollLeft).toBe(0);
   expect(
-    screen.getByRole("button", { name: "Scroll board left" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Scroll columns left" }),
+  ).toBeNull();
 });
 it("resize and content changes show only genuine overflow, including at a new zoom-width", () => {
   width = 1400;
   mount();
   const region = screen.getByRole("region", { name: "Board columns" });
   expect(
-    screen.queryByRole("button", { name: "Scroll board right" }),
+    screen.queryByRole("button", { name: "Scroll columns right" }),
   ).toBeNull();
   expect(region).not.toHaveAttribute("aria-describedby");
   act(() => {
@@ -93,7 +100,7 @@ it("resize and content changes show only genuine overflow, including at a new zo
     window.dispatchEvent(new Event("resize"));
   });
   expect(
-    screen.getByRole("button", { name: "Scroll board right" }),
+    screen.getByRole("button", { name: "Scroll columns right" }),
   ).toBeEnabled();
   act(() => {
     content = 600;
@@ -151,7 +158,7 @@ it.each([false, true])(
     region.scrollTop = 280;
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: "Scroll board right" }));
+      .click(screen.getByRole("button", { name: "Scroll columns right" }));
     expect(region.scrollTo).toHaveBeenLastCalledWith({
       left: 400,
       behavior: "instant",

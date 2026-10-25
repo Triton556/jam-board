@@ -21,6 +21,7 @@ import { TaskDrawer } from "./task/TaskDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {
@@ -28,7 +29,7 @@ beforeEach(async () => {
   mockApi.calls.length = 0;
 });
 function wrap(node: React.ReactNode) {
-  return render(
+  const view = render(
     <QueryClientProvider
       client={
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -37,6 +38,9 @@ function wrap(node: React.ReactNode) {
       {node}
     </QueryClientProvider>,
   );
+  const external = view.container.querySelector(".external-agents > summary");
+  if (external) fireEvent.click(external);
+  return view;
 }
 it("configuration tabs use manual arrow focus rather than changing the chosen transport", async () => {
   const user = userEvent.setup();
@@ -101,7 +105,8 @@ it("Description mode arrows never erase unsaved text, and explicit Preview/Write
     name: "Description",
   });
   await user.clear(notes);
-  await user.type(notes, "Unsaved **careful plan**");
+  // Keep the fixture fast; the arrows and activation keys below are the contract.
+  await user.paste("Unsaved **careful plan**");
   const write = screen.getByRole("tab", { name: "Write" });
   write.focus();
   await user.keyboard("{ArrowRight}");
@@ -130,11 +135,10 @@ it("asset source switching keeps unsaved fields and never opens a file picker on
     screen.getByRole("textbox", { name: "Asset location" }),
   ).toBeDisabled();
   await user.keyboard("{Enter}");
-  await user.type(
-    screen.getByRole("textbox", { name: "Asset location" }),
-    "https://example.invalid/rough.png",
-  );
-  await user.type(screen.getByRole("textbox", { name: "Name" }), "Rough idea");
+  await user.click(screen.getByRole("textbox", { name: "Asset location" }));
+  await user.paste("https://example.invalid/rough.png");
+  await user.click(screen.getByRole("textbox", { name: "Name" }));
+  await user.paste("Rough idea");
   await user.click(file);
   await user.click(screen.getByRole("tab", { name: "URL" }));
   expect(screen.getByRole("textbox", { name: "Asset location" })).toHaveValue(
@@ -165,7 +169,7 @@ it("report navigation keeps comments and test choices intact in one vertical rea
     block: "center",
     behavior: "instant",
   });
-  await user.type(comments, "Keep this draft while reading the full report.");
+  await user.paste("Keep this draft while reading the full report.");
   const checkbox = screen.getAllByRole("checkbox")[0];
   if (!checkbox) throw Error("Missing report check");
   await user.click(checkbox);

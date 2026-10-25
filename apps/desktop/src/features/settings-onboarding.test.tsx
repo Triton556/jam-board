@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { brainHandoff, projectConnectionPrompt } from "../lib/brain-handoff";
@@ -24,6 +31,8 @@ function wrap(node: React.ReactNode) {
   const view = render(
     <QueryClientProvider client={client}>{node}</QueryClientProvider>,
   );
+  const external = view.container.querySelector(".external-agents > summary");
+  if (external) fireEvent.click(external);
   return { ...view, client };
 }
 function connectionCard() {

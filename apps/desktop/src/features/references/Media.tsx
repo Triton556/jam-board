@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@xyflow/react";
-import { File, Pause, Play } from "lucide-react";
+import { File, FolderOpen, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Tooltip } from "../../components/ui";
 import { api } from "../../lib/api";
 import type { RefItem } from "../../lib/references-api";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./image-resolution";
 import { referenceKind } from "./model";
 import { useCanvas } from "./runtime";
+import { useDevicePixelRatio } from "./use-device-pixel-ratio";
 
 let currentAudio: HTMLAudioElement | null = null;
 const audioCache = new Map<
@@ -33,7 +35,7 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
     zoom = useStore((s) => s.transform[2]),
     [thumb, setThumb] = useState<Thumbnail>(),
     [size, setSize] = useState({ width: 0, height: 0 }),
-    [dpr, setDpr] = useState(() => window.devicePixelRatio || 1),
+    dpr = useDevicePixelRatio(),
     [pixel, setPixel] = useState(false),
     [thumbFailed, setThumbFailed] = useState(false),
     [failed, setFailed] = useState(false),
@@ -67,22 +69,6 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => {
-    let query: MediaQueryList;
-    const update = () => {
-      query?.removeEventListener("change", update);
-      const value = window.devicePixelRatio || 1;
-      setDpr(value);
-      query = window.matchMedia(`(resolution: ${value}dppx)`);
-      query.addEventListener("change", update);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => {
-      query.removeEventListener("change", update);
-      window.removeEventListener("resize", update);
-    };
-  }, []);
   const useThumb =
     !thumbFailed &&
     thumb &&
@@ -90,11 +76,11 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
   const src = useThumb ? thumb.src : url;
   if (failed)
     return (
-      <div className="reference-file nodrag">
+      <div className="reference-file">
         <span role="status">Image unavailable</span>
         <button
           type="button"
-          className="button ghost"
+          className="button ghost reference-text-action nodrag"
           onClick={() => {
             setThumbFailed(true);
             setFailed(false);
@@ -106,17 +92,20 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
       </div>
     );
   return (
-    <button
-      type="button"
-      className="reference-image nodrag"
+    <fieldset
+      className="reference-image"
       aria-label={`Open ${title}`}
-      onClick={() => runtime.lightbox(url, title)}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        runtime.lightbox(url, title);
+      }}
     >
       <img
         ref={measureImage}
         key={`${src}:${attempt}`}
         src={src}
         alt={title}
+        draggable={false}
         loading="lazy"
         style={{ imageRendering: pixel ? "pixelated" : "auto" }}
         onLoad={(e) => {
@@ -133,7 +122,7 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
           else setFailed(true);
         }}
       />
-    </button>
+    </fieldset>
   );
 }
 export function AudioMedia({ url, item }: { url: string; item: RefItem }) {
@@ -211,7 +200,7 @@ export function AudioMedia({ url, item }: { url: string; item: RefItem }) {
     };
   }, []);
   return (
-    <div className="reference-audio nodrag nowheel">
+    <div className="reference-audio nowheel">
       <audio
         ref={ref}
         src={url}
@@ -223,22 +212,25 @@ export function AudioMedia({ url, item }: { url: string; item: RefItem }) {
       >
         <track kind="captions" />
       </audio>
-      <button
-        type="button"
-        aria-label={playing ? "Pause audio" : "Play audio"}
-        onClick={() => {
-          const audio = ref.current;
-          if (!audio) return;
-          if (playing) audio.pause();
-          else {
-            if (currentAudio !== audio) currentAudio?.pause();
-            currentAudio = audio;
-            void audio.play().catch(() => setPlaying(false));
-          }
-        }}
-      >
-        {playing ? <Pause size={18} /> : <Play size={18} />}
-      </button>
+      <Tooltip text={playing ? "Pause audio" : "Play audio"}>
+        <button
+          type="button"
+          className="nodrag"
+          aria-label={playing ? "Pause audio" : "Play audio"}
+          onClick={() => {
+            const audio = ref.current;
+            if (!audio) return;
+            if (playing) audio.pause();
+            else {
+              if (currentAudio !== audio) currentAudio?.pause();
+              currentAudio = audio;
+              void audio.play().catch(() => setPlaying(false));
+            }
+          }}
+        >
+          {playing ? <Pause size={18} /> : <Play size={18} />}
+        </button>
+      </Tooltip>
       <svg viewBox="0 0 256 54" aria-label="Audio waveform" role="img">
         <path
           fill="none"
@@ -252,17 +244,20 @@ export function AudioMedia({ url, item }: { url: string; item: RefItem }) {
             .join(" ")}
         />
       </svg>
-      <input
-        type="range"
-        aria-label="Audio position"
-        min={0}
-        max={data?.duration ?? 1}
-        step={0.01}
-        value={time}
-        onChange={(e) => {
-          if (ref.current) ref.current.currentTime = Number(e.target.value);
-        }}
-      />
+      <Tooltip text="Audio position">
+        <input
+          className="nodrag"
+          type="range"
+          aria-label="Audio position"
+          min={0}
+          max={data?.duration ?? 1}
+          step={0.01}
+          value={time}
+          onChange={(e) => {
+            if (ref.current) ref.current.currentTime = Number(e.target.value);
+          }}
+        />
+      </Tooltip>
       <span className="mono">
         {data ? `${data.duration.toFixed(1)} s` : "Loading audio…"}
       </span>
@@ -272,15 +267,19 @@ export function AudioMedia({ url, item }: { url: string; item: RefItem }) {
 }
 const posters = new Map<string, string>();
 export function VideoMedia({ url, title }: { url: string; title: string }) {
+  const runtime = useCanvas();
   const [poster, setPoster] = useState(posters.get(url));
   return (
     <video
-      className="nodrag nowheel"
+      className="nowheel"
       src={url}
       poster={poster}
       muted
       crossOrigin="anonymous"
-      controls
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        runtime.lightbox(url, title, "video");
+      }}
       preload="metadata"
       aria-label={title}
       onLoadedData={(e) => {
@@ -342,7 +341,16 @@ export function LocalMedia({ item, path }: { item: RefItem; path: string }) {
   if (url.data && kind === "video")
     return <VideoMedia url={url.data} title={item.title} />;
   return (
-    <div className="reference-file">
+    // biome-ignore lint/a11y/noStaticElementInteractions: Node keyboard actions provide the same open action.
+    <div
+      className="reference-file"
+      onDoubleClick={(event) => {
+        if (!(event.target as HTMLElement).closest("button")) {
+          event.stopPropagation();
+          void api.openReferenceFile(path);
+        }
+      }}
+    >
       <File size={32} />
       <span
         title={path.split(/[\\/]/).at(-1) || item.title}
@@ -367,6 +375,7 @@ export function LocalMedia({ item, path }: { item: RefItem; path: string }) {
         className="button ghost nodrag"
         onClick={() => void api.showInFolder(path)}
       >
+        <FolderOpen size={14} aria-hidden="true" />
         Show in folder
       </button>
       {!url.data && url.isFetched && (

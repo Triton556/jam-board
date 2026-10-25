@@ -5,6 +5,7 @@ import { CustomSelect } from "../../components/ui/CustomSelect";
 import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useProjectWrite } from "../../lib/use-project-write";
+import { useReferenceDialogFocus } from "./use-dialog-focus";
 export function AddReferenceDialog({
   kind,
   close,
@@ -20,6 +21,7 @@ export function AddReferenceDialog({
     [text, setText] = useState("");
   const write = useProjectWrite(`add-reference:${kind}`),
     form = useRef<HTMLFormElement>(null);
+  useReferenceDialogFocus(form, write.ready);
   return (
     <Dialog
       title={kind === "link" ? "Add link" : "Add note"}
@@ -49,7 +51,6 @@ export function AddReferenceDialog({
           Title
           <input
             disabled={!write.ready}
-            autoFocus
             value={title}
             maxLength={140}
             onChange={(e) => setTitle(e.target.value)}
@@ -93,6 +94,7 @@ export function FrameDialog({
       `frame:${initial?.id ?? (initial ? "edit" : "new")}`,
     ),
     form = useRef<HTMLFormElement>(null);
+  useReferenceDialogFocus(form, write.ready);
   return (
     <Dialog
       title={initial ? "Edit frame" : "New frame"}
@@ -112,7 +114,6 @@ export function FrameDialog({
           <input
             disabled={!write.ready}
             required
-            autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -170,6 +171,7 @@ export function EditReferenceDialog({
     [key, setKey] = useState("");
   const write = useProjectWrite(`reference:${item.id}:${mode}`),
     form = useRef<HTMLFormElement>(null);
+  useReferenceDialogFocus(form, write.ready);
   return (
     <Dialog
       title={

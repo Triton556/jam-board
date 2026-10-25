@@ -546,3 +546,40 @@ pub async fn update_ref_geometry(
     })
     .await
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn set_reference_verdict(
+    input: ReferenceVerdictInput,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<RefItem, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.set_reference_verdict(&s.current_member()?.id, input)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn link_ref_frame(
+    input: RefFrameLinkInput,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<RefFrame, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.link_ref_frame(&s.current_member()?.id, &input.frame_id, &input.target_key)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn unlink_ref_frame(
+    input: RefFrameLinkInput,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<RefFrame, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.unlink_ref_frame(&s.current_member()?.id, &input.frame_id, &input.target_key)
+    })
+    .await
+}

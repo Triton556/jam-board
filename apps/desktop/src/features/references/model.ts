@@ -4,6 +4,8 @@ import type {
   RefFrame,
   RefItem,
 } from "../../bindings";
+import type { LinkedFrame } from "../../lib/api";
+import { applyCanvasGroup } from "./history-group";
 export type ReferenceKind =
   | "image"
   | "audio"
@@ -98,6 +100,11 @@ export function linkedTargets(
     epic = targets.find((t) => t.id === frame?.epicId);
   if (epic && !links.some((l) => l.id === epic.id))
     links.push({ ...epic, viaFrame: true });
+  for (const link of (frame as LinkedFrame | undefined)?.links ?? []) {
+    const target = targets.find((t) => t.key === link.targetKey);
+    if (target && !links.some((l) => l.id === target.id))
+      links.push({ ...target, viaFrame: true });
+  }
   return links;
 }
 export type PasteContent =
@@ -164,6 +171,21 @@ export class CanvasHistory {
     this.past.push(action);
     this.future = [];
   }
+  async perform(label: string, actions: UndoAction[]) {
+    if (!actions.length) return;
+    if (this.busy) throw Error("Wait for the current canvas change to finish.");
+    this.busy = true;
+    try {
+      await applyCanvasGroup(actions, "redo");
+      this.record({
+        label,
+        undo: () => applyCanvasGroup(actions, "undo"),
+        redo: () => applyCanvasGroup(actions, "redo"),
+      });
+    } finally {
+      this.busy = false;
+    }
+  }
   async undo() {
     const action = this.past.at(-1);
     if (!action || this.busy) return;
@@ -188,6 +210,15 @@ export class CanvasHistory {
       this.busy = false;
     }
   }
+}
+const histories = new Map<string, CanvasHistory>();
+export function getCanvasHistory(projectId: string) {
+  let history = histories.get(projectId);
+  if (!history) {
+    history = new CanvasHistory();
+    histories.set(projectId, history);
+  }
+  return history;
 }
 export const palette = (color: string) =>
   /^m[1-6]$/.test(color) ? `var(--${color})` : color;

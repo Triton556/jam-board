@@ -5,6 +5,15 @@ use crate::*;
 use rusqlite::{Connection, params};
 use serde_json::json;
 
+pub(crate) fn archive_actor(c: &Connection, actor: &str) -> Result<String> {
+    let who = crate::service::member(c, actor)?;
+    Ok(if who.kind == "human" {
+        "human".into()
+    } else {
+        who.name
+    })
+}
+
 pub(crate) fn file_kind(path: &std::path::Path) -> &'static str {
     match path
         .extension()
@@ -50,16 +59,228 @@ fn link(c: &Connection, item: &RefItem, key: &str) -> Result<(String, String, St
     Ok((kind, id, epic_id))
 }
 pub(crate) fn task_references(c: &Connection, t: &TaskSummary) -> Result<Vec<RefItem>> {
-    records(
+    references_for(
         c,
-        "ref_items",
-        "archived_at IS NULL AND (id IN (SELECT item_id FROM ref_links WHERE archived_at IS NULL AND ((target_type='task' AND target_id=?) OR (target_type='story' AND target_id=?) OR (target_type='epic' AND target_id=?))) OR frame_id IN (SELECT id FROM ref_frames WHERE epic_id=? AND archived_at IS NULL)) ORDER BY z,id",
-        &[&t.id, &t.story_id, &t.epic_id, &t.epic_id],
+        &[
+            ("task".into(), t.id.clone(), t.epic_id.clone()),
+            ("story".into(), t.story_id.clone(), t.epic_id.clone()),
+            ("epic".into(), t.epic_id.clone(), t.epic_id.clone()),
+        ],
     )
 }
+
+pub(crate) fn frame_targets(c: &Connection, frame_id: &str) -> Result<Vec<RefFrameTarget>> {
+    let links: Vec<RefFrameLink> = records(
+        c,
+        "ref_frame_links",
+        "frame_id=? AND archived_at IS NULL ORDER BY target_type,target_id",
+        &[&frame_id],
+    )?;
+    links
+        .into_iter()
+        .map(|l| {
+            let table = match l.target_type.as_str() {
+                "epic" => "epics",
+                "story" => "stories",
+                _ => "tasks",
+            };
+            let row: serde_json::Value = fetch(c, table, "id", &l.target_id)?;
+            Ok(RefFrameTarget {
+                target_key: row["key"].as_str().unwrap_or("").into(),
+                kind: serde_json::from_value(json!(l.target_type))?,
+                title: row["title"].as_str().unwrap_or("").into(),
+            })
+        })
+        .collect()
+}
+
+fn references_for(c: &Connection, targets: &[(String, String, String)]) -> Result<Vec<RefItem>> {
+    let project_id = if let Some((_, _, eid)) = targets.first() {
+        epic(c, eid)?.audit.jam_id
+    } else {
+        jam(c)?.id
+    };
+    let mut rows: Vec<RefItem> = records(
+        c,
+        "ref_items",
+        "jam_id=? AND archived_at IS NULL ORDER BY z,id",
+        &[&project_id],
+    )?;
+    if targets.is_empty() {
+        return Ok(rows);
+    }
+    let links: Vec<RefLink> = records(
+        c,
+        "ref_links",
+        "archived_at IS NULL AND item_id IN (SELECT id FROM ref_items WHERE jam_id=?)",
+        &[&project_id],
+    )?;
+    let frames: Vec<RefFrame> = records(
+        c,
+        "ref_frames",
+        "jam_id=? AND archived_at IS NULL",
+        &[&project_id],
+    )?;
+    let frame_links: Vec<RefFrameLink> = records(
+        c,
+        "ref_frame_links",
+        "archived_at IS NULL AND frame_id IN (SELECT id FROM ref_frames WHERE jam_id=?)",
+        &[&project_id],
+    )?;
+    rows.retain_mut(|item| {
+        let direct = targets.iter().any(|(kind, id, _)| {
+            links
+                .iter()
+                .any(|l| l.item_id == item.audit.id && l.target_type == *kind && l.target_id == *id)
+        });
+        let frame = frames.iter().find(|f| {
+            Some(&f.id) == item.frame_id.as_ref()
+                && targets.iter().any(|(kind, id, _)| {
+                    (kind == "epic" && f.epic_id.as_ref() == Some(id))
+                        || frame_links.iter().any(|l| {
+                            l.frame_id == f.id && l.target_type == *kind && l.target_id == *id
+                        })
+                })
+        });
+        if !direct && let Some(frame) = frame {
+            item.via = Some("frame".into());
+            item.frame_title = Some(frame.title.clone());
+        }
+        direct || frame.is_some()
+    });
+    Ok(rows)
+}
 impl Store {
+    pub fn link_ref_frame(&self, actor: &str, frame_id: &str, key: &str) -> Result<RefFrame> {
+        self.change_frame_link(actor, frame_id, key, false)
+    }
+    pub fn unlink_ref_frame(&self, actor: &str, frame_id: &str, key: &str) -> Result<RefFrame> {
+        self.change_frame_link(actor, frame_id, key, true)
+    }
+    fn change_frame_link(
+        &self,
+        actor: &str,
+        frame_id: &str,
+        key: &str,
+        unlink: bool,
+    ) -> Result<RefFrame> {
+        self.write(|c| {
+            crate::service::member(c,actor)?;
+            let frame: RefFrame=fetch(c,"ref_frames","id",frame_id)?;
+            if frame.archived_at.is_some() { return Err(Error::Archived(frame_id.into())); }
+            let (kind,target_id,eid)=target(c,key)?;
+            if epic(c,&eid)?.audit.jam_id != frame.jam_id { return Err(invalid("targetKey","Frame and target must belong to the same project")); }
+            if unlink {
+                let changed=c.execute("UPDATE ref_frame_links SET archived_at=? WHERE frame_id=? AND target_type=? AND target_id=? AND archived_at IS NULL",params![now(),frame_id,kind,target_id])?;
+                if changed==0 { return Err(Error::NotFound("frame link".into())); }
+            } else {
+                c.execute("INSERT INTO ref_frame_links(frame_id,target_type,target_id) VALUES (?,?,?) ON CONFLICT(frame_id,target_type,target_id) DO UPDATE SET archived_at=NULL",params![frame_id,kind,target_id])?;
+            }
+            v2_event(c,actor,Some(&eid),if unlink {"reference.updated"} else {"reference.linked"},if kind=="task" {Some(&target_id)} else {None},json!({"frameId":frame_id,"key":key,"unlinked":unlink}))?;
+            fetch(c,"ref_frames","id",frame_id)
+        })
+    }
+    pub fn set_reference_verdict(
+        &self,
+        actor: &str,
+        input: ReferenceVerdictInput,
+    ) -> Result<RefItem> {
+        self.write(|c| {
+            if crate::service::member(c, actor)?.kind != "human" {
+                return Err(Error::Forbidden(
+                    "Only humans set reference verdicts".into(),
+                ));
+            }
+            let item: RefItem = fetch(c, "ref_items", "id", &input.item_id)?;
+            editable_audit(&item.audit)?;
+            patch_record(
+                c,
+                "ref_items",
+                &input.item_id,
+                &json!({"verdict":input.verdict,"updatedBy":actor,"updatedAt":now()}),
+            )?;
+            v2_event(
+                c,
+                actor,
+                reference_epic(c, &item)?.as_deref(),
+                "reference.updated",
+                None,
+                json!({"itemId":input.item_id,"verdict":input.verdict}),
+            )?;
+            fetch(c, "ref_items", "id", &input.item_id)
+        })
+    }
     pub fn add_reference(&self, actor: &str, input: AddReference) -> Result<RefItem> {
+        if input.copy == Some(true) {
+            return self.add_copied_reference(actor, input);
+        }
         self.add_reference_with_title_mode(actor, input, false)
+    }
+    fn add_copied_reference(&self, actor: &str, mut input: AddReference) -> Result<RefItem> {
+        use std::io::{Read, Write};
+        if input.kind != "asset" {
+            return Err(invalid("copy", "Copy is only supported for assets"));
+        }
+        let source = std::path::Path::new(
+            input
+                .file_path
+                .as_deref()
+                .ok_or_else(|| invalid("filePath", "A local file is required"))?,
+        );
+        if !source.is_absolute() {
+            return Err(invalid("filePath", "Use an absolute local file path"));
+        }
+        let file = std::fs::File::open(source)
+            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+        if !metadata.is_file() {
+            return Err(invalid("filePath", "Choose a file"));
+        }
+        const CAP: u64 = 50 * 1024 * 1024;
+        if metadata.len() > CAP {
+            return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
+        }
+        let mut bytes = Vec::new();
+        file.take(CAP + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+        if bytes.len() as u64 > CAP {
+            return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
+        }
+        if input.title.is_none() {
+            input.title = Some(
+                source
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Reference")
+                    .into(),
+            );
+        }
+        let extension = source.extension().and_then(|s| s.to_str()).unwrap_or("");
+        let directory = self.reference_directory()?;
+        let path = directory.join(format!(
+            "clipboard-{}{}{}",
+            id(),
+            if extension.is_empty() { "" } else { "." },
+            extension
+        ));
+        let result = (|| {
+            let mut destination = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)?;
+            destination.write_all(&bytes)?;
+            drop(destination);
+            input.file_path = Some(path.to_string_lossy().into_owned());
+            input.copy = None;
+            self.add_reference_with_title_mode(actor, input, false)
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&path);
+        }
+        result
     }
     /// Native direct paper: retain an explicit no-heading choice without changing
     /// the legacy/MCP default title contract. No empty new records are accepted.
@@ -193,6 +414,7 @@ impl Store {
                         color: e.color,
                         archived_at: None,
                         collapsed: false,
+                        links: vec![],
                     };
                     insert(c, "ref_frames", &f)?;
                     f.id
@@ -221,6 +443,7 @@ impl Store {
                         color: "m4".into(),
                         archived_at: None,
                         collapsed: false,
+                        links: vec![],
                     };
                     insert(c, "ref_frames", &f)?;
                     f.id
@@ -289,6 +512,10 @@ impl Store {
                 frame_id,
                 link_preview: None,
                 metadata,
+                verdict: None,
+                archived_by: None,
+                via: None,
+                frame_title: None,
             };
             insert(c, "ref_items", &item)?;
             let mut tid = None;
@@ -407,8 +634,8 @@ impl Store {
             let item: RefItem = fetch(c, "ref_items", "id", id)?;
             editable_audit(&item.audit)?;
             c.execute(
-                "UPDATE ref_items SET archived_at=?,updated_by=?,updated_at=? WHERE id=?",
-                params![now(), actor, now(), id],
+                "UPDATE ref_items SET archived_at=?,updated_by=?,updated_at=?,archived_by=? WHERE id=?",
+                params![now(), actor, now(), archive_actor(c,actor)?, id],
             )?;
             v2_event(
                 c,
@@ -427,64 +654,22 @@ impl Store {
         task_key: Option<&str>,
     ) -> Result<Vec<RefItem>> {
         self.read(|c| {
-            let j = jam(c)?;
-            let mut rows: Vec<RefItem> = records(
-                c,
-                "ref_items",
-                "jam_id=? AND archived_at IS NULL ORDER BY z,id",
-                &[&j.id],
-            )?;
+            let project = jam(c)?;
             let targets = [epic_key, story_key, task_key]
                 .into_iter()
                 .flatten()
                 .map(|k| target(c, k))
                 .collect::<Result<Vec<_>>>()?;
-            if !targets.is_empty() {
-                let links: Vec<RefLink> = records(c, "ref_links", "archived_at IS NULL", &[])?;
-                let frames: Vec<RefFrame> = records(c, "ref_frames", "archived_at IS NULL", &[])?;
-                rows.retain(|item| {
-                    targets.iter().any(|(kind, id, _)| {
-                        links.iter().any(|l| {
-                            l.item_id == item.audit.id
-                                && l.target_type == *kind
-                                && l.target_id == *id
-                        }) || (kind == "epic"
-                            && frames.iter().any(|f| {
-                                Some(&f.id) == item.frame_id.as_ref()
-                                    && f.epic_id.as_ref() == Some(id)
-                            }))
-                    })
-                });
-            }
-            Ok(rows)
-        })
-    }
-    pub fn create_ref_frame(&self, actor: &str, mut frame: RefFrame) -> Result<RefFrame> {
-        self.write(|c| {
-            let a = audit(c, actor)?;
-            frame.id = id();
-            frame.jam_id = a.jam_id;
-            frame.archived_at = None;
-            crate::m5::validate_name("title", &frame.title, 140)?;
-            geometry(frame.x, frame.y, frame.w, frame.h)?;
-            if let Some(eid) = &frame.epic_id {
-                let e = epic(c, eid)?;
-                editable_audit(&e.audit)?;
-                if e.audit.jam_id != frame.jam_id {
-                    return Err(invalid("epicId", "Choose an epic in this project"));
+            for (_, _, eid) in &targets {
+                if epic(c, eid)?.audit.jam_id != project.id {
+                    return Err(invalid("targetKey", "Choose a target in this project"));
                 }
             }
-            insert(c, "ref_frames", &frame)?;
-            v2_event(
-                c,
-                actor,
-                frame.epic_id.as_deref(),
-                "reference.added",
-                None,
-                json!({"frameId":frame.id,"title":frame.title}),
-            )?;
-            Ok(frame)
+            references_for(c, &targets)
         })
+    }
+    pub fn create_ref_frame(&self, actor: &str, frame: RefFrame) -> Result<RefFrame> {
+        self.write(|c| create_frame_record(c, actor, frame))
     }
     pub fn update_ref_geometry(
         &self,
@@ -522,34 +707,7 @@ impl Store {
         to: &str,
         label: &str,
     ) -> Result<RefEdge> {
-        self.write(|c| {
-            let a = audit(c, actor)?;
-            let first: RefItem = fetch(c, "ref_items", "id", from)?;
-            let second: RefItem = fetch(c, "ref_items", "id", to)?;
-            editable_audit(&first.audit)?;
-            editable_audit(&second.audit)?;
-            if first.audit.jam_id != a.jam_id || second.audit.jam_id != a.jam_id {
-                return Err(invalid("items", "Choose items in this project"));
-            }
-            let edge = RefEdge {
-                id: id(),
-                jam_id: a.jam_id,
-                from_item: from.into(),
-                to_item: to.into(),
-                label: label.into(),
-                archived_at: None,
-            };
-            insert(c, "ref_edges", &edge)?;
-            v2_event(
-                c,
-                actor,
-                reference_epic(c, &first)?.as_deref(),
-                "reference.linked",
-                None,
-                json!({"edgeId":edge.id}),
-            )?;
-            Ok(edge)
-        })
+        self.write(|c| create_edge_record(c, actor, from, to, label))
     }
     pub fn list_ref_frames(&self) -> Result<Vec<RefFrame>> {
         self.read(|c| {
@@ -664,6 +822,72 @@ fn geometry(x: f64, y: f64, w: f64, h: f64) -> Result<()> {
     }
 }
 
-fn free_frame_x(c: &Connection, jam_id: &str) -> Result<f64> {
+pub(crate) fn free_frame_x(c: &Connection, jam_id: &str) -> Result<f64> {
     Ok(c.query_row("SELECT coalesce(max(right_edge),-80)+80 FROM (SELECT x+w AS right_edge FROM ref_frames WHERE jam_id=?1 AND archived_at IS NULL UNION ALL SELECT i.x+i.w+coalesce(f.x,0) AS right_edge FROM ref_items i LEFT JOIN ref_frames f ON f.id=i.frame_id WHERE i.jam_id=?1 AND i.archived_at IS NULL)",[jam_id],|r|r.get(0))?)
+}
+
+pub(crate) fn create_frame_record(
+    c: &Connection,
+    actor: &str,
+    mut frame: RefFrame,
+) -> Result<RefFrame> {
+    let a = audit(c, actor)?;
+    frame.id = id();
+    frame.jam_id = a.jam_id;
+    frame.archived_at = None;
+    frame.links.clear();
+    crate::m5::validate_name("title", &frame.title, 140)?;
+    geometry(frame.x, frame.y, frame.w, frame.h)?;
+    if let Some(eid) = &frame.epic_id {
+        let e = epic(c, eid)?;
+        editable_audit(&e.audit)?;
+        if e.audit.jam_id != frame.jam_id {
+            return Err(invalid("epicId", "Choose an epic in this project"));
+        }
+    }
+    insert(c, "ref_frames", &frame)?;
+    v2_event(
+        c,
+        actor,
+        frame.epic_id.as_deref(),
+        "reference.added",
+        None,
+        json!({"frameId":frame.id,"title":frame.title}),
+    )?;
+    Ok(frame)
+}
+
+pub(crate) fn create_edge_record(
+    c: &Connection,
+    actor: &str,
+    from: &str,
+    to: &str,
+    label: &str,
+) -> Result<RefEdge> {
+    let a = audit(c, actor)?;
+    let first: RefItem = fetch(c, "ref_items", "id", from)?;
+    let second: RefItem = fetch(c, "ref_items", "id", to)?;
+    editable_audit(&first.audit)?;
+    editable_audit(&second.audit)?;
+    if first.audit.jam_id != a.jam_id || second.audit.jam_id != a.jam_id {
+        return Err(invalid("items", "Choose items in this project"));
+    }
+    let edge = RefEdge {
+        id: id(),
+        jam_id: a.jam_id,
+        from_item: from.into(),
+        to_item: to.into(),
+        label: label.into(),
+        archived_at: None,
+    };
+    insert(c, "ref_edges", &edge)?;
+    v2_event(
+        c,
+        actor,
+        reference_epic(c, &first)?.as_deref(),
+        "reference.linked",
+        None,
+        json!({"edgeId":edge.id}),
+    )?;
+    Ok(edge)
 }

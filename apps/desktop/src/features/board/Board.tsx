@@ -17,10 +17,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 import { LayoutGroup } from "motion/react";
 import type { KeyboardEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button, IconButton } from "../../components/ui";
 import { QueryRefreshNotice } from "../../components/ui/AsyncState";
-import { RoughLine } from "../../components/ui/RoughLine";
+import { ErrorBoundary } from "../../components/ui/ErrorBoundary";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
@@ -38,9 +45,49 @@ import {
 import type { ColorBy, Member, Status, TaskSummary } from "../../lib/types";
 import { emptyBoard, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
-import { StoryPicker } from "../plan/PlanningControls";
+import { StoryPicker } from "../plan/StoryPicker";
 import { BoardOverflow } from "./BoardOverflow";
 import { TaskCard } from "./TaskCard";
+
+const RoughDrawing = lazy(() =>
+  import("../../components/ui/RoughLine").then((module) => ({
+    default: module.RoughLine,
+  })),
+);
+function RoughLine({
+  color = "var(--line)",
+  frame = false,
+}: {
+  color?: string;
+  frame?: boolean;
+}) {
+  const fallback = (
+    <span
+      aria-hidden="true"
+      className={frame ? "rough-frame" : "rough-line"}
+      style={frame ? { inset: 3, border: `1.5px dashed ${color}` } : undefined}
+    >
+      {!frame && (
+        <svg
+          aria-hidden="true"
+          width="100%"
+          height="9"
+          viewBox="0 0 240 9"
+          preserveAspectRatio="none"
+        >
+          <path d="M3 4H237" stroke={color} strokeWidth={3} />
+        </svg>
+      )}
+    </span>
+  );
+  return (
+    <ErrorBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <RoughDrawing color={color} frame={frame} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
   const [title, setTitle] = useState("");
@@ -147,7 +194,8 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
           {create.isPending ? "Adding…" : "Add"}
         </Button>
         <IconButton
-          label="Cancel new task"
+          label="Cancel new task · Esc"
+          aria-label="Cancel new task"
           disabled={create.isPending}
           onClick={() => useUiStore.getState().setQuickColumn(null)}
         >
@@ -171,6 +219,10 @@ function SortableCard({
   const { settings } = useBoardSettings();
   const { listeners, setNodeRef, isDragging, isOver, transform, transition } =
     useSortable({ id: task.key, data: { status: task.status } });
+  const dragClick = useRef(false);
+  useLayoutEffect(() => {
+    if (isDragging) dragClick.current = true;
+  }, [isDragging]);
   return (
     <button
       type="button"
@@ -181,11 +233,28 @@ function SortableCard({
         transform: transform
           ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)`
           : undefined,
-        transition,
+        transition: transition
+          ? "transform var(--motion-base) var(--ease-out)"
+          : undefined,
       }}
       {...listeners}
+      onPointerDownCapture={() => {
+        dragClick.current = false;
+      }}
+      onKeyDownCapture={(event) => {
+        if (event.key === "Enter" || event.key === " ")
+          dragClick.current = false;
+      }}
       aria-label={`Open ${task.key}: ${task.title}${storyTitle ? ` · Story: ${storyTitle}` : ""}`}
       onClick={(event) => {
+        // A cancelled pointer drag can release after dnd-kit's temporary click
+        // blocker is gone. Keep the latch until that click or a new activation.
+        if (dragClick.current) {
+          dragClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         event.currentTarget.focus();
         open(task.key);
       }}
@@ -243,7 +312,8 @@ function Column({
         </span>
         {status === "backlog" && (
           <IconButton
-            label={`Add task to ${labels[status]}`}
+            label={`Add task to ${labels[status]} · N`}
+            aria-label={`Add task to ${labels[status]}`}
             onClick={() => useUiStore.getState().setQuickColumn(status)}
           >
             <Plus size={17} />

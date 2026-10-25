@@ -336,6 +336,9 @@ pub(crate) fn tool<T: JsonSchema>(
             Some(schema::<jam_core::TaskDetail>())
         }
         "get_execution" => Some(schema::<jam_core::ExecutionState>()),
+        "get_canvas" => Some(schema::<jam_core::CanvasPage>()),
+        "create_frame" | "update_frame" => Some(schema::<jam_core::RefFrame>()),
+        "connect_references" | "update_connection" => Some(schema::<jam_core::RefEdge>()),
         "request_execution" => Some(schema::<jam_core::ExecutionRequest>()),
         "get_session_context" => Some(schema::<SessionContext>()),
         "list_tasks" => Some(schema::<jam_core::TaskPage>()),
@@ -594,7 +597,7 @@ impl ServerHandler for JamServer {
                     Ok(include_str!(
                         "../../../integrations/agent-skill/jam-board/references/operations.md"
                     )
-                    .into())
+                    .replace("../SKILL.md", "jam://guide"))
                 } else if uri == "jam://board" {
                     let b = store.board(Some(&actor.id))?;
                     let mut md = format!(

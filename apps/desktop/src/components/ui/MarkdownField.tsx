@@ -1,6 +1,7 @@
 import { Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "../Markdown";
+import { AutosizeTextarea } from "./AutosizeTextarea";
 import { Tooltip } from "./index";
 export function MarkdownField({
   label,
@@ -69,11 +70,11 @@ export function MarkdownField({
         </div>
       </div>
       {editing && !disabled ? (
-        <textarea
+        <AutosizeTextarea
           ref={input}
           aria-label={label}
           value={value}
-          rows={Math.max(4, value.split("\n").length + 1)}
+          rows={4}
           onChange={(e) => onChange(e.target.value)}
           onBlur={(event) => {
             setEditing(false);

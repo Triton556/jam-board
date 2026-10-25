@@ -11,7 +11,9 @@ import type { ReferenceCanvas } from "../../bindings";
 import { api } from "../../lib/api";
 import { decodedThumbnail } from "./Media";
 import { referenceKind, referenceLabel, worldPosition } from "./model";
+import { overviewRasterScale } from "./overview-resolution";
 import { roughPaths } from "./rough";
+import { useDevicePixelRatio } from "./use-device-pixel-ratio";
 // At overview scale a cached raster avoids repainting hundreds of text/card layers
 // on every zoom frame. Real React Flow nodes remain the interactive/accessible model.
 export const OverviewScene = memo(function OverviewScene({
@@ -32,6 +34,7 @@ export const OverviewScene = memo(function OverviewScene({
   targets: { id: string; epicId?: string; color?: string }[];
 }) {
   const overview = useStore((s) => s.transform[2] < 0.4),
+    dpr = useDevicePixelRatio(),
     flow = useReactFlow(),
     canvas = useRef<HTMLCanvasElement>(null),
     images = useRef(new Map<string, HTMLImageElement>()),
@@ -75,7 +78,7 @@ export const OverviewScene = memo(function OverviewScene({
         ...frames.map((f) => (f.y ?? 0) + (f.h ?? 0)),
         ...data.items.map((i, n) => (positions[n]?.y ?? 0) + (i.h ?? 180)),
       ) + 32,
-    scale = Math.min(0.65, 4096 / (right - left), 4096 / (bottom - top));
+    scale = overviewRasterScale(right - left, bottom - top, dpr);
   useEffect(() => {
     if (!overview) return;
     let live = true;
@@ -147,6 +150,7 @@ export const OverviewScene = memo(function OverviewScene({
             ? 1
             : 0.15;
         c.fillStyle = card;
+        if (item.verdict === "reject") c.globalAlpha *= 0.45;
         c.strokeStyle = ink;
         c.beginPath();
         c.roundRect(p.x, p.y, w, h, 10);
@@ -178,7 +182,7 @@ export const OverviewScene = memo(function OverviewScene({
           );
         } else {
           c.fillStyle = ink;
-          c.font = '22px "Caveat"';
+          c.font = `400 16px ${style.getPropertyValue(item.kind === "note" ? "--font-hand" : "--font-sans").trim()}`;
           c.fillText(
             (item.captionMd || item.url || "")
               .replace(/[#*\n]/g, " ")
@@ -189,8 +193,24 @@ export const OverviewScene = memo(function OverviewScene({
           );
         }
         c.fillStyle = ink;
-        c.font = '600 16px "Manrope Variable"';
-        c.fillText(referenceLabel(item), p.x + 10, p.y + 22, w - 20);
+        c.font = `700 16px ${style.getPropertyValue(item.kind === "note" ? "--font-hand" : "--font-sans").trim()}`;
+        const badgeWidth =
+          item.verdict === "reject" ? 64 : item.verdict ? 24 : 0;
+        c.fillText(
+          referenceLabel(item),
+          p.x + 10,
+          p.y + 22,
+          Math.max(0, w - 20 - badgeWidth),
+        );
+        if (item.verdict) {
+          c.font = `400 14px ${style.getPropertyValue("--font-sans").trim()}`;
+          c.fillText(
+            item.verdict === "keep" ? "✓" : "Not this",
+            p.x + w - badgeWidth,
+            p.y + 22,
+            badgeWidth - 8,
+          );
+        }
         const highlight = highlights[item.id];
         if (highlight) {
           c.strokeStyle = color(highlight.color);
@@ -244,6 +264,7 @@ export const OverviewScene = memo(function OverviewScene({
       }
     };
     draw();
+    void document.fonts?.ready.then(draw);
     const firstFrame = requestAnimationFrame(draw);
     load.current();
     return () => {

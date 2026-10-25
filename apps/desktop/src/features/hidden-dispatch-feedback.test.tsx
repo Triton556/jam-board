@@ -10,6 +10,7 @@ import { MemberDialog } from "./team/TeamPage";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 afterEach(() => vi.restoreAllMocks());
@@ -21,6 +22,7 @@ it.each(
 )(
   "AS01 $kind: $change before dispatch is known not sent, not an uncertain write",
   async ({ kind, change }) => {
+    const consoleError = vi.spyOn(console, "error");
     mockApi.setLatency(0);
     await mockApi.resetDemo();
     const app = await mockApi.appState();
@@ -118,5 +120,12 @@ it.each(
     expect(input).toHaveAttribute("readonly");
     stop();
     client.clear();
+    expect(
+      consoleError.mock.calls.filter((args) =>
+        args.some((message) =>
+          String(message).includes("Cannot update a component"),
+        ),
+      ),
+    ).toEqual([]);
   },
 );

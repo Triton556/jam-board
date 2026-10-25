@@ -14,6 +14,7 @@ import { TaskDrawer } from "./task/TaskDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 vi.mock("../lib/sound", () => ({ paperRustle: vi.fn() }));

@@ -1,5 +1,7 @@
 //! Shared domain and SQLite storage. No desktop or MCP dependencies.
 mod canvas;
+mod canvas_tools;
+pub use canvas_tools::*;
 mod changes;
 mod context;
 mod db;

@@ -15,6 +15,7 @@ import {
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
 import { PageHeading } from "../../components/ui/m5";
 import { ReadReceipt } from "../../components/ui/ReadReceipt";
+import { useDismissible } from "../../components/ui/useDismissible";
 import { api } from "../../lib/api";
 import {
   epicsQuery,
@@ -26,6 +27,7 @@ import { appQuery, membersQuery, tasksQuery } from "../../lib/queries";
 import { useExplicitRead } from "../../lib/use-explicit-read";
 import { ExecutionRequests } from "../execution/ExecutionRequests";
 import { AnswerContinuation } from "./AnswerContinuation";
+import "./inbox.css";
 export function QuestionCard({
   question: q,
   onDecision,
@@ -41,6 +43,7 @@ export function QuestionCard({
   const [selected, setSelected] = useState<number | null>(null),
     [text, setText] = useState(""),
     [menu, setMenu] = useState(false);
+  const { root: menuRoot } = useDismissible(menu, () => setMenu(false));
   const client = useQueryClient();
   const epoch = useRef(0);
   const answerEpoch = useRef(0);
@@ -133,20 +136,23 @@ export function QuestionCard({
           {scopeLabel ?? q.scopeType}
         </Button>
         <div className="grow" />
-        <IconButton
-          label={`Question menu: ${q.title}`}
-          onClick={() => setMenu(!menu)}
-        >
-          <MoreHorizontal size={18} />
-        </IconButton>
-        {menu && pending && (
-          <Button
-            disabled={answer.isPending || withdraw.isPending}
-            onClick={() => withdraw.mutate()}
+        <div ref={menuRoot} className="question-menu">
+          <IconButton
+            label={`Question menu: ${q.title}`}
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
           >
-            Withdraw
-          </Button>
-        )}
+            <MoreHorizontal size={18} />
+          </IconButton>
+          {menu && pending && (
+            <Button
+              disabled={answer.isPending || withdraw.isPending}
+              onClick={() => withdraw.mutate()}
+            >
+              Withdraw
+            </Button>
+          )}
+        </div>
       </div>
       <h3>{q.title}</h3>
       <Markdown>{q.bodyMd}</Markdown>
@@ -219,25 +225,27 @@ export function QuestionList(props: QuestionListProps) {
   }, [decision]);
   return (
     <section aria-label="Questions">
-      <h2 ref={heading} tabIndex={-1}>
-        Questions
-      </h2>
-      {decision && decision.jamId === app.data?.jam?.id && (
-        <p role="status" className="execution-feedback">
-          {decision.status === "answered"
-            ? `Answer saved for “${decision.title}”. The connected brain can read it and update the plan; this does not start work.`
-            : `“${decision.title}” was withdrawn. No work was started.`}
-        </p>
-      )}
-      {(props.status ?? "open") === "open" &&
-        decision?.status === "answered" &&
-        decision.jamId === app.data?.jam?.id && (
-          <AnswerContinuation
-            key={`${decision.jamId}:${decision.id}`}
-            question={decision}
-          />
+      <QuestionListContent
+        {...props}
+        onDecision={setDecision}
+        headingRef={heading}
+      >
+        {decision && decision.jamId === app.data?.jam?.id && (
+          <p role="status" className="execution-feedback">
+            {decision.status === "answered"
+              ? `Answer saved for “${decision.title}”. The connected brain can read it and update the plan; this does not start work.`
+              : `“${decision.title}” was withdrawn. No work was started.`}
+          </p>
         )}
-      <QuestionListContent {...props} onDecision={setDecision} />
+        {(props.status ?? "open") === "open" &&
+          decision?.status === "answered" &&
+          decision.jamId === app.data?.jam?.id && (
+            <AnswerContinuation
+              key={`${decision.jamId}:${decision.id}`}
+              question={decision}
+            />
+          )}
+      </QuestionListContent>
     </section>
   );
 }
@@ -245,8 +253,12 @@ function QuestionListContent({
   epicId,
   status = "open",
   onDecision,
+  headingRef,
+  children,
 }: QuestionListProps & {
   onDecision(question: Question): void;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  children: React.ReactNode;
 }) {
   const questions = useQuery(questionsQuery),
     epics = useQuery(epicsQuery);
@@ -259,76 +271,80 @@ function QuestionListContent({
     questions.data?.filter(
       (q) => q.status === status && (!epicId || q.epicId === epicId),
     ) ?? [];
-  if (questions.isPending) return <PaperSkeleton label="Loading questions" />;
-  if (questions.error && !questions.data)
-    return (
-      <>
-        <QueryError
-          error={questions.error}
-          retry={refresh}
-          busy={read.pending || questions.isFetching}
-        />
+  const groups = [...new Set(filtered.map((q) => q.epicId ?? "project"))];
+  return (
+    <div className="question-groups">
+      <div className="inbox-section-heading">
+        <h2 ref={headingRef} tabIndex={-1}>
+          Questions
+        </h2>
+        <Button
+          onClick={refresh}
+          disabled={read.pending || questions.isFetching}
+          aria-busy={read.pending || questions.isFetching}
+        >
+          {read.pending ? "Checking questions…" : "Refresh"}
+        </Button>
         <ReadReceipt
           checkedAt={read.checkedAt}
           phase={read.phase}
           resource="questions"
         />
-      </>
-    );
-  const groups = [...new Set(filtered.map((q) => q.epicId ?? "project"))];
-  return (
-    <div className="question-groups">
-      <Button
-        onClick={refresh}
-        disabled={read.pending || questions.isFetching}
-        aria-busy={read.pending || questions.isFetching}
-      >
-        {read.pending ? "Checking questions…" : "Refresh"}
-      </Button>
-      <ReadReceipt
-        checkedAt={read.checkedAt}
-        phase={read.phase}
-        resource="questions"
-      />
-      {questions.error && (
-        <p role="alert">
-          Could not refresh questions. Showing the last loaded questions; your
-          answer draft is kept. {questions.error.message}
-        </p>
+      </div>
+      {children}
+      {questions.isPending ? (
+        <PaperSkeleton label="Loading questions" />
+      ) : questions.error && !questions.data ? (
+        <QueryError
+          error={questions.error}
+          retry={refresh}
+          busy={read.pending || questions.isFetching}
+        />
+      ) : (
+        <>
+          {questions.error && (
+            <p role="alert">
+              Could not refresh questions. Showing the last loaded questions;
+              your answer draft is kept. {questions.error.message}
+            </p>
+          )}
+          {!filtered.length && <EmptyState text="No questions right now" />}
+          {groups.map((id) => {
+            const epic = epics.data?.find((e) => e.id === id);
+            const rows = filtered.filter((q) => (q.epicId ?? "project") === id);
+            return (
+              <section key={id}>
+                <h2
+                  className="question-group-title"
+                  style={{
+                    borderColor: epic
+                      ? `var(--${epic.color})`
+                      : "var(--line-soft)",
+                  }}
+                >
+                  {epic ? `${epic.key} · ${epic.title}` : "Project questions"}
+                </h2>
+                {[...new Set(rows.map((q) => q.roundLabel ?? "Questions"))].map(
+                  (round) => (
+                    <section key={round}>
+                      <h3 className="muted small">{round}</h3>
+                      {rows
+                        .filter((q) => (q.roundLabel ?? "Questions") === round)
+                        .map((q) => (
+                          <QuestionCard
+                            key={q.id}
+                            question={q}
+                            onDecision={onDecision}
+                          />
+                        ))}
+                    </section>
+                  ),
+                )}
+              </section>
+            );
+          })}
+        </>
       )}
-      {!filtered.length && <EmptyState text="No questions right now" />}
-      {groups.map((id) => {
-        const epic = epics.data?.find((e) => e.id === id);
-        const rows = filtered.filter((q) => (q.epicId ?? "project") === id);
-        return (
-          <section key={id}>
-            <h2
-              className="question-group-title"
-              style={{
-                borderColor: epic ? `var(--${epic.color})` : "var(--line-soft)",
-              }}
-            >
-              {epic ? `${epic.key} · ${epic.title}` : "Project questions"}
-            </h2>
-            {[...new Set(rows.map((q) => q.roundLabel ?? "Questions"))].map(
-              (round) => (
-                <section key={round}>
-                  <h3 className="muted small">{round}</h3>
-                  {rows
-                    .filter((q) => (q.roundLabel ?? "Questions") === round)
-                    .map((q) => (
-                      <QuestionCard
-                        key={q.id}
-                        question={q}
-                        onDecision={onDecision}
-                      />
-                    ))}
-                </section>
-              ),
-            )}
-          </section>
-        );
-      })}
     </div>
   );
 }

@@ -8,6 +8,23 @@ import {
 
 // Deterministic geometry only. Browser/native typography and hit testing are separate gates.
 describe("RF02 title-priority frame header", () => {
+  it("reserves a separate linked-target row at compact and full zoom", () => {
+    expect(frameHeaderLayout(800, 1, true).height).toBe(86);
+    expect(frameHeaderLayout(280, 0.4, true).height).toBe(124);
+    const bounds = referenceFitBounds(
+      [
+        {
+          x: 0,
+          y: 0,
+          width: 280,
+          height: 40,
+          frame: { collapsed: true, linked: true },
+        },
+      ],
+      0.4,
+    );
+    expect(bounds.height).toBe(124 * (0.75 / 0.4));
+  });
   it.each([0.39, 0.4, 0.49, 0.75, 1, 2, 4])(
     "keeps a 320px frame's title out of the controls row at narrow zoom %s",
     (zoom) => {

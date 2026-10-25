@@ -26,18 +26,18 @@ it("keeps an already open card tooltip current through heartbeat and expiry", as
   const view = render(<WorkingLine state={quiet} />);
   const line = screen.getByTestId("working-line");
   await user.hover(line.querySelector(".tooltip-wrap") as HTMLElement);
-  const tooltip = screen.getByRole("tooltip");
+  const tooltip = await screen.findByRole("tooltip");
   expect(tooltip).toHaveTextContent(quiet.tooltip);
   expect(line).not.toHaveAttribute("title");
 
   view.rerender(<WorkingLine state={active} />);
   expect(screen.getByTestId("working-line")).toBe(line);
-  expect(screen.getByRole("tooltip")).toBe(tooltip);
+  expect(await screen.findByRole("tooltip")).toBe(tooltip);
   expect(tooltip).toHaveTextContent(active.tooltip);
   expect(line).toHaveTextContent(active.text);
 
   view.rerender(<WorkingLine state={quiet} />);
-  expect(screen.getByRole("tooltip")).toBe(tooltip);
+  expect(await screen.findByRole("tooltip")).toBe(tooltip);
   expect(tooltip).toHaveTextContent(quiet.tooltip);
   expect(tooltip).not.toHaveTextContent(active.status);
   expect(line).toHaveTextContent(quiet.text);
@@ -74,7 +74,7 @@ it("removes the old tooltip when its card or presence disappears", async () => {
       .getByTestId("working-line")
       .querySelector(".tooltip-wrap") as HTMLElement,
   );
-  expect(screen.getByRole("tooltip")).toHaveTextContent(active.tooltip);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(active.tooltip);
   view.rerender(<WorkingLine state={null} />);
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   view.rerender(<WorkingLine state={quiet} />);
@@ -101,14 +101,14 @@ it("repositions a longer live tooltip using synthetic viewport coordinates", asy
     toJSON: () => ({}),
   });
   await user.hover(wrapper);
-  const tooltip = screen.getByRole("tooltip");
+  const tooltip = await screen.findByRole("tooltip");
   const initialLeft = Number.parseFloat(tooltip.style.left);
   view.rerender(
     <Tooltip text="A much longer and newly reported task-specific activity description">
       <span>Presence</span>
     </Tooltip>,
   );
-  expect(screen.getByRole("tooltip")).toBe(tooltip);
+  expect(await screen.findByRole("tooltip")).toBe(tooltip);
   expect(Number.parseFloat(tooltip.style.left)).toBeLessThan(initialLeft);
-  expect(Number.parseFloat(tooltip.style.left)).toBe(window.innerWidth - 328);
+  expect(Number.parseFloat(tooltip.style.left)).toBe(window.innerWidth - 288);
 });

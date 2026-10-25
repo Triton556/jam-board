@@ -1,6 +1,13 @@
 # Refine: new conversation or continuation
 
-Candidate for alpha31; source/DOM coverage is not agent-model or native acceptance.
+Original alpha31 mode contract; source/DOM coverage is not agent-model or native acceptance.
+The current increment moves Refine into drawer heading actions and adds primary
+**Open in brain chat**, staging the scoped prompt and scope chip then closing
+the dialog; **Copy prompt** is secondary. Neither action auto-sends or grants
+Start. [Brain dock](../brain-dock.md) owns this compose contract; UX03/BC07 in the
+[current acceptance map](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
+remain not yet run in browser/native QA. Mode, draft and clipboard guards below
+still apply.
 Human path **H-P07**, agent actions **AG02.setup/continue/request**, acceptance **AC02**.
 
 ## Person's goal and interaction

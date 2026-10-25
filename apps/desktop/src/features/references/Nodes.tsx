@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   Handle,
   type Node,
@@ -8,6 +9,7 @@ import {
 } from "@xyflow/react";
 import {
   Archive,
+  ArrowUpRight,
   AudioLines,
   ChevronDown,
   ChevronRight,
@@ -18,7 +20,9 @@ import {
   MoreHorizontal,
   StickyNote,
   Type,
+  Unlink,
   Video,
+  X,
 } from "lucide-react";
 import {
   memo,
@@ -30,13 +34,19 @@ import {
 } from "react";
 import type { RefFrame, RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
+import { Tooltip } from "../../components/ui";
+import type { VerdictItem } from "../../lib/api";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
 import { frameHeaderLayout } from "./frame-layout";
+import { frameTargets } from "./linking";
 import { LocalMedia } from "./Media";
 import { palette, referenceKind, referenceLabel } from "./model";
+import { ReferencePopover } from "./ReferencePopover";
 import { useCanvas } from "./runtime";
 import { StickyEditor } from "./StickyEditor";
+import { useSummaryTooltip } from "./use-summary-tooltip";
+import { VerdictBadge, VerdictToolbar } from "./VerdictToolbar";
 export type TargetChip = { key: string; viaFrame: boolean; color?: string };
 export type ItemData = {
   item: RefItem;
@@ -79,6 +89,11 @@ export function ReferenceActions({
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
+  const tooltip = useSummaryTooltip(
+    summary,
+    open,
+    `Actions for ${referenceLabel(item)}`,
+  );
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: PointerEvent) => {
@@ -112,6 +127,31 @@ export function ReferenceActions({
           event.stopPropagation();
           return;
         }
+        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (menu.current) menu.current.open = true;
+          setOpen(true);
+          const buttons = Array.from(
+            menu.current?.querySelectorAll<HTMLButtonElement>(
+              "button:not(:disabled)",
+            ) ?? [],
+          );
+          const index = buttons.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          buttons[
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? buttons.length - 1
+                : (index +
+                    (event.key === "ArrowDown" ? 1 : -1) +
+                    buttons.length) %
+                  buttons.length
+          ]?.focus();
+          return;
+        }
         if (event.key !== "Escape" || !menu.current?.open) return;
         event.preventDefault();
         event.stopPropagation();
@@ -119,9 +159,14 @@ export function ReferenceActions({
         summary.current?.focus();
       }}
     >
-      <summary ref={summary} aria-label={`Actions for ${referenceLabel(item)}`}>
+      <summary
+        ref={summary}
+        aria-label={`Actions for ${referenceLabel(item)}`}
+        aria-describedby={tooltip.id}
+      >
         <MoreHorizontal size={18} />
       </summary>
+      {tooltip.tip}
       <fieldset
         className="reference-action-list"
         aria-label="Reference actions"
@@ -138,6 +183,49 @@ export function ReferenceActions({
         >
           {item.kind === "note" ? "Edit note" : "Edit caption"}
         </button>
+        {item.kind === "note" && (
+          <button
+            type="button"
+            disabled={noteEditing}
+            title={
+              noteEditing
+                ? "Finish editing this note before creating a task"
+                : undefined
+            }
+            onClick={() => activate(() => runtime.createTask?.(item))}
+          >
+            Create task from note…
+          </button>
+        )}
+        {item.kind === "note" && (
+          <Tooltip
+            text={
+              noteEditing
+                ? "Finish editing this note before asking brain"
+                : "Ask brain about this"
+            }
+          >
+            <button
+              type="button"
+              disabled={noteEditing}
+              title={
+                noteEditing
+                  ? "Finish editing this note before asking brain"
+                  : undefined
+              }
+              onClick={() =>
+                activate(() =>
+                  runtime.askBrain?.(
+                    item,
+                    links.map((link) => link.key),
+                  ),
+                )
+              }
+            >
+              Ask brain about this
+            </button>
+          </Tooltip>
+        )}
         <button
           type="button"
           onClick={() => activate(() => runtime.edit(item.id, "tags"))}
@@ -159,6 +247,19 @@ export function ReferenceActions({
             Open {l.key}
           </button>
         ))}
+        {links
+          .filter((link) => !link.viaFrame)
+          .map((link) => (
+            <button
+              type="button"
+              key={`unlink:${link.key}`}
+              onClick={() =>
+                activate(() => runtime.unlinkItem?.(item, link.key))
+              }
+            >
+              Remove link to {link.key}
+            </button>
+          ))}
         <button
           type="button"
           disabled={noteEditing}
@@ -184,6 +285,20 @@ export const ReferenceNode = memo(function ReferenceNode({
     kind = referenceKind(item, path),
     Icon = icons[kind];
   const editNote = useRef<(() => void) | null>(null);
+  const media = useQuery({
+    queryKey: [
+      kind === "image" ? "assetPreview" : "referenceMedia",
+      item.assetId,
+    ],
+    queryFn: () =>
+      item.assetId
+        ? kind === "image"
+          ? api.assetPreview(item.assetId)
+          : api.referenceMedia(item.assetId)
+        : Promise.resolve(null),
+    enabled: item.kind === "asset" && (kind === "image" || kind === "video"),
+    staleTime: Infinity,
+  });
   const [noteEditing, setNoteEditing] = useState(false);
   const editingChanged = useCallback(
     (active: boolean) => {
@@ -193,6 +308,16 @@ export const ReferenceNode = memo(function ReferenceNode({
     [item.id, runtime.noteEditing],
   );
   const overview = useStore((s) => s.transform[2] < 0.4);
+  const hasNoteHeading = kind === "note" && !!item.title.trim();
+  const headingless = kind === "note" && !hasNoteHeading;
+  const actions = (
+    <ReferenceActions
+      item={item}
+      links={links}
+      editNote={() => editNote.current?.()}
+      noteEditing={noteEditing}
+    />
+  );
   if (overview && !selected && !data.connect && !data.expanded && !noteEditing)
     return (
       <article
@@ -219,13 +344,34 @@ export const ReferenceNode = memo(function ReferenceNode({
   }
   return (
     <article
-      className={`reference-card kind-${kind} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
+      className={`reference-card kind-${kind} ${headingless ? "note-without-heading" : ""} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
+      onDoubleClick={(event) => {
+        if (
+          (event.target as HTMLElement).closest(
+            "button, summary, input, textarea, a, .nodrag",
+          )
+        )
+          return;
+        if (kind === "note") editNote.current?.();
+        else if (kind === "link") void api.openUrl(item.url ?? "");
+        else if ((kind === "image" || kind === "video") && media.data)
+          runtime.lightbox(
+            media.data,
+            item.title,
+            kind === "video" ? "video" : undefined,
+          );
+        else if (kind !== "audio") void api.openReferenceFile(path);
+      }}
       data-reference-id={item.id}
       data-highlighted={!!data.highlight}
       aria-label={`${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
       style={
         {
-          opacity: data.dim ? 0.15 : 1,
+          opacity: data.dim
+            ? 0.15
+            : (item as VerdictItem).verdict === "reject"
+              ? 0.45
+              : 1,
           "--reference-color": data.color,
           "--reference-highlight": data.highlight ?? "transparent",
         } as React.CSSProperties
@@ -239,23 +385,40 @@ export const ReferenceNode = memo(function ReferenceNode({
         onResizeEnd={(_, p) => runtime.resize(item, p.width, p.height)}
       />
       <Handle type="target" position={Position.Left} isConnectable />
-      <header className="reference-card-header">
-        <Icon size={15} />
-        <strong className={kind === "note" ? "sticky-kind-label" : undefined}>
-          {kind === "note" ? "Note" : item.title}
-        </strong>
-        <ReferenceActions
-          item={item}
-          links={links}
-          editNote={() => editNote.current?.()}
-          noteEditing={noteEditing}
-        />
-      </header>
+      {
+        // biome-ignore lint/a11y/noStaticElementInteractions: Note titles keep the body double-click shortcut; the Actions menu supplies keyboard Edit.
+        <header
+          className="reference-card-header"
+          onDoubleClick={(event) => {
+            if (
+              kind === "note" &&
+              !(event.target as HTMLElement).closest("button, summary, details")
+            )
+              editNote.current?.();
+          }}
+        >
+          {kind === "note" ? (
+            hasNoteHeading && !noteEditing ? (
+              <strong className="sticky-note-title">{item.title}</strong>
+            ) : (
+              <span className="sticky-kind-label" />
+            )
+          ) : (
+            <>
+              <Icon size={15} />
+              <strong>{item.title}</strong>
+            </>
+          )}
+          <VerdictBadge item={item} />
+          <VerdictToolbar item={item} />
+          {actions}
+        </header>
+      }
       <div className="reference-content">
         {item.kind === "asset" ? (
           <LocalMedia item={item} path={path} />
         ) : kind === "link" ? (
-          <div className="reference-link nodrag">
+          <div className="reference-link">
             <small className="mono">
               {(() => {
                 try {
@@ -267,7 +430,7 @@ export const ReferenceNode = memo(function ReferenceNode({
             </small>
             <button
               type="button"
-              className="reference-link-title"
+              className="reference-link-title nodrag"
               onClick={() => void api.openUrl(item.url ?? "")}
             >
               {preview?.title || item.title}
@@ -279,7 +442,7 @@ export const ReferenceNode = memo(function ReferenceNode({
             )}
             <button
               type="button"
-              className="button ghost"
+              className="button ghost reference-text-action nodrag"
               onClick={() =>
                 void (
                   preview
@@ -288,6 +451,7 @@ export const ReferenceNode = memo(function ReferenceNode({
                 ).catch((e) => useUiStore.getState().error(String(e)))
               }
             >
+              {preview ? <X size={14} /> : <Image size={14} />}
               {preview ? "Remove preview" : "Fetch preview"}
             </button>
           </div>
@@ -313,17 +477,18 @@ export const ReferenceNode = memo(function ReferenceNode({
         </div>
       )}
       <footer className="reference-chips nodrag">
-        {links.map((link) => (
-          <button
-            type="button"
-            key={link.key}
-            title={link.viaFrame ? "Linked via frame" : "Linked reference"}
-            onClick={() => runtime.open(link.key)}
-          >
-            {link.key}
-            {link.viaFrame && <small> via frame</small>}
-          </button>
-        ))}
+        {links
+          .filter((link) => !link.viaFrame)
+          .map((link) => (
+            <button
+              type="button"
+              key={link.key}
+              title={`Open ${link.key}`}
+              onClick={() => runtime.open(link.key)}
+            >
+              {link.key}
+            </button>
+          ))}
       </footer>
       <Handle type="source" position={Position.Right} isConnectable />
     </article>
@@ -347,6 +512,7 @@ function NoteContent({
       beginRef={beginRef}
       editingChanged={editingChanged}
       unavailable={unavailable}
+      headingInHeader
       item={item}
       projectId={item.jamId}
       confirmed={(saved, previous) => runtime.noteSaved?.(saved, previous)}
@@ -362,7 +528,16 @@ export const ReferenceFrame = memo(function ReferenceFrame({
     c = useCanvas();
   const zoom = useStore((s) => s.transform[2]);
   const overview = zoom < 0.4;
-  const header = frameHeaderLayout(width ?? frame.w ?? 800, zoom);
+  const links = frameTargets(frame);
+  const visibleLinks =
+    (width ?? frame.w ?? 800) / Math.max(1, 0.75 / Math.max(0.1, zoom)) < 360
+      ? 1
+      : 2;
+  const header = frameHeaderLayout(
+    width ?? frame.w ?? 800,
+    zoom,
+    links.length > 0,
+  );
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -399,12 +574,12 @@ export const ReferenceFrame = memo(function ReferenceFrame({
         </svg>
       )}
       <div
-        className={`reference-frame-tab ${header.compact ? "compact" : ""}`}
+        className={`reference-frame-tab ${header.compact ? "compact" : ""} ${links.length ? "has-links" : ""}`}
         style={{
           transform: `scale(${header.scale})`,
           width: `${header.cssWidth}px`,
         }}
-        title="Drag this header to move the frame; select it to resize"
+        title="Drag the tab or empty background to move the frame; Shift+drag to select"
       >
         <div className="reference-frame-heading">
           <GripHorizontal
@@ -417,35 +592,135 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           </span>
         </div>
         <div className="reference-frame-actions">
-          <button
-            type="button"
-            className="nodrag"
-            aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
-            onClick={() => c.collapse(frame)}
+          <Tooltip text="Link frame to work">
+            <button
+              type="button"
+              className="nodrag"
+              aria-label="Link frame to work"
+              onClick={() => c.linkFrame?.(frame)}
+            >
+              <Link size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip
+            text={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
           >
-            {frame.collapsed ? (
-              <ChevronRight size={16} />
-            ) : (
-              <ChevronDown size={16} />
-            )}
-          </button>
-          <button
-            type="button"
-            className="nodrag"
-            aria-label={`Edit frame ${frame.title}`}
-            onClick={() => c.editFrame(frame)}
-          >
-            <MoreHorizontal size={15} />
-          </button>
-          <button
-            type="button"
-            className="nodrag"
-            aria-label={`Archive frame ${frame.title}`}
-            onClick={() => c.archive("frame", frame.id)}
-          >
-            <Archive size={15} />
-          </button>
+            <button
+              type="button"
+              className="nodrag"
+              title={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+              aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+              onClick={() => c.collapse(frame)}
+            >
+              {frame.collapsed ? (
+                <ChevronRight size={16} />
+              ) : (
+                <ChevronDown size={16} />
+              )}
+            </button>
+          </Tooltip>
+          <Tooltip text={`Edit frame ${frame.title}`}>
+            <button
+              type="button"
+              className="nodrag"
+              title={`Edit frame ${frame.title}`}
+              aria-label={`Edit frame ${frame.title}`}
+              onClick={() => c.editFrame(frame)}
+            >
+              <MoreHorizontal size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip text={`Archive frame ${frame.title}`}>
+            <button
+              type="button"
+              className="nodrag"
+              title={`Archive frame ${frame.title}`}
+              aria-label={`Archive frame ${frame.title}`}
+              onClick={() => c.archive("frame", frame.id)}
+            >
+              <Archive size={15} />
+            </button>
+          </Tooltip>
         </div>
+        {!!links.length && (
+          <div className="reference-frame-links nodrag">
+            {links.slice(0, visibleLinks).map((link) => (
+              <ReferencePopover
+                className="reference-link-pill"
+                key={link.targetKey}
+                label={link.targetKey}
+                tooltip={`${link.targetKey} · ${link.title}`}
+                trigger={
+                  <>
+                    <Link size={12} aria-hidden="true" />
+                    {link.targetKey}
+                  </>
+                }
+              >
+                {(close) => (
+                  <>
+                    <button
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        close();
+                        c.open(link.targetKey);
+                      }}
+                    >
+                      <ArrowUpRight size={14} aria-hidden="true" /> Open
+                    </button>
+                    <button
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        close();
+                        c.unlinkFrame?.(frame, link.targetKey);
+                      }}
+                    >
+                      <Unlink size={14} aria-hidden="true" /> Remove link
+                    </button>
+                  </>
+                )}
+              </ReferencePopover>
+            ))}
+            {links.length > visibleLinks && (
+              <ReferencePopover
+                className="reference-link-pill reference-frame-more"
+                label="More linked work"
+                trigger={<>+{links.length - visibleLinks}</>}
+              >
+                {(close) => (
+                  <>
+                    {links.map((link) => (
+                      <div key={link.targetKey}>
+                        <button
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            close();
+                            c.open(link.targetKey);
+                          }}
+                        >
+                          {link.targetKey} · {link.title}
+                        </button>
+                        <button
+                          role="menuitem"
+                          type="button"
+                          onClick={() => {
+                            close();
+                            c.unlinkFrame?.(frame, link.targetKey);
+                          }}
+                        >
+                          Remove link to {link.targetKey}
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </ReferencePopover>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

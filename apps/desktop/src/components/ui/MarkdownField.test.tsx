@@ -9,11 +9,17 @@ const runtime = vi.hoisted(() => ({
   openUrl: vi.fn(async () => {}),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: runtime.isTauri }));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: runtime.openUrl }));
+vi.mock("@tauri-apps/plugin-opener", async () => ({
+  ...(await import("../../test/mock-opener")),
+  openUrl: runtime.openUrl,
+}));
 
 const initial =
   "Read [guide](https://example.invalid/guide) before changing.\n\n## Heading\n\n- First\n- Second";
 const saves = vi.fn();
+// Exercise the real lazy Markdown, including cold import under full-suite load.
+// Wait for semantic output, not the Suspense fallback's matching plain text.
+const markdownReady = { timeout: 4000 };
 function Harness({
   disabled = false,
   start = initial,
@@ -46,7 +52,11 @@ beforeEach(() => {
 describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
   it("renders links and block content outside the explicit edit button", async () => {
     render(<Harness />);
-    const link = await screen.findByRole("link", { name: "guide" });
+    const link = await screen.findByRole(
+      "link",
+      { name: "guide" },
+      markdownReady,
+    );
     const button = screen.getByRole("button", { name: "Edit Context" });
     expect(button).not.toContainElement(link);
     expect(link.closest("button")).toBeNull();
@@ -64,7 +74,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
     async (mode) => {
       const user = userEvent.setup();
       render(<Harness />);
-      const link = await screen.findByRole("link", { name: "guide" });
+      const link = await screen.findByRole(
+        "link",
+        { name: "guide" },
+        markdownReady,
+      );
       if (mode === "pointer") await user.click(link);
       else {
         await user.tab();
@@ -89,7 +103,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
     async (mode) => {
       const user = userEvent.setup();
       render(<Harness disabled />);
-      const link = await screen.findByRole("link", { name: "guide" });
+      const link = await screen.findByRole(
+        "link",
+        { name: "guide" },
+        markdownReady,
+      );
       expect(
         screen.getByRole("button", { name: "Edit Context" }),
       ).toBeDisabled();
@@ -110,7 +128,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
 
   it("direct reference event remains independent of disabled editing (not native simulation)", async () => {
     render(<Harness disabled />);
-    const link = await screen.findByRole("link", { name: "guide" });
+    const link = await screen.findByRole(
+      "link",
+      { name: "guide" },
+      markdownReady,
+    );
     fireEvent.click(link);
     expect(runtime.openUrl).toHaveBeenCalledExactlyOnceWith(
       "https://example.invalid/guide",
@@ -122,7 +144,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
     runtime.isTauri.mockReturnValue(false);
     const user = userEvent.setup();
     render(<Harness />);
-    const link = await screen.findByRole("link", { name: "guide" });
+    const link = await screen.findByRole(
+      "link",
+      { name: "guide" },
+      markdownReady,
+    );
     // The capture guard is only a safety stub; it does not stop propagation.
     const preventNavigation = (event: Event) => event.preventDefault();
     document.addEventListener("click", preventNavigation, true);
@@ -198,7 +224,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
 
   it("native-path link prevents default without causing an editing action", async () => {
     render(<Harness />);
-    const link = await screen.findByRole("link", { name: "guide" });
+    const link = await screen.findByRole(
+      "link",
+      { name: "guide" },
+      markdownReady,
+    );
     const event = new MouseEvent("click", { bubbles: true, cancelable: true });
     expect(fireEvent(link, event)).toBe(false);
     expect(event.defaultPrevented).toBe(true);
@@ -215,7 +245,11 @@ describe("semantic MarkdownField interaction; actual lazy Markdown", () => {
     const user = userEvent.setup();
     render(<Harness start="Selectable context" />);
     await user.click(
-      await screen.findByText("Selectable context", { selector: "p" }),
+      await screen.findByText(
+        "Selectable context",
+        { selector: "p" },
+        markdownReady,
+      ),
     );
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     const edit = screen.getByRole("button", { name: "Edit Context" });

@@ -13,6 +13,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 jam-core.workspace = true
+jam-agents = { path = "../../../crates/jam-agents" }
+jam-voice = { path = "../../../crates/jam-voice" }
 jam-mcp.workspace = true
 tauri = { workspace = true, features = ["protocol-asset"] }
 percent-encoding = "2"

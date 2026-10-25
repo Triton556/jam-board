@@ -1,0 +1,135 @@
+/* Shared fit adjustments for the wider caption face; pixel acceptance is separate. */
+input::placeholder,
+textarea::placeholder {
+  font-weight: 400;
+}
+.small,
+.muted,
+.optional,
+.column-count {
+  font-weight: 400;
+}
+.button {
+  gap: 6px;
+  padding-inline: 12px;
+  letter-spacing: 0;
+}
+.button-row,
+.dialog-actions,
+.drawer-heading-actions,
+.board-actions,
+.section-heading {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.segmented button {
+  padding-inline: 9px;
+}
+.stamp,
+.chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.topbar {
+  gap: 10px;
+  padding-inline: 16px;
+}
+.topbar-space {
+  min-width: 0;
+}
+.project-switcher {
+  min-width: 0;
+  flex-shrink: 1;
+  max-width: min(28vw, 300px);
+}
+.project-switcher small {
+  letter-spacing: 0.02em;
+}
+.nav-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.expanded .nav-link {
+  gap: 10px;
+  padding-inline: 10px;
+}
+.expanded .nav-label {
+  font-size: 13px;
+}
+.column-heading {
+  gap: 6px;
+}
+.column-heading h2 {
+  font-size: 17px;
+  min-width: 0;
+}
+.card-title {
+  overflow-wrap: anywhere;
+}
+.empty-state p,
+.hand-note,
+.page-heading .hand-note,
+.board-hint {
+  font-size: 18px;
+  line-height: 1.4;
+}
+.empty-state .small {
+  font: 400 13px / 1.45 var(--font-sans);
+}
+.dialog-heading h2,
+.drawer-heading h1 {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.dialog-actions .button {
+  height: auto;
+  min-height: 40px;
+  padding-block: 8px;
+  white-space: normal;
+}
+.settings-form-row {
+  grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
+  gap: 16px;
+}
+.settings-row-label,
+.settings-row-control,
+.question-heading > b,
+.planning-tools,
+.epic-card h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reference-toolbar {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.task-table th {
+  min-width: 0;
+  font-size: 11px;
+  padding-inline: 9px;
+}
+@media (width < 1200px) {
+  .topbar {
+    gap: 6px;
+    padding-inline: 12px;
+  }
+  .board-intro {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .board-actions {
+    gap: 8px;
+  }
+  .settings-form-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+.button[aria-pressed="true"],
+.button[aria-selected="true"],
+.settings-nav button[aria-current="page"],
+.board-epic-filters button[aria-pressed="true"],
+.status-filters button[aria-pressed="true"] .chip {
+  font-weight: 700;
+}

@@ -2,7 +2,7 @@
   border: 1.5px solid var(--line-soft);
   border-radius: var(--r-card);
   background: var(--card);
-  padding: 14px 18px;
+  padding: 16px;
   margin-bottom: 24px;
   line-height: 1.6;
 }
@@ -224,7 +224,7 @@
   background: var(--mint);
 }
 .execution-partial {
-  font-weight: 600;
+  font-weight: 400;
 }
 .execution-feedback {
   border-top: 1px dashed var(--line);
@@ -290,16 +290,16 @@
   line-height: 1.6;
 }
 .column-policy {
-  margin: -4px 2px 10px;
+  margin: -4px 0 12px;
   min-height: 42px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.5;
   color: var(--ink-2);
 }
 .column-policy.over-wip {
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 400;
 }
 .execution-controls {
   display: grid;
@@ -408,20 +408,20 @@
 /* Equal policy rows keep the first paper cards aligned across the workflow. */
 .column-empty {
   margin: 0;
-  padding: 20px 10px;
+  padding: 20px 12px;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.5;
 }
 .quick-create > .quick-create-story {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   padding-block: 8px;
 }
 .quick-create > p,
 .quick-create-story p {
-  margin: 6px 0;
+  margin: 8px 0;
   line-height: 1.5;
 }
 .quick-create-actions {
@@ -437,14 +437,85 @@
   min-width: 0;
 }
 .epic-header-controls {
-  align-items: flex-end;
+  align-items: flex-start;
+  gap: 16px;
 }
 .epic-brain-control {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+.epic-header-controls .planning-status {
+  gap: 8px;
+}
+.epic-header-controls :is(.planning-status-label, .epic-brain-control > label) {
+  min-height: 20px;
+  font-size: 13px;
+}
+
+/* Field helpers remain in their own column; controls share a 40px row. */
+.epic-process-choice {
+  min-width: 0;
+  align-content: start;
+}
+.epic-process-choice > label {
+  min-height: 20px;
+}
+.epic-process-choice :is(input, .custom-select, .input-like),
+.planning-form .field > .custom-select {
+  width: 100%;
+  min-width: 0;
+}
+.epic-process-choice :is(input, .input-like) {
+  height: 40px;
+}
+.epic-process-choice small {
+  margin: 0;
+  line-height: 1.5;
+}
+.epic-tab-content .stories-heading,
+.story-editor > .section-heading {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stories-heading h2 {
+  margin: 0;
+}
+.planning-form .field {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.task-field-grid > .field {
+  gap: 8px;
+  min-width: 0;
+  text-transform: none;
+}
+.task-field-grid .segmented {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+}
+.task-field-grid :where(.segmented) button {
+  flex: 1;
+  height: 100%;
+}
+.task-field-grid .task-status-control > .custom-select {
+  flex: 1;
+  min-width: 0;
+}
+.epic-swatches button {
+  width: 28px;
+  height: 28px;
+}
+@media (width < 600px) {
+  .epic-process,
+  .task-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .epic-header-controls .epic-swatches {
-  padding-block: 9px;
+  align-self: center;
+  padding-block: 8px;
 }
 .epic-detail-heading > .scope-hierarchy {
   padding: 10px 14px;
@@ -708,19 +779,29 @@
   margin: 8px 0 0;
 }
 
+.board-surface {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
 .board-overflow-controls {
+  position: absolute;
+  inset: 10px 0 auto;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: 0 26px 8px;
   color: var(--ink-2);
-  font-size: 12px;
+  pointer-events: none;
 }
-.board-overflow-controls .button {
-  min-height: 30px;
-  padding: 4px 9px;
+.board-overflow-controls .icon-button {
+  width: 28px;
+  height: 28px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  pointer-events: auto;
 }
 .board-scroll:focus-visible {
   outline-offset: -3px;

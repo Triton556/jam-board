@@ -24,6 +24,8 @@ pub struct PlanningExport {
     pub items: Vec<RefItem>,
     pub edges: Vec<RefEdge>,
     pub reference_links: Vec<RefLink>,
+    #[serde(default)]
+    pub frame_links: Vec<RefFrameLink>,
 }
 
 /// Validate polymorphic relationships too: SQLite cannot put a foreign key on scope_id/target_id.
@@ -236,6 +238,14 @@ pub(crate) fn validate(s: &JamExport) -> Result<()> {
             ));
         }
     }
+    for l in &p.frame_links {
+        if !frames.contains(l.frame_id.as_str())
+            || !target(&l.target_type, &l.target_id)
+            || l.target_type == "project"
+        {
+            return Err(invalid("planning.frameLinks", "Unknown frame or target"));
+        }
+    }
     if s.activity.iter().any(|a| {
         a.epic_id
             .as_ref()
@@ -284,6 +294,12 @@ pub(crate) fn export(c: &Connection, jam_id: &str) -> Result<PlanningExport> {
             c,
             "ref_links",
             "item_id IN (SELECT id FROM ref_items WHERE jam_id=?)",
+            &[&jam_id],
+        )?,
+        frame_links: records(
+            c,
+            "ref_frame_links",
+            "frame_id IN (SELECT id FROM ref_frames WHERE jam_id=?)",
             &[&jam_id],
         )?,
     })
@@ -420,6 +436,7 @@ pub(crate) fn finish(
             ("ref_items", &p.items),
             ("ref_edges", &p.edges),
             ("ref_links", &p.reference_links),
+            ("ref_frame_links", &p.frame_links),
         ] {
             for row in rows.values()? {
                 insert(c, table, &crate::snapshot::remap_payload(&row, ids, keys))?;

@@ -96,6 +96,8 @@ it("2000 tasks retain a bounded real virtual window while scrolling and opening 
   fireEvent.keyDown(row, { key: "Enter" });
   expect(open).toHaveBeenCalledExactlyOnceWith(row.dataset.taskKey);
 });
+// Seed 2000 records and complete eight real query/render cycles. This verifies
+// exact results and virtualization bounds, not a machine-dependent 5 s benchmark.
 it("large-table status, hierarchy, tags, text and numeric order keep exact counts", async () => {
   const project = await mockApi.createJam(blank("Filter fixture"));
   await mockApi.seedBulk(2000);
@@ -125,7 +127,7 @@ it("large-table status, hierarchy, tags, text and numeric order keep exact count
     "data-task-key",
     `${project.jam?.keyPrefix}-2000`,
   );
-});
+}, 10000);
 it("an unreadable table never claims there are zero tasks", async () => {
   vi.spyOn(mockApi, "listTasks").mockRejectedValueOnce(
     new Error("Fictional read failure"),

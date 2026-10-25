@@ -237,6 +237,7 @@ it("dirty close offers Keep editing and Discard and protects task navigation", a
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   expect(input).toHaveValue("Unsaved");
+  expect(input).toBeVisible();
   act(() => {
     void router.navigate({ to: "/board", search: { task: "JB-8" } });
   });

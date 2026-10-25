@@ -11,6 +11,7 @@ import { TaskDrawer } from "./TaskDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {
@@ -58,7 +59,7 @@ it("F07: Escape closes actions first and returns focus; second Escape closes dra
   expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
   expect(screen.getByRole("button", { name: "Task actions" })).toHaveFocus();
   await user.keyboard("{Escape}");
-  expect(close).toHaveBeenCalledOnce();
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
 });
 it("F08 archive: double click sends one pending write; Escape retains reason and unconfirmed failure", async () => {
   const { user } = await task();
@@ -250,7 +251,9 @@ it("F08 archive project ABA prevents late follow-up read and cache writes", asyn
     client.setQueryData(["app"], app);
   });
   await act(async () => release(task));
-  await screen.findByText(/project or form target changed/);
+  await within(screen.getByRole("dialog", { name: "Archive task" })).findByText(
+    /project or form target changed/,
+  );
   expect(read).not.toHaveBeenCalled();
   expect(close).not.toHaveBeenCalled();
   expect(client.getQueryData(["task", task.key])).toEqual(cached);

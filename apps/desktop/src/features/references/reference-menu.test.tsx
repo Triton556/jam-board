@@ -44,8 +44,24 @@ function actions(): CanvasRuntime {
     lightbox: vi.fn(),
     edgeLabel: vi.fn(),
     caption: vi.fn(),
+    createTask: vi.fn(),
   };
 }
+it("H-R03 note menu forwards its saved snapshot to task creation without other writes", async () => {
+  const runtime = actions();
+  const note = { ...item, kind: "note", url: null };
+  render(<Harness runtime={runtime} reference={note} />);
+  const summary = screen.getByLabelText("Actions for Agent findings");
+  await userEvent.click(summary);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Create task from note…" }),
+  );
+  expect(runtime.createTask).toHaveBeenCalledExactlyOnceWith(note);
+  expect(summary).toHaveFocus();
+  expect(summary.closest("details")).not.toHaveAttribute("open");
+  expect(runtime.edit).not.toHaveBeenCalled();
+  expect(runtime.caption).not.toHaveBeenCalled();
+});
 function Harness({
   runtime = actions(),
   outerEscape = vi.fn(),

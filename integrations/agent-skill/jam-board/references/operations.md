@@ -58,3 +58,17 @@ create the example records only for a genuinely new requested plan.
   decision. Never silently fetch new validators merely to replay old intent.
 - A returned task requires a new claim and report round. Old evidence remains
   history, not proof that the corrected version was checked.
+
+## Organizing the ideas canvas
+
+Read `get_canvas` before moving things, following `nextCursor` while
+`truncated` is true. Prefer frames per epic. Do not rearrange the human's manual
+layout unless asked. Use `create_frame` / `update_frame` for frames,
+`connect_references`, `update_connection` and `remove_connection` for labelled
+directed connections, and `arrange_references` for explicit world positions or
+`layout:"grid"` inside a frame. Grid preserves unselected occupants and rejects
+the whole batch if it cannot fit. A write response is not a concurrency token:
+reread and reconcile uncertain results before an intentional retry.
+
+
+For requested moodboards and human feedback, follow the [guide moodboard loop](../SKILL.md#building-and-refining-a-moodboard). Use frameId in link_reference / unlink_reference; read human verdicts, note attachedTo and archive attribution before the next search.

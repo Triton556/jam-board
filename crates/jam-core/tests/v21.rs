@@ -136,7 +136,7 @@ fn v01_fixture_migrates_without_losing_tasks_and_only_once() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        7
+        8
     );
     assert!(
         db.prepare("PRAGMA foreign_key_check")

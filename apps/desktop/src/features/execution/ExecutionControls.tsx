@@ -15,6 +15,7 @@ import {
   invalidateExecution,
 } from "../../lib/execution-queries";
 import { appQuery } from "../../lib/queries";
+import "./execution-controls.css";
 
 export function ExecutionConsequences({ state }: { state: ExecutionState }) {
   return (

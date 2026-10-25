@@ -9,7 +9,11 @@ const load = vi.hoisted(() => {
     resolve = yes;
     reject = no;
   });
-  return { promise, resolve, reject, requested: vi.fn() };
+  let loaded!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    loaded = resolve;
+  });
+  return { promise, resolve, reject, ready, loaded, requested: vi.fn() };
 });
 vi.mock("./lib/api", async () => {
   localStorage.clear();
@@ -19,18 +23,17 @@ vi.mock("./lib/api", async () => {
   return { api };
 });
 vi.mock("./lib/grain", () => ({ preparePaperGrain: () => Promise.resolve() }));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openUrl: vi.fn(),
-  openPath: vi.fn(),
-  revealItemInDir: vi.fn(),
-}));
+vi.mock("@tauri-apps/plugin-opener", () => import("./test/mock-opener"));
 vi.mock("./features/task/TaskDrawer", async (original) => {
   load.requested();
   await load.promise;
-  return original();
+  const module = await original();
+  load.loaded();
+  return module;
 });
 
 import { App, router } from "./app";
+import { api } from "./lib/api";
 import { useUiStore } from "./lib/ui-store";
 
 it("resolving the visible pending task transfers modal focus then restores the real opener", async () => {
@@ -51,9 +54,20 @@ it("resolving the visible pending task transfers modal focus then restores the r
   const key = router.state.location.search.task as string;
   const pending = await screen.findByRole("dialog", { name: key });
   expect(pending).toHaveFocus();
+  const preview = await screen.findByRole("textbox", {
+    name: "Task title (loading)",
+  });
+  expect(preview).toHaveAttribute("readonly");
+  expect(preview).toHaveValue((await api.getTask(key)).title);
 
-  await act(async () => load.resolve());
-  await screen.findByRole("textbox", { name: "Task title" });
+  await act(async () => {
+    load.resolve();
+    await load.ready;
+  });
+  await screen.findByRole("combobox", { name: "Status" });
+  expect(
+    screen.getByRole("textbox", { name: "Task title" }),
+  ).not.toHaveAttribute("readonly");
   const loaded = screen.getByRole("dialog", { name: key });
   expect(loaded).toContainElement(document.activeElement as HTMLElement);
   const close = within(loaded).getByRole("button", { name: "Close task" });

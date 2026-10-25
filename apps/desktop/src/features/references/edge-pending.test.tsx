@@ -1,6 +1,6 @@
 // DOM controller/real edge-button probe; ReactFlow geometry is substituted, not browser gesture evidence.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Edge, EdgeTypes } from "@xyflow/react";
 import type { ReactNode } from "react";
@@ -116,4 +116,43 @@ it("F08 edge: real label button opens editor; repeated Enter writes once; Escape
   expect(screen.getByRole("textbox", { name: "Label" })).toHaveAttribute(
     "readonly",
   );
+});
+it("F08 page keeps a confirmed label after a real query refresh fails; retry refresh never rewrites", async () => {
+  const a = await mockApi.addReference({ kind: "note", text: "A" });
+  const b = await mockApi.addReference({ kind: "note", text: "B" });
+  await mockApi.createRefEdge(a.id, b.id, "Original label");
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  client.setQueryData(["app"], await mockApi.appState());
+  render(
+    <QueryClientProvider client={client}>
+      <ReferencesPage />
+    </QueryClientProvider>,
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Original label" }),
+  );
+  const write = vi.spyOn(mockApi, "updateRefEdge");
+  vi.spyOn(mockApi, "referenceCanvas").mockRejectedValueOnce(
+    Error("read failed"),
+  );
+  await userEvent.clear(screen.getByRole("textbox", { name: "Label" }));
+  await userEvent.type(
+    screen.getByRole("textbox", { name: "Label" }),
+    "Saved label",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Save label" }));
+  await screen.findByText(/Saved, but the canvas could not refresh/);
+  expect(screen.getByRole("dialog", { name: "Edge label" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Label" })).toHaveValue(
+    "Saved label",
+  );
+  expect(screen.getByRole("button", { name: "Save label" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: "Retry refresh" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Edge label" })).toBeNull(),
+  );
+  expect(screen.getByRole("button", { name: "Saved label" })).toBeVisible();
+  expect(write).toHaveBeenCalledTimes(1);
 });

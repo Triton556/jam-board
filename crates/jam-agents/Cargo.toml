@@ -1,0 +1,24 @@
+[package]
+name = "jam-agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+jam-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+specta.workspace = true
+ulid.workspace = true
+time.workspace = true
+agent-client-protocol = { version = "3.5", features = ["process", "unstable"] }
+portable-pty = "0.9"
+keyring = "4.2"
+which = "8"
+futures = "0.3"
+tokio-util = { version = "0.7", features = ["compat", "codec"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }

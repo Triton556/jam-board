@@ -14,12 +14,16 @@ import { appQuery, membersQuery } from "../../lib/queries";
 import type { TaskDetail } from "../../lib/types";
 
 type Confirmation = { task: TaskDetail; projectName: string; holder: string };
+export const claimRecoveryExplanation =
+  "Need to give this work back? Returning it to Backlog does not stop a worker process.";
 export function ReleaseClaim({
   task,
   hasUnsavedEdits = false,
+  compact = false,
 }: {
   task: TaskDetail;
   hasUnsavedEdits?: boolean;
+  compact?: boolean;
 }) {
   const app = useQuery(appQuery),
     members = useQuery(membersQuery);
@@ -66,10 +70,11 @@ export function ReleaseClaim({
     >
       {eligible && (
         <div className="claim-recovery-row">
-          <span className="claim-recovery-hint small muted">
-            Need to give this work back? Returning it to Backlog does not stop a
-            worker process.
-          </span>
+          {!compact && (
+            <span className="claim-recovery-hint small muted">
+              {claimRecoveryExplanation}
+            </span>
+          )}
           <Button
             disabled={writes > 0 || hasUnsavedEdits}
             onClick={() => {

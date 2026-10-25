@@ -15,7 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import type { Member } from "../../lib/types";
 import { CustomSelect } from "./CustomSelect";
-import { Button, Chip, IconButton } from "./index";
+import { Button, Chip, IconButton, Tooltip } from "./index";
 
 /** Visible native tab stops, including disclosure summaries but not their hidden contents. */
 export function modalTabStops(root: HTMLElement) {
@@ -56,8 +56,19 @@ export function modalTabStops(root: HTMLElement) {
 
 const layers: symbol[] = [];
 export type ModalFocusReturn = () => HTMLElement | null;
-export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
+export function useModal(
+  onClose: () => void,
+  returnFocus?: ModalFocusReturn,
+  options: { modal?: boolean; active?: boolean; firstField?: boolean } = {},
+) {
   const ref = useRef<HTMLDivElement>(null);
+  const origin = useRef(
+    typeof document === "undefined"
+      ? null
+      : (document.activeElement as HTMLElement | null),
+  );
+  const mode = useRef(options);
+  mode.current = options;
   const close = useRef(onClose),
     restore = useRef(returnFocus);
   close.current = onClose;
@@ -65,11 +76,37 @@ export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
   useEffect(() => {
     const token = Symbol();
     layers.push(token);
-    const previous = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    const previous = origin.current;
+    const root = ref.current;
+    // Child autofocus/effects may already have deliberately selected a field.
+    if (
+      !mode.current.firstField ||
+      !root?.contains(document.activeElement) ||
+      document.activeElement === root
+    ) {
+      const nodes = mode.current.firstField && root ? modalTabStops(root) : [];
+      const initial = mode.current.firstField
+        ? (nodes.find((node) => node.hasAttribute("data-autofocus")) ??
+          nodes.find((node) =>
+            node.matches('input,textarea,select,[role="combobox"]'),
+          ))
+        : root?.querySelector<HTMLElement>("[data-autofocus]:not(:disabled)");
+      (initial ?? root)?.focus();
+    }
+    let focusWithin = true;
+    const focus = (event: FocusEvent) => {
+      focusWithin = !!ref.current?.contains(event.target as Node);
+    };
+    document.addEventListener("focusin", focus);
     const key = (event: KeyboardEvent) => {
-      if (layers.at(-1) !== token) return;
+      if (layers.at(-1) !== token || mode.current.active === false) return;
       if (event.key === "Escape") {
+        if (document.querySelector('[data-list-dragging="true"]')) {
+          // Let the sensor receive Escape at bubble phase and cancel the drag.
+          event.preventDefault();
+          return;
+        }
+        if (event.defaultPrevented) return;
         if (
           event.target instanceof Element &&
           event.target
@@ -81,7 +118,7 @@ export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
         event.stopPropagation();
         close.current();
       }
-      if (event.key !== "Tab") return;
+      if (event.key !== "Tab" || mode.current.modal === false) return;
       const nodes = ref.current ? modalTabStops(ref.current) : [];
       const first = nodes[0],
         last = nodes.at(-1);
@@ -107,13 +144,24 @@ export function useModal(onClose: () => void, returnFocus?: ModalFocusReturn) {
         first.focus();
       }
     };
-    document.addEventListener("keydown", key, true);
+    const capture = (event: KeyboardEvent) => {
+      if (mode.current.modal !== false) key(event);
+    };
+    const bubble = (event: KeyboardEvent) => {
+      if (mode.current.modal === false && !event.defaultPrevented) key(event);
+    };
+    document.addEventListener("keydown", capture, true);
+    document.addEventListener("keydown", bubble);
     return () => {
       const wasTop = layers.at(-1) === token;
       layers.splice(layers.indexOf(token), 1);
-      document.removeEventListener("keydown", key, true);
+      document.removeEventListener("keydown", capture, true);
+      document.removeEventListener("keydown", bubble);
+      document.removeEventListener("focusin", focus);
       // An older closing layer must not steal focus from a newer dialog.
       if (!wasTop) return;
+      // A non-modal canvas panel must not steal focus back from ongoing canvas work.
+      if (mode.current.modal === false && !focusWithin) return;
       if (restore.current) {
         const target = restore.current();
         // Explicit null denies restoration (expired view/project); it must not
@@ -162,7 +210,7 @@ export function Dialog({
   const close = () => {
     if (!busy) onClose();
   };
-  const ref = useModal(close);
+  const ref = useModal(close, undefined, { firstField: true });
   const id = useId();
   return createPortal(
     // biome-ignore lint/a11y/noStaticElementInteractions: Only direct backdrop clicks close; Escape and the close button provide keyboard access.
@@ -184,7 +232,12 @@ export function Dialog({
       >
         <div className="dialog-heading">
           <h2 id={id}>{title}</h2>
-          <IconButton label={`Close ${title}`} onClick={close} disabled={busy}>
+          <IconButton
+            label={`Close ${title} · Esc`}
+            aria-label={`Close ${title}`}
+            onClick={close}
+            disabled={busy}
+          >
             <X />
           </IconButton>
         </div>
@@ -366,14 +419,16 @@ export function TagInput({
         {value.map((tag) => (
           <Chip key={tag}>
             {tag}
-            <button
-              type="button"
-              aria-label={`Remove ${tag}`}
-              disabled={disabled}
-              onClick={() => onChange(value.filter((t) => t !== tag))}
-            >
-              ×
-            </button>
+            <Tooltip text={`Remove ${tag}`}>
+              <button
+                type="button"
+                aria-label={`Remove ${tag}`}
+                disabled={disabled}
+                onClick={() => onChange(value.filter((t) => t !== tag))}
+              >
+                ×
+              </button>
+            </Tooltip>
           </Chip>
         ))}
         <input

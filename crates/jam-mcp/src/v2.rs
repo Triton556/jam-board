@@ -3,6 +3,14 @@ use jam_core::*;
 use rmcp::model::Tool;
 use serde_json::Value;
 
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CanvasReferenceLink {
+    item_id: Option<String>,
+    frame_id: Option<String>,
+    target_key: String,
+}
+
 pub(crate) fn execute(
     store: &Store,
     actor: &Member,
@@ -114,12 +122,66 @@ pub(crate) fn execute(
                 )?)?
             }
             "link_reference" => {
-                let a: ReferenceLinkInput = parse(args)?;
-                value(store.link_reference(&actor.id, &a.item_id, &a.target_key)?)?
+                let a: CanvasReferenceLink = parse(args)?;
+                match (a.item_id, a.frame_id) {
+                    (Some(id), None) => {
+                        value(store.link_reference(&actor.id, &id, &a.target_key)?)?
+                    }
+                    (None, Some(id)) => {
+                        value(store.link_ref_frame(&actor.id, &id, &a.target_key)?)?
+                    }
+                    _ => {
+                        return Err(Error::Validation {
+                            field: "itemId".into(),
+                            reason: "Choose exactly one of itemId or frameId".into(),
+                        });
+                    }
+                }
+            }
+            "unlink_reference" => {
+                let a: CanvasReferenceLink = parse(args)?;
+                match (a.item_id, a.frame_id) {
+                    (Some(id), None) => {
+                        store.unlink_reference(&actor.id, &id, &a.target_key)?;
+                        serde_json::json!({"unlinked":true})
+                    }
+                    (None, Some(id)) => {
+                        value(store.unlink_ref_frame(&actor.id, &id, &a.target_key)?)?
+                    }
+                    _ => {
+                        return Err(Error::Validation {
+                            field: "itemId".into(),
+                            reason: "Choose exactly one of itemId or frameId".into(),
+                        });
+                    }
+                }
             }
             "update_reference" => {
                 let a: ReferenceEditInput = parse(args)?;
                 value(store.update_reference(&actor.id, &a.item_id, a.patch)?)?
+            }
+            "get_canvas" => value(store.get_canvas(parse(args)?)?)?,
+            "create_frame" => value(store.create_canvas_frame(&actor.id, parse(args)?)?)?,
+            "update_frame" => value(store.update_canvas_frame(&actor.id, parse(args)?)?)?,
+            "connect_references" => {
+                let a: ConnectInput = parse(args)?;
+                value(store.connect_canvas_references(
+                    &actor.id,
+                    &a.from,
+                    &a.to,
+                    a.label.as_deref().unwrap_or(""),
+                )?)?
+            }
+            "update_connection" => {
+                let a: ConnectionUpdate = parse(args)?;
+                value(store.update_ref_edge(&actor.id, &a.id, &a.label)?)?
+            }
+            "remove_connection" => {
+                store.archive_ref_edge(&actor.id, &parse::<IdInput>(args)?.id)?;
+                serde_json::json!({"archived":true})
+            }
+            "arrange_references" => {
+                value(store.arrange_canvas_references(&actor.id, parse(args)?)?)?
             }
             _ => return Err(Error::NotFound("unhandled".into())),
         })
@@ -132,8 +194,57 @@ struct IdInput {
     id: String,
 }
 
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ConnectInput {
+    from: String,
+    to: String,
+    label: Option<String>,
+}
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ConnectionUpdate {
+    id: String,
+    label: String,
+}
+
 pub(crate) fn tools() -> Vec<Tool> {
     vec![
+        tool::<CanvasQuery>(
+            "get_canvas",
+            "Read the pinned project's ideas canvas: frames, references with world x/y, 200-character text, linked keys and human verdict (keep/reject/null), and directed edges. Frames expose explicit links. Notes expose attachedTo item IDs (centre inside or >=30% note-area overlap in world units). epicKey/frameId filters intersect; archived excluded by default; includeArchived returns archivedAt and archivedBy (human or agent display name; unknown historical actor is null). limit defaults to 100 (1..200), cursor is an offset across frames then references then edges. Follow nextCursor while truncated; pages are not an atomic snapshot. linkedKeys capped at 50 with linkedKeysTruncated.",
+            true,
+        ),
+        tool::<CanvasFrameCreate>(
+            "create_frame",
+            "Create an ideas frame, optionally linked by epicKey. Defaults: 900 by 600 world units, y=0 and x to the right of existing content without overlap. Read get_canvas first; preserve manual layouts unless asked to organize them.",
+            false,
+        ),
+        tool::<CanvasFrameUpdate>(
+            "update_frame",
+            "Rename, move or resize a frame by id, or set epicKey (null unlinks it). Omitted fields stay unchanged. Coordinates are canvas/world units. No canvas concurrency token exists: inspect current layout and reconcile uncertain responses before retrying.",
+            false,
+        ),
+        tool::<ConnectInput>(
+            "connect_references",
+            "Connect two active references in this project using from/to item IDs and an optional label (up to 240 characters). Directed duplicates and self-connections are refused. Reverse direction is a distinct connection.",
+            false,
+        ),
+        tool::<ConnectionUpdate>(
+            "update_connection",
+            "Replace a connection's label by id (up to 240 characters; empty clears it). Connection must be active in this project.",
+            false,
+        ),
+        tool::<IdInput>(
+            "remove_connection",
+            "Archive a connection by id in this project, preserving history. This does not delete either reference. Read current state before retrying an uncertain response.",
+            false,
+        ),
+        tool::<CanvasArrange>(
+            "arrange_references",
+            "Atomically arrange 1..100 items ({itemId,x?,y?}) using canvas/world coordinates. Returned references use world x/y, with w, h and frameId matching get_canvas; storage remains frame-local. frameId omitted preserves parents, null detaches, a frame ID reparents; omitted coordinates preserve world position. layout=grid requires a frameId and no explicit x/y: packs inside it, avoiding unselected occupants with 24-unit gaps and a 56-unit header. Insufficient space rejects every move. Read get_canvas before moving; do not rearrange human layouts unless asked. No canvas concurrency tokens exist.",
+            false,
+        ),
         tool::<ExecutionScopeInput>(
             "get_execution",
             "Read the exact story/epic execution permission and revision. Ready is separate; only a human can start work.",
@@ -271,17 +382,22 @@ pub(crate) fn tools() -> Vec<Tool> {
         ),
         tool::<AddReference>(
             "add_reference",
-            "Add an existing readable file, a URL or a note without copying files or fetching links. Optionally place it in an epic frame and link it to an epic, story or task key.",
+            "Add a readable local asset, URL or note without fetching links. copy:true copies an asset (at most 50 MiB) to managed references storage; otherwise its original path is retained. Optionally place it in a frame and link it to work.",
             false,
         ),
         tool::<ReferenceListInput>(
             "list_references",
-            "List active references, optionally filtered by epicKey, storyKey or taskKey. Archived items are hidden.",
+            "List active references, optionally filtered by epicKey, storyKey or taskKey (union). Includes items through explicitly linked frames and legacy epic frames without duplicates; inherited items have via:frame, frameId and frameTitle, while direct links take precedence. Returns human verdict; archived items are hidden.",
             true,
         ),
-        tool::<ReferenceLinkInput>(
+        tool::<CanvasReferenceLink>(
             "link_reference",
-            "Link a reference item to a task, story or epic by targetKey. References and targets must belong to the same project.",
+            "Link exactly one itemId or frameId to targetKey (task, story or epic). Frame links include current and future children. Same-project active records only.",
+            false,
+        ),
+        tool::<CanvasReferenceLink>(
+            "unlink_reference",
+            "Remove an explicit item or frame link from targetKey. Supply exactly one of itemId or frameId. Does not archive references or remove inherited links.",
             false,
         ),
         tool::<ReferenceEditInput>(

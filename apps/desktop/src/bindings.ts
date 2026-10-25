@@ -5,21 +5,51 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
+	voiceStatus: () => typedError<VoiceStatus, ApiError_Serialize>(__TAURI_INVOKE("voice_status")),
+	voicePrepare: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_prepare")),
+	voiceSettingsSave: (input: VoiceSettingsInput_Deserialize) => typedError<VoiceStatus, ApiError_Serialize>(__TAURI_INVOKE("voice_settings_save", { input })),
+	voiceInstall: (model: VoiceModel, device: VoiceDevice) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_install", { model, device })),
+	voiceCancelInstall: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_cancel_install")),
+	voiceRemove: (model: "fast" | "balanced" | "best" | null) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_remove", { model })),
+	voiceTranscribe: (wavBase64: string, language: "auto" | "ru" | "en" | null, initialPrompt: string | null) => typedError<Transcription, ApiError_Serialize>(__TAURI_INVOKE("voice_transcribe", { wavBase64, language, initialPrompt })),
+	voiceUnload: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_unload")),
+	agentModelCatalog: (input: AgentModelCatalogInput_Deserialize) => typedError<ModelCatalog_Serialize, ApiError_Serialize>(__TAURI_INVOKE("agent_model_catalog", { input })),
+	addAgentAttachment: (input: AddAgentAttachmentInput) => typedError<AttachmentView, ApiError_Serialize>(__TAURI_INVOKE("add_agent_attachment", { input })),
+	removeAgentAttachment: (input: RemoveAgentAttachmentInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("remove_agent_attachment", { input })),
+	agentProfiles: () => typedError<AgentProfileView[], ApiError_Serialize>(__TAURI_INVOKE("agent_profiles")),
+	saveAgentProfile: (input: AgentProfileInput_Deserialize) => typedError<AgentProfileView, ApiError_Serialize>(__TAURI_INVOKE("save_agent_profile", { input })),
+	deleteAgentProfile: (profileId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("delete_agent_profile", { profileId })),
+	setAgentSecret: (profileId: string, key: string, value: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_agent_secret", { profileId, key, value })),
+	clearAgentSecret: (profileId: string, key: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("clear_agent_secret", { profileId, key })),
+	agentSessions: () => typedError<AgentSessionView[], ApiError_Serialize>(__TAURI_INVOKE("agent_sessions")),
+	startAgentSession: (input: StartAgentSessionInput_Deserialize) => typedError<AgentSessionView, ApiError_Serialize>(__TAURI_INVOKE("start_agent_session", { input })),
+	sendAgentPrompt: (input: SendAgentPromptInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("send_agent_prompt", { input })),
+	cancelAgentTurn: (sessionId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("cancel_agent_turn", { sessionId })),
+	resolveAgentPermission: (input: ResolveAgentPermissionInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("resolve_agent_permission", { input })),
+	setAgentConfigOption: (input: SetAgentConfigOptionInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_agent_config_option", { input })),
+	stopAgentSession: (sessionId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("stop_agent_session", { sessionId })),
+	agentSessionHistory: (sessionId: string) => typedError<AgentDockEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("agent_session_history", { sessionId })),
+	terminalWrite: (input: TerminalWriteInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("terminal_write", { input })),
+	terminalResize: (input: TerminalResizeInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("terminal_resize", { input })),
+	terminalSnapshot: (sessionId: string) => typedError<string, ApiError_Serialize>(__TAURI_INVOKE("terminal_snapshot", { sessionId })),
 	pickFolder: () => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("pick_folder")),
 	skillSavedPath: () => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("skill_saved_path")),
 	skillCheck: (input: SkillInput) => typedError<SkillCheck, ApiError_Serialize>(__TAURI_INVOKE("skill_check", { input })),
 	cancelSkill: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("cancel_skill")),
 	runSkill: (input: SkillInput, step: string) => typedError<SkillResult, ApiError_Serialize>(__TAURI_INVOKE("run_skill", { input, step })),
-	referenceCanvas: () => typedError<ReferenceCanvas, ApiError_Serialize>(__TAURI_INVOKE("reference_canvas")),
-	canvasGeometry: (input: CanvasGeometry) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("canvas_geometry", { input })),
+	referenceCanvas: () => typedError<ReferenceCanvas_Serialize, ApiError_Serialize>(__TAURI_INVOKE("reference_canvas")),
+	canvasGeometry: (input: CanvasGeometry) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("canvas_geometry", { input })),
 	canvasArchive: (input: CanvasArchive) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("canvas_archive", { input })),
-	referenceMetadata: (id: string, metadata: string | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("reference_metadata", { id, metadata })),
+	referenceMetadata: (id: string, metadata: string | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("reference_metadata", { id, metadata })),
 	updateRefEdge: (id: string, label: string) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("update_ref_edge", { id, label })),
-	clipboardReference: (bytes: number[], x: number | null, y: number | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("clipboard_reference", { bytes, x, y })),
-	fetchReferencePreview: (id: string) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("fetch_reference_preview", { id })),
-	clearReferencePreview: (id: string) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("clear_reference_preview", { id })),
+	clipboardReference: (bytes: number[], x: number | null, y: number | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("clipboard_reference", { bytes, x, y })),
+	fetchReferencePreview: (id: string) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("fetch_reference_preview", { id })),
+	clearReferencePreview: (id: string) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("clear_reference_preview", { id })),
 	canvasViewport: (value: string | null) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("canvas_viewport", { value })),
 	referenceMedia: (id: string) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("reference_media", { id })),
+	setReferenceVerdict: (input: ReferenceVerdictInput) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_reference_verdict", { input })),
+	linkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("link_ref_frame", { input })),
+	unlinkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("unlink_ref_frame", { input })),
 	listPlanEpics: () => typedError<Epic[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_epics")),
 	listPlanStories: () => typedError<Story[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_stories")),
 	clearBrain: (key: string) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("clear_brain", { key })),
@@ -47,13 +77,13 @@ export const commands = {
 	setBrain: (input: BrainInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
 	listChangesSince: (input: ChangesInput) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_changes_since", { input })),
 	epicJournal: (epicKey: string, after: number) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("epic_journal", { epicKey, after })),
-	addReference: (input: AddReference, untitled: boolean | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
-	listReferences: (input: ReferenceListInput) => typedError<RefItem[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
+	addReference: (input: AddReference, untitled: boolean | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
+	listReferences: (input: ReferenceListInput) => typedError<RefItem_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
 	updateReference: (input: ReferenceEditInput_Deserialize, expected: {
 	title: string,
 	caption: string,
-} | null) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input, expected })),
-	linkReference: (input: ReferenceLinkInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
+} | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input, expected })),
+	linkReference: (input: ReferenceLinkInput) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
 	unlinkReference: (input: ReferenceLinkInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("unlink_reference", { input })),
 	archiveReference: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_reference", { id })),
 	listRefFrames: () => typedError<RefFrame[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_frames")),
@@ -63,7 +93,7 @@ export const commands = {
 	listRefEdges: () => typedError<RefEdge[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_edges")),
 	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
 	archiveRefEdge: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_edge", { id })),
-	updateRefGeometry: (input: GeometryInput) => typedError<RefItem, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
+	updateRefGeometry: (input: GeometryInput) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_ref_geometry", { input })),
 	getExecution: (scope: ExecutionScope) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("get_execution", { scope })),
 	listExecution: () => typedError<ExecutionState[], ApiError_Serialize>(__TAURI_INVOKE("list_execution")),
 	setExecution: (input: SetExecution) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("set_execution", { input })),
@@ -121,9 +151,12 @@ export const commands = {
 
 /** Events */
 export const events = {
+	agentDockEvent: makeEvent<DockEvent_Deserialize>("agent-dock-event"),
+	agentTerminalOutput: makeEvent<TerminalOutputEvent>("agent-terminal-output"),
 	boardChanged: makeEvent<BoardChanged_Deserialize>("board-changed"),
 	mcpCallsChanged: makeEvent<McpCallsChanged>("mcp-calls-changed"),
 	skillOutput: makeEvent<SkillOutput>("skill-output"),
+	voiceInstallProgress: makeEvent<VoiceProgress>("voice-install-progress"),
 };
 
 /* Types */
@@ -164,9 +197,15 @@ export type ActivityQuery = {
 	actorKind: string | null,
 };
 
+export type AddAgentAttachmentInput = {
+	sessionId: string,
+	source: AttachmentSource,
+};
+
 export type AddReference = {
 	kind: string,
 	filePath: string | null,
+	copy?: boolean | null,
 	url: string | null,
 	text: string | null,
 	title: string | null,
@@ -177,6 +216,117 @@ export type AddReference = {
 	linkTo: string | null,
 	x: number | null,
 	y: number | null,
+};
+
+export type AgentDockEvent = AgentDockEvent_Serialize | AgentDockEvent_Deserialize;
+
+export type AgentDockEvent_Deserialize = {
+	sessionId: string,
+	seq: number,
+	at: string,
+} & AgentEventKind_Deserialize;
+
+export type AgentDockEvent_Serialize = {
+	sessionId: string,
+	seq: number,
+	at: string,
+} & AgentEventKind_Serialize;
+
+export type AgentEventKind = AgentEventKind_Serialize | AgentEventKind_Deserialize;
+
+export type AgentEventKind_Deserialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { commands?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "tool_call"; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; label?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; state?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "plan"; entries: PlanEntry_Deserialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; options?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "config_options"; options: ConfigOption_Deserialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "turn_end"; stopReason: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "error"; message: string; detail?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never };
+
+export type AgentEventKind_Serialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { commands?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "tool_call"; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; label?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; state?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "plan"; entries: PlanEntry_Serialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; options?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "config_options"; options: ConfigOption_Serialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "turn_end"; stopReason: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "error"; message: string; detail?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never };
+
+export type AgentModelCatalogInput = AgentModelCatalogInput_Serialize | AgentModelCatalogInput_Deserialize;
+
+export type AgentModelCatalogInput_Deserialize = {
+	profileId: string,
+	refresh?: boolean | null,
+};
+
+export type AgentModelCatalogInput_Serialize = {
+	profileId: string,
+	refresh?: boolean | null,
+};
+
+export type AgentProfileInput = AgentProfileInput_Serialize | AgentProfileInput_Deserialize;
+
+export type AgentProfileInput_Deserialize = {
+	id?: string | null,
+	label: string,
+	kind: RuntimeKind,
+	preset?: string | null,
+	agentName?: string | null,
+	command?: string | null,
+	args?: string[] | null,
+	baseUrl?: string | null,
+	model?: string | null,
+	effort?: string | null,
+	effortStyle?: EffortStyle | null,
+	env?: Env[] | null,
+	hidden?: boolean | null,
+	/**  Optional declarations for custom credentials, never credential values. */
+	secretKeys?: SecretKey[] | null,
+	extraMcpServers?: McpEntry[] | null,
+};
+
+export type AgentProfileInput_Serialize = {
+	id?: string | null,
+	label: string,
+	kind: RuntimeKind,
+	preset?: string | null,
+	agentName?: string | null,
+	command?: string | null,
+	args?: string[] | null,
+	baseUrl?: string | null,
+	model?: string | null,
+	effort?: string | null,
+	effortStyle?: EffortStyle | null,
+	env?: Env[] | null,
+	hidden?: boolean | null,
+	/**  Optional declarations for custom credentials, never credential values. */
+	secretKeys?: SecretKey[] | null,
+	extraMcpServers?: McpEntry[] | null,
+};
+
+export type AgentProfileView = {
+	id: string,
+	label: string,
+	kind: RuntimeKind,
+	preset: string | null,
+	agentName: string,
+	command: string | null,
+	args: string[],
+	baseUrl: string | null,
+	model: string | null,
+	effort: string | null,
+	effortStyle: EffortStyle,
+	env: Env[],
+	hidden: boolean,
+	secretKeys: SecretView[],
+	available: boolean,
+	unavailableReason: string | null,
+	builtIn: boolean,
+};
+
+export type AgentSessionView = {
+	id: string,
+	profileId: string,
+	projectId: string,
+	kind: RuntimeKind,
+	title: string,
+	status: SessionStatus,
+	cwd: string,
+	createdAt: string,
+	capabilities: Capabilities,
+	model: string | null,
+	effort: string | null,
+};
+
+export type AgentTerminalOutput = {
+	sessionId: string,
+	data: string,
 };
 
 export type AnswerQuestion = {
@@ -251,6 +401,19 @@ export type AssetWithTasks = {
 	tasks: LinkedTask[],
 } & Asset;
 
+export type AttachmentSource = { kind: "path"; path: string } | { kind: "bytes"; name: string; mimeType: string; data: string };
+
+export type AttachmentView = {
+	id: string,
+	name: string,
+	mimeType: string,
+	size: number,
+	path: string,
+	isImage: boolean,
+	thumbnail: string | null,
+	previewUrl: string | null,
+};
+
 export type Audit = {
 	id: string,
 	jamId: string,
@@ -260,6 +423,13 @@ export type Audit = {
 	createdAt: string,
 	updatedAt: string,
 	archivedAt: string | null,
+};
+
+export type AuthState = "ok" | "required" | "unknown";
+
+export type AvailableCommand = {
+	name: string,
+	description: string,
 };
 
 export type BoardChanged = BoardChanged_Serialize | BoardChanged_Deserialize;
@@ -367,6 +537,15 @@ export type CanvasGeometry = {
 	frameId: string | null,
 };
 
+export type Capabilities = {
+	images: boolean,
+	audio: boolean,
+	embeddedContext: boolean,
+	configOptions: boolean,
+};
+
+export type CatalogSource = "provider" | "static" | "profile";
+
 export type Change = {
 	title: string,
 	now?: string,
@@ -395,11 +574,45 @@ export type CommentInput = {
 	bodyMd: string,
 };
 
+export type ConfigOption = ConfigOption_Serialize | ConfigOption_Deserialize;
+
+export type ConfigOption_Deserialize = {
+	id: string,
+	name: string,
+	value: string,
+	values: ConfigValue_Deserialize[],
+	category: string | null,
+	description?: string | null,
+};
+
+export type ConfigOption_Serialize = {
+	id: string,
+	name: string,
+	value: string,
+	values: ConfigValue_Serialize[],
+	category: string | null,
+	description?: string | null,
+};
+
 export type ConfigSnippets = {
 	codexStdio: string,
 	codexHttp: string,
 	claudeStdio: string,
 	claudeHttp: string,
+};
+
+export type ConfigValue = ConfigValue_Serialize | ConfigValue_Deserialize;
+
+export type ConfigValue_Deserialize = {
+	value: string,
+	name: string,
+	description?: string | null,
+};
+
+export type ConfigValue_Serialize = {
+	value: string,
+	name: string,
+	description?: string | null,
 };
 
 export type CreateTask = {
@@ -414,10 +627,23 @@ export type CreateTask = {
 	storyKey: string | null,
 } & TaskBrief;
 
+export type DockEvent = DockEvent_Serialize | DockEvent_Deserialize;
+
+export type DockEvent_Deserialize = AgentDockEvent_Deserialize;
+
+export type DockEvent_Serialize = AgentDockEvent_Serialize;
+
 export type EdgeInput = {
 	fromItem: string,
 	toItem: string,
 	label: string,
+};
+
+export type EffortStyle = "openrouter" | "zai" | "openai" | "none";
+
+export type Env = {
+	name: string,
+	value: string,
 };
 
 export type Epic = {
@@ -588,6 +814,8 @@ export type GeometryInput = {
 	h: number | null,
 };
 
+export type InstallPhase = "runtime" | "model";
+
 export type Jam = {
 	id: string,
 	name: string,
@@ -615,6 +843,13 @@ export type LinkedTask = {
 };
 
 export type McpCallsChanged = Record<string, never>;
+
+export type McpEntry = {
+	name: string,
+	command: string,
+	args: string[],
+	env: Env[],
+};
 
 export type McpStatus = {
 	projectId: string | null,
@@ -671,6 +906,46 @@ export type MemberWithStats = {
 	workingOn: LinkedTask[],
 	statusStale: boolean,
 } & Member;
+
+export type ModelCatalog = ModelCatalog_Serialize | ModelCatalog_Deserialize;
+
+export type ModelCatalog_Deserialize = {
+	models: ModelInfo_Deserialize[],
+	source: CatalogSource,
+	fetchedAt: string | null,
+	error: string | null,
+};
+
+export type ModelCatalog_Serialize = {
+	models: ModelInfo_Serialize[],
+	source: CatalogSource,
+	fetchedAt: string | null,
+	error: string | null,
+};
+
+export type ModelInfo = ModelInfo_Serialize | ModelInfo_Deserialize;
+
+export type ModelInfo_Deserialize = {
+	id: string,
+	name: string,
+	contextLength: number | null,
+	inputImage: boolean,
+	reasoning: boolean,
+	tools: boolean,
+	promptPricePerM: string | null,
+	completionPricePerM: string | null,
+};
+
+export type ModelInfo_Serialize = {
+	id: string,
+	name: string,
+	contextLength?: number | null,
+	inputImage: boolean,
+	reasoning: boolean,
+	tools: boolean,
+	promptPricePerM?: string | null,
+	completionPricePerM?: string | null,
+};
 
 export type MoveInput = {
 	key: string,
@@ -730,6 +1005,30 @@ export type NewStory = {
 	acceptance: Acceptance[] | null,
 };
 
+export type PermissionKind = "allow_once" | "allow_always" | "reject_once" | "reject_always";
+
+export type PermissionOption = {
+	optionId: string,
+	name: string,
+	kind: PermissionKind,
+};
+
+export type PlanEntry = PlanEntry_Serialize | PlanEntry_Deserialize;
+
+export type PlanEntry_Deserialize = {
+	content: string,
+	status: PlanStatus,
+	priority?: string | null,
+};
+
+export type PlanEntry_Serialize = {
+	content: string,
+	status: PlanStatus,
+	priority?: string | null,
+};
+
+export type PlanStatus = "pending" | "in_progress" | "completed";
+
 export type PlanningStatusInput = {
 	key: string,
 	status: string,
@@ -763,6 +1062,8 @@ export type ProjectSummary = {
 	taskCount: number,
 	inProgressCount: number,
 } & Jam;
+
+export type PromptPart = { type: "attachment"; attachmentId: string } | { type: "text"; text: string } | { type: "board_ref"; uri: string; label: string; text: string } | { type: "image"; mimeType: string; data: string };
 
 export type Question = {
 	id: string,
@@ -820,6 +1121,8 @@ export type RecentCall = {
 	ok: boolean,
 };
 
+export type RecommendedModel = "fast" | "balanced";
+
 export type RefEdge = {
 	id: string,
 	jamId: string,
@@ -841,9 +1144,23 @@ export type RefFrame = {
 	color: string,
 	archivedAt: string | null,
 	collapsed?: boolean,
+	links?: RefFrameTarget[],
 };
 
-export type RefItem = {
+export type RefFrameLinkInput = {
+	frameId: string,
+	targetKey: string,
+};
+
+export type RefFrameTarget = {
+	targetKey: string,
+	kind: ReferenceTargetKind,
+	title: string,
+};
+
+export type RefItem = RefItem_Serialize | RefItem_Deserialize;
+
+export type RefItem_Deserialize = {
 	kind: string,
 	assetId: string | null,
 	url: string | null,
@@ -858,6 +1175,31 @@ export type RefItem = {
 	frameId: string | null,
 	linkPreview: string | null,
 	metadata?: string | null,
+	verdict?: ReferenceVerdict | null,
+	archivedBy?: string | null,
+	via?: string | null,
+	frameTitle?: string | null,
+} & Audit;
+
+export type RefItem_Serialize = {
+	kind: string,
+	assetId: string | null,
+	url: string | null,
+	title: string,
+	captionMd: string,
+	tags: string[],
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
+	z: number | null,
+	frameId: string | null,
+	linkPreview: string | null,
+	metadata: string | null,
+	verdict: ReferenceVerdict | null,
+	archivedBy: string | null,
+	via?: string | null,
+	frameTitle?: string | null,
 } & Audit;
 
 export type RefLink = {
@@ -867,8 +1209,17 @@ export type RefLink = {
 	archivedAt: string | null,
 };
 
-export type ReferenceCanvas = {
-	items: RefItem[],
+export type ReferenceCanvas = ReferenceCanvas_Serialize | ReferenceCanvas_Deserialize;
+
+export type ReferenceCanvas_Deserialize = {
+	items: RefItem_Deserialize[],
+	frames: RefFrame[],
+	edges: RefEdge[],
+	links: RefLink[],
+};
+
+export type ReferenceCanvas_Serialize = {
+	items: RefItem_Serialize[],
 	frames: RefFrame[],
 	edges: RefEdge[],
 	links: RefLink[],
@@ -918,10 +1269,24 @@ export type ReferencePatch_Serialize = {
 	title?: string | null,
 };
 
+export type ReferenceTargetKind = "epic" | "story" | "task";
+
+export type ReferenceVerdict = "keep" | "reject";
+
+export type ReferenceVerdictInput = {
+	itemId: string,
+	verdict: ReferenceVerdict | null,
+};
+
 /**  Human confirmation of a captured claim; neither actor nor destination is caller-controlled. */
 export type ReleaseClaim = {
 	key: string,
 	expectedUpdatedAt: string,
+};
+
+export type RemoveAgentAttachmentInput = {
+	sessionId: string,
+	attachmentId: string,
 };
 
 export type Report = {
@@ -947,6 +1312,12 @@ export type ReportTest = {
 
 export type ResetInput = {
 	confirmName: string,
+};
+
+export type ResolveAgentPermissionInput = {
+	sessionId: string,
+	requestId: string,
+	optionId: string | null,
 };
 
 export type ResolveExecutionRequest = {
@@ -980,9 +1351,35 @@ export type RuntimeInfo = {
 	sidecarPath: string,
 };
 
+export type RuntimeKind = "acp" | "terminal" | "api";
+
 export type Scope = {
 	type: string,
 	id: string,
+};
+
+export type SecretKey = {
+	key: string,
+	label: string,
+};
+
+export type SecretView = {
+	key: string,
+	label: string,
+	isSet: boolean,
+};
+
+export type SendAgentPromptInput = {
+	sessionId: string,
+	content: PromptPart[],
+};
+
+export type SessionStatus = "starting" | "ready" | "running" | "awaiting_permission" | "stopped" | "failed";
+
+export type SetAgentConfigOptionInput = {
+	sessionId: string,
+	optionId: string,
+	value: string,
 };
 
 export type SetExecution = {
@@ -1035,6 +1432,22 @@ export type SkillResult = {
 	exitCode: number | null,
 	cancelled: boolean,
 	timedOut: boolean,
+};
+
+export type StartAgentSessionInput = StartAgentSessionInput_Serialize | StartAgentSessionInput_Deserialize;
+
+export type StartAgentSessionInput_Deserialize = {
+	profileId: string,
+	cwd?: string | null,
+	model?: string | null,
+	effort?: string | null,
+};
+
+export type StartAgentSessionInput_Serialize = {
+	profileId: string,
+	cwd?: string | null,
+	model?: string | null,
+	effort?: string | null,
 };
 
 export type Story = {
@@ -1131,7 +1544,7 @@ export type TaskDetail_Deserialize = {
 	epic: Epic,
 	reports: Report[],
 	reviews: Review[],
-	references: RefItem[],
+	references: RefItem_Deserialize[],
 } & TaskSummary;
 
 export type TaskDetail_Serialize = {
@@ -1147,7 +1560,7 @@ export type TaskDetail_Serialize = {
 	epic: Epic,
 	reports: Report[],
 	reviews: Review[],
-	references: RefItem[],
+	references: RefItem_Serialize[],
 } & TaskSummary;
 
 export type TaskEditInput = TaskEditInput_Serialize | TaskEditInput_Deserialize;
@@ -1249,6 +1662,82 @@ export type TaskSummary = {
 	/**  Opaque, task-bound lifecycle validator. Read again after a successful mutation. */
 	claimGeneration?: string,
 };
+
+export type TerminalOutputEvent = AgentTerminalOutput;
+
+export type TerminalResizeInput = {
+	sessionId: string,
+	cols: number,
+	rows: number,
+};
+
+export type TerminalWriteInput = {
+	sessionId: string,
+	data: string,
+};
+
+export type Transcription = {
+	text: string,
+	durationMs: number,
+};
+
+export type VoiceDevice = "auto" | "cpu" | "gpu";
+
+export type VoiceEngine = "local-whisper";
+
+export type VoiceInstallProgress = {
+	phase: InstallPhase,
+	received: number,
+	total: number | null,
+};
+
+export type VoiceLanguage = "auto" | "ru" | "en";
+
+export type VoiceModel = "fast" | "balanced" | "best";
+
+export type VoiceProgress = VoiceInstallProgress;
+
+export type VoiceSettings = {
+	enabled: boolean,
+	model: VoiceModel,
+	device: VoiceDevice,
+	language: VoiceLanguage,
+	idleUnloadMinutes: number | null,
+};
+
+/**  Omitting model preserves a saved choice, or uses the recommendation on first enable. */
+export type VoiceSettingsInput = VoiceSettingsInput_Serialize | VoiceSettingsInput_Deserialize;
+
+/**  Omitting model preserves a saved choice, or uses the recommendation on first enable. */
+export type VoiceSettingsInput_Deserialize = {
+	enabled: boolean,
+	model?: VoiceModel | null,
+	device: VoiceDevice,
+	language: VoiceLanguage,
+	idleUnloadMinutes: number | null,
+};
+
+/**  Omitting model preserves a saved choice, or uses the recommendation on first enable. */
+export type VoiceSettingsInput_Serialize = {
+	enabled: boolean,
+	model?: VoiceModel | null,
+	device: VoiceDevice,
+	language: VoiceLanguage,
+	idleUnloadMinutes: number | null,
+};
+
+export type VoiceState = "off" | "not_installed" | "installing" | "idle" | "loading" | "ready" | "error";
+
+export type VoiceStatus = {
+	engine: VoiceEngine,
+	installedModels: string[],
+	runtimeInstalled: boolean,
+	gpuAvailable: boolean,
+	recommendedModel: RecommendedModel,
+	state: VoiceState,
+	error: string | null,
+	diskBytes: number,
+} & VoiceSettings;
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

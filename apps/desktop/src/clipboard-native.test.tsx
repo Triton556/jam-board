@@ -53,10 +53,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
     },
   }),
 }));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openUrl: vi.fn(),
-  revealItemInDir: vi.fn(),
-}));
+vi.mock("@tauri-apps/plugin-opener", () => import("./test/mock-opener"));
 vi.mock("./lib/grain", () => ({ preparePaperGrain: async () => {} }));
 
 import { App, router } from "./app";
@@ -359,6 +356,15 @@ async function route(to: "/assets" | "/projects" | "/plan" | "/references") {
   });
   await waitFor(() => expect(router.state.location.pathname).toBe(to));
 }
+async function referencesCanvas() {
+  // Router location commits before the lazy page import and its canvas read.
+  // The paste target must be the real mounted region, never a loading fallback.
+  return screen.findByRole(
+    "region",
+    { name: "References canvas" },
+    { timeout: 5000 },
+  );
+}
 async function switchTo(id: Project, user: ReturnType<typeof userEvent.setup>) {
   await route("/projects");
   await screen.findByRole("heading", { name: "Your projects" });
@@ -402,9 +408,7 @@ it("fences delayed clipboard preparation through actual project/page navigation 
   ] as const) {
     if (appState().jam.id === "B") await switchTo("A", user);
     await route("/references");
-    const canvas = await screen.findByRole("region", {
-      name: "References canvas",
-    });
+    const canvas = await referencesCanvas();
     calls = [];
     const decoded = deferred<ImageBitmap>();
     const close = vi.fn();
@@ -443,9 +447,7 @@ it("fences delayed clipboard preparation through actual project/page navigation 
     );
   }
   await route("/references");
-  const canvas = await screen.findByRole("region", {
-    name: "References canvas",
-  });
+  const canvas = await referencesCanvas();
   const close = vi.fn();
   vi.stubGlobal(
     "createImageBitmap",
@@ -489,9 +491,7 @@ it("fences delayed clipboard preparation through actual project/page navigation 
   ] as const) {
     if (appState().jam.id === "B") await switchTo("A", user);
     await route("/references");
-    const originCanvas = await screen.findByRole("region", {
-      name: "References canvas",
-    });
+    const originCanvas = await referencesCanvas();
     const previousReceipt = useUiStore.getState().toasts.at(-1)?.id;
     clipboardGate = deferred<void>();
     clipboardRejectAfterPersist = mode.includes("uncertain");

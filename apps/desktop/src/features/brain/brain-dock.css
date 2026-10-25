@@ -1,0 +1,915 @@
+.brain-workspace-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+.brain-routed-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+body .drawer-backdrop {
+  right: var(--dock-width, 0px);
+}
+body .drawer {
+  max-width: calc(100vw - var(--dock-width, 0px));
+}
+:root[data-brain-docked="true"] body .drawer-backdrop {
+  top: 56px;
+}
+.brain-glyph {
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.brain-trigger {
+  position: relative;
+  gap: 7px;
+  white-space: nowrap;
+}
+body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
+  white-space: pre-line !important;
+}
+.brain-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.brain-dot.working {
+  animation: brain-pulse 1.6s ease-in-out infinite;
+}
+.brain-dot.needs-you {
+  background: var(--coral);
+}
+.brain-dot.error {
+  background: var(--danger-ink);
+}
+.brain-dock {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-left: 1.5px solid var(--line-soft);
+  color: var(--ink);
+  z-index: 51;
+}
+.brain-dock.overlay {
+  position: fixed;
+  top: 56px;
+  bottom: 0;
+  right: 0;
+  z-index: 82;
+  box-shadow: -12px 0 40px #0002;
+}
+.brain-backdrop {
+  position: fixed;
+  inset: 56px 0 0;
+  border: 0;
+  background: #25221f55;
+  z-index: 81;
+  cursor: default;
+}
+.brain-resize {
+  position: absolute;
+  width: 8px;
+  left: -5px;
+  top: 0;
+  bottom: 0;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.brain-resize:hover,
+.brain-resize:focus-visible {
+  background: var(--coral);
+  opacity: 0.5;
+  outline: 2px solid var(--coral);
+}
+.brain-header,
+.brain-session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.brain-header {
+  padding-bottom: 8px;
+}
+.brain-tabs {
+  display: flex;
+  gap: 4px;
+}
+.brain-tabs button {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-input);
+  color: var(--ink-2);
+  background: transparent;
+}
+.brain-tabs button[aria-selected="true"] {
+  background: var(--card);
+  border-color: var(--line-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+.brain-session-bar {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.brain-session-bar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.brain-session-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 0;
+}
+.brain-session-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brain-popover-anchor {
+  position: relative;
+}
+.brain-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 210px;
+  max-width: 310px;
+  max-height: 330px;
+  overflow: auto;
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-input);
+  padding: 6px;
+  box-shadow: 0 8px 24px #0002;
+  z-index: 5;
+}
+.brain-popover.right {
+  right: 0;
+  left: auto;
+}
+.brain-popover button,
+.brain-mention-picker button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  overflow-wrap: anywhere;
+}
+.brain-popover button:hover,
+.brain-mention-picker button:hover {
+  background: var(--paper-2);
+}
+.brain-popover small,
+.brain-profile small,
+.brain-connection-row > div > small {
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.brain-empty {
+  padding: 22px;
+  overflow-y: auto;
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+.brain-empty > * {
+  flex-shrink: 0;
+}
+.brain-empty > .button {
+  min-height: 40px;
+}
+.brain-empty > img {
+  align-self: center;
+  object-fit: contain;
+}
+.brain-empty h2 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  text-align: center;
+  margin: 0;
+}
+.brain-empty > p {
+  font-size: 13px;
+  line-height: 1.65;
+  text-align: center;
+  margin: 0;
+}
+.brain-profiles {
+  display: grid;
+  gap: 7px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.brain-profile-heading {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 6px 0;
+  color: var(--ink);
+}
+.brain-profile-subtitle {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0 0 6px;
+}
+.brain-profile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px 10px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+}
+.brain-profile.selected {
+  border-color: var(--coral);
+  box-shadow: inset 3px 0 var(--coral);
+}
+.brain-profile > span {
+  font-weight: 650;
+  font-size: 13px;
+}
+.brain-profile:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+.brain-profile > small:last-child:not(:nth-child(2)) {
+  flex-basis: 100%;
+}
+.brain-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-gutter: stable;
+}
+.brain-transcript-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.brain-markdown ul {
+  list-style: disc outside;
+}
+.brain-markdown ol {
+  list-style: decimal outside;
+}
+.brain-markdown li {
+  margin: 4px 0;
+}
+.brain-permission code,
+.brain-permission-done code {
+  font:
+    0.95em "JetBrains Mono Variable",
+    monospace;
+  background: var(--paper-2);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.brain-text-action {
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.brain-text-action:hover {
+  color: var(--ink);
+}
+.brain-auth {
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--coral);
+  background: var(--card);
+  border-radius: var(--r-input);
+  padding: 13px;
+  font-size: 12px;
+}
+.brain-auth .button-row {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.brain-config .custom-select > .input-like {
+  min-height: 26px;
+  padding: 3px 9px;
+  border-radius: var(--r-chip);
+  background: var(--paper);
+  font-size: 11px;
+}
+.brain-config .custom-select {
+  min-width: 90px;
+  max-width: 145px;
+}
+.brain-terminal-host,
+.brain-terminal-host .xterm,
+.brain-terminal-host .xterm .xterm-viewport,
+.brain-terminal-host .xterm .xterm-scrollable-element,
+.brain-terminal-host .xterm .xterm-scroll-area {
+  background-color: var(--paper);
+}
+.brain-terminal-host .xterm .xterm-scrollable-element > .shadow {
+  box-shadow: none;
+}
+.brain-terminal-host .xterm .xterm-viewport {
+  scrollbar-color: var(--ink-2) var(--paper);
+}
+.brain-key-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brain-advanced > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+.brain-advanced summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.brain-connection-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.brain-greeting {
+  text-align: center;
+  margin-top: 20px;
+}
+.brain-user {
+  max-width: 95%;
+  align-self: flex-end;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.brain-session-context {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: normal;
+}
+.brain-session-context summary {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-chip);
+  padding: 3px 8px;
+  display: inline-block;
+  cursor: pointer;
+}
+.brain-agent {
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.brain-agent-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.brain-markdown > :first-child {
+  margin-top: 0;
+}
+.brain-markdown p {
+  margin: 5px 0 10px;
+}
+.brain-markdown ul,
+.brain-markdown ol {
+  padding-left: 22px;
+}
+.brain-markdown li > ul,
+.brain-markdown li > ol {
+  margin: 5px 0;
+}
+.brain-markdown ul ul {
+  list-style-type: circle;
+}
+.brain-markdown pre,
+.brain-tool pre,
+.brain-session-context pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    11px / 1.65 "JetBrains Mono Variable",
+    monospace;
+  padding: 8px;
+  background: var(--paper-2);
+  border-radius: 7px;
+}
+.brain-board-key {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  min-width: 28px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-chip);
+  padding: 5px;
+  background: var(--card);
+  color: var(--ink);
+  font:
+    600 11px "JetBrains Mono Variable",
+    monospace;
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.brain-board-key:hover {
+  border-color: var(--coral);
+}
+.brain-connection-form [role="alert"] pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.brain-thought {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.brain-thought summary {
+  cursor: pointer;
+  font-style: italic;
+}
+.brain-thought em {
+  display: block;
+  padding-top: 6px;
+}
+.brain-tool {
+  padding: 9px 10px;
+  background: var(--paper-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  font-size: 12px;
+}
+.brain-tool summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.brain-tool summary > span:first-of-type {
+  flex: 1;
+}
+.brain-tool summary > small {
+  color: var(--ink-2);
+  font-size: 10px;
+}
+.brain-success {
+  color: var(--success-ink);
+}
+.brain-failure {
+  color: var(--danger-ink);
+}
+.brain-spinner svg {
+  animation: brain-spin 1.6s linear infinite;
+}
+.brain-permission,
+.brain-plan,
+.brain-error {
+  padding: 13px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--card);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.brain-permission {
+  border-left: 3px solid var(--coral);
+}
+.brain-permission .button-row {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.brain-permission-done {
+  font-size: 11px;
+}
+.brain-plan > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding-top: 7px;
+}
+.brain-error {
+  color: var(--danger-ink);
+  margin: 8px;
+}
+.brain-caret {
+  width: 6px;
+  height: 14px;
+  display: inline-block;
+  background: var(--ink);
+  animation: brain-pulse 1s steps(2) infinite;
+}
+.brain-composer {
+  margin: 8px 12px 10px;
+  padding: 11px;
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  position: relative;
+  flex-shrink: 0;
+}
+.brain-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  max-height: 192px;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 2px;
+  box-shadow: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.brain-composer textarea:focus {
+  outline: none;
+}
+.brain-composer:focus-within {
+  border-color: var(--ink-2);
+}
+.brain-composer-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 5px;
+}
+.brain-composer-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.brain-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.brain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-chip);
+  color: var(--ink-2);
+  font-size: 10px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.brain-chip button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  padding: 1px;
+}
+.brain-config {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ink-2);
+}
+.brain-mention-picker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-input);
+  box-shadow: 0 -6px 20px #0002;
+  padding: 5px;
+  z-index: 4;
+  font-size: 12px;
+}
+.brain-mention-picker > button > small {
+  color: var(--ink-2);
+  font-size: 10px;
+}
+.brain-jump {
+  position: absolute;
+  bottom: 180px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.brain-cwd {
+  padding: 4px 15px 8px;
+  color: var(--ink-2);
+  font:
+    9px "JetBrains Mono Variable",
+    monospace;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.brain-terminal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  padding: 10px;
+}
+.brain-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+.brain-terminal-header code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.brain-terminal-header button {
+  padding: 5px;
+  font-size: 11px;
+}
+.brain-terminal-host {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.brain-terminal-host .xterm {
+  height: 100%;
+}
+.brain-connections {
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+  padding: 22px;
+  margin-bottom: 22px;
+  scroll-margin-top: 20px;
+}
+.brain-connections h2 {
+  margin-top: 0;
+}
+.brain-connection-group {
+  margin: 18px 0;
+}
+.brain-connection-group h3 {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 20px 0 8px;
+}
+.brain-connection-group h4 {
+  font: 400 10px / 1.5 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 14px 0 6px;
+}
+.brain-connection-row > div > small {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.brain-visibility-action {
+  border: 0;
+  background: transparent;
+  padding: 7px 8px;
+  font: inherit;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ink-2);
+  border-radius: var(--r-input);
+}
+.brain-visibility-action:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.brain-connection-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 10px 0;
+}
+.brain-connection-row > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.brain-connection-row strong {
+  font-size: 13px;
+}
+.brain-connection-dialog .brain-connection-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brain-connection-dialog .brain-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+.brain-connection-dialog .brain-connection-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  margin: 0;
+}
+.brain-connection-dialog .brain-field > small,
+.brain-connection-dialog .brain-key-status small {
+  margin: 0;
+  color: var(--ink-2);
+  font-weight: 400;
+  line-height: 1.45;
+}
+.brain-connection-dialog .brain-advanced > div {
+  gap: 16px;
+}
+.brain-connection-dialog
+  .brain-connection-form
+  :is(input:not([type="checkbox"]), textarea, select):focus-visible {
+  outline: 1px solid var(--coral);
+  outline-offset: 0;
+  box-shadow: none;
+}
+.brain-connection-dialog .brain-connection-form label.brain-mock-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.brain-connection-form textarea {
+  min-height: 65px;
+  font:
+    11px "JetBrains Mono Variable",
+    monospace;
+}
+.brain-secret {
+  padding: 0;
+  margin: 0;
+}
+.brain-secret > small[role="status"] {
+  color: var(--ink-2);
+}
+@keyframes brain-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes brain-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-dot.working,
+  .brain-caret,
+  .brain-spinner svg {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .brain-dock.overlay {
+    top: 0;
+  }
+  .brain-backdrop {
+    top: 0;
+  }
+  .brain-trigger > span:not(.brain-dot) {
+    display: none;
+  }
+}
+
+:root[data-brain-docked="true"] .brain-routed-content .board-intro,
+:root[data-brain-docked="true"] .brain-routed-content .board-actions,
+:root[data-brain-docked="true"] .brain-routed-content .question-option > span,
+:root[data-brain-docked="true"] .brain-routed-content .reference-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+:root[data-brain-docked="true"] .brain-routed-content .reference-toolbar {
+  max-width: 100%;
+}
+
+/* Reserve the saved width before the panel chunk arrives. */
+.brain-dock-slot {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+  position: relative;
+}
+.brain-dock-slot.overlay {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  z-index: 82;
+}
+.brain-dock-placeholder {
+  width: 100%;
+  flex: 1;
+}
+.brain-load-state {
+  display: flex;
+  flex: 1;
+  min-height: 160px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--paper);
+  color: var(--ink-2);
+  text-align: center;
+}
+.brain-load-state .button-row {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .brain-dock-slot.overlay {
+    top: 0;
+  }
+}
+
+.brain-dock-slot.overlay .brain-dock-placeholder {
+  z-index: 82;
+}

@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RefItem } from "../../bindings";
 import { decodedImageThumbnail, type Thumbnail } from "./image-resolution";
-import { ImageMedia } from "./Media";
+import { AudioMedia, ImageMedia, VideoMedia } from "./Media";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
 
 let zoom = 0.75;
@@ -61,6 +62,60 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("VS03 media source and lifetime (DOM, not native clarity)", () => {
+  it.each([1, 2])(
+    "uses the original at zoom 1/2/4 on DPR %s and restores thumbnails when zoomed out",
+    async (dpr) => {
+      Object.defineProperty(window, "devicePixelRatio", { value: dpr });
+      const { rerender } = render(view("full-resolution-media"));
+      await act(async () => {});
+      measure();
+      for (const value of [1, 2, 4]) {
+        zoom = value;
+        rerender(view("full-resolution-media"));
+        expect(screen.getByRole("img")).toHaveAttribute(
+          "src",
+          "full-resolution-media",
+        );
+      }
+      zoom = 0.2;
+      rerender(view("full-resolution-media"));
+      expect(screen.getByRole("img")).toHaveAttribute("src", "data:thumb");
+    },
+  );
+  it("audio and video previews allow body dragging and keep only player controls non-draggable", async () => {
+    const item = {
+      id: "audio",
+      kind: "asset",
+      title: "Audio",
+      metadata: JSON.stringify({ peaks: [0.5], duration: 1 }),
+    } as RefItem;
+    const view = render(
+      <CanvasContext.Provider value={runtime}>
+        <AudioMedia url="data:audio/wav;base64," item={item} />
+        <VideoMedia url="data:video/webm;base64," title="Clip" />
+      </CanvasContext.Provider>,
+    );
+    expect(view.container.querySelector(".reference-audio")).not.toHaveClass(
+      "nodrag",
+    );
+    expect(screen.getByRole("button", { name: "Play audio" })).toHaveClass(
+      "nodrag",
+    );
+    expect(screen.getByRole("slider", { name: "Audio position" })).toHaveClass(
+      "nodrag",
+    );
+    const video = view.container.querySelector("video");
+    expect(video).not.toHaveClass("nodrag");
+    expect(video).not.toHaveAttribute("controls");
+    if (!video) throw Error("Missing video");
+    fireEvent.doubleClick(video);
+    expect(lightbox).toHaveBeenCalledWith(
+      "data:video/webm;base64,",
+      "Clip",
+      "video",
+    );
+    await act(async () => {});
+  });
   it("never has undefined src while pending; selects by measured size, zoom and changing DPR", async () => {
     const { rerender } = render(view());
     expect(screen.getByRole("img")).toHaveAttribute("src", "original");
@@ -75,7 +130,11 @@ describe("VS03 media source and lifetime (DOM, not native clarity)", () => {
     Object.defineProperty(window, "devicePixelRatio", { value: 2 });
     fireEvent(window, new Event("resize"));
     expect(screen.getByRole("img")).toHaveAttribute("src", "original");
-    fireEvent.click(screen.getByRole("button", { name: "Open Reference" }));
+    const body = screen.getByRole("group", { name: "Open Reference" });
+    expect(body).not.toHaveClass("nodrag");
+    fireEvent.click(body);
+    expect(lightbox).not.toHaveBeenCalled();
+    fireEvent.doubleClick(body);
     expect(lightbox).toHaveBeenCalledWith("original", "Reference");
   });
   it("thumbnail error falls back once; original failure is explicit and retry reloads original", async () => {
@@ -148,4 +207,27 @@ describe("VS03 media source and lifetime (DOM, not native clarity)", () => {
     unmount();
     expect(disconnect).toHaveBeenCalledTimes(3);
   });
+});
+it("audio controls expose exactly one shared tooltip on keyboard focus", async () => {
+  const item = {
+    id: "audio-tooltip",
+    kind: "asset",
+    title: "Audio",
+    metadata: JSON.stringify({ peaks: [0.5], duration: 2 }),
+  } as RefItem;
+  render(
+    <CanvasContext.Provider value={runtime}>
+      <AudioMedia url="data:audio/wav;base64," item={item} />
+    </CanvasContext.Provider>,
+  );
+  const play = screen.getByRole("button", { name: "Play audio" });
+  expect(play).not.toHaveAttribute("title");
+  act(() => play.focus());
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Play audio");
+  expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  act(() => screen.getByRole("slider", { name: "Audio position" }).focus());
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Audio position",
+  );
+  expect(screen.getAllByRole("tooltip")).toHaveLength(1);
 });

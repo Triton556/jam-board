@@ -173,7 +173,9 @@ export function AssetDialog({
           Name
           <input
             data-write-focus
-            disabled={!write.ready}
+            data-autofocus
+            disabled={write.pending}
+            readOnly={!write.ready}
             {...form.register("name")}
           />
         </label>
@@ -372,8 +374,28 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
     void read.run(() => assets.refetch({ cancelRefetch: false }));
   useEffect(
     () =>
-      api.onFileDrop((paths) => {
+      api.onFileDrop((paths, point) => {
         if (document.querySelector(".drawer")) return;
+        // onFileDrop has already converted physical pixels to CSS pixels.
+        if (
+          point &&
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '[data-brain-dock], #brain-dock, [data-board-ref-drop="brain-composer"]',
+            ),
+          ).some((element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              point.x >= rect.left &&
+              point.x <= rect.right &&
+              point.y >= rect.top &&
+              point.y <= rect.bottom
+            );
+          })
+        )
+          return;
         void batch.run(
           paths,
           (location) =>

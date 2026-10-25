@@ -2,14 +2,16 @@ import { PencilLine } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import {
   type CSSProperties,
+  lazy,
   type ReactNode,
-  useEffect,
+  Suspense,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import rough from "roughjs";
 import type { WorkingState } from "../../lib/agent-working";
 import { Tooltip } from ".";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 let visibility: IntersectionObserver | undefined;
 const watched = new Set<Element>();
@@ -34,56 +36,16 @@ export function watchWorkingVisibility(node: HTMLElement | null) {
   };
 }
 
-const generator = rough.generator();
-const lines = new Map<number, string>();
-export function workingUnderline(width: number) {
-  const w = Math.max(8, Math.round(width));
-  let path = lines.get(w);
-  if (!path) {
-    path = generator
-      .toPaths(
-        generator.line(2, 3, w - 2, 3, {
-          seed: 27,
-          roughness: 1.2,
-          bowing: 1,
-          strokeWidth: 1.3,
-        }),
-      )
-      .map((p) => p.d)
-      .join(" ");
-    if (lines.size > 256) lines.clear();
-    lines.set(w, path);
-  }
-  return path;
-}
-const resizing = new Map<Element, (width: number) => void>();
-let sizes: ResizeObserver | undefined;
+const Drawing = lazy(() =>
+  import("./WorkingUnderline").then((module) => ({
+    default: module.Underline,
+  })),
+);
 function Underline({ staticMotion }: { staticMotion: boolean }) {
-  const ref = useRef<SVGSVGElement>(null);
-  const [width, setWidth] = useState(220);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    sizes ??= new ResizeObserver((entries) => {
-      for (const entry of entries)
-        resizing.get(entry.target)?.(Math.round(entry.contentRect.width));
-    });
-    resizing.set(node, (w) => setWidth(Math.max(8, w)));
-    sizes.observe(node);
-    return () => {
-      sizes?.unobserve(node);
-      resizing.delete(node);
-      if (!resizing.size) {
-        sizes?.disconnect();
-        sizes = undefined;
-      }
-    };
-  }, []);
-  return (
+  const fallback = (
     <svg
-      ref={ref}
       className="working-underline"
-      viewBox={`0 0 ${width} 6`}
+      viewBox="0 0 220 6"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
@@ -94,10 +56,17 @@ function Underline({ staticMotion }: { staticMotion: boolean }) {
             ? { animation: "none", strokeDashoffset: 0, opacity: 1 }
             : undefined
         }
-        d={workingUnderline(width)}
+        d="M1.10515534381762 0.9301492603340251 C44.56248544825758 3.572924080381571, 89.3711472792451 5.543018466877533, 216.50449377673377 1.5255728751246458 M2.509342815230923 2.1031111318767954 C83.1829869692544 3.7463849284928328, 164.99701259140303 4.394907741222406, 218.34571805168125 3.3416669459297728"
         pathLength={100}
       />
     </svg>
+  );
+  return (
+    <ErrorBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <Drawing staticMotion={staticMotion} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
@@ -178,14 +147,91 @@ export function WorkingLine({ state }: { state: WorkingState }) {
       data-testid="working-line"
       data-mode={state.mode}
     >
-      <Tooltip text={state.tooltip}>
+      <Tooltip
+        text={
+          state.tooltip.includes(state.text)
+            ? state.tooltip
+            : `${state.text}. ${state.tooltip}`
+        }
+      >
         <WorkingPencil staticMotion={!!reduced} />
-        <span className="working-copy">
-          {state.text}
-          <Underline staticMotion={!!reduced || state.mode === "quiet"} />
-        </span>
+        <WorkingCopy
+          text={state.text}
+          staticMotion={!!reduced || state.mode === "quiet"}
+        />
       </Tooltip>
     </div>
+  );
+}
+export function fitWorkingText(
+  text: string,
+  width: number,
+  measure: (text: string) => number,
+) {
+  if (width <= 0 || measure(text) <= width) return text;
+  const words = text.trim().split(/\s+/u);
+  const candidate = (count: number) =>
+    `${words
+      .slice(0, count)
+      .join(" ")
+      .replace(/[\s·,:;—–-]+$/u, "")}…`;
+  let low = 0,
+    high = words.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (measure(candidate(middle)) <= width) low = middle;
+    else high = middle - 1;
+  }
+  return candidate(low);
+}
+function WorkingCopy({
+  text,
+  staticMotion,
+}: {
+  text: string;
+  staticMotion: boolean;
+}) {
+  const root = useRef<HTMLSpanElement>(null),
+    measure = useRef<HTMLSpanElement>(null);
+  const [fitted, setFitted] = useState({ source: text, value: text });
+  useLayoutEffect(() => {
+    let mounted = true;
+    const refit = () => {
+      if (!mounted || !root.current || !measure.current) return;
+      const probe = measure.current;
+      const value = fitWorkingText(
+        text,
+        root.current.clientWidth,
+        (candidate) => {
+          probe.textContent = candidate;
+          return probe.getBoundingClientRect().width;
+        },
+      );
+      probe.textContent = "";
+      setFitted((previous) =>
+        previous.source === text && previous.value === value
+          ? previous
+          : { source: text, value },
+      );
+    };
+    refit();
+    const observer = new ResizeObserver(refit);
+    if (root.current) observer.observe(root.current);
+    const fonts = document.fonts;
+    void fonts?.ready.then(refit);
+    fonts?.addEventListener("loadingdone", refit);
+    return () => {
+      mounted = false;
+      observer.disconnect();
+      fonts?.removeEventListener("loadingdone", refit);
+    };
+  }, [text]);
+  return (
+    <span className="working-copy" ref={root}>
+      {fitted.source === text ? fitted.value : text}
+      <span className="working-measure" ref={measure} aria-hidden="true" />
+      <Underline staticMotion={staticMotion} />
+    </span>
   );
 }
 export function WorkingPill({ state }: { state: WorkingState }) {

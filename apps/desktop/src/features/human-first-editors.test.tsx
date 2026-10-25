@@ -18,6 +18,7 @@ import { TaskDrawer } from "./task/TaskDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 afterEach(() => vi.restoreAllMocks());
@@ -94,6 +95,13 @@ function deferred<T>() {
     reject = no;
   });
   return { promise, resolve, reject };
+}
+// These fixtures test draft/save/blur reconciliation, not per-key input. Paste
+// still fires the real input/change path and leaves the editor focused for blur.
+async function pasteFixture(element: HTMLElement, value: string) {
+  const user = userEvent.setup();
+  await user.click(element);
+  await user.paste(value);
 }
 it("existing description and full agent plan retain their content on opening without any write", async () => {
   const original = await mockApi.getTask("JB-7");
@@ -530,12 +538,12 @@ it("technical Markdown blur saves only the plan and keeps unrelated human Descri
     name: "Description",
   });
   await userEvent.clear(description);
-  await userEvent.type(description, "Human draft not submitted");
+  await pasteFixture(description, "Human draft not submitted");
   await userEvent.click(planSummary());
   await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
   const goal = screen.getByRole("textbox", { name: "Goal" });
   await userEvent.clear(goal);
-  await userEvent.type(goal, "Refined technical goal");
+  await pasteFixture(goal, "Refined technical goal");
   expect(update).not.toHaveBeenCalled();
   await userEvent.click(planSummary());
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
@@ -579,7 +587,7 @@ it("a collapsed Story technical save exposes pending and unconfirmed error witho
     name: "Whose material is the basis",
   });
   await userEvent.clear(basis);
-  await userEvent.type(basis, "Retain this source and scope");
+  await pasteFixture(basis, "Retain this source and scope");
   await userEvent.click(planSummary());
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
   expect(
@@ -620,12 +628,12 @@ it("failed technical blur retains both drafts and an explicit main Save can reco
     name: "Description",
   });
   await userEvent.clear(description);
-  await userEvent.type(description, "My separate human wish");
+  await pasteFixture(description, "My separate human wish");
   await userEvent.click(planSummary());
   await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
   const goal = screen.getByRole("textbox", { name: "Goal" });
   await userEvent.clear(goal);
-  await userEvent.type(goal, "Technical goal retained after rejection");
+  await pasteFixture(goal, "Technical goal retained after rejection");
   await userEvent.click(planSummary());
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(description).toBeEnabled());
@@ -660,12 +668,12 @@ it("a partial save acknowledgement cannot erase input queued after its captured 
     name: "Description",
   });
   await userEvent.clear(description);
-  await userEvent.type(description, "Earlier human draft");
+  await pasteFixture(description, "Earlier human draft");
   await userEvent.click(planSummary());
   await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
   const goal = screen.getByRole("textbox", { name: "Goal" });
   await userEvent.clear(goal);
-  await userEvent.type(goal, "Pending technical goal");
+  await pasteFixture(goal, "Pending technical goal");
   await userEvent.click(planSummary());
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
   expect(description).toBeDisabled();
@@ -690,6 +698,7 @@ it("a partial save acknowledgement cannot erase input queued after its captured 
 it.each(["project", "ABA", "entity", "unmount"])(
   "late partial-save acknowledgement cannot refill or announce into a changed %s view",
   async (kind) => {
+    const consoleError = vi.spyOn(console, "error");
     const original = await mockApi.getTask("JB-7");
     const app = await mockApi.appState();
     const pending = deferred<typeof original>();
@@ -711,7 +720,7 @@ it.each(["project", "ABA", "entity", "unmount"])(
     await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
     const goal = screen.getByRole("textbox", { name: "Goal" });
     await userEvent.clear(goal);
-    await userEvent.type(goal, "Captured technical goal");
+    await pasteFixture(goal, "Captured technical goal");
     await userEvent.click(planSummary());
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     if (kind === "unmount") view.unmount();
@@ -748,6 +757,13 @@ it.each(["project", "ABA", "entity", "unmount"])(
     expect(client.getQueryData(["task", original.key])).toEqual(newer);
     expect(invalidation).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledTimes(1);
+    expect(
+      consoleError.mock.calls.filter((args) =>
+        args.some((message) =>
+          String(message).includes("Cannot update a component"),
+        ),
+      ),
+    ).toEqual([]);
   },
 );
 
@@ -766,7 +782,7 @@ it("a Story technical draft typed during autosave survives the earlier acknowled
   await userEvent.clear(
     screen.getByRole("textbox", { name: "Whose material is the basis" }),
   );
-  await userEvent.type(
+  await pasteFixture(
     screen.getByRole("textbox", { name: "Whose material is the basis" }),
     "Earlier basis",
   );
@@ -780,7 +796,7 @@ it("a Story technical draft typed during autosave survives the earlier acknowled
     name: "Whose material is the basis",
   });
   await userEvent.clear(input);
-  await userEvent.type(input, "Newer basis still being edited");
+  await pasteFixture(input, "Newer basis still being edited");
   await act(async () =>
     pending.resolve({ ...original.story, basisMd: "Earlier basis" }),
   );
@@ -797,12 +813,12 @@ it("clicking the explicit task Save from a focused Goal saves the intended form 
     name: "Description",
   });
   await userEvent.clear(description);
-  await userEvent.type(description, "Explicitly saving this human wish");
+  await pasteFixture(description, "Explicitly saving this human wish");
   await userEvent.click(planSummary());
   await userEvent.click(screen.getByRole("button", { name: "Edit Goal" }));
   const goal = screen.getByRole("textbox", { name: "Goal" });
   await userEvent.clear(goal);
-  await userEvent.type(goal, "Explicitly saving this goal");
+  await pasteFixture(goal, "Explicitly saving this goal");
   await userEvent.click(screen.getByRole("button", { name: /^Save Ctrl/ }));
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
   expect(update.mock.calls[0]?.[0]).toEqual({
@@ -826,11 +842,11 @@ it("Story error recovery rereads without replaying or clearing the retained tech
   await userEvent.click(
     screen.getByRole("button", { name: "Edit Whose material is the basis" }),
   );
-  const input = screen.getByRole("textbox", {
+  const input = await screen.findByRole("textbox", {
     name: "Whose material is the basis",
   });
   await userEvent.clear(input);
-  await userEvent.type(input, "Keep this draft through rereads");
+  await pasteFixture(input, "Keep this draft through rereads");
   await userEvent.click(planSummary());
   await screen.findByRole("alert", { name: "Agent plan save problem" });
   const read = vi

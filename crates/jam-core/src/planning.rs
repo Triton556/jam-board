@@ -91,7 +91,7 @@ pub(crate) fn fetch<T: DeserializeOwned>(
     column: &str,
     key: &str,
 ) -> Result<T> {
-    let value = c
+    let mut value = c
         .query_row(
             &format!("SELECT * FROM {table} WHERE {column}=?"),
             [key],
@@ -101,6 +101,12 @@ pub(crate) fn fetch<T: DeserializeOwned>(
         .ok_or_else(|| Error::NotFound(format!("{table} {key}")))?;
     if let Some(project) = value.get("jamId").and_then(Value::as_str) {
         crate::projects::ensure_scope(c, project)?;
+    }
+    if table == "ref_frames" {
+        value["links"] = serde_json::to_value(crate::references::frame_targets(
+            c,
+            value["id"].as_str().unwrap_or(""),
+        )?)?;
     }
     Ok(serde_json::from_value(value)?)
 }
@@ -113,9 +119,15 @@ pub(crate) fn records<T: DeserializeOwned>(
     c.prepare(&format!("SELECT * FROM {table} WHERE {filter}"))?
         .query_map(values, row_value)?
         .map(|r| {
-            let value = r?;
+            let mut value = r?;
             if let Some(project) = value.get("jamId").and_then(Value::as_str) {
                 crate::projects::ensure_scope(c, project)?;
+            }
+            if table == "ref_frames" {
+                value["links"] = serde_json::to_value(crate::references::frame_targets(
+                    c,
+                    value["id"].as_str().unwrap_or(""),
+                )?)?;
             }
             Ok(serde_json::from_value(value)?)
         })
@@ -134,7 +146,16 @@ fn sql_value(v: &Value) -> SqlValue {
     }
 }
 pub(crate) fn insert(c: &Connection, table: &str, data: &impl Serialize) -> Result<()> {
-    let object = serde_json::to_value(data)?;
+    let mut object = serde_json::to_value(data)?;
+    if let Some(fields) = object.as_object_mut() {
+        if table == "ref_frames" {
+            fields.remove("links");
+        }
+        if table == "ref_items" {
+            fields.remove("via");
+            fields.remove("frameTitle");
+        }
+    }
     let object = object
         .as_object()
         .ok_or_else(|| invalid("record", "Expected object"))?;

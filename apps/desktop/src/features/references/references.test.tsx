@@ -209,7 +209,10 @@ it.each(["image", "audio", "video", "font", "file", "link", "note"])(
           url: kind === "link" ? "https://example.test" : null,
         },
         path,
-        links: [{ key: "JB-E1", viaFrame: true }],
+        links: [
+          { key: "JB-E1", viaFrame: true },
+          { key: "JB-1", viaFrame: false },
+        ],
         color: "var(--m1)",
         dim: false,
         connect: false,
@@ -242,8 +245,10 @@ it.each(["image", "audio", "video", "font", "file", "link", "note"])(
     );
     expect(screen.getByRole("article")).toHaveClass(`kind-${kind}`);
     expect(screen.getByRole("article")).toHaveAccessibleName(
-      `${kind} reference: Snow lantern, linked to JB-E1`,
+      `${kind} reference: Snow lantern, linked to JB-E1, JB-1`,
     );
-    expect(screen.getByText("via frame")).toBeVisible();
+    expect(screen.queryByText("via frame")).toBeNull();
+    expect(screen.getByRole("button", { name: "JB-1" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "JB-E1" })).toBeNull();
   },
 );

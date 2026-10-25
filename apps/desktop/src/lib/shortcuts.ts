@@ -4,6 +4,19 @@ export function isEditing(target: EventTarget | null) {
     !!target.closest('input,textarea,select,[contenteditable="true"]')
   );
 }
+export function isBrainDockShortcut(
+  event: Pick<
+    KeyboardEvent,
+    "key" | "ctrlKey" | "metaKey" | "altKey" | "target"
+  >,
+) {
+  return (
+    event.ctrlKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === "j" &&
+    !(event.target instanceof HTMLElement && event.target.closest(".xterm"))
+  );
+}
 export function shortcutAction(
   event: Pick<
     KeyboardEvent,

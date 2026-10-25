@@ -8,6 +8,7 @@ import { ReferencesSection } from "./ReferencesSection";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board?task=JB-1",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {
@@ -30,8 +31,10 @@ async function openPicker() {
     </QueryClientProvider>,
   );
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Add reference" }));
-  const dialog = screen.getByRole("dialog", { name: "Add reference" });
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("menuitem", { name: "From canvas…" }));
+  const dialog = screen.getByRole("dialog", { name: "From canvas" });
+  await user.click(within(dialog).getByRole("tab", { name: "Items" }));
   return {
     user,
     dialog,
@@ -62,26 +65,27 @@ it("RF04 untitled note choices use distinct body labels, search body text and li
   const update = vi.spyOn(mockApi, "updateReference");
   const link = vi.spyOn(mockApi, "linkReference");
   const { user, dialog, search } = await openPicker();
-  await within(dialog).findByRole("button", {
+  await within(dialog).findByRole("checkbox", {
     name: "Amber lanterns on fresh snow.",
   });
   expect(
-    within(dialog).getByRole("button", {
+    within(dialog).getByRole("checkbox", {
       name: "Blue shadows in the ice cave.",
     }),
   ).toBeVisible();
-  expect(within(dialog).getByRole("button", { name: "Note" })).toBeVisible();
+  expect(within(dialog).getByRole("checkbox", { name: "Note" })).toBeVisible();
   await user.type(search, "ICE CAVE");
-  const choice = within(dialog).getByRole("button", {
+  const choice = within(dialog).getByRole("checkbox", {
     name: "Blue shadows in the ice cave.",
   });
   expect(
-    within(dialog).queryByRole("button", {
+    within(dialog).queryByRole("checkbox", {
       name: "Amber lanterns on fresh snow.",
     }),
   ).toBeNull();
-  expect(within(dialog).queryByRole("button", { name: "Note" })).toBeNull();
+  expect(within(dialog).queryByRole("checkbox", { name: "Note" })).toBeNull();
   await user.click(choice);
+  await user.click(within(dialog).getByRole("button", { name: "Link 1" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(link).toHaveBeenCalledExactlyOnceWith(blue.id, "JB-1");
   const after = await mockApi.referenceCanvas();
@@ -117,32 +121,32 @@ it("RF04 media and links retain title-only search and labels without content wri
   const update = vi.spyOn(mockApi, "updateReference");
   const link = vi.spyOn(mockApi, "linkReference");
   const { user, dialog, search } = await openPicker();
-  await within(dialog).findByRole("button", { name: "Style guide" });
+  await within(dialog).findByRole("checkbox", { name: "Style guide" });
   expect(
-    within(dialog).getByRole("button", { name: "Palette reference" }),
+    within(dialog).getByRole("checkbox", { name: "Palette reference" }),
   ).toBeVisible();
   await user.type(search, "not-a-title-only-marker");
   expect(
-    within(dialog).queryByRole("button", { name: "Style guide" }),
+    within(dialog).queryByRole("checkbox", { name: "Style guide" }),
   ).toBeNull();
   expect(
-    within(dialog).queryByRole("button", { name: "Palette reference" }),
+    within(dialog).queryByRole("checkbox", { name: "Palette reference" }),
   ).toBeNull();
   await user.clear(search);
   await user.type(search, "STYLE");
   expect(
-    within(dialog).getByRole("button", { name: "Style guide" }),
+    within(dialog).getByRole("checkbox", { name: "Style guide" }),
   ).toBeVisible();
   expect(
-    within(dialog).queryByRole("button", { name: "Palette reference" }),
+    within(dialog).queryByRole("checkbox", { name: "Palette reference" }),
   ).toBeNull();
   await user.clear(search);
   await user.type(search, "PALETTE");
   expect(
-    within(dialog).getByRole("button", { name: "Palette reference" }),
+    within(dialog).getByRole("checkbox", { name: "Palette reference" }),
   ).toBeVisible();
   expect(
-    within(dialog).queryByRole("button", { name: "Style guide" }),
+    within(dialog).queryByRole("checkbox", { name: "Style guide" }),
   ).toBeNull();
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("dialog")).toBeNull();

@@ -1,0 +1,421 @@
+.brain-launcher {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.brain-launcher h2,
+.brain-launcher h3 {
+  margin: 0;
+}
+.brain-launcher h2 {
+  font-size: 18px;
+}
+.brain-launcher h3 {
+  font-size: 13px;
+}
+.brain-launcher > .button-row {
+  justify-content: flex-end;
+}
+.brain-dock,
+.brain-dock * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong, var(--ink-2)) var(--paper-2);
+}
+.brain-dock {
+  container: brain-dock / inline-size;
+}
+.brain-model-picker {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.brain-model-picker > input {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--paper);
+  color: var(--ink);
+}
+.brain-model-results {
+  max-height: 240px;
+  overflow: auto;
+}
+.brain-model-results h4 {
+  margin: 8px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.brain-model-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.brain-model-row > button {
+  flex: 1;
+  min-width: 0;
+}
+.brain-model-row > .tooltip-wrap {
+  flex: 0 0 auto;
+}
+.brain-model-picker button:not(.icon-button, .switch),
+.brain-controls-popover > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--r-input);
+  background: transparent;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.brain-model-picker button[aria-pressed="true"],
+.brain-controls-popover button[aria-pressed="true"] {
+  background: var(--paper-2);
+  box-shadow: inset 2px 0 var(--coral);
+}
+.brain-model-picker button:hover,
+.brain-controls-popover > button:hover {
+  background: var(--paper-2);
+}
+.brain-model-picker small,
+.brain-controls-popover small {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.brain-model-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brain-model-footer > button {
+  margin-left: auto;
+  width: auto !important;
+}
+.brain-model-footer > .tooltip-wrap {
+  margin-left: auto;
+}
+.brain-model-footer label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.brain-effort {
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.brain-effort legend {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.brain-effort > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.brain-effort button {
+  min-height: 28px;
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+}
+.brain-effort button[aria-pressed="true"] {
+  border-color: var(--coral);
+  background: var(--paper-2);
+}
+.brain-session-controls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+.brain-composer-actions > .brain-session-controls {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.brain-control-anchor {
+  min-width: 0;
+  position: relative;
+}
+.brain-control-anchor > .tooltip-wrap {
+  display: flex;
+  min-width: 0;
+}
+.brain-model-anchor {
+  flex: 0 1 auto;
+}
+.brain-access-anchor {
+  flex: 0 0 auto;
+}
+.brain-control-chip {
+  min-width: 0;
+  height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-chip);
+  background: var(--card);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  max-width: 176px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brain-control-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brain-control-chip > svg {
+  flex-shrink: 0;
+}
+.brain-control-chip.brain-access-chip {
+  flex-shrink: 0;
+  max-width: none;
+}
+@container brain-dock (max-width: 379px) {
+  .brain-access-chip > span {
+    display: none;
+  }
+  .brain-control-chip.brain-access-chip {
+    width: 28px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+.brain-controls-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 12;
+  width: min(320px, calc(100vw - 40px));
+  max-height: min(440px, 60vh);
+  overflow: auto;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-card);
+  box-shadow: 0 8px 24px #0002;
+  animation: brain-control-enter var(--motion-base) var(--ease-out);
+}
+.brain-access-danger,
+.brain-control-chip.brain-failure {
+  color: var(--danger-ink) !important;
+}
+.brain-access-danger small {
+  color: inherit;
+}
+.brain-toolbar-gap {
+  flex: 1;
+  min-width: 4px;
+}
+.brain-composer-actions {
+  gap: 4px;
+}
+.brain-composer-actions > .button {
+  flex-shrink: 0;
+  padding-inline: 8px;
+}
+.brain-composer {
+  display: flex;
+  flex-direction: column;
+}
+.brain-composer.brain-board-over {
+  outline: 2px solid var(--coral);
+  outline-offset: -4px;
+}
+.brain-config-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+  text-align: center;
+}
+.brain-config-divider::before,
+.brain-config-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line-soft);
+}
+.brain-drop-overlay {
+  position: absolute;
+  inset: 4px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  opacity: 0.95;
+  border: 2px dashed var(--coral);
+  border-radius: var(--r-card);
+  font-weight: 700;
+  pointer-events: none;
+}
+.brain-attachment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.brain-attachment-row:empty {
+  display: none;
+}
+.brain-composer > .brain-attachment-row {
+  order: -1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, 68px);
+  grid-auto-columns: minmax(160px, calc((100% - 8px) / 2));
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 160px;
+  flex-shrink: 0;
+  padding-bottom: 4px;
+}
+.brain-composer > .brain-attachment-row:has(> :only-child) {
+  grid-template-rows: 68px;
+}
+.brain-composer > .brain-attachment-row:empty {
+  display: none;
+}
+.brain-composer {
+  max-height: calc(100dvh - 240px);
+}
+.brain-composer > textarea {
+  flex-shrink: 1;
+  overflow-y: auto;
+}
+.brain-composer-actions {
+  flex-shrink: 0;
+}
+.brain-composer > .brain-context-chips {
+  max-height: 80px;
+  overflow: auto;
+}
+.brain-attachment {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--card);
+  font-size: 12px;
+}
+.brain-attachment > img {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.brain-attachment > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.brain-attachment > .tooltip-wrap {
+  flex-shrink: 0;
+}
+.brain-attachment small {
+  display: block;
+  font-size: 11px;
+}
+.brain-attachment.refused {
+  border-color: var(--danger-ink);
+}
+.brain-attachment.refused small {
+  color: var(--danger-ink);
+}
+.brain-composer > .brain-attachment-row .brain-attachment > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brain-composer > .brain-attachment-row .brain-attachment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brain-transcript-attachment {
+  position: relative;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.brain-transcript-attachment:has(.brain-image-preview) {
+  padding-right: 152px;
+}
+.brain-image-preview {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.brain-image-preview img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.brain-add-to-canvas {
+  opacity: 0;
+  position: absolute;
+  top: 4px;
+  left: 64px;
+  white-space: nowrap;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.brain-transcript-attachment:hover .brain-add-to-canvas,
+.brain-transcript-attachment:focus-within .brain-add-to-canvas {
+  opacity: 1;
+}
+.brain-lightbox-image {
+  display: block;
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+}
+@keyframes brain-control-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-controls-popover {
+    animation: none;
+  }
+  .brain-add-to-canvas {
+    transition: none;
+  }
+}
+@media (max-width: 600px) {
+  .brain-control-chip {
+    max-width: 112px;
+  }
+}

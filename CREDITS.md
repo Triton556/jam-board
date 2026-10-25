@@ -29,7 +29,7 @@ Jam Board is MIT licensed, copyright 2026 Danil Volodin. Dependencies retain the
 | sharp | Apache-2.0 (bundled libvips: LGPL-3.0-or-later) |
 | Fontsource package tooling | MIT |
 
-Self-hosted fonts: Fraunces (Undercase Type), Manrope (Mikhail Sharanda and contributors), JetBrains Mono (JetBrains), Caveat (Pablo Impallari and contributors). Font artwork is distributed under SIL Open Font License 1.1; license notices are included in `apps/desktop/src/assets/licenses/`. Fonts are the explicitly specified artwork assets, not a replacement software dependency.
+Self-hosted fonts: PT Serif and PT Serif Caption (ParaType), Shantell Sans (Arrow Type / Shantell Martin), and JetBrains Mono (JetBrains). All font artwork uses SIL Open Font License 1.1; original license texts are included in `apps/desktop/src/assets/licenses/`. Regular UI text uses PT Serif Caption; emphasized UI weights use real PT Serif 700 glyphs through the Jam Text alias; headings use PT Serif and handwritten accents use Shantell Sans.
 
 The sticker/J/star icon is original vector artwork for Jam Board, generated to platform sizes by the Tauri CLI. M3–M5 include only the five approved chibi PNGs supplied by Danil (`danil-laptop`, `duo-board`, `wife-paint`, `duo-hello`, `danil-wave`) and their local WebP derivatives. The source is the approved `chibi-heroes-20261019/out/` collection. No photographs, reference sheets or external image services are included. These are likenesses of Danil and his wife; permission for these approved chibi does not extend to other images or reference material.
 

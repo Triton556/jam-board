@@ -19,6 +19,7 @@ import { taskPatch, taskValues } from "./task-form";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {

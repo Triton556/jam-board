@@ -248,6 +248,40 @@ pub struct RefFrame {
     pub archived_at: Option<String>,
     #[serde(default)]
     pub collapsed: bool,
+    #[serde(default)]
+    pub links: Vec<RefFrameTarget>,
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReferenceTargetKind {
+    #[default]
+    Epic,
+    Story,
+    Task,
+}
+record!(RefFrameTarget {
+    target_key: String,
+    kind: ReferenceTargetKind,
+    title: String
+});
+record!(RefFrameLink {frame_id:String,target_type:String,target_id:String,archived_at:Option<String>});
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReferenceVerdict {
+    Keep,
+    Reject,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReferenceVerdictInput {
+    pub item_id: String,
+    pub verdict: Option<ReferenceVerdict>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RefFrameLinkInput {
+    pub frame_id: String,
+    pub target_key: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -269,6 +303,14 @@ pub struct RefItem {
     pub link_preview: Option<String>,
     #[serde(default)]
     pub metadata: Option<String>,
+    #[serde(default)]
+    pub verdict: Option<ReferenceVerdict>,
+    #[serde(default)]
+    pub archived_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_title: Option<String>,
 }
 record!(RefEdge {id:String,jam_id:String,from_item:String,to_item:String,label:String,archived_at:Option<String>});
 record!(RefLink {item_id:String,target_type:String,target_id:String,archived_at:Option<String>});
@@ -277,6 +319,8 @@ record!(RefLink {item_id:String,target_type:String,target_id:String,archived_at:
 pub struct AddReference {
     pub kind: String,
     pub file_path: Option<String>,
+    #[serde(default)]
+    pub copy: Option<bool>,
     pub url: Option<String>,
     pub text: Option<String>,
     pub title: Option<String>,

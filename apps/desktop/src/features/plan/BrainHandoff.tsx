@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, MessageSquareText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, SegmentedControl } from "../../components/ui";
+import { api } from "../../lib/api";
 import {
   brainHandoff,
   type HandoffMode,
@@ -9,6 +10,7 @@ import {
   type HandoffScope,
 } from "../../lib/brain-handoff";
 import { appQuery } from "../../lib/queries";
+import { useBrainDock } from "../brain/brain-store";
 import { usePlanningDraft } from "./planning-draft";
 
 type Snapshot = {
@@ -128,15 +130,96 @@ function HandoffDialog({
   copy(prompt: string): Promise<void>;
 }) {
   const { scope, project } = snapshot;
+  const client = useQueryClient();
+  const dock = useBrainDock();
+  const [composing, setComposing] = useState(false);
+  const [composeError, setComposeError] = useState("");
+  const composeLock = useRef(false),
+    mounted = useRef(true),
+    epoch = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    let selected = selectedProjectId;
+    const unsubscribe = client.getQueryCache().subscribe((event) => {
+      if (event.query.queryKey[0] !== "app") return;
+      const next = client.getQueryData<
+        Awaited<ReturnType<typeof api.appState>>
+      >(["app"])?.jam?.id;
+      if (next !== selected) {
+        selected = next;
+        epoch.current++;
+      }
+    });
+    return () => {
+      mounted.current = false;
+      epoch.current++;
+      unsubscribe();
+    };
+  }, [client, selectedProjectId]);
   const draft = usePlanningDraft(
     emptyRequest,
     `handoff:${project.id}:${scope.type}:${scope.id ?? project.id}`,
   );
   const prompt = brainHandoff(scope, project, draft.value);
+  const openChat = async () => {
+    if (composeLock.current || pending || selectedProjectId !== project.id)
+      return;
+    composeLock.current = true;
+    setComposing(true);
+    setComposeError("");
+    const capturedEpoch = epoch.current;
+    const current = () =>
+      mounted.current &&
+      epoch.current === capturedEpoch &&
+      client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])
+        ?.jam?.id === project.id;
+    try {
+      if (!current()) return;
+      const entity =
+        scope.type === "project"
+          ? project
+          : scope.type === "epic"
+            ? (await api.getEpic(scope.key)).epic
+            : scope.type === "story"
+              ? (await api.getStory(scope.key)).story
+              : await api.getTask(scope.key);
+      if (!current()) return;
+      if (
+        scope.type !== "project" &&
+        (entity.id !== scope.id ||
+          !("jamId" in entity) ||
+          entity.jamId !== project.id)
+      )
+        throw new Error(
+          "The scope changed. Close and reopen this preview for the intended scope.",
+        );
+      const title = "title" in entity ? entity.title : project.name;
+      const key = scope.key ?? project.keyPrefix;
+      dock.compose({
+        text: prompt,
+        context: [
+          {
+            type: "board_ref",
+            uri: `jam://${scope.type}/${scope.key ?? project.id}`,
+            label: `${key} · ${title}`,
+            text: `${scope.type}: ${title}`,
+          },
+        ],
+      });
+      close();
+    } catch (error) {
+      if (current())
+        setComposeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      composeLock.current = false;
+      if (mounted.current) setComposing(false);
+    }
+  };
+  const busy = pending || composing;
   const words = prompt.trim().split(/\s+/u).length;
   const bytes = new TextEncoder().encode(prompt).length;
   const edit = (value: typeof emptyRequest) => {
-    if (pending) return;
+    if (busy) return;
     draft.change(value, false);
     clearNotice();
   };
@@ -177,7 +260,7 @@ function HandoffDialog({
             label="Conversation context"
             value={draft.value.mode}
             onChange={(mode) => edit({ ...draft.value, mode })}
-            disabled={pending}
+            disabled={busy}
             options={[
               { value: "setup", label: "First / new chat" },
               { value: "continue", label: "Continue in this chat" },
@@ -196,7 +279,7 @@ function HandoffDialog({
           <textarea
             aria-label="What should change?"
             value={draft.value.request}
-            disabled={pending}
+            disabled={busy}
             rows={3}
             onChange={(event) =>
               edit({ ...draft.value, request: event.target.value })
@@ -220,14 +303,19 @@ function HandoffDialog({
           </span>
         </label>
         {notice && <p role="status">{notice}</p>}
+        {composeError && <p role="alert">{composeError}</p>}
         <div className="dialog-actions">
           <Button onClick={close}>Close</Button>
+          <Button disabled={busy} onClick={() => void copy(prompt)}>
+            <Copy size={16} /> {pending ? "Copying…" : "Copy planning prompt"}
+          </Button>
           <Button
             variant="primary"
-            disabled={pending}
-            onClick={() => void copy(prompt)}
+            disabled={busy || selectedProjectId !== project.id}
+            onClick={() => void openChat()}
           >
-            <Copy size={16} /> {pending ? "Copying…" : "Copy planning prompt"}
+            <MessageSquareText size={16} />{" "}
+            {composing ? "Preparing chat…" : "Open in brain chat"}
           </Button>
         </div>
       </div>

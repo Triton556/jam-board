@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { labels, statuses } from "../../lib/types";
-import { Button } from "./index";
+import { Button, Tooltip } from "./index";
 import { RoughLine } from "./RoughLine";
 export const memberColors = [
   "#5B8DEF",
@@ -9,6 +9,14 @@ export const memberColors = [
   "#9B7BE0",
   "#F07E5F",
   "#D8A630",
+];
+export const memberColorNames = [
+  "Blue",
+  "Pink",
+  "Green",
+  "Purple",
+  "Coral",
+  "Gold",
 ];
 export function Switch({
   label,
@@ -51,14 +59,15 @@ export function ColorSwatches({
     <fieldset className="color-swatches">
       <legend>Color</legend>
       {memberColors.map((c, i) => (
-        <button
-          key={c}
-          type="button"
-          aria-label={`Color ${i + 1}`}
-          aria-pressed={value === c}
-          style={{ background: c }}
-          onClick={() => onChange(c)}
-        />
+        <Tooltip key={c} text={memberColorNames[i] ?? c}>
+          <button
+            type="button"
+            aria-label={`Color ${i + 1}`}
+            aria-pressed={value === c}
+            style={{ background: c }}
+            onClick={() => onChange(c)}
+          />
+        </Tooltip>
       ))}
     </fieldset>
   );
