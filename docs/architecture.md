@@ -1,11 +1,16 @@
 # Architecture
 
-Jam Board runs entirely on the user's computer. There are no accounts, hosted services, analytics, or remote database. Asset files stay in place; SQLite stores references to them.
+Jam Board stores project records locally in SQLite and has no hosted board backend or analytics. Asset files stay in place. Optional brain-dock runtimes use the person's configured CLI login or API provider; prompts and attached context can leave the computer through that selected runtime.
 
 ```mermaid
 flowchart LR
   UI[Window · React] <-->|typed commands / events| Bridge[tauri-specta]
   Bridge <--> Core[jam-core]
+  Bridge <--> DockRuntime[jam-agents: sessions / profiles / secrets]
+  DockRuntime -->|ACP or PTY| DockAgent[Dock-owned agent subprocess]
+  DockRuntime -->|API chat HTTP| Provider[Configured OpenAI-compatible provider]
+  DockAgent <-->|project-pinned stdio| CLI
+  DockRuntime <-->|API tools: project-pinned stdio| CLI
   Core <--> DB[(SQLite · WAL)]
   Agents[Codex / Claude Code] <-->|stdio| CLI[jam-board-mcp]
   CLI <--> MCP[jam-mcp · rmcp]
@@ -18,9 +23,32 @@ flowchart LR
 
 ## Processes and crates
 
-`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to 44 MCP tools, resources, three prompts and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
+`jam-core` owns migrations, validation, task numbering/ordering, claims, archives, import/export, settings and change feed. It depends on neither Tauri nor rmcp. `jam-mcp` adapts those services to 52 MCP tools, resources, three prompts and authenticated HTTP. `jam-mcp-cli` is the thin stdio binary. `apps/desktop/src-tauri` owns the window, commands, HTTP lifecycle and native integrations; its React frontend lives in `apps/desktop/src`.
 
 The installer places `jam-board.exe` and `jam-board-mcp.exe` together. Installed processes use `%APPDATA%\dev.triton556.jamboard\jam.db`. Development sets `JAM_BOARD_DATA_DIR` to a directory inside `.dev-data`. The CLI resolves `--db`, then `JAM_BOARD_DB`, then `JAM_BOARD_DATA_DIR/jam.db`, then the platform default. The HTTP server exists only while the desktop is open; stdio can work independently.
+
+## Brain dock runtimes
+
+[The brain-dock contract](brain-dock.md) owns this increment. `jam-agents` is a
+Tauri-independent runtime crate for profiles, executable detection, OS credential
+store access, ACP chat, PTY terminals, built-in API chat, session events and owned
+process cleanup. `agent_commands.rs` captures project context and adapts commands
+and events to `features/brain` through `lib/agent-dock-*.ts`.
+
+Each explicit dock start captures project ID, data directory, cwd and profile
+`JAM_AGENT_NAME`; ACP receives jam-board in session/new, known terminal CLIs get
+MCP arguments, and API chat uses an rmcp client against its own jam-board sidecar.
+The in-app agent is an ordinary MCP client with the same authority checks. API
+chat currently has only jam-board tools: read-only calls auto-run, writes ask for
+permission; that permission never grants board Start. Optional API keys use the
+OS credential store, not SQLite/profile JSON; views expose boolean status only.
+
+The shell controller retains bounded in-memory session events while panels
+close/remount. Profiles persist separately; transcripts do not resume after app
+restart. Explicit runtime start/Stop is distinct from planning, board Start and
+Pause/Release. Board entry points stage drafts without sending. Real adapters,
+packaged cleanup and rendered integration remain [unverified gaps](agents/known-gaps.md#brain-dock-integration-boundary);
+source and fake-provider tests are not live-model or native acceptance.
 
 ## One command, one domain implementation
 
@@ -93,9 +121,13 @@ React Flow retains every node/edge record, handles interaction and uses onlyRend
 
 Template-aware onboarding creates Game jam, Gamedev, Web app or Custom projects. Only Game jam uses a countdown; Gamedev and Web app may have a milestone. Used tags remain task data, separate from each template's suggestions. Human project changes run through one jam-core transaction and append one project.updated event. Project settings expose the existing immutable key prefix.
 
-Agents settings keeps the local MCP connection controls and adds a local playbook installer. The user selects a project and an agent-playbook checkout. The app checks harness.py, manifest.json and Python 3.12+, then launches only plan, install or verify with fixed argument positions and no shell. Each step has a 120-second process deadline; cancellation kills and waits for the Python child. Output streams through a typed skill-output event. The selected playbook path is stored in the local settings table.
-
-The app neither bundles nor downloads the playbook. A successful plan precedes a concrete installation confirmation, then install and verify run in order. The harness owns destination files and its private .harness-state/receipts in the selected checkout; the UI discloses both write locations. Source files and global agent configuration are not modified. Claude Code uses the harness CLI client identifier claude. Copyable commands use PowerShell single-quoted arguments; the actual runner uses separate argv values, never the displayed command string.
+Settings -> Agents now presents Brain dock profiles first. One session-remembered
+External agents (MCP) disclosure contains manual connection setup and the bundled
+Jam Board skill installer. The alpha41 bundled review/install/verify flow replaces
+the retired external Python/playbook installer; it preserves modified/foreign
+skills and keeps upgrade backups outside the catalog. It does not change global
+agent configuration, appoint a brain or launch a session. The dock's explicit
+New/start lifecycle is separate from that optional installation flow.
 
 ## V0.2 presentation and release boundary
 

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_specta::Event;
+mod agent_commands;
 mod canvas_commands;
 pub mod commands;
 mod execution_commands;
@@ -10,6 +11,7 @@ mod m5_commands;
 mod skill_commands;
 mod skill_runner;
 mod v2_commands;
+mod voice_commands;
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct McpCallsChanged {}
 
@@ -26,9 +28,11 @@ pub struct BoardChanged {
 pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
     macro_rules! desktop_commands {
         ($($extra:ident),*) => { tauri_specta::collect_commands![
+            voice_commands::voice_status,voice_commands::voice_prepare,voice_commands::voice_settings_save,voice_commands::voice_install,voice_commands::voice_cancel_install,voice_commands::voice_remove,voice_commands::voice_transcribe,voice_commands::voice_unload,
+            agent_commands::agent_model_catalog,agent_commands::add_agent_attachment,agent_commands::remove_agent_attachment,agent_commands::agent_profiles,agent_commands::save_agent_profile,agent_commands::delete_agent_profile,agent_commands::set_agent_secret,agent_commands::clear_agent_secret,agent_commands::agent_sessions,agent_commands::start_agent_session,agent_commands::send_agent_prompt,agent_commands::cancel_agent_turn,agent_commands::resolve_agent_permission,agent_commands::set_agent_config_option,agent_commands::stop_agent_session,agent_commands::agent_session_history,agent_commands::terminal_write,agent_commands::terminal_resize,agent_commands::terminal_snapshot,
             skill_commands::pick_folder,skill_commands::skill_saved_path,skill_commands::skill_check,skill_commands::cancel_skill,skill_commands::run_skill,
             canvas_commands::reference_canvas,canvas_commands::canvas_geometry,canvas_commands::canvas_archive,canvas_commands::reference_metadata,canvas_commands::update_ref_edge,canvas_commands::clipboard_reference,canvas_commands::fetch_reference_preview,canvas_commands::clear_reference_preview,canvas_commands::canvas_viewport,canvas_commands::reference_media,
-            v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
+            v2_commands::set_reference_verdict,v2_commands::link_ref_frame,v2_commands::unlink_ref_frame,v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
             v2_commands::get_project,v2_commands::update_project,v2_commands::list_epics,v2_commands::get_epic,v2_commands::get_story,v2_commands::create_epic,v2_commands::update_epic,v2_commands::set_epic_status,v2_commands::create_story,v2_commands::update_story,v2_commands::set_story_status,v2_commands::update_task_brief,v2_commands::check_ready,v2_commands::mark_ready,v2_commands::answer_question,v2_commands::ask_user,v2_commands::withdraw_question,v2_commands::list_questions,v2_commands::review_task,v2_commands::submit_report,v2_commands::set_brain,v2_commands::list_changes_since,v2_commands::epic_journal,v2_commands::add_reference,v2_commands::list_references,v2_commands::update_reference,v2_commands::link_reference,v2_commands::unlink_reference,v2_commands::archive_reference,v2_commands::list_ref_frames,v2_commands::create_ref_frame,v2_commands::update_ref_frame,v2_commands::archive_ref_frame,v2_commands::list_ref_edges,v2_commands::create_ref_edge,v2_commands::archive_ref_edge,v2_commands::update_ref_geometry,
             execution_commands::get_execution,execution_commands::list_execution,execution_commands::set_execution,execution_commands::list_execution_requests,execution_commands::resolve_execution_request,
             commands::list_projects, commands::select_project, commands::restore_project,
@@ -46,7 +50,10 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
         .events(tauri_specta::collect_events![
             BoardChanged,
             McpCallsChanged,
-            skill_commands::SkillOutput
+            voice_commands::VoiceProgress,
+            skill_commands::SkillOutput,
+            agent_commands::DockEvent,
+            agent_commands::TerminalOutputEvent
         ]);
     #[cfg(debug_assertions)]
     let builder = builder.commands(desktop_commands!(seed_bulk));
@@ -134,6 +141,8 @@ pub fn run() {
                 feed: feed.clone(),
             });
             app.manage(runtime.clone());
+            app.manage(agent_commands::manager(store.clone(), app.handle().clone()));
+            app.manage(voice_commands::manager(&data_dir, app.handle().clone())?);
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = runtime.listen_stdio().await {
                     tracing::error!(%e,"Cannot receive stdio call metadata");
@@ -186,6 +195,18 @@ pub fn run() {
             });
             Ok(())
         })
-        .run(context)
-        .expect("run Jam Board");
+        .build(context)
+        .expect("build Jam Board")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit)
+                && let Some(runtime) = app.try_state::<jam_voice::LocalWhisper>()
+            {
+                runtime.shutdown();
+            }
+            if matches!(event, tauri::RunEvent::Exit)
+                && let Some(runtime) = app.try_state::<Arc<jam_agents::SessionManager>>()
+            {
+                tauri::async_runtime::block_on(runtime.stop_all());
+            }
+        });
 }

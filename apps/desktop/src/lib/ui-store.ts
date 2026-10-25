@@ -24,6 +24,20 @@ type UiState = {
   agentPulse: Record<string, number>;
   toasts: ToastMessage[];
   sidebarExpanded: boolean;
+  brainDockOpen: boolean;
+  brainDockWidth: number;
+  brainPreferences: Record<
+    string,
+    {
+      model?: string;
+      effort?: string;
+      recent?: string[];
+      starred?: string[];
+      options?: import("./agent-dock-api").ConfigOption[];
+    }
+  >;
+  setBrainDockOpen(open: boolean): void;
+  setBrainDockWidth(width: number): void;
   soundEnabled: boolean;
   quickColumn: string | null;
   readyRequest: import("./types").MoveInput | null;
@@ -45,7 +59,38 @@ function savedSidebar() {
     return false;
   }
 }
+function savedDock(key: string, fallback: number) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : Number(value);
+  } catch {
+    return fallback;
+  }
+}
+export function clampDockWidth(width: number) {
+  return Number.isFinite(width) ? Math.min(720, Math.max(340, width)) : 420;
+}
 export const useUiStore = create<UiState>((set) => ({
+  brainPreferences: {},
+  brainDockOpen: savedDock("jam.brainDockOpen", 0) === 1,
+  brainDockWidth: clampDockWidth(savedDock("jam.brainDockWidth", 420)),
+  setBrainDockOpen: (brainDockOpen) => {
+    try {
+      localStorage.setItem("jam.brainDockOpen", brainDockOpen ? "1" : "0");
+    } catch {
+      /* Optional persistence. */
+    }
+    set({ brainDockOpen });
+  },
+  setBrainDockWidth: (value) => {
+    const brainDockWidth = clampDockWidth(value);
+    try {
+      localStorage.setItem("jam.brainDockWidth", String(brainDockWidth));
+    } catch {
+      /* Optional persistence. */
+    }
+    set({ brainDockWidth });
+  },
   now: Date.now(),
   highlights: {},
   agentPulse: {},

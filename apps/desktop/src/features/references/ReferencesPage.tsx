@@ -14,6 +14,7 @@ import {
   ViewportPortal,
 } from "@xyflow/react";
 import {
+  ChevronDown,
   Focus,
   Frame,
   Link2,
@@ -21,12 +22,26 @@ import {
   Minus,
   Plus,
   Redo2,
+  StickyNote,
   Undo2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import paint from "../../assets/chibi/wife-paint-256.webp";
 import type { CanvasGeometry, RefFrame, RefItem } from "../../bindings";
-import { Button, Dialog, EmptyState, IconButton } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  IconButton,
+  Tooltip,
+} from "../../components/ui";
 import {
   PaperSkeleton,
   QueryError,
@@ -40,6 +55,10 @@ import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
 import { useUiStore } from "../../lib/ui-store";
 import { useExplicitRead } from "../../lib/use-explicit-read";
+import { useProjectWrite } from "../../lib/use-project-write";
+import { useBrainDock } from "../brain/brain-store";
+import { referenceBrainContext, useCanvasBrainContext } from "./brain-context";
+import { referenceLinkActions, verdictActions } from "./canvas-actions";
 import { useClipboardImagePaste } from "./clipboard-paste";
 import { referenceControlsBottom } from "./control-layout";
 import { DraftNote } from "./DraftNote";
@@ -51,11 +70,22 @@ import {
 import { ReferenceEdge } from "./Edge";
 import { EdgeLabelDialog } from "./EdgeLabelDialog";
 import { referenceFitViewport } from "./frame-layout";
-import { stopReferenceAudio } from "./Media";
+import { LinkTargetDialog } from "./LinkTargetDialog";
 import {
-  CanvasHistory,
+  boardDropTarget,
+  canvasPick,
+  choiceRefs,
+  dispatchBoardDrop,
+  dragPoint,
+  frameTargets,
+  type ReferenceChoice,
+} from "./linking";
+import { stopReferenceAudio } from "./Media";
+import type { UndoAction } from "./model";
+import {
   debounceSave,
   geometryAt,
+  getCanvasHistory,
   linkedTargets,
   palette,
   parentAt,
@@ -72,10 +102,16 @@ import {
   ReferenceFrame,
   ReferenceNode,
 } from "./Nodes";
+import { NoteTaskDialog } from "./NoteTaskDialog";
 import { placedNoteLayout } from "./note-draft-layout";
 import { OverviewScene } from "./OverviewScene";
+import {
+  ReferenceDragPreview,
+  type ReferenceDragPreviewData,
+} from "./ReferenceDragPreview";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
 import { editedNoteTarget, retainNoteEditors } from "./sticky-node-ownership";
+import { useViewportGesture } from "./use-viewport-gesture";
 import "@xyflow/react/dist/style.css";
 import "./references.css";
 
@@ -92,13 +128,19 @@ declare global {
 }
 const nodeTypes = { reference: ReferenceNode, frame: ReferenceFrame },
   edgeTypes = { reference: ReferenceEdge };
-const histories = new Map<string, CanvasHistory>();
 export const referencesQuery = {
   queryKey: ["references"],
   queryFn: () => api.referenceCanvas(),
   staleTime: Infinity,
 };
 function Canvas() {
+  const dock = useBrainDock();
+  const brainCompose = useRef(dock.compose);
+  brainCompose.current = dock.compose;
+  const compose = useCallback(
+    (draft: Parameters<typeof dock.compose>[0]) => brainCompose.current(draft),
+    [],
+  );
   const batch = useFileDropBatch("references"),
     pasteImage = useClipboardImagePaste();
   const query = useQuery(referencesQuery),
@@ -131,15 +173,18 @@ function Canvas() {
       maxHeight: number;
     } | null>(null),
     [placingNote, setPlacingNote] = useState<string | null>(null),
+    [taskNote, setTaskNote] = useState<RefItem | null>(null),
     [menu, setMenu] = useState(false),
     [frameEdit, setFrameEdit] = useState<RefFrame | null>(null),
     [edit, setEdit] = useState<{
       id: string;
       mode: "caption" | "tags" | "link";
     } | null>(null),
-    [lightbox, setLightbox] = useState<{ url: string; title: string } | null>(
-      null,
-    ),
+    [lightbox, setLightbox] = useState<{
+      url: string;
+      title: string;
+      kind?: "video";
+    } | null>(null),
     [edgeEdit, setEdgeEdit] = useState<{ id: string; label: string } | null>(
       null,
     ),
@@ -148,6 +193,124 @@ function Canvas() {
     dragging = useRef(false),
     selectNext = useRef<string | undefined>(undefined);
   const activeNotes = useRef(new Set<string>());
+  const viewportGesture = useViewportGesture();
+  const [linkSelection, setLinkSelection] = useState<ReferenceChoice[] | null>(
+    null,
+  );
+  const pick = useSyncExternalStore(canvasPick.subscribe, canvasPick.get);
+  const pickWrite = useProjectWrite("canvas-pick", pick?.projectId);
+  const pickBusy = pickWrite.pending;
+  const dragOrigin = useRef<CanvasNode[]>([]);
+  const dragCancelled = useRef(false);
+  const dropHighlight = useRef<HTMLElement | null>(null);
+  const [dragPreview, setDragPreview] =
+    useState<ReferenceDragPreviewData | null>(null);
+  const [marquee, setMarquee] = useState<{
+    x: number;
+    y: number;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const marqueeOrigin = useRef<{
+    x: number;
+    y: number;
+    selected: Set<string>;
+    hit?: string;
+  } | null>(null);
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const origin = marqueeOrigin.current;
+      if (!origin) return;
+      const left = Math.min(origin.x, event.clientX),
+        top = Math.min(origin.y, event.clientY);
+      const rect = container.current?.getBoundingClientRect();
+      setMarquee({
+        x: left - (rect?.left ?? 0),
+        y: top - (rect?.top ?? 0),
+        left,
+        top,
+        width: Math.abs(event.clientX - origin.x),
+        height: Math.abs(event.clientY - origin.y),
+      });
+      if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 4)
+        return;
+      const a = flow.screenToFlowPosition({ x: left, y: top }),
+        b = flow.screenToFlowPosition({
+          x: Math.max(origin.x, event.clientX),
+          y: Math.max(origin.y, event.clientY),
+        });
+      setNodes((ns) =>
+        ns.map((node) => {
+          const parent = ns.find((n) => n.id === node.parentId);
+          const x = node.position.x + (parent?.position.x ?? 0),
+            y = node.position.y + (parent?.position.y ?? 0);
+          const intersects =
+            x < b.x &&
+            y < b.y &&
+            x + (node.measured?.width ?? node.width ?? 240) > a.x &&
+            y + (node.measured?.height ?? node.height ?? 180) > a.y;
+          return {
+            ...node,
+            selected:
+              origin.selected.has(node.id) || (!node.hidden && intersects),
+          };
+        }),
+      );
+    };
+    const end = (event: PointerEvent) => {
+      const origin = marqueeOrigin.current;
+      if (
+        origin &&
+        Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 4 &&
+        origin.hit
+      )
+        setNodes((ns) =>
+          ns.map((n) => ({
+            ...n,
+            selected:
+              n.id === origin.hit
+                ? !origin.selected.has(n.id)
+                : origin.selected.has(n.id),
+          })),
+        );
+      marqueeOrigin.current = null;
+      setMarquee(null);
+    };
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (marqueeOrigin.current) {
+        const selected = marqueeOrigin.current.selected;
+        setNodes((ns) =>
+          ns.map((n) => ({ ...n, selected: selected.has(n.id) })),
+        );
+        marqueeOrigin.current = null;
+        setMarquee(null);
+      }
+      if (!dragging.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dragCancelled.current = true;
+      setDragPreview(null);
+      setNodes(dragOrigin.current);
+      dropHighlight.current?.classList.remove("board-ref-drag-over");
+      dropHighlight.current = null;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("keydown", cancel, true);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("keydown", cancel, true);
+      dropHighlight.current?.classList.remove("board-ref-drag-over");
+    };
+  }, [flow]);
+  useEffect(() => {
+    if (pick && app.data?.jam && pick.projectId !== app.data.jam.id)
+      canvasPick.set(null);
+  }, [pick, app.data?.jam]);
   const [editingNotes, setEditingNotes] = useState<ReadonlySet<string>>(
     new Set(),
   );
@@ -196,6 +359,26 @@ function Canvas() {
     .filter((n) => n.type === "reference" && n.selected)
     .map((n) => n.id)
     .join(",");
+  const canvasContext = useMemo(
+    () =>
+      nodes
+        .filter(
+          (node): node is ItemNode =>
+            node.type === "reference" &&
+            !!node.selected &&
+            !node.hidden &&
+            !node.data.item.archivedAt &&
+            node.data.item.jamId === app.data?.jam?.id,
+        )
+        .map((node) =>
+          referenceBrainContext(
+            node.data.item,
+            node.data.links.map((link) => link.key),
+          ),
+        ),
+    [nodes, app.data?.jam?.id],
+  );
+  useCanvasBrainContext(canvasContext);
   const excluded = nodes
     .filter(
       (n) =>
@@ -220,12 +403,7 @@ function Canvas() {
   );
   const history = useMemo(() => {
     const id = app.data?.jam?.id ?? "empty";
-    let h = histories.get(id);
-    if (!h) {
-      h = new CanvasHistory();
-      histories.set(id, h);
-    }
-    return h;
+    return getCanvasHistory(id);
   }, [app.data?.jam?.id]);
   const targets = useMemo<
     {
@@ -272,6 +450,87 @@ function Canvas() {
     (e: unknown) => useUiStore.getState().error(String(e)),
     [],
   );
+  const pendingGroup = useRef<Promise<unknown> | null>(null);
+  const runGroup = useCallback(
+    async (label: string, actions: UndoAction[]) => {
+      if (history.busy)
+        throw Error("Wait for the current canvas change to finish.");
+      const projectId = app.data?.jam?.id;
+      const guard = async (perform: () => Promise<unknown>) => {
+        if (!projectId || (await api.appState()).jam?.id !== projectId)
+          throw Error("The project changed before the canvas change finished.");
+        return perform();
+      };
+      const result = history.perform(
+        label,
+        actions.map((action) => ({
+          label: action.label,
+          undo: () => guard(action.undo),
+          redo: () => guard(action.redo),
+        })),
+      );
+      pendingGroup.current = result;
+      try {
+        await result;
+      } finally {
+        if (pendingGroup.current === result) pendingGroup.current = null;
+        setRevision((r) => r + 1);
+        void refresh().catch(error);
+      }
+    },
+    [app.data?.jam?.id, history, refresh, error],
+  );
+  const linkSelectionTo = useCallback(
+    async (choices: ReferenceChoice[], key: string) => {
+      if (!latest.current) return;
+      await runGroup(
+        "Link references",
+        referenceLinkActions(choices, key, latest.current, targets),
+      );
+    },
+    [runGroup, targets],
+  );
+  const setVerdict = useCallback(
+    async (
+      item: RefItem,
+      verdict: import("../../lib/api").ReferenceVerdict,
+    ) => {
+      const selected = flow
+        .getNodes()
+        .filter(
+          (node): node is ItemNode =>
+            node.type === "reference" && !!node.selected,
+        );
+      const items = selected.some((node) => node.id === item.id)
+        ? selected.map((node) => node.data.item)
+        : [item];
+      if (items.some((row) => row.jamId !== app.data?.jam?.id))
+        throw Error("The project changed.");
+      await client.cancelQueries({ queryKey: ["references"] });
+      const update = (restore = false) =>
+        client.setQueryData<import("../../bindings").ReferenceCanvas>(
+          ["references"],
+          (current) =>
+            current && {
+              ...current,
+              items: current.items.map((row) => {
+                const before = items.find((item) => item.id === row.id);
+                return before
+                  ? { ...row, verdict: restore ? before.verdict : verdict }
+                  : row;
+              }),
+            },
+        );
+      update();
+      try {
+        await runGroup("Reference feedback", verdictActions(items, verdict));
+      } catch (reason) {
+        update(true);
+        throw reason;
+      }
+    },
+    [app.data?.jam?.id, client, flow, runGroup],
+  );
   const announce = useCallback((text: string) => setNotice(text), []);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fitCanvas = useCallback(
@@ -287,7 +546,10 @@ function Canvas() {
             ...flow.getNodesBounds([node.id]),
             frame:
               node.type === "frame"
-                ? { collapsed: !!node.data.frame.collapsed }
+                ? {
+                    collapsed: !!node.data.frame.collapsed,
+                    linked: frameTargets(node.data.frame).length > 0,
+                  }
                 : undefined,
           })),
         { width: bounds.width, height: bounds.height, toolsBottom },
@@ -316,8 +578,18 @@ function Canvas() {
       y: (rect?.top ?? 0) + (rect?.height ?? 600) / 2,
     });
   }, [flow]);
-  const placeNote = (clientPoint?: { x: number; y: number }) => {
-    if (!placingNote || placingNote !== app.data?.jam?.id || noteDraft) return;
+  const beginNote = () => {
+    if (noteDraft || !app.data?.jam) return;
+    setMenu(false);
+    setPlacingNote(app.data.jam.id);
+    container.current?.focus({ preventScroll: true });
+  };
+  const placeNote = (
+    clientPoint?: { x: number; y: number },
+    direct = false,
+  ) => {
+    const projectId = direct ? app.data?.jam?.id : placingNote;
+    if (!projectId || projectId !== app.data?.jam?.id || noteDraft) return;
     const bounds = container.current?.getBoundingClientRect();
     if (!bounds) return;
     const screen = clientPoint ?? {
@@ -336,7 +608,7 @@ function Canvas() {
     );
     setPlacingNote(null);
     setNoteDraft({
-      projectId: placingNote,
+      projectId,
       x: layout.x,
       y: layout.y,
       maxHeight: layout.maxHeight,
@@ -438,32 +710,34 @@ function Canvas() {
     },
     [history, refresh, error],
   );
-  const archive = useCallback(
-    (kind: "item" | "frame" | "edge", id: string) => {
+  const archiveGroup = useCallback(
+    (choices: { kind: "item" | "frame" | "edge"; id: string }[]) => {
       try {
-        requireFinishedNote(kind, id);
-      } catch (reason) {
-        error(reason);
-        return;
-      }
-      void api
-        .canvasArchive({ kind, id, archived: true })
-        .then(async () => {
-          history.record({
+        for (const choice of choices)
+          requireFinishedNote(choice.kind, choice.id);
+        void runGroup(
+          "Archive reference",
+          choices.map(({ kind, id }) => ({
             label: "Archive reference",
             undo: () => api.canvasArchive({ kind, id, archived: false }),
             redo: () => {
               requireFinishedNote(kind, id);
               return api.canvasArchive({ kind, id, archived: true });
             },
-          });
-          setRevision((r) => r + 1);
-          announce("Archived reference");
-          await refresh();
-        })
-        .catch(error);
+          })),
+        )
+          .then(() => announce("Archived reference"))
+          .catch(error);
+      } catch (reason) {
+        error(reason);
+      }
     },
-    [history, refresh, error, announce, requireFinishedNote],
+    [runGroup, requireFinishedNote, announce, error],
+  );
+  const archive = useCallback(
+    (kind: "item" | "frame" | "edge", id: string) =>
+      archiveGroup([{ kind, id }]),
+    [archiveGroup],
   );
   const open = useCallback(
     (key: string) => {
@@ -484,10 +758,26 @@ function Canvas() {
   );
   const runtime = useMemo<CanvasRuntime>(
     () => ({
-      edit: (id, mode) => setEdit({ id, mode }),
+      edit: (id, mode) =>
+        mode === "link"
+          ? setLinkSelection([{ id, kind: "item" }])
+          : setEdit({ id, mode }),
+      createTask: setTaskNote,
+      askBrain: (item, linkedKeys) => {
+        if (
+          client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])
+            ?.jam?.id !== item.jamId
+        )
+          return;
+        compose({
+          text: "",
+          context: [referenceBrainContext(item, linkedKeys)],
+        });
+      },
       archive,
+      verdict: setVerdict,
       open,
-      lightbox: (url, title) => setLightbox({ url, title }),
+      lightbox: (url, title, kind) => setLightbox({ url, title, kind }),
       edgeLabel: (id, label) => setEdgeEdit({ id, label }),
       noteEditing,
       noteSaved: (item, previous) => {
@@ -536,6 +826,13 @@ function Canvas() {
         }),
       resizeFrame: (frame, w, h) => queueFrame(frame, { w, h }),
       editFrame: setFrameEdit,
+      linkFrame: (frame) => setLinkSelection([{ kind: "frame", id: frame.id }]),
+      unlinkFrame: (frame, key) => {
+        void api.unlinkRefFrame(frame.id, key).then(refresh).catch(error);
+      },
+      unlinkItem: (item, key) => {
+        void api.unlinkReference(item.id, key).then(refresh).catch(error);
+      },
       collapse: (frame) => {
         if (!frame.collapsed) {
           try {
@@ -553,6 +850,7 @@ function Canvas() {
     }),
     [
       archive,
+      setVerdict,
       open,
       queueGeometry,
       queueFrame,
@@ -561,6 +859,8 @@ function Canvas() {
       error,
       noteEditing,
       requireFinishedNote,
+      compose,
+      client,
     ],
   );
   useEffect(() => {
@@ -578,6 +878,7 @@ function Canvas() {
         data: {
           frame: {
             ...f,
+            links: frameTargets(f, targets),
             color: epics.data?.find((e) => e.id === f.epicId)?.color ?? f.color,
           },
           dim: !!filter.length && !matched(f.epicId ?? "unlinked"),
@@ -596,7 +897,6 @@ function Canvas() {
         },
         handles: [],
         zIndex: -1,
-        dragHandle: ".reference-frame-tab",
         ariaLabel: `Reference frame: ${f.title}`,
       }));
     const items: ItemNode[] = data.items
@@ -793,6 +1093,7 @@ function Canvas() {
   const undo = useCallback(
     async (redo = false) => {
       try {
+        await pendingGroup.current;
         if (redo) await history.redo();
         else await history.undo();
         setRevision((r) => r + 1);
@@ -863,6 +1164,26 @@ function Canvas() {
     () =>
       api.onFileDrop((paths, point) => {
         if (document.querySelector(".drawer")) return;
+        // onFileDrop already converts Tauri's physical pixels to CSS pixels.
+        if (
+          point &&
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '[data-brain-dock], #brain-dock, [data-board-ref-drop="brain-composer"]',
+            ),
+          ).some((element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              point.x >= rect.left &&
+              point.x <= rect.right &&
+              point.y >= rect.top &&
+              point.y <= rect.bottom
+            );
+          })
+        )
+          return;
         void addFiles(
           paths,
           point ? flow.screenToFlowPosition(point) : center(),
@@ -906,6 +1227,96 @@ function Canvas() {
     },
     [flow, queueFrame, queueGeometry],
   );
+  const dropNodes = (moved: CanvasNode[]) => {
+    const ids = new Set(moved.map((node) => node.id));
+    const roots = moved.filter(
+      (node) => !node.parentId || !ids.has(node.parentId),
+    );
+    if (roots.length <= 1) {
+      for (const node of roots) dropNode(node);
+      return;
+    }
+    dragging.current = false;
+    const actions: UndoAction[] = [];
+    for (const node of roots) {
+      if (node.type === "frame") {
+        const before = { x: node.data.frame.x, y: node.data.frame.y };
+        const after = { x: node.position.x, y: node.position.y };
+        pendingFrames.current.set(node.id, after);
+        actions.push({
+          label: "Move frame",
+          undo: () => api.updateRefFrame(node.id, before),
+          redo: () => api.updateRefFrame(node.id, after),
+        });
+      } else {
+        const item = node.data.item,
+          parent = node.parentId ? flow.getNode(node.parentId) : null;
+        const after = geometryAt(
+          item,
+          {
+            x: node.position.x + (parent?.position.x ?? 0),
+            y: node.position.y + (parent?.position.y ?? 0),
+          },
+          (latest.current?.frames ?? []).map((frame) => {
+            const moving = roots.find((node) => node.id === frame.id);
+            return moving
+              ? { ...frame, x: moving.position.x, y: moving.position.y }
+              : frame;
+          }),
+        );
+        const before = {
+          id: item.id,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          z: item.z,
+          frameId: item.frameId,
+        };
+        pendingItems.current.set(item.id, after);
+        actions.push({
+          label: "Move reference",
+          undo: () => api.canvasGeometry(before),
+          redo: () => api.canvasGeometry(after),
+        });
+        setNodes((nodes) =>
+          nodes.map((node) =>
+            node.id === item.id
+              ? {
+                  ...node,
+                  parentId: after.frameId ?? undefined,
+                  position: { x: after.x ?? 0, y: after.y ?? 0 },
+                }
+              : node,
+          ),
+        );
+      }
+    }
+    void runGroup("Move references", actions)
+      .catch((reason) => {
+        setNodes((nodes) =>
+          nodes.map((node) => {
+            const moved = roots.find((moved) => moved.id === node.id);
+            if (!moved) return node;
+            const before =
+              moved.type === "frame" ? moved.data.frame : moved.data.item;
+            return {
+              ...node,
+              parentId:
+                "frameId" in before ? (before.frameId ?? undefined) : undefined,
+              position: { x: before.x ?? 0, y: before.y ?? 0 },
+            };
+          }),
+        );
+        error(reason);
+      })
+      .finally(() => {
+        for (const node of roots) {
+          pendingItems.current.delete(node.id);
+          pendingFrames.current.delete(node.id);
+        }
+      });
+  };
   if (query.isPending) return <PaperSkeleton label="Loading references" />;
   if (query.error && !query.data)
     return (
@@ -925,11 +1336,84 @@ function Canvas() {
   return (
     <CanvasContext.Provider value={runtime}>
       <section
-        className={`references-page ${placingNote ? "reference-placing-note" : ""}`}
+        className={`references-page ${placingNote ? "reference-placing-note" : ""} ${viewportGesture.moving ? "reference-viewport-moving" : ""}`}
         ref={container}
         tabIndex={-1}
         aria-label="References canvas"
         data-history-revision={revision}
+        onMouseDownCapture={(event) => {
+          if (
+            event.shiftKey &&
+            !(event.target as HTMLElement).closest(
+              "button, input, textarea, a, summary, .nodrag",
+            )
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          if (
+            (event.target as HTMLElement).closest(
+              "button, input, textarea, a, summary, video[controls]",
+            )
+          )
+            event.stopPropagation();
+        }}
+        onPointerDownCapture={(event) => {
+          const element = event.target as HTMLElement;
+          if (
+            event.button !== 0 ||
+            element.closest(
+              "button, input, textarea, a, summary, .nodrag, .react-flow__resize-control",
+            )
+          )
+            return;
+          if (event.shiftKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            marqueeOrigin.current = {
+              x: event.clientX,
+              y: event.clientY,
+              selected: new Set(
+                flow
+                  .getNodes()
+                  .filter((n) => n.selected)
+                  .map((n) => n.id),
+              ),
+              hit: element.closest<HTMLElement>(".react-flow__node")?.dataset
+                .id,
+            };
+          } else {
+            dragOrigin.current = flow.getNodes();
+            dragCancelled.current = false;
+          }
+        }}
+        onClickCapture={(event) => {
+          const target = event.target as HTMLElement;
+          if (
+            event.shiftKey &&
+            target.closest(".react-flow__node") &&
+            !target.closest("button, input, textarea, a, summary, .nodrag")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+        onDoubleClickCapture={(event) => {
+          if (dragCancelled.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          const target = event.target as HTMLElement;
+          if (
+            target.closest(".react-flow__pane") &&
+            !target.closest(".react-flow__node")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            placeNote({ x: event.clientX, y: event.clientY }, true);
+          }
+        }}
         onPaste={(e) => {
           const tag = (e.target as HTMLElement).tagName;
           if (["INPUT", "TEXTAREA"].includes(tag)) return;
@@ -955,6 +1439,23 @@ function Canvas() {
           })().catch(error);
         }}
         onKeyDownCapture={(e) => {
+          if (
+            (e.target as HTMLElement).closest(
+              'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="dialog"],dialog',
+            )
+          )
+            return;
+          if (
+            e.key.toLowerCase() === "n" &&
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.altKey
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            beginNote();
+            return;
+          }
           if (placingNote && (e.key === "Escape" || e.key === "Enter")) {
             e.preventDefault();
             e.stopPropagation();
@@ -989,7 +1490,7 @@ function Canvas() {
               ? flow.getNode(focused.dataset.id)
               : undefined;
           const chosen = flow.getNodes().filter((n) => n.selected),
-            selected = focusNode ? [focusNode] : chosen;
+            selected = focusNode && !focusNode.selected ? [focusNode] : chosen;
           if (
             (e.target as HTMLElement).closest(
               "button,a,summary,[role=combobox]",
@@ -1014,23 +1515,61 @@ function Canvas() {
           if (!selected.length) {
             if (e.key === "Delete" || e.key === "Backspace") {
               e.preventDefault();
-              for (const edge of flow
-                .getEdges()
-                .filter((edge) => edge.selected))
-                archive("edge", edge.id);
+              archiveGroup(
+                flow
+                  .getEdges()
+                  .filter((edge) => edge.selected)
+                  .map((edge) => ({ kind: "edge", id: edge.id })),
+              );
             }
             return;
           }
           if (e.key === "Delete" || e.key === "Backspace") {
             e.preventDefault();
             e.stopPropagation();
-            for (const n of selected)
-              archive(n.type === "frame" ? "frame" : "item", n.id);
+            archiveGroup(
+              selected.map((n) => ({
+                kind: n.type === "frame" ? "frame" : "item",
+                id: n.id,
+              })),
+            );
           }
           if (e.key === "Enter") {
-            const n = selected[0];
-            if (n?.type === "reference") setEdit({ id: n.id, mode: "caption" });
-            else if (n?.type === "frame") {
+            const n = focusNode ?? selected[0];
+            if (n?.type === "reference") {
+              if (n.data.item.kind === "note")
+                container.current
+                  ?.querySelector<HTMLButtonElement>(
+                    `[data-id="${CSS.escape(n.id)}"] .sticky-edit-button`,
+                  )
+                  ?.click();
+              else {
+                const item = n.data.item,
+                  kind = referenceKind(item, n.data.path);
+                if (kind === "link")
+                  void api.openUrl(item.url ?? "").catch(error);
+                else if (
+                  (kind === "image" || kind === "video") &&
+                  item.assetId
+                ) {
+                  void (
+                    kind === "image"
+                      ? api.assetPreview(item.assetId)
+                      : api.referenceMedia(item.assetId)
+                  )
+                    .then((url) => {
+                      if (url)
+                        runtime.lightbox(
+                          url,
+                          item.title,
+                          kind === "video" ? "video" : undefined,
+                        );
+                    })
+                    .catch(error);
+                } else if (kind !== "audio")
+                  void api.openReferenceFile(n.data.path).catch(error);
+              }
+            } else if (n?.type === "frame") {
               if (n.data.frame.collapsed) runtime.collapse(n.data.frame);
               else runtime.editFrame(n.data.frame);
             }
@@ -1041,7 +1580,7 @@ function Canvas() {
             e.preventDefault();
             e.stopPropagation();
             const step = e.shiftKey ? 32 : 8;
-            for (const n of selected) {
+            const moved = selected.map((n) => {
               const position = {
                 x:
                   n.position.x +
@@ -1061,8 +1600,9 @@ function Canvas() {
               setNodes((ns) =>
                 ns.map((v) => (v.id === n.id ? { ...v, position } : v)),
               );
-              dropNode({ ...n, position });
-            }
+              return { ...n, position };
+            });
+            dropNodes(moved);
           }
         }}
       >
@@ -1077,10 +1617,13 @@ function Canvas() {
           minZoom={0.1}
           maxZoom={4}
           nodeDragThreshold={4}
+          multiSelectionKeyCode="Shift"
           deleteKeyCode={null}
           snapToGrid
           snapGrid={[1, 1]}
           onNodesChange={(changes: NodeChange<CanvasNode>[]) => {
+            if (dragCancelled.current && dragging.current)
+              changes = changes.filter((change) => change.type !== "position");
             setNodes((ns) => applyNodeChanges(changes, ns));
             for (const change of changes) {
               if (
@@ -1128,10 +1671,72 @@ function Canvas() {
           }}
           onNodeDragStart={() => {
             dragging.current = true;
+            if (!dragOrigin.current.length)
+              dragOrigin.current = flow.getNodes();
           }}
-          onNodeDragStop={(_, node, dragged) => {
-            for (const moved of dragged.length ? dragged : [node])
-              dropNode(moved);
+          onNodeDrag={(event, node, dragged) => {
+            if (dragCancelled.current || !dragging.current) return;
+            const point = dragPoint(event);
+            const bounds = container.current?.getBoundingClientRect();
+            const hit = document
+              .elementsFromPoint(point.x, point.y)
+              .find((element) => !element.closest(".reference-drag-preview"));
+            const onCanvas =
+              bounds &&
+              point.x >= bounds.left &&
+              point.x <= bounds.right &&
+              point.y >= bounds.top &&
+              point.y <= bounds.bottom &&
+              (!hit || container.current?.contains(hit));
+            setDragPreview(
+              onCanvas ||
+                point.x < 0 ||
+                point.y < 0 ||
+                point.x > window.innerWidth ||
+                point.y > window.innerHeight
+                ? null
+                : {
+                    ...point,
+                    title:
+                      node.type === "frame"
+                        ? node.data.frame.title
+                        : referenceLabel(node.data.item),
+                    kind:
+                      node.type === "frame"
+                        ? "frame"
+                        : referenceKind(node.data.item, node.data.path),
+                    count: dragged.length || 1,
+                  },
+            );
+            const target = boardDropTarget(point.x, point.y);
+            if (target === dropHighlight.current) return;
+            dropHighlight.current?.classList.remove("board-ref-drag-over");
+            dropHighlight.current = target;
+            target?.classList.add("board-ref-drag-over");
+          }}
+          onNodeDragStop={(event, node, dragged) => {
+            setDragPreview(null);
+            const point = dragPoint(event);
+            const target = boardDropTarget(point.x, point.y);
+            dropHighlight.current?.classList.remove("board-ref-drag-over");
+            dropHighlight.current = null;
+            if (target || dragCancelled.current) {
+              setNodes(dragOrigin.current);
+              dragging.current = false;
+              if (target && !dragCancelled.current && latest.current)
+                dispatchBoardDrop(
+                  target,
+                  choiceRefs(
+                    (dragged.length ? dragged : [node]).map((n) => ({
+                      id: n.id,
+                      kind: n.type === "frame" ? "frame" : "item",
+                    })),
+                    latest.current,
+                  ),
+                );
+              return;
+            }
+            dropNodes(dragged.length ? dragged : [node]);
           }}
           onConnect={(connection) => {
             if (connection.source && connection.target)
@@ -1151,9 +1756,11 @@ function Canvas() {
           }}
           onNodeClick={() => setSelectedEdges([])}
           onEdgesDelete={(edges) => {
-            for (const edge of edges) archive("edge", edge.id);
+            archiveGroup(edges.map((edge) => ({ kind: "edge", id: edge.id })));
           }}
+          onMoveStart={viewportGesture.start}
           onMoveEnd={(_, v) => {
+            viewportGesture.end();
             viewportSave.schedule(v);
           }}
           proOptions={{ hideAttribution: false }}
@@ -1243,12 +1850,67 @@ function Canvas() {
             />
           )}
         </ReactFlow>
+        {marquee && (
+          <div
+            className="reference-marquee"
+            style={{
+              left: marquee.x,
+              top: marquee.y,
+              width: marquee.width,
+              height: marquee.height,
+            }}
+          />
+        )}
+        {pick && pick.projectId === app.data?.jam?.id && (
+          <section
+            className="reference-pick-banner"
+            aria-label="Pick references"
+          >
+            <span>Select items or a frame to link to {pick.targetKey}</span>
+            <Button
+              variant="primary"
+              disabled={!pickWrite.ready || !(selectedItems || selectedFrames)}
+              onClick={() => {
+                if (!pickWrite.ready) return;
+                const choices: ReferenceChoice[] = nodes
+                  .filter((n) => n.selected)
+                  .map((n) => ({
+                    id: n.id,
+                    kind: n.type === "frame" ? "frame" : "item",
+                  }));
+                pickWrite.run(
+                  () => linkSelectionTo(choices, pick.targetKey),
+                  () => {
+                    canvasPick.set(null);
+                    void refresh();
+                    void navigate({ href: pick.returnTo });
+                  },
+                );
+              }}
+            >
+              {pickBusy
+                ? "Linking…"
+                : `Link ${nodes.filter((n) => n.selected).length}`}
+            </Button>
+            <Button
+              disabled={pickBusy}
+              onClick={() => {
+                canvasPick.set(null);
+                void navigate({ href: pick.returnTo });
+              }}
+            >
+              Cancel
+            </Button>
+            {pickWrite.error && <p role="alert">{String(pickWrite.error)}</p>}
+          </section>
+        )}
         {placingNote && (
           <div className="reference-note-placement" role="status">
             Click the canvas to place a note · Enter places it in view · Escape
             cancels
           </div>
         )}
+        {dragPreview && <ReferenceDragPreview preview={dragPreview} />}
         <FileDropProgress progress={batch.progress} />
         <div className="reference-control-stack">
           <div
@@ -1256,14 +1918,26 @@ function Canvas() {
             role="toolbar"
             aria-label="Canvas tools"
           >
+            <Tooltip text="Note · N">
+              <Button
+                variant="primary"
+                aria-label="Note · N"
+                onClick={beginNote}
+                disabled={!!noteDraft || !!placingNote || !app.data?.jam}
+              >
+                <StickyNote size={16} /> Note
+              </Button>
+            </Tooltip>
             <div className="reference-add">
               <Button
                 data-reference-add
-                variant="primary"
+                variant="ghost"
+                aria-expanded={menu}
                 onClick={() => setMenu(!menu)}
               >
                 <Plus size={16} />
                 Add
+                <ChevronDown size={14} aria-hidden="true" />
               </Button>
               {menu && (
                 <div className="reference-add-menu">
@@ -1287,12 +1961,7 @@ function Canvas() {
                     Link…
                   </Button>
                   <Button
-                    onClick={() => {
-                      setMenu(false);
-                      if (noteDraft || !app.data?.jam) return;
-                      setPlacingNote(app.data.jam.id);
-                      container.current?.focus({ preventScroll: true });
-                    }}
+                    onClick={beginNote}
                     disabled={!!noteDraft || !!placingNote || !app.data?.jam}
                   >
                     Note
@@ -1304,6 +1973,31 @@ function Canvas() {
               <Frame size={16} />
               Frame
             </Button>
+            <Tooltip
+              text={
+                selectedItems || selectedFrames
+                  ? "Link selected references"
+                  : "Select items or a frame"
+              }
+            >
+              <Button
+                variant="ghost"
+                disabled={!selectedItems && !selectedFrames}
+                onClick={() =>
+                  setLinkSelection(
+                    nodes
+                      .filter((n) => n.selected)
+                      .map((n) => ({
+                        id: n.id,
+                        kind: n.type === "frame" ? "frame" : "item",
+                      })),
+                  )
+                }
+              >
+                <Link2 size={16} />
+                Link to…
+              </Button>
+            </Tooltip>
             <Button
               variant="ghost"
               aria-pressed={connect}
@@ -1312,6 +2006,22 @@ function Canvas() {
               <Link2 size={16} />
               Connect
             </Button>
+            {canvasContext.length >= 2 && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (
+                    client.getQueryData<
+                      Awaited<ReturnType<typeof api.appState>>
+                    >(["app"])?.jam?.id !== app.data?.jam?.id
+                  )
+                    return;
+                  compose({ text: "", context: canvasContext });
+                }}
+              >
+                Ask brain ({canvasContext.length})
+              </Button>
+            )}
             <IconButton
               label="Fit view · F"
               onClick={() => void fitCanvas(reduced ? 0 : 220)}
@@ -1338,14 +2048,16 @@ function Canvas() {
               <MinimapIcon size={18} />
             </IconButton>
             <IconButton
-              label="Undo"
+              label="Undo · Ctrl+Z"
+              aria-label="Undo"
               disabled={!history.canUndo}
               onClick={() => void undo()}
             >
               <Undo2 size={18} />
             </IconButton>
             <IconButton
-              label="Redo"
+              label="Redo · Ctrl+Shift+Z"
+              aria-label="Redo"
               disabled={!history.canRedo}
               onClick={() => void undo(true)}
             >
@@ -1429,6 +2141,16 @@ function Canvas() {
               )}
           </div>
         </div>
+        {linkSelection && (
+          <LinkTargetDialog
+            choices={linkSelection}
+            targets={targets}
+            projectId={app.data?.jam?.id ?? ""}
+            close={() => setLinkSelection(null)}
+            saved={refresh}
+            link={linkSelectionTo}
+          />
+        )}
         {!data?.items.some((item) => !item.archivedAt) &&
           !data?.frames.some((frame) => !frame.archivedAt) &&
           !noteDraft &&
@@ -1436,10 +2158,15 @@ function Canvas() {
             <div className="reference-empty">
               <EmptyState
                 image={paint}
-                text="Drop images, sounds, videos or links here"
+                text="Double-click anywhere to jot an idea"
               >
+                <p className="small muted">
+                  or drop images, sounds, videos and links
+                </p>
+                <Button variant="primary" onClick={beginNote}>
+                  New note
+                </Button>
                 <Button
-                  variant="primary"
                   onClick={() =>
                     void api
                       .pickFiles()
@@ -1530,6 +2257,16 @@ function Canvas() {
             }}
           />
         )}
+        {taskNote && (
+          <NoteTaskDialog
+            item={taskNote}
+            close={() => setTaskNote(null)}
+            created={(key) => {
+              setTaskNote(null);
+              announce(`Task ${key} created and linked to note`);
+            }}
+          />
+        )}
         {frameEdit && (
           <FrameDialog
             initial={frameEdit}
@@ -1547,7 +2284,18 @@ function Canvas() {
             className="reference-lightbox"
             onClose={() => setLightbox(null)}
           >
-            <img src={lightbox.url} alt={lightbox.title} />
+            {lightbox.kind === "video" ? (
+              <video
+                src={lightbox.url}
+                controls
+                autoPlay
+                aria-label={lightbox.title}
+              >
+                <track kind="captions" />
+              </video>
+            ) : (
+              <img src={lightbox.url} alt={lightbox.title} />
+            )}
           </Dialog>
         )}
         {edgeEdit && (
@@ -1555,7 +2303,12 @@ function Canvas() {
             key={edgeEdit.id}
             edge={edgeEdit}
             close={() => setEdgeEdit(null)}
-            refresh={refresh}
+            refresh={() =>
+              client.invalidateQueries(
+                { queryKey: ["references"] },
+                { throwOnError: true },
+              )
+            }
             archived={() => {
               const id = edgeEdit.id;
               history.record({

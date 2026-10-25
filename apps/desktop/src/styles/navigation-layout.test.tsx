@@ -7,6 +7,7 @@ import { mockApi } from "../lib/mock-bridge";
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/plan/JB-E1",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {

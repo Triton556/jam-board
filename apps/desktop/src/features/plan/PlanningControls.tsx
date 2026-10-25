@@ -1,14 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 import { Button } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { MarkdownField } from "../../components/ui/MarkdownField";
 import { api } from "../../lib/api";
-import {
-  epicsQuery,
-  invalidatePlanning,
-  storiesQuery,
-} from "../../lib/planning-queries";
+import { invalidatePlanning } from "../../lib/planning-queries";
 import { usePlanningDraft } from "./planning-draft";
 export const participationText = {
   each_iteration: "Check each iteration together before continuing.",
@@ -149,55 +145,4 @@ export function SavedMarkdown({
     </>
   );
 }
-export function StoryPicker({
-  value,
-  onChange,
-  label = "Story",
-  epicKey,
-  epicKeys,
-  disabled = false,
-  remember = false,
-}: {
-  value: string;
-  onChange(key: string): void;
-  label?: string;
-  epicKey?: string;
-  epicKeys?: string[];
-  disabled?: boolean;
-  remember?: boolean;
-}) {
-  const stories = useQuery(storiesQuery),
-    epics = useQuery(epicsQuery);
-  const allowedKeys = epicKeys ?? (epicKey ? [epicKey] : []);
-  const allowedIds = new Set(
-    (epics.data ?? [])
-      .filter((epic) => allowedKeys.includes(epic.key))
-      .map((epic) => epic.id),
-  );
-  return (
-    <CustomSelect
-      label={label}
-      value={value}
-      disabled={disabled}
-      searchable
-      onChange={(key) => {
-        onChange(key);
-        if (remember)
-          try {
-            localStorage.setItem("jam.lastStory", key);
-          } catch {}
-      }}
-      options={[
-        { value: "", label: "Choose a story" },
-        ...(stories.data ?? [])
-          .filter((s) => !allowedKeys.length || allowedIds.has(s.epicId))
-          .map((s) => ({
-            value: s.key,
-            label: `${s.key} · ${s.title}`,
-            group:
-              epics.data?.find((e) => e.id === s.epicId)?.title ?? "Stories",
-          })),
-      ]}
-    />
-  );
-}
+export { StoryPicker } from "./StoryPicker";

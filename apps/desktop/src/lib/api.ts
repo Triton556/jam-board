@@ -1,3 +1,5 @@
+import type { RefFrame, RefFrameTarget, RefItem } from "../bindings";
+import { nativeReferenceApi } from "../features/references/native-commands";
 import type { ExecutionApi } from "./execution-api";
 import type { PlanningApi } from "./planning-api";
 import type { ProjectsApi } from "./project-api";
@@ -115,7 +117,23 @@ export interface JamApi
   setTheme(theme: Theme): Promise<void>;
   onBoardChanged(cb: (events: ActivityEvent[]) => void): () => void;
 }
-export const api: JamApi =
+const baseApi: JamApi =
   import.meta.env.VITE_MOCK_BRIDGE === "1"
     ? (await import("./mock-bridge")).mockApi
     : tauriApi;
+
+export type ReferenceVerdict = import("../bindings").ReferenceVerdict | null;
+export type FrameTarget = RefFrameTarget;
+export type VerdictItem = RefItem;
+export type LinkedFrame = RefFrame;
+const mockReferences =
+  import.meta.env.VITE_MOCK_BRIDGE === "1"
+    ? await import("./mock-bridge").then(({ mockApi }) => ({
+        setReferenceVerdict: mockApi.setReferenceVerdict.bind(mockApi),
+        linkRefFrame: mockApi.linkRefFrame.bind(mockApi),
+        unlinkRefFrame: mockApi.unlinkRefFrame.bind(mockApi),
+        unlinkReference: mockApi.unlinkReference.bind(mockApi),
+        openReferenceFile: mockApi.openReferenceFile.bind(mockApi),
+      }))
+    : null;
+export const api = Object.assign(baseApi, mockReferences ?? nativeReferenceApi);

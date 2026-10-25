@@ -52,6 +52,7 @@ export function EdgeLabelDialog({
   const [label, setLabel] = useState(edge.label);
   const write = useProjectWrite(`edge:${edge.id}`);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   useEffect(() => {
     if (refreshError) form.current?.querySelector("input")?.focus();
   }, [refreshError]);
@@ -72,7 +73,7 @@ export function EdgeLabelDialog({
           await refresh();
           return null;
         } catch (error) {
-          return `Saved, but the canvas could not refresh: ${String(error)}. Close and inspect the canvas; do not repeat this write.`;
+          return `Saved, but the canvas could not refresh: ${String(error)}. Retry refresh to check the canvas. This will not repeat the write.`;
         }
       },
       (error) => {
@@ -85,8 +86,10 @@ export function EdgeLabelDialog({
   return (
     <Dialog
       title="Edge label"
-      busy={write.pending}
-      onClose={() => write.dismiss(close)}
+      busy={write.pending || retrying}
+      onClose={() => {
+        if (!retrying) write.dismiss(close);
+      }}
     >
       <form
         className="m5-form"
@@ -117,9 +120,36 @@ export function EdgeLabelDialog({
             not be sent again automatically.
           </p>
         )}
-        {refreshError && <p role="alert">{refreshError}</p>}
+        {refreshError && (
+          <>
+            <p role="alert">{refreshError}</p>
+            <Button
+              disabled={!write.ready || retrying}
+              onClick={async () => {
+                setRetrying(true);
+                try {
+                  await refresh();
+                  if (owner.current.mounted && !owner.current.invalidated)
+                    close();
+                } catch (reason) {
+                  if (owner.current.mounted)
+                    setRefreshError(
+                      `Saved, but the canvas could not refresh: ${String(reason)}. Your saved label is kept.`,
+                    );
+                } finally {
+                  if (owner.current.mounted) setRetrying(false);
+                }
+              }}
+            >
+              {retrying ? "Refreshing…" : "Retry refresh"}
+            </Button>
+          </>
+        )}
         <div className="dialog-actions">
-          <Button disabled={write.pending} onClick={() => write.dismiss(close)}>
+          <Button
+            disabled={write.pending || retrying}
+            onClick={() => write.dismiss(close)}
+          >
             Cancel
           </Button>
           <Button

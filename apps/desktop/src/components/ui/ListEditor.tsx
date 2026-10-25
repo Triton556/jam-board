@@ -11,8 +11,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
-import { type ReactNode, useRef } from "react";
-import { Button, IconButton } from "./index";
+import { type ReactNode, useEffect, useRef } from "react";
+import { Button, IconButton, Tooltip } from "./index";
 export function reorder<T>(items: T[], from: number, to: number) {
   const next = [...items];
   if (from < 0 || to < 0 || to >= next.length) return next;
@@ -27,6 +27,7 @@ function ListRow({
   move,
   remove,
   disabled,
+  last,
   children,
 }: {
   id: string;
@@ -35,6 +36,7 @@ function ListRow({
   move(to: number): void;
   remove(): void;
   disabled: boolean;
+  last: boolean;
   children: ReactNode;
 }) {
   const sortable = useSortable({ id, disabled });
@@ -50,6 +52,7 @@ function ListRow({
           : undefined,
       }}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) {
           e.preventDefault();
           e.stopPropagation();
@@ -58,27 +61,33 @@ function ListRow({
       }}
     >
       <div className="list-editor-actions">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Drag ${label} ${index + 1}`}
-          disabled={disabled}
-          {...sortable.attributes}
-          {...sortable.listeners}
+        <Tooltip
+          text={`Drag ${label} ${index + 1} / Alt+ArrowUp / Alt+ArrowDown`}
         >
-          <GripVertical size={16} />
-        </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Drag ${label} ${index + 1}`}
+            disabled={disabled}
+            {...sortable.attributes}
+            {...sortable.listeners}
+          >
+            <GripVertical size={16} />
+          </button>
+        </Tooltip>
         <span className="mono muted">{index + 1}</span>
         <IconButton
-          label={`Move ${label} ${index + 1} up`}
+          label={`Move ${label} ${index + 1} up · ${disabled ? "Editing is unavailable" : index === 0 ? "Already first" : "Alt+ArrowUp"}`}
+          aria-label={`Move ${label} ${index + 1} up`}
           disabled={disabled || index === 0}
           onClick={() => move(index - 1)}
         >
           <ArrowUp size={14} />
         </IconButton>
         <IconButton
-          label={`Move ${label} ${index + 1} down`}
-          disabled={disabled}
+          label={`Move ${label} ${index + 1} down · ${disabled ? "Editing is unavailable" : last ? "Already last" : "Alt+ArrowDown"}`}
+          aria-label={`Move ${label} ${index + 1} down`}
+          disabled={disabled || last}
           onClick={() => move(index + 1)}
         >
           <ArrowDown size={14} />
@@ -111,6 +120,22 @@ export function ListEditor<T>({
   disabled?: boolean;
 }) {
   const ids = useRef<string[]>([]);
+  const root = useRef<HTMLElement>(null);
+  const stopEscape = useRef((event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }).current;
+  const endDrag = () => {
+    if (root.current) delete root.current.dataset.listDragging;
+    // The sensor cancels before our listener runs; keep this event fenced.
+    queueMicrotask(() => document.removeEventListener("keydown", stopEscape));
+  };
+  useEffect(
+    () => () => document.removeEventListener("keydown", stopEscape),
+    [stopEscape],
+  );
   while (ids.current.length < value.length)
     ids.current.push(crypto.randomUUID());
   ids.current.length = value.length;
@@ -118,15 +143,23 @@ export function ListEditor<T>({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
   const move = (from: number, to: number) => {
+    if (disabled || from === to || from < 0 || to < 0 || to >= value.length)
+      return;
     ids.current = reorder(ids.current, from, to);
     onChange(reorder(value, from, to));
   };
   return (
-    <section className="list-editor" aria-label={`${label} list`}>
+    <section ref={root} className="list-editor" aria-label={`${label} list`}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={() => {
+          if (root.current) root.current.dataset.listDragging = "true";
+          document.addEventListener("keydown", stopEscape);
+        }}
+        onDragCancel={endDrag}
         onDragEnd={({ active, over }) => {
+          endDrag();
           if (over)
             move(
               ids.current.indexOf(String(active.id)),
@@ -145,6 +178,7 @@ export function ListEditor<T>({
               index={index}
               label={label}
               disabled={disabled}
+              last={index === value.length - 1}
               move={(to) => move(index, to)}
               remove={() => {
                 ids.current.splice(index, 1);

@@ -27,7 +27,7 @@
   background: var(--card-hover);
 }
 .template-card strong {
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 600;
 }

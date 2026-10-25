@@ -2,7 +2,7 @@
 
 Generated from the locked Cargo metadata and `npx license-checker` dependency inventory. Includes build/test dependencies; native dependencies retain their own notices. Paths and contact details are deliberately omitted. This inventory is not a replacement for upstream license texts.
 
-Self-hosted fonts: Fraunces, Manrope, JetBrains Mono and Caveat ? SIL Open Font License 1.1. Font notices are in `apps/desktop/src/assets/licenses/`. SQLite is public domain. Sharp uses libvips (LGPL-3.0-or-later) in development tooling.
+Self-hosted fonts: PT Serif and PT Serif Caption (ParaType), Shantell Sans (Arrow Type / Shantell Martin), and JetBrains Mono (JetBrains) ? SIL Open Font License 1.1. Original notices are in `apps/desktop/src/assets/licenses/`. SQLite is public domain. Sharp uses libvips (LGPL-3.0-or-later) in development tooling.
 
 ## Rust dependencies
 
@@ -547,10 +547,10 @@ Self-hosted fonts: Fraunces, Manrope, JetBrains Mono and Caveat ? SIL Open Font 
 | @dnd-kit/sortable@10.0.0 | MIT |
 | @dnd-kit/utilities@3.2.2 | MIT |
 | @emnapi/runtime@1.11.3 | MIT |
-| @fontsource-variable/fraunces@5.3.0 | OFL-1.1 |
 | @fontsource-variable/jetbrains-mono@5.3.0 | OFL-1.1 |
-| @fontsource-variable/manrope@5.3.0 | OFL-1.1 |
-| @fontsource/caveat@5.3.0 | OFL-1.1 |
+| @fontsource/pt-serif@5.3.0 | OFL-1.1 |
+| @fontsource/pt-serif-caption@5.3.0 | OFL-1.1 |
+| @fontsource-variable/shantell-sans@5.3.0 | OFL-1.1 |
 | @hookform/resolvers@5.9.2 | MIT |
 | @img/colour@1.1.0 | MIT |
 | @img/sharp-wasm32@0.35.5 | Apache-2.0 AND LGPL-3.0-or-later AND MIT |

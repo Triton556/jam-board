@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { memo, useState } from "react";
 import { Avatar, Button } from "../../components/ui";
+import { useDismissible } from "../../components/ui/useDismissible";
 import { epicsQuery, storiesQuery } from "../../lib/planning-queries";
 import { tasksQuery } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
@@ -34,6 +35,7 @@ export const AgentStatus = memo(function AgentStatus({
   pulse?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { root, trigger } = useDismissible(open, () => setOpen(false));
   useTableClock();
   const epics = useQuery(epicsQuery),
     stories = useQuery(storiesQuery),
@@ -53,19 +55,20 @@ export const AgentStatus = memo(function AgentStatus({
     // biome-ignore lint/a11y/noStaticElementInteractions: Observes pointer and descendant focus; the trigger and scope button handle activation.
     <div
       className="agent-status-wrap"
+      ref={root}
       onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+      onMouseLeave={() => {
+        if (!root.current?.contains(document.activeElement)) setOpen(false);
       }}
+      onFocus={() => setOpen(true)}
     >
       <button
         className="agent-status-trigger"
+        ref={trigger}
         type="button"
         aria-label={`${member.name} status`}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
       >
         <Avatar member={member} size={30} />
         {pulse && <i className="agent-pulse" />}

@@ -1,0 +1,20 @@
+.external-agents {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--card);
+  padding: 16px;
+}
+.external-agents > summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.external-agents-description {
+  display: block;
+  margin-top: 6px;
+  font-weight: 400;
+}
+.external-agents-content {
+  display: grid;
+  gap: 16px;
+  padding-top: 16px;
+}

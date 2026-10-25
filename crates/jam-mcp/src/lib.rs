@@ -11,4 +11,6 @@ pub use runtime::{
     ConfigSnippets, McpRuntime, McpStatus, config_snippets, project_config_snippets,
 };
 
+#[cfg(test)]
+mod canvas_tests;
 mod v2;

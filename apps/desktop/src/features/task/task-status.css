@@ -1,0 +1,56 @@
+.task-operational-status,
+.task-permission-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.task-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-heading-actions .button {
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.task-operational-status .button {
+  font-size: 12px;
+  padding-inline: 6px;
+}
+.task-operational-status {
+  margin: 4px 0 16px;
+}
+.task-operational-status .claim-recovery {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.task-permission-pill {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-chip);
+  padding: 4px 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 12px;
+}
+.task-status-why {
+  position: relative;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.task-status-why summary {
+  cursor: pointer;
+}
+.task-status-why[open] .task-status-explanations {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  width: min(280px, 65vw);
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}

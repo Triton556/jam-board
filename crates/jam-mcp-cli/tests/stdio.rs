@@ -66,10 +66,12 @@ fn task_input(story: &str, title: &str) -> Value {
 fn assert_tools(tools: &[Tool]) {
     let mut actual = tools.iter().map(|t| t.name.to_string()).collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 44);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
+    assert_eq!(actual.len(), expected.len());
     assert_eq!(actual, expected);
+    assert_eq!(actual.len(), 52);
+    assert!(!actual.iter().any(|name| name == "set_reference_verdict"));
     let wait = tools.iter().find(|t| t.name == "wait_for_changes").unwrap();
     assert_eq!(wait.input_schema["required"], json!(["cursor"]));
     assert_eq!(
@@ -471,6 +473,144 @@ async fn full_stdio_contract_and_errors() {
     // The same process remains healthy after all tool errors.
     data(call_fresh(&c, "get_board", json!({})).await);
     other.cancel().await.unwrap();
+    c.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
+    let (dir, s, h) = fixture();
+    let c = client(&dir.path().join("jam.db"), "Moodboard stdio").await;
+    let tools = c.list_all_tools().await.unwrap();
+    assert_tools(&tools);
+    let e = data(call_raw(&c, "create_epic", json!({"title":"Moodboard"})).await);
+    let frame = data(
+        call_raw(
+            &c,
+            "create_frame",
+            json!({"title":"Moodboard candidates","x":100,"y":200}),
+        )
+        .await,
+    );
+    let source = dir.path().join("candidate.png");
+    std::fs::write(&source, b"local asset fixture").unwrap();
+    let item=data(call_raw(&c,"add_reference",json!({"kind":"asset","filePath":source,"copy":true,"frameId":frame["id"],"caption":"https://example.test/candidate — composition"})).await);
+    let asset = s
+        .list_assets(None, None)
+        .unwrap()
+        .into_iter()
+        .find(|a| Some(a.id.as_str()) == item["assetId"].as_str())
+        .unwrap();
+    std::fs::remove_file(&source).unwrap();
+    assert!(std::path::Path::new(&asset.location).is_file());
+    error(
+        call_raw(
+            &c,
+            "add_reference",
+            json!({"kind":"asset","filePath":source,"copy":true}),
+        )
+        .await,
+        "validation",
+    );
+    let linked = data(
+        call_raw(
+            &c,
+            "link_reference",
+            json!({"frameId":frame["id"],"targetKey":e["key"]}),
+        )
+        .await,
+    );
+    assert_eq!(linked["links"][0]["targetKey"], e["key"]);
+    let refs = data(call_raw(&c, "list_references", json!({"epicKey":e["key"]})).await);
+    assert_eq!(refs[0]["via"], "frame");
+    assert_eq!(refs[0]["frameTitle"], "Moodboard candidates");
+    error(
+        call_raw(
+            &c,
+            "link_reference",
+            json!({"itemId":item["id"],"frameId":frame["id"],"targetKey":e["key"]}),
+        )
+        .await,
+        "validation",
+    );
+    s.set_reference_verdict(
+        &h.id,
+        jam_core::ReferenceVerdictInput {
+            item_id: item["id"].as_str().unwrap().into(),
+            verdict: Some(jam_core::ReferenceVerdict::Keep),
+        },
+    )
+    .unwrap();
+    let canvas = data(call_raw(&c, "get_canvas", json!({"frameId":frame["id"]})).await);
+    assert_eq!(canvas["references"][0]["verdict"], "keep");
+    s.canvas_archive(
+        &h.id,
+        jam_core::CanvasArchive {
+            kind: "item".into(),
+            id: item["id"].as_str().unwrap().into(),
+            archived: true,
+        },
+    )
+    .unwrap();
+    let canvas = data(
+        call_raw(
+            &c,
+            "get_canvas",
+            json!({"frameId":frame["id"],"includeArchived":true}),
+        )
+        .await,
+    );
+    assert_eq!(canvas["references"][0]["archivedBy"], "human");
+    assert!(canvas["references"][0]["archivedAt"].is_string());
+    let unlinked = data(
+        call_raw(
+            &c,
+            "unlink_reference",
+            json!({"frameId":frame["id"],"targetKey":e["key"]}),
+        )
+        .await,
+    );
+    assert!(unlinked["links"].as_array().unwrap().is_empty());
+    let (other, other_h) = s
+        .create_jam("Other moodboard", None, None, None, "UTC", "Other human")
+        .unwrap();
+    let foreign = s.for_project(&other.id).unwrap();
+    let foreign_frame = foreign
+        .create_canvas_frame(
+            &other_h.id,
+            serde_json::from_value(json!({"title":"Other frame"})).unwrap(),
+        )
+        .unwrap();
+    let foreign_epic = foreign
+        .create_epic(
+            &other_h.id,
+            jam_core::NewEpic {
+                title: "Other epic".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let count = s.activity_count().unwrap();
+    for name in ["link_reference", "unlink_reference"] {
+        for args in [
+            json!({"frameId":foreign_frame.id,"targetKey":e["key"]}),
+            json!({"frameId":frame["id"],"targetKey":foreign_epic.key}),
+        ] {
+            error(call_raw(&c, name, args).await, "forbidden");
+        }
+    }
+    assert_eq!(s.activity_count().unwrap(), count);
+    // Desktop selection moved, but this existing stdio connection stays pinned.
+    assert_eq!(
+        data(
+            call_raw(
+                &c,
+                "get_canvas",
+                json!({"frameId":frame["id"],"includeArchived":true})
+            )
+            .await
+        )["references"][0]["id"],
+        item["id"]
+    );
     c.cancel().await.unwrap();
 }
 
@@ -1911,6 +2051,24 @@ async fn standalone_skill_example_lifecycle() {
         .await
         .unwrap();
     assert!(format!("{:?}", guide.contents).contains("jam://guide/operations"));
+    let guide_text = format!("{:?}", guide.contents);
+    for text in [
+        "Building and refining a moodboard",
+        "copy:true",
+        "attachedTo",
+        "archivedBy",
+        "never re-add",
+    ] {
+        assert!(guide_text.contains(text), "{text}");
+    }
+    let operations = brain
+        .read_resource(ReadResourceRequestParams::new("jam://guide/operations"))
+        .await
+        .unwrap();
+    assert!(
+        format!("{:?}", operations.contents)
+            .contains("jam://guide#building-and-refining-a-moodboard")
+    );
     let replay = data(
         call_raw(
             &brain,

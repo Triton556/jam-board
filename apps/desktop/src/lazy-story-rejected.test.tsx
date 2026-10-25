@@ -19,11 +19,7 @@ vi.mock("./lib/api", async () => {
   return { api };
 });
 vi.mock("./lib/grain", () => ({ preparePaperGrain: () => Promise.resolve() }));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openUrl: vi.fn(),
-  openPath: vi.fn(),
-  revealItemInDir: vi.fn(),
-}));
+vi.mock("@tauri-apps/plugin-opener", () => import("./test/mock-opener"));
 vi.mock("./features/plan/StoryDrawer", async (original) => {
   load.requested();
   await load.promise;

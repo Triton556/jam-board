@@ -32,6 +32,7 @@ async function mount() {
       <SettingsPage initialSection="Agents" />
     </QueryClientProvider>,
   );
+  await user.click(screen.getByText("External agents (MCP)"));
   const region = within(
     await screen.findByRole("region", { name: "Connect the board" }),
   );

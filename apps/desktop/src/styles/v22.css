@@ -104,7 +104,7 @@
 }
 .epic-swatches {
   display: flex;
-  gap: 5px;
+  gap: 8px;
 }
 .epic-swatches button {
   width: 22px;
@@ -121,8 +121,21 @@
 }
 .epic-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
+}
+.plan-detail {
+  container-type: inline-size;
+}
+@container (width < 760px) {
+  .epic-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container (width < 360px) {
+  .plan-detail .epic-process {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .epic-process {
   align-self: start;
@@ -131,7 +144,9 @@
   border-radius: var(--r-card);
   padding: 16px;
   display: grid;
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
 }
 .epic-process-choice,
 .epic-process label {
@@ -140,7 +155,7 @@
   font-size: 13px;
 }
 .epic-process small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-2);
 }
 .markdown-field {
@@ -155,7 +170,7 @@
 .markdown-field textarea {
   width: 100%;
   min-height: 100px;
-  resize: vertical;
+  resize: none;
 }
 .markdown-field-actions {
   display: flex;
@@ -188,8 +203,8 @@
 .help-mark {
   display: inline-grid;
   place-items: center;
-  width: 17px;
-  height: 17px;
+  width: 28px;
+  height: 28px;
   font: 500 11px var(--font-sans);
   border: 1px solid var(--line-soft);
   border-radius: 50%;
@@ -208,7 +223,7 @@
   border: 1.5px solid var(--line-soft);
   border-radius: var(--r-card);
   padding: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   box-shadow: var(--shadow-card);
 }
 .story-card > header {
@@ -703,6 +718,7 @@
   flex-wrap: wrap;
 }
 .board-epic-filters button {
+  min-height: 28px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -774,11 +790,11 @@
   );
   background-size: 200% 100%;
   border-radius: 12px;
-  animation: paper-shimmer 1.5s infinite;
+  animation: paper-shimmer calc(var(--motion-slow) * 6) var(--ease-out) infinite;
 }
 @keyframes paper-shimmer {
   to {
-    background-position: -200% 0;
+    opacity: 0.5;
   }
 }
 @media (width < 1360px) {
@@ -860,4 +876,21 @@
 .expanded .nav-link .inbox-badge {
   position: static;
   margin-left: auto;
+}
+.epic-menu {
+  position: relative;
+}
+.epic-menu > .popover-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 184px;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-input);
+  box-shadow: var(--shadow-card);
 }

@@ -40,3 +40,40 @@ Pause prevents new claims but does not stop external processes. Finish at the
 requested result and report checks and limits. Do not start ongoing monitoring
 solely because a wait tool exists. Reports persist on the board; they do not
 contain all conversation or source files.
+
+## Organizing the ideas canvas
+
+Read `get_canvas` before moving things, following `nextCursor` while
+`truncated` is true. Prefer frames per epic. Do not rearrange the human's manual
+layout unless asked. Use `create_frame` / `update_frame` for frames,
+`connect_references`, `update_connection` and `remove_connection` for labelled
+directed connections, and `arrange_references` for explicit world positions or
+`layout:"grid"` inside a frame. Grid preserves unselected occupants and rejects
+the whole batch if it cannot fit. A write response is not a concurrency token:
+reread and reconcile uncertain results before an intentional retry.
+
+
+## Building and refining a moodboard
+
+When the user requests a web moodboard for selected work:
+
+1. Read get_canvas and create_frame with title "Moodboard ? <topic>" beside the
+   related work. Use link_reference { frameId, targetKey } to link it to its
+   story or epic; current and future children become references of that target.
+2. Find candidates using your client's own authorized web tools and download
+   them into your workspace. Jam Board MCP tools never fetch the network.
+3. Call add_reference { kind:"asset", filePath, copy:true, frameId, caption }.
+   Caption each candidate with its source URL and one line explaining its fit.
+   Managed copies (at most 50 MiB each) survive temporary workspace cleanup.
+4. Call arrange_references with frameId, the candidate item IDs and layout:"grid".
+5. After the person reviews, read get_canvas { frameId, includeArchived:true },
+   following all pages. verdict:"keep" means Keep; verdict:"reject" or an item
+   archivedBy:"human" means rejected. For each note, attachedTo names the items
+   it comments on. Read its full reference text if the canvas excerpt is clipped.
+6. Search again using that feedback, explain what changed, and never re-add a
+   rejected source. Human feedback is read-only to agents; do not rewrite verdicts.
+
+Built-in API chat has no web tools: a web moodboard requires an agent connection
+such as Claude Code or Codex. API chat can organize images the person attaches.
+Use unlink_reference { frameId, targetKey } to remove an explicit frame link;
+this preserves the frame and its items.

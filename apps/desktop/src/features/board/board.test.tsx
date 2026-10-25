@@ -298,6 +298,67 @@ function dropPointerInDoing() {
     clientY: 130,
   });
 }
+it.each(["pointer", "keyboard"])(
+  "Escape-cancelled drag swallows a delayed release click, then permits a fresh %s activation",
+  async (activation) => {
+    pointerRects();
+    const { Wrapper } = wrapper(),
+      open = vi.fn();
+    render(<Board open={open} />, { wrapper: Wrapper });
+    const card = await screen.findByRole("button", { name: /Open JB-2:/ });
+    const removed = vi.spyOn(document, "removeEventListener");
+    const rect = card.getBoundingClientRect();
+    fireEvent.pointerDown(card, {
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: rect.x + 20,
+      clientY: rect.y + 20,
+    });
+    fireEvent.pointerMove(document, {
+      pointerId: 1,
+      isPrimary: true,
+      buttons: 1,
+      clientX: rect.x + 45,
+      clientY: rect.y + 50,
+    });
+    await waitFor(() => expect(card).toHaveClass("dragging"));
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    await waitFor(() => expect(card).not.toHaveClass("dragging"));
+    // Dnd-kit's document click blocker detaches 50 ms after cancellation. A
+    // person can release later: wait for actual teardown, not a fixed sleep.
+    await waitFor(() =>
+      expect(
+        removed.mock.calls.some(
+          ([type, , options]) =>
+            type === "click" && typeof options === "object" && options?.capture,
+        ),
+      ).toBe(true),
+    );
+    fireEvent.pointerUp(card, {
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientX: rect.x + 45,
+      clientY: rect.y + 50,
+    });
+    fireEvent.click(card, { detail: 1 });
+    expect(open).not.toHaveBeenCalled();
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      false,
+    );
+    const user = userEvent.setup();
+    if (activation === "pointer") await user.click(card);
+    else {
+      card.focus();
+      await user.keyboard("{Enter}");
+    }
+    expect(open).toHaveBeenCalledExactlyOnceWith("JB-2");
+    expect(mockApi.calls.some((call) => call.command === "move_task")).toBe(
+      false,
+    );
+  },
+);
 it("pointer dragging supplies destination neighbors and the captured version", async () => {
   await mockApi.startAllDemoScopes();
   pointerRects();

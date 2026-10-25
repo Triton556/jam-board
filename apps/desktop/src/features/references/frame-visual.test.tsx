@@ -19,6 +19,10 @@ vi.mock("@xyflow/react", async (original) => ({
 afterEach(() => {
   vi.restoreAllMocks();
   camera.zoom = 1;
+  Object.defineProperty(window, "devicePixelRatio", {
+    configurable: true,
+    value: 1,
+  });
 });
 const frame: RefFrame = {
   id: "frame",
@@ -116,10 +120,21 @@ it.each([1, 0.75, 0.4, 0.39])(
     ).toBeInTheDocument();
   },
 );
-it.each(["light", "dark"])(
-  "RF02 %s overview has one live frame title, no raster duplicate, and still draws note cards",
-  async (theme) => {
+it.each([
+  ["light", 1, null],
+  ["dark", 1, null],
+  ["light", 2, null],
+  ["dark", 2, null],
+  ["light", 1, "keep"],
+  ["dark", 2, "reject"],
+] as const)(
+  "RF02 %s DPR %s verdict %s overview has one live frame title and puts feedback beside the card title",
+  async (theme, dpr, verdict) => {
     camera.zoom = 0.39;
+    Object.defineProperty(window, "devicePixelRatio", {
+      configurable: true,
+      value: dpr,
+    });
     const context = {
       resetTransform: vi.fn(),
       clearRect: vi.fn(),
@@ -161,6 +176,7 @@ it.each(["light", "dark"])(
       url: null,
       linkPreview: null,
       metadata: null,
+      verdict,
     };
     render(
       <ReactFlowProvider>
@@ -179,13 +195,31 @@ it.each(["light", "dark"])(
       </ReactFlowProvider>,
     );
     await waitFor(() =>
-      expect(context.fillText).toHaveBeenCalledWith("Warm light", 34, 78, 220),
+      expect(context.fillText).toHaveBeenCalledWith(
+        "Warm light",
+        34,
+        78,
+        verdict === "reject" ? 156 : verdict ? 196 : 220,
+      ),
     );
     expect(screen.getAllByText("Lighting studies")).toHaveLength(1);
     expect(
       context.fillText.mock.calls.some((args) => args[0] === frame.title),
     ).toBe(false);
     expect(context.roundRect).toHaveBeenCalledWith(24, 56, 240, 180, 10);
+    if (verdict)
+      expect(context.fillText).toHaveBeenCalledWith(
+        verdict === "keep" ? "✓" : "Not this",
+        verdict === "keep" ? 240 : 200,
+        78,
+        verdict === "keep" ? 16 : 56,
+      );
+    expect(context.scale).toHaveBeenCalledWith(0.65 * dpr, 0.65 * dpr);
+    const raster = document.querySelector("canvas.reference-overview-scene");
+    expect(raster).toHaveAttribute(
+      "width",
+      String(Math.ceil(864 * 0.65 * dpr)),
+    );
   },
 );
 

@@ -1,6 +1,6 @@
 import type { AskUser, Scope, SubmitReport } from "../bindings";
 import { assetKind, assetName } from "../features/assets/model";
-import type { JamApi } from "./api";
+import type { JamApi, LinkedFrame, ReferenceVerdict, VerdictItem } from "./api";
 import fixture from "./demo-fixture.json";
 import { makeSnippets } from "./mcp-config";
 import {
@@ -189,7 +189,65 @@ export class MockBridge implements JamApi {
     call: (c, i) => this.call(c, i),
     save: () => this.checkpoint(),
   });
-  referenceCanvas = () => this.canvas.snapshot();
+  referenceCanvas: JamApi["referenceCanvas"] = async () => {
+    const data = await this.canvas.snapshot();
+    return {
+      ...data,
+      items: data.items.map((item) => ({
+        verdict: null,
+        archivedBy: null,
+        ...item,
+      })),
+      frames: data.frames.map((frame) => ({ links: [], ...frame })),
+    };
+  };
+  async setReferenceVerdict(itemId: string, verdict: ReferenceVerdict) {
+    await this.call("set_reference_verdict", { input: { itemId, verdict } });
+    const item: VerdictItem = this.canvas.item(itemId);
+    item.verdict = verdict;
+    this.canvas.change("reference.updated", itemId);
+    return clone(item);
+  }
+  openReferenceFile = async (path: string) => {
+    await this.call("open_reference_file", { path });
+  };
+  private async frameLink(frameId: string, targetKey: string, unlink: boolean) {
+    await this.call(unlink ? "unlink_ref_frame" : "link_ref_frame", {
+      input: { frameId, targetKey },
+    });
+    const frame: LinkedFrame | undefined = this.canvasData.frames.find(
+      (f) => f.id === frameId && !f.archivedAt,
+    );
+    const target = [
+      ...this.planData.epics.map((t) => ({ ...t, kind: "epic" as const })),
+      ...this.planData.stories.map((t) => ({ ...t, kind: "story" as const })),
+      ...this.tasks.map((t) => ({ ...t, kind: "task" as const })),
+    ].find((t) => t.key === targetKey && !t.archivedAt);
+    if (!frame || !target)
+      throw new JamError("not_found", "Frame or target not found");
+    frame.links = (frame.links ?? []).filter((l) => l.targetKey !== targetKey);
+    if (!unlink)
+      frame.links.push({ targetKey, kind: target.kind, title: target.title });
+    if (unlink && frame.epicId === target.id) frame.epicId = null;
+    this.canvas.change("reference.linked", frameId);
+    return clone(frame);
+  }
+  linkRefFrame = (frameId: string, targetKey: string) =>
+    this.frameLink(frameId, targetKey, false);
+  unlinkRefFrame = (frameId: string, targetKey: string) =>
+    this.frameLink(frameId, targetKey, true);
+  async unlinkReference(itemId: string, targetKey: string) {
+    await this.call("unlink_reference", { input: { itemId, targetKey } });
+    const target = [
+      ...this.planData.epics,
+      ...this.planData.stories,
+      ...this.tasks,
+    ].find((t) => t.key === targetKey);
+    this.canvasData.links = this.canvasData.links.filter(
+      (l) => l.itemId !== itemId || l.targetId !== target?.id,
+    );
+    this.canvas.change("reference.unlinked", itemId);
+  }
   addReference: JamApi["addReference"] = (input, untitled) =>
     this.canvas.add(input, undefined, untitled);
   updateReference: JamApi["updateReference"] = (...a) =>
@@ -266,6 +324,8 @@ export class MockBridge implements JamApi {
           createdAt: now,
         });
       this.canvasData.items.push({
+        verdict: null,
+        archivedBy: null,
         id: `perf-item-${n}`,
         jamId,
         position: n * 1024,
@@ -943,8 +1003,40 @@ export class MockBridge implements JamApi {
     const task = this.tasks.find((t) => t.key === key);
     if (!task) throw new JamError("not_found", `Task ${key} was not found`);
     this.planning.sync(task);
+    const targetIds = new Set([task.id, task.epic.id, task.story.id]);
+    const targetKeys = new Set([task.key, task.epic.key, task.story.key]);
+    const references = this.canvasData.items.flatMap((item) => {
+      if (item.archivedAt) return [];
+      const direct = this.canvasData.links.some(
+        (link) =>
+          !link.archivedAt &&
+          link.itemId === item.id &&
+          targetIds.has(link.targetId),
+      );
+      const frame = this.canvasData.frames.find(
+        (frame) => frame.id === item.frameId && !frame.archivedAt,
+      );
+      const inherited =
+        frame &&
+        (targetIds.has(frame.epicId ?? "") ||
+          frame.links?.some((link) => targetKeys.has(link.targetKey)));
+      return direct || inherited
+        ? [
+            {
+              ...item,
+              via: direct ? null : "frame",
+              frameTitle: !direct && frame ? frame.title : null,
+            },
+          ]
+        : [];
+    });
     return clone({
       ...task,
+      references: [
+        ...new Map(
+          [...task.references, ...references].map((item) => [item.id, item]),
+        ).values(),
+      ],
       activity: this.activity.filter((e) => e.taskKey === key).slice(-20),
       history: this.activity.filter((e) => e.taskKey === key).slice(-50),
     });

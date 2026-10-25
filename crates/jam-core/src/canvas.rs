@@ -2,10 +2,27 @@
 use crate::planning::*;
 use crate::references::reference_epic;
 use crate::*;
-use rusqlite::params;
+use rusqlite::{Connection, params};
 use serde_json::json;
 
 impl Store {
+    pub(crate) fn reference_directory(&self) -> Result<std::path::PathBuf> {
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| invalid("dataDir", "No data directory"))?;
+        let directory = parent.join("references");
+        std::fs::create_dir_all(&directory)?;
+        let root = parent.canonicalize()?;
+        let directory = directory.canonicalize()?;
+        if directory != root.join("references") {
+            return Err(invalid(
+                "filePath",
+                "The references directory must stay inside the data directory",
+            ));
+        }
+        Ok(directory)
+    }
     /// Explicit user action only. Use the OS HTTP/TLS implementation without a new
     /// networking dependency; curl enforces the deadline, protocols and response cap.
     pub fn fetch_reference_preview(&self, actor: &str, id: &str) -> Result<RefItem> {
@@ -46,28 +63,7 @@ impl Store {
         })
     }
     pub fn canvas_geometry(&self, actor: &str, input: CanvasGeometry) -> Result<RefItem> {
-        if [input.x, input.y, input.w, input.h, input.z]
-            .iter()
-            .any(|v| !v.is_finite())
-            || input.w < 80.
-            || input.h < 50.
-        {
-            return Err(invalid(
-                "geometry",
-                "Use finite coordinates and a minimum size of 80 × 50",
-            ));
-        }
-        self.write(|c|{
-            crate::service::member(c,actor)?;
-            let old:RefItem=fetch(c,"ref_items","id",&input.id)?;editable_audit(&old.audit)?;
-            let mut epic_id=None;
-            if let Some(id)=&input.frame_id {let f:RefFrame=fetch(c,"ref_frames","id",id)?;if f.archived_at.is_some()||f.jam_id!=old.audit.jam_id{return Err(invalid("frameId","Choose an active frame in this project"));}epic_id=f.epic_id;}
-            patch_record(c,"ref_items",&input.id,&json!({"x":input.x,"y":input.y,"w":input.w,"h":input.h,"z":input.z,"frameId":input.frame_id,"updatedBy":actor,"updatedAt":now()}))?;
-            let updated:RefItem=fetch(c,"ref_items","id",&input.id)?;
-            let epic_id=epic_id.or(reference_epic(c,&updated)?).or(reference_epic(c,&old)?);
-            v2_event(c,actor,epic_id.as_deref(),"reference.updated",None,json!({"itemId":input.id,"fields":["x","y","w","h","z","frameId"]}))?;
-            fetch(c,"ref_items","id",&input.id)
-        })
+        self.write(|c| geometry_record(c, actor, input))
     }
     pub fn canvas_archive(&self, actor: &str, input: CanvasArchive) -> Result<()> {
         self.write(|c| {
@@ -95,10 +91,28 @@ impl Store {
             if row["jamId"] != crate::service::jam(c)?.id {
                 return Err(invalid("id", "Choose a record in the active project"));
             }
+            if input.archived == row["archivedAt"].is_string() {
+                return Ok(());
+            }
             c.execute(
                 &format!("UPDATE {table} SET archived_at=? WHERE id=?"),
                 params![input.archived.then(now), input.id],
             )?;
+            if input.kind == "item" {
+                c.execute(
+                    "UPDATE ref_items SET archived_by=?,updated_by=?,updated_at=? WHERE id=?",
+                    params![
+                        if input.archived {
+                            Some(crate::references::archive_actor(c, actor)?)
+                        } else {
+                            None
+                        },
+                        actor,
+                        now(),
+                        input.id
+                    ],
+                )?;
+            }
             v2_event(
                 c,
                 actor,
@@ -197,24 +211,7 @@ impl Store {
                 "Use a PNG clipboard image smaller than 20 MiB",
             ));
         }
-        let directory = self
-            .path
-            .parent()
-            .ok_or_else(|| invalid("dataDir", "No data directory"))?
-            .join("references");
-        std::fs::create_dir_all(&directory)?;
-        let root = self
-            .path
-            .parent()
-            .ok_or_else(|| invalid("dataDir", "No data directory"))?
-            .canonicalize()?;
-        let directory = directory.canonicalize()?;
-        if directory != root.join("references") {
-            return Err(invalid(
-                "image",
-                "The references directory must stay inside the data directory",
-            ));
-        }
+        let directory = self.reference_directory()?;
         let path = directory.join(format!("clipboard-{}.png", id()));
         use std::io::Write;
         let mut file = std::fs::OpenOptions::new()
@@ -425,6 +422,55 @@ fn preview_failure(code: Option<i32>) -> Error {
             "Page preview failed or exceeded the 5 second deadline / 2 MiB limit"
         },
     )
+}
+
+pub(crate) fn geometry_record(
+    c: &Connection,
+    actor: &str,
+    input: CanvasGeometry,
+) -> Result<RefItem> {
+    if [input.x, input.y, input.w, input.h, input.z]
+        .iter()
+        .any(|v| !v.is_finite())
+        || input.w < 80.
+        || input.h < 50.
+    {
+        return Err(invalid(
+            "geometry",
+            "Use finite coordinates and a minimum size of 80 × 50",
+        ));
+    }
+
+    crate::service::member(c, actor)?;
+    let old: RefItem = fetch(c, "ref_items", "id", &input.id)?;
+    editable_audit(&old.audit)?;
+    let mut epic_id = None;
+    if let Some(id) = &input.frame_id {
+        let f: RefFrame = fetch(c, "ref_frames", "id", id)?;
+        if f.archived_at.is_some() || f.jam_id != old.audit.jam_id {
+            return Err(invalid("frameId", "Choose an active frame in this project"));
+        }
+        epic_id = f.epic_id;
+    }
+    patch_record(
+        c,
+        "ref_items",
+        &input.id,
+        &json!({"x":input.x,"y":input.y,"w":input.w,"h":input.h,"z":input.z,"frameId":input.frame_id,"updatedBy":actor,"updatedAt":now()}),
+    )?;
+    let updated: RefItem = fetch(c, "ref_items", "id", &input.id)?;
+    let epic_id = epic_id
+        .or(reference_epic(c, &updated)?)
+        .or(reference_epic(c, &old)?);
+    v2_event(
+        c,
+        actor,
+        epic_id.as_deref(),
+        "reference.updated",
+        None,
+        json!({"itemId":input.id,"fields":["x","y","w","h","z","frameId"]}),
+    )?;
+    fetch(c, "ref_items", "id", &input.id)
 }
 
 #[cfg(test)]

@@ -7,18 +7,23 @@
 | ID | Actor / entry → depth and actions | Result / authority boundary | Failure/recovery and human counterpart |
 |---|---|---|---|
 | AG01 | New client → initialize exact project → get_session_context → scoped baseline | Connection stays pinned; current desktop project is not retargeting | Wrong/archived project fails closed. Verify immutable ID before reads; H-G04/S01 |
-| AG02 | Human Prepare planning prompt → copy → client full setup → inspect scope/sources → refine | Copy is deterministic guidance, not execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
+| AG02 | Human Refine heading action -> scoped prompt -> stage in dock composer or secondary copy -> inspect scope/sources -> refine | Compose/copy is guidance, not Send, execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
 | AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04 |
 | AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06 |
 | AG05 | Agent prepares brief → check_ready → mark_ready | Backlog → Ready when valid/authorized override; no work launch | Missing codes lead to brief repair; capture claim generation + updatedAt from inspected task; H-D02/D07 |
 | AG06 | Brain request_execution → human typed Inbox confirmation / direct Start → effective scope running | Human-only native authorization; MCP has no approve/Start/Pause tool | Exact revision and scope; stale request blocks; declined/superseded not grants; H-I02/P08 |
-| AG07 | Worker reads running scope + Ready task → get_task → claim_task → implementation | Accepted claim sets holder and ordinarily In progress atomically; claim response supplies new generation | Conflicting claim, stale token or paused scope stops new work. No filesystem/process launch from board itself; H-B02/D08 |
+| AG07 | Worker reads running scope + Ready task → get_task → claim_task → implementation | Accepted claim sets holder and ordinarily In progress atomically; claim response supplies new generation | Conflicting claim, stale token or paused scope stops new work. A board claim never launches a filesystem/process action; explicit dock startup is separate (AG15); H-B02/D08 |
 | AG08 | Holder submits report → Review → human/brain reviews captured report/context → accept or changes requested | Accept → Done; changes requested → Ready, same worker retained; next round needs current permission | Evidence names test setup/command/expected/actual/PASS/FAIL/NOT_RUN; stale context reread/reconcile, not token substitution; H-D09 |
 | AG09 | Human Pause / holder or human release → tracking recovery | Pause blocks new rounds/claims, existing holder may report; release clears holder, returns Backlog/Ready | Neither kills process; no Done via release. Archive retains evidence/flags; project archive refuses In-progress work; H-D08/S03 |
-| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. No session transcript stream; H-M02/H01 |
+| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate in-memory state (AG15); H-M02/H01 |
 | AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent | Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 |
-| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview/file copying | File must be readable; project mismatch fails; arrays replace; human-only geometry/edge/preview surfaces remain separate; H-R01–R08 |
+| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets | File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 |
 | AG13 | Agent searches/reads tasks/assets/members; comments or allowed task edits | Reads do not authorize mutations; comments append, update fields use current contract | Foreign-project addresses rejected; pages/tails are not complete history; capture validators before overwrites; H-D03/A01/M01 |
+| AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch | Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 |
+| AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start | First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay, no app-restart resume; H-BD01/BD02/BD05/BD06 |
+| AG16 | Dock session startup -> project-pinned jam-board MCP and cwd -> ordinary agent calls | In-app agent is an ordinary MCP client with stable profile JAM_AGENT_NAME; exact project/data dir/cwd captured before dispatch | Navigation cannot retarget; same normalized name shares a member, not independent worker identity; custom terminal needs compatible CLI wiring; H-BD01/BD03 |
+| AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims | Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; failed in-memory history retained until app exit; H-BD03/BD08 |
+| AG18 | Built-in API chat -> MCP tool metadata -> automatic read or explicit write permission | Only tools explicitly annotated read-only auto-run; writes ask Allow once / Always allow this tool for this session / Reject; only jam-board MCP is available | Rejection/cancel does not execute; session allow is not a board Start grant and does not bypass project/claim/review validators; H-BD02/BD07/BD08; BC10 |
 
 ## State meanings: never collapse these into “agent working”
 
@@ -34,9 +39,9 @@ release --------------------------------------------> Backlog or permitted Ready
 
 An epic running grant is inherited only by inheriting stories. Explicit story pause wins. Pausing epic clears explicit child running grants; a later explicitly started story can run under a paused epic. Closing/archiving revokes grants; reopening does not silently resurrect them. Consult [inheritance matrix](../mcp.md#inheritance-and-pause-matrix) rather than guessing from one badge.
 
-## Complete baseline tool inventory (44)
+## Complete baseline tool inventory (52)
 
-This is an indexed copy of the current MCP inventory for map completeness; argument evolution must update this table and `docs/mcp.md` together. Tools are grouped into AG paths above, not exposed as invented UI actions. Human-only native `set_execution`, `resolve_execution_request`, `answer_question`, geometry/frame/edge/preview and application settings actions are represented in the human map, not falsely offered as MCP tools.
+This is an indexed copy of the current MCP inventory for map completeness; argument evolution must update this table and `docs/mcp.md` together. Tools are grouped into AG paths above, not exposed as invented UI actions. Human-only native `set_execution`, `resolve_execution_request`, `answer_question`, preview/restore and application settings actions are represented in the human map. AG14 exposes the listed canvas geometry/frame/edge tools; dock lifecycle invokes remain native commands, not additional MCP tools.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
@@ -78,10 +83,18 @@ This is an indexed copy of the current MCP inventory for map completeness; argum
 | set_status | text (0..120), scope? | Member; empty text clears the status/scope |
 | list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
 | wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | kind (asset/link/note); filePath? / url? / text?, title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
+| add_reference | kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
 | list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
-| link_reference | itemId, targetKey | RefItem |
+| link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
+| unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
 | update_reference | itemId; caption?, tags?, title? | RefItem |
+| get_canvas | epicKey?, frameId?, includeArchived?=false, limit?=100 (1..200), cursor? (nonnegative offset) | { frames, references, edges, total, truncated, nextCursor }; world x/y, text capped at 200 characters, linkedKeys capped at 50 with linkedKeysTruncated |
+| create_frame | title; epicKey?, x?, y?, w?=900, h?=600 | RefFrame; omitted x is placed right of content with 80 units clearance, omitted y=0 |
+| update_frame | id; title?, epicKey? (null unlinks), x?, y?, w?, h? | RefFrame; omitted fields unchanged |
+| connect_references | from, to (item IDs); label? | RefEdge; directed duplicates/self-edges refused, label max 240 characters |
+| update_connection | id, label | RefEdge; empty label clears it, max 240 characters |
+| remove_connection | id | { archived: true }; retains the connection record |
+| arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
 | list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
 | list_assets | kind?, query? | Asset[] with role=asset/reference |
 
@@ -221,3 +234,80 @@ board-owned skill files. No tool is added; existing 44-tool contracts remain.
 Connection-only setup verifies exact project, reads guide and reports availability,
 folder hint and next step; no appointment/plan/work follows without a requested task.
 Use the app's current schemas and captured validators, not legacy playbook calls.
+
+## Ideas canvas tools (current additive baseline)
+
+The current inventory has **52 tools**: the historical 44 plus unlink_reference and the seven canvas
+tools above. AG12 retains content/link operations; AG14 adds organization. Read
+`get_canvas` before moving content, prefer a frame per epic and preserve manual
+human layouts unless asked. Canvas geometry has no CAS/idempotency token; an
+uncertain response requires a fresh read and a deliberate decision, not blind retry.
+See [the canvas contract](../mcp.md#ideas-canvas) for paging, coordinates and grid limits.
+
+## Brain dock runtime boundary
+
+The [brain-dock contract](../brain-dock.md) owns the connector and UI contract.
+AG15 adds the session state alongside the board state machine above:
+
+```text
+explicit New/start -> starting -> ready -> running <-> awaiting_permission
+                                             -> ready / stopped / failed
+close dock -> UI hidden; runtime continues
+Stop turn -> cancel current turn/pending permission; not board Pause
+Stop session / app exit -> owned runtime cleanup; not claim release
+```
+
+ACP chat, terminal and built-in API chat are implemented source paths. The
+in-app agent uses an ordinary project-pinned MCP connection with its profile's
+`JAM_AGENT_NAME`, subject to the same member identity, captured validators,
+claim/review rules and human Start gate as external clients. Identical normalized
+names still share a board member; starting two chats is not independent identity.
+A chat message, session ready/running state, plan, model reply, config selection,
+PTY output or tool permission decision is never Start approval. Human direct
+Start or a fresh typed Inbox approval remains the only execution grant path.
+
+Built-in API chat discovers tools from its per-session jam-board sidecar. Only
+`readOnlyHint:true` tools auto-run; writes and absent/unknown read-only annotations
+ask through a permission card. Choices are Allow once, Always allow this tool for
+this session, or Reject. A session allow is scoped to that tool and runtime
+session, not future sessions or arbitrary filesystem/process work. ACP runtimes
+provide their own offered options. Reject/cancel does not dispatch a rejected
+API tool; Stop cancels outstanding requests. These permissions never bypass
+core Start, project isolation, claim generation or review checks.
+
+`useBrainDock().compose` and board Refine/Continue/Ask brain actions stage an
+editable prompt with scope/context chips; they do not send it or start a turn.
+Explicit session launch and explicit Send are separate actions. Navigation
+changes the displayed project, never an existing runtime's captured project/cwd.
+API chat currently has only jam-board MCP; custom terminal commands inherit board
+environment, while standardized CLI MCP flags apply to known Claude/Codex paths.
+
+Session events and terminal scrollback are bounded in memory. Remount can replay
+them during this app process; application restart cannot resume the conversation.
+Stored board reports/questions/activity remain separate durable records. Required
+process cleanup, live providers, credentials and rendered interaction evidence are
+tracked in [BC01-BC11](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
+and [remaining gaps](known-gaps.md#brain-dock-integration-boundary).
+
+
+## W4 frame links and moodboard feedback (AC14)
+
+AG12 now links/unlinks exactly one itemId or frameId to an epic/story/task key.
+Explicit frame links are persisted and include future children; RefFrame.links
+lists targetKey, kind and title. get_task inherits story/epic links and frames,
+without duplicate references. list_references retains its target union filter.
+Frame provenance is via:"frame", frameId and frameTitle; direct links take
+precedence. Unlink preserves the reference and other inheritance paths.
+
+AG14 reads human feedback through get_canvas: verdict (keep/reject/null), note
+attachedTo computed from world geometry (centre inside or >=30% note-area
+overlap), and archivedAt/archivedBy with includeArchived:true. Only humans set
+verdicts or restore archives; no MCP verdict tool exists. A human archive and an
+agent archive are distinguishable. Use copy:true for downloaded local assets
+(up to 50 MiB); the managed references copy survives source cleanup. See the
+[guide moodboard loop](../../integrations/agent-skill/jam-board/SKILL.md#building-and-refining-a-moodboard).
+
+Source/API evidence: crates/jam-core/tests/reference_feedback.rs and
+crates/jam-mcp/src/canvas_tests.rs; stdio protocol coverage in
+crates/jam-mcp-cli/tests/stdio.rs. Browser/native and human acceptance remain
+separate and require the UI worker/QA evidence.

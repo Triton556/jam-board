@@ -7,11 +7,17 @@ export type CanvasRuntime = {
   resizeFrame(frame: RefFrame, w: number, h: number): void;
   collapse(frame: RefFrame): void;
   editFrame(frame: RefFrame): void;
+  linkFrame?(frame: RefFrame): void;
+  unlinkFrame?(frame: RefFrame, key: string): void;
+  unlinkItem?(item: RefItem, key: string): void;
+  verdict?(item: RefItem, verdict: "keep" | "reject" | null): Promise<void>;
   open(key: string): void;
-  lightbox(url: string, title: string): void;
+  lightbox(url: string, title: string, kind?: "video"): void;
   edgeLabel(id: string, label: string): void;
   noteEditing?(id: string, active: boolean): void;
   noteSaved?(item: RefItem, previous?: RefItem): void;
+  createTask?(item: RefItem): void;
+  askBrain?(item: RefItem, linkedKeys: string[]): void;
   caption(item: RefItem, value: string): Promise<void>;
 };
 export const CanvasContext = createContext<CanvasRuntime | null>(null);

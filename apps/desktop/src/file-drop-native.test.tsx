@@ -53,10 +53,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
     },
   }),
 }));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openUrl: vi.fn(),
-  revealItemInDir: vi.fn(),
-}));
+vi.mock("@tauri-apps/plugin-opener", () => import("./test/mock-opener"));
 vi.mock("./lib/grain", () => ({ preparePaperGrain: async () => {} }));
 
 import { App, router } from "./app";
@@ -335,6 +332,16 @@ async function startAssets() {
   await screen.findByRole("heading", { name: "Assets" });
   await waitFor(() => expect(native.drops.size).toBe(1));
 }
+async function startReferences() {
+  await route("/references");
+  // A committed route is not a mounted lazy page or registered native listener.
+  await screen.findByRole(
+    "region",
+    { name: "References canvas" },
+    { timeout: 5000 },
+  );
+  await waitFor(() => expect(native.drops.size).toBe(1), { timeout: 5000 });
+}
 function creates() {
   return calls.filter((c) => c.command === "create_asset");
 }
@@ -606,8 +613,7 @@ it("fences Assets and References continuation across project switching, ABA and 
   // One adjacent check: real unframed ReferencesPage also keeps its queued write alive.
   calls = [];
   referenceStores = { A: [], B: [] };
-  await route("/references");
-  await waitFor(() => expect(native.drops.size).toBe(1));
+  await startReferences();
   await waitFor(() =>
     expect(calls.some((c) => c.command === "reference_canvas")).toBe(true),
   );
@@ -711,9 +717,7 @@ it("offers read-only Refresh after late settlement in all four page/project-retu
   }
   postCommitFailAt = 0;
   // References exposes the same read recovery without reviving an abandoned batch.
-  await route("/references");
-  await screen.findByRole("region", { name: "References canvas" });
-  await waitFor(() => expect(native.drops.size).toBe(1));
+  await startReferences();
   calls = [];
   useUiStore.setState({ toasts: [] });
   gate = deferred();
@@ -729,8 +733,7 @@ it("offers read-only Refresh after late settlement in all four page/project-retu
   );
   await route("/plan");
   await screen.findByRole("heading", { name: "Plan" });
-  await route("/references");
-  await screen.findByRole("region", { name: "References canvas" });
+  await startReferences();
   await act(async () => late.resolve(undefined));
   await waitFor(() =>
     expect(useUiStore.getState().toasts.at(-1)?.text).toContain(

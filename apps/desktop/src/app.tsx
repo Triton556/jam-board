@@ -23,6 +23,7 @@ import {
   Activity,
   ArrowLeftToLine,
   ArrowRightToLine,
+  Bell,
   Boxes,
   ChevronDown,
   Images,
@@ -49,6 +50,8 @@ import {
   Stamp,
   Tooltip,
 } from "./components/ui";
+import { CustomSelect } from "./components/ui/CustomSelect";
+import { scheduleIdle } from "./components/ui/idle";
 import {
   LazyDrawerBoundary,
   LazyPageBoundary,
@@ -56,15 +59,53 @@ import {
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
 import { useBoardReturnFocus } from "./features/board/use-board-return-focus";
-import { NotificationBell } from "./features/notifications/NotificationBell";
+import {
+  BrainButton,
+  BrainDock,
+  BrainDockController,
+  useDockLayout,
+} from "./features/brain/BrainDockShell";
+import { createBrainSurface } from "./features/brain/BrainLazy";
 import { ProjectTiming } from "./features/onboarding/ProjectTiming";
 import type { PlanSearch } from "./features/plan/PlanPage";
+import {
+  LazyReadinessDialog,
+  loadReadinessDialog,
+} from "./features/task/LazyReadinessDialog";
+import { TaskTitlePreview } from "./features/task/TaskTitle";
 import { executionRequestsQuery } from "./lib/execution-queries";
 import { useMemberPresenceRefresh } from "./lib/use-member-presence-refresh";
 
-const PlanPage = lazy(() =>
-  import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage })),
+const NotificationBell = createBrainSurface<{
+  projectId: string;
+  projectName: string;
+  memberId: string;
+}>(
+  () =>
+    import("./features/notifications/NotificationBell").then((module) => ({
+      default: (props) => (
+        <Tooltip text="Project notifications">
+          <module.NotificationBell {...props} />
+        </Tooltip>
+      ),
+    })),
+  "project notifications",
+  (_props, retry) => (
+    <IconButton
+      label={
+        retry ? "Retry project notifications" : "Loading project notifications…"
+      }
+      disabled={!retry}
+      onClick={retry}
+    >
+      <Bell size={18} />
+    </IconButton>
+  ),
 );
+
+const loadPlanPage = () =>
+  import("./features/plan/PlanPage").then((m) => ({ default: m.PlanPage }));
+const PlanPage = lazy(loadPlanPage);
 const InboxPage = lazy(() =>
   import("./features/inbox/InboxPage").then((m) => ({ default: m.InboxPage })),
 );
@@ -74,7 +115,6 @@ const StoryDrawer = lazy(() =>
   })),
 );
 
-import { ReadinessDialog } from "./features/task/Readiness";
 import { AgentStatus, InboxBadge } from "./features/team/AgentStatus";
 import { questionsQuery } from "./lib/planning-queries";
 
@@ -88,11 +128,11 @@ const AssetsPage = lazy(() =>
     default: m.AssetsPage,
   })),
 );
-const ReferencesPage = lazy(() =>
+const loadReferencesPage = () =>
   import("./features/references/ReferencesPage").then((m) => ({
     default: m.ReferencesPage,
-  })),
-);
+  }));
+const ReferencesPage = lazy(loadReferencesPage);
 
 import { Board } from "./features/board/Board";
 import { CommandCenter } from "./features/command/CommandCenter";
@@ -168,6 +208,7 @@ function TaskDrawer(props: {
   return (
     <LazyDrawerBoundary
       title={props.taskKey}
+      preview={<TaskTitlePreview taskKey={props.taskKey} />}
       kind="task"
       close={props.close}
       returnFocus={props.returnFocus}
@@ -216,6 +257,18 @@ function applyTheme(theme: string) {
 function Root() {
   useMemberPresenceRefresh();
   const app = useQuery(appQuery);
+  useEffect(() => {
+    if (!app.data?.hasJam) return;
+    return scheduleIdle(() => {
+      void Promise.allSettled([
+        loadPlanPage(),
+        loadReferencesPage(),
+        loadReadinessDialog(),
+        import("./components/ui/WorkingUnderline"),
+        import("./components/ui/RoughLine"),
+      ]);
+    });
+  }, [app.data?.hasJam]);
   const allMembers = useQuery({ ...membersQuery, enabled: !!app.data?.hasJam });
   const boardTasks = useQuery({ ...tasksQuery, enabled: !!app.data?.hasJam });
   useQuery({
@@ -316,7 +369,7 @@ function Root() {
     scheme.addEventListener("change", apply);
     return () => scheme.removeEventListener("change", apply);
   }, [app.data, app.error, boardTasks.data, boardTasks.error]);
-  if (app.error)
+  if (app.error && !app.data)
     return (
       <main className="center-page">
         <EmptyState image={errorImage} text="The sketchbook couldn't open">
@@ -332,20 +385,30 @@ function Root() {
         <Outlet />
       </Suspense>
       <Toasts />
-      <ReadinessDialog />
+      <LazyReadinessDialog />
     </AvatarMembersContext>
   );
 }
-function WhoAreYou() {
+export function WhoAreYou() {
   const members = useQuery(membersQuery);
   const queryClient = useQueryClient();
+  const adding = useRef(false);
   const select = useMutation({
     mutationFn: (id: string) => api.setCurrentMember(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["app"] }),
   });
   const add = useMutation({
     mutationFn: (name: string) => api.addSelf(name),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["app"] }),
+    retry: false,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["app"] }),
+        queryClient.invalidateQueries({ queryKey: ["members"] }),
+      ]);
+    },
+    onError: () => {
+      adding.current = false;
+    },
   });
   return (
     <main className="center-page">
@@ -356,7 +419,11 @@ function WhoAreYou() {
         {members.data
           ?.filter((m) => m.kind === "human")
           .map((m) => (
-            <Button key={m.id} onClick={() => select.mutate(m.id)}>
+            <Button
+              key={m.id}
+              disabled={add.isPending || add.isSuccess || select.isPending}
+              onClick={() => select.mutate(m.id)}
+            >
               <Avatar member={m} />
               {m.name}
             </Button>
@@ -364,15 +431,30 @@ function WhoAreYou() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (adding.current || select.isPending) return;
             const data = new FormData(e.currentTarget);
-            add.mutate(String(data.get("name")));
+            const name = String(data.get("name") ?? "").trim();
+            if (!name) return;
+            adding.current = true;
+            add.mutate(name);
           }}
         >
           <label>
             Your name
-            <input name="name" required maxLength={40} />
+            <input
+              name="name"
+              required
+              maxLength={40}
+              disabled={add.isPending || add.isSuccess || select.isPending}
+            />
           </label>
-          <Button type="submit">Add myself</Button>
+          <Button
+            type="submit"
+            disabled={add.isPending || add.isSuccess || select.isPending}
+            aria-busy={add.isPending}
+          >
+            {add.isPending ? "Adding myself…" : "Add myself"}
+          </Button>
         </form>
         {(add.error || select.error) && (
           <p role="alert">{(add.error ?? select.error)?.message}</p>
@@ -382,6 +464,7 @@ function WhoAreYou() {
   );
 }
 function Shell() {
+  const dock = useDockLayout();
   const app = useQuery(appQuery);
   const board = useQuery({ ...boardQuery, enabled: !!app.data?.hasJam });
   const expanded = useUiStore((s) => s.sidebarExpanded);
@@ -418,7 +501,16 @@ function Shell() {
   if (!app.data?.hasJam) return <Welcome />;
   if (!app.data.currentMember) return <WhoAreYou />;
   return (
-    <div className={`app-shell ${expanded ? "expanded" : ""}`}>
+    <div
+      className={`app-shell ${expanded ? "expanded" : ""}`}
+      style={dock.style}
+    >
+      {app.data.jam && (
+        <BrainDockController
+          key={app.data.jam.id}
+          projectId={app.data.jam.id}
+        />
+      )}
       <aside className="sidebar">
         <Link to="/board" className="brand" aria-label="Jam Board">
           <span className="brand-mark">
@@ -443,19 +535,21 @@ function Shell() {
         </nav>
         <div className="sidebar-bottom">
           <Tooltip text="Theme">
-            <label className="theme-control">
+            <div className="theme-control">
               <Sun size={18} />
-              <select
-                aria-label="Theme"
+              <CustomSelect
+                label="Theme"
                 value={app.data.theme}
-                onChange={(e) => theme.mutate(e.target.value as Theme)}
-              >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
+                disabled={theme.isPending}
+                onChange={(value) => theme.mutate(value as Theme)}
+                options={[
+                  { value: "system", label: "System" },
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                ]}
+              />
               <Moon className="theme-moon" size={18} />
-            </label>
+            </div>
           </Tooltip>
           <IconButton
             label={expanded ? "Collapse sidebar" : "Expand sidebar"}
@@ -485,6 +579,7 @@ function Shell() {
             <Stamp className="theme-stamp">{board.data.jam.theme}</Stamp>
           )}
           <div className="topbar-space" />
+          <BrainButton />
           {app.data.jam && (
             <NotificationBell
               key={`${app.data.jam.id}:${app.data.currentMember.id}`}
@@ -496,15 +591,14 @@ function Shell() {
           <IconButton label="New task · N" onClick={newTask}>
             <Plus size={17} />
           </IconButton>
-          <button
+          <IconButton
             className="icon-button top-inbox"
-            type="button"
-            aria-label="Open inbox"
+            label="Open inbox"
             onClick={() => void navigate({ to: "/inbox" })}
           >
             <Inbox size={18} />
             <InboxBadge count={questionCount} />
-          </button>
+          </IconButton>
           <CommandCenter
             newTask={newTask}
             toggleTheme={() =>
@@ -535,7 +629,12 @@ function Shell() {
               ))}
           </div>
         </header>
-        <Outlet />
+        <div className="brain-workspace-layout">
+          <div className="brain-routed-content">
+            <Outlet />
+          </div>
+          {dock.open && <BrainDock overlay={dock.overlay} />}
+        </div>
       </div>
     </div>
   );

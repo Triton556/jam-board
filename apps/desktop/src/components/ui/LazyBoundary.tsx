@@ -1,5 +1,6 @@
-import { CatchBoundary, Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { createContext, type ReactNode, Suspense, useContext } from "react";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Button, Drawer, type ModalFocusReturn } from "./index";
 
 const PageLabel = createContext("screen");
@@ -35,7 +36,7 @@ export function LazyPageBoundary({
 }) {
   return (
     <PageLabel.Provider value={label}>
-      <CatchBoundary getResetKey={() => label} errorComponent={PageLoadError}>
+      <ErrorBoundary resetKey={label} fallback={<PageLoadError />}>
         <Suspense
           fallback={
             <main className="loading">
@@ -50,7 +51,7 @@ export function LazyPageBoundary({
         >
           {children}
         </Suspense>
-      </CatchBoundary>
+      </ErrorBoundary>
     </PageLabel.Provider>
   );
 }
@@ -60,11 +61,15 @@ type DrawerLoad = {
   kind: "task" | "story";
   close(): void;
   returnFocus?: ModalFocusReturn;
+  preview?: ReactNode;
 };
 const DrawerContext = createContext<DrawerLoad | null>(null);
 
 function DrawerLoadState({ failed = false }: { failed?: boolean }) {
   const state = useContext(DrawerContext);
+  const pathname = useRouterState({
+    select: (route) => route.location.pathname,
+  });
   if (!state) throw new Error("Drawer loading state needs its boundary");
   return (
     <Drawer
@@ -72,7 +77,9 @@ function DrawerLoadState({ failed = false }: { failed?: boolean }) {
       onClose={state.close}
       closeLabel={`Close ${state.kind}`}
       returnFocus={state.returnFocus}
+      modal={state.kind !== "task" || !/^\/references(?:\/|$)/.test(pathname)}
     >
+      {state.preview}
       <div className="drawer-load-state">
         {failed ? (
           <>
@@ -100,12 +107,12 @@ export function LazyDrawerBoundary({
 }: DrawerLoad & { children: ReactNode }) {
   return (
     <DrawerContext.Provider value={state}>
-      <CatchBoundary
-        getResetKey={() => `${state.kind}:${state.title}`}
-        errorComponent={DrawerLoadError}
+      <ErrorBoundary
+        resetKey={`${state.kind}:${state.title}`}
+        fallback={<DrawerLoadError />}
       >
         <Suspense fallback={<DrawerLoadState />}>{children}</Suspense>
-      </CatchBoundary>
+      </ErrorBoundary>
     </DrawerContext.Provider>
   );
 }

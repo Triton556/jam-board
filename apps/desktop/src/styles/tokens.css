@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  font-synthesis: none;
+  --font-sans: "Jam Text", serif;
+  --font-display: "PT Serif", serif;
+  --font-hand: "Shantell Sans Variable", cursive;
   --paper: #f7f1e6;
   --primary: #4a4541;
   --primary-hover: #3d3834;
@@ -45,9 +49,14 @@
   --shadow-lift:
     0 2px 0 rgba(43, 38, 34, 0.08), 0 18px 36px -12px rgba(43, 38, 34, 0.38);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --t-fast: 120ms;
-  --t-mid: 200ms;
-  --t-slow: 320ms;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --t-fast: var(--motion-fast);
+  --t-mid: var(--motion-base);
+  --t-slow: var(--motion-slow);
 }
 [data-theme="dark"] {
   --paper: #1e1b19;
@@ -107,10 +116,10 @@
   --color-m4: var(--m4);
   --color-m5: var(--m5);
   --color-m6: var(--m6);
-  --font-display: "Fraunces Variable", serif;
-  --font-sans: "Manrope Variable", sans-serif;
+  --font-display: "PT Serif", serif;
+  --font-sans: "Jam Text", serif;
   --font-mono: "JetBrains Mono Variable", monospace;
-  --font-hand: "Caveat", cursive;
+  --font-hand: "Shantell Sans Variable", cursive;
   --radius-card: var(--r-card);
   --radius-input: var(--r-input);
   --radius-chip: var(--r-chip);

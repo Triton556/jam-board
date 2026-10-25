@@ -306,7 +306,7 @@ it("RF01 frame-only canvas hides empty artwork; placement is cancellable and Ent
   );
   await screen.findByRole("button", { name: "Add" });
   expect(
-    screen.queryByText("Drop images, sounds, videos or links here"),
+    screen.queryByText("Double-click anywhere to jot an idea"),
   ).not.toBeInTheDocument();
   const arm = async () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));

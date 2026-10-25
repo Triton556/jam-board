@@ -19,6 +19,7 @@ import { StoryDrawer } from "./plan/StoryDrawer";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/plan/JB-E1",
   useBlocker: () => ({}),
 }));
 beforeEach(async () => {
@@ -204,7 +205,7 @@ function storyView(key = "JB-S1") {
   };
 }
 it.each(["acceptance", "outcomeMd"] as const)(
-  "queued Story %s saves retain their submitted target after navigation",
+  "Story %s saves retain their submitted target and newer draft after navigation",
   async (field) => {
     const original = mockApi.updateStory.bind(mockApi);
     const gates = [deferred(), deferred()];
@@ -246,7 +247,7 @@ it.each(["acceptance", "outcomeMd"] as const)(
     await submit("First save for Story 1");
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     await submit("Second save for Story 1");
-    // The second save is queued, rather than concurrently hitting the API.
+    // Markdown queues a revision; acceptance keeps it as a draft until explicit Save.
     expect(update).toHaveBeenCalledTimes(1);
     switchTo("JB-S2");
     await waitFor(() =>
@@ -255,6 +256,16 @@ it.each(["acceptance", "outcomeMd"] as const)(
       ),
     );
     await act(async () => gates[0]?.resolve());
+    if (field === "acceptance") {
+      expect(update).toHaveBeenCalledTimes(1);
+      switchTo("JB-S1");
+      await waitFor(() =>
+        expect(
+          screen.getByRole("textbox", { name: "Criterion 1" }),
+        ).toHaveValue("Second save for Story 1"),
+      );
+      await user.click(screen.getByRole("button", { name: "Save acceptance" }));
+    }
     await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
     await act(async () => gates[1]?.resolve());
     await waitFor(async () => {

@@ -1,0 +1,18 @@
+.inbox-scroll > section {
+  max-width: 900px;
+  margin-inline: auto;
+}
+.inbox-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.inbox-section-heading h2 {
+  margin-right: auto;
+}
+.question-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

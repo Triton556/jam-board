@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button, Drawer, Stamp } from "../../components/ui";
 import {
   PaperSkeleton,
@@ -232,11 +232,16 @@ function AcceptanceDraft({
   disabled?: boolean;
 }) {
   const draft = usePlanningDraft(value, identity);
+  const locked = useRef(false);
   const mutation = useMutation({
     scope: { id: identity },
+    retry: false,
     mutationFn: (submitted: typeof draft.snapshot & { save: typeof save }) =>
       submitted.save(submitted.draft),
     onSuccess: (_, submitted) => draft.saved(submitted),
+    onSettled: () => {
+      locked.current = false;
+    },
   });
   return (
     <section>
@@ -256,10 +261,16 @@ function AcceptanceDraft({
         variant="primary"
         disabled={
           disabled ||
+          mutation.isPending ||
           !draft.dirty ||
           draft.value.some((a) => !a.criterion.trim() || !a.check.trim())
         }
-        onClick={() => mutation.mutate({ ...draft.snapshot, save })}
+        aria-busy={mutation.isPending}
+        onClick={() => {
+          if (locked.current) return;
+          locked.current = true;
+          mutation.mutate({ ...draft.snapshot, save });
+        }}
       >
         Save acceptance
       </Button>

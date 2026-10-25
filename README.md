@@ -35,7 +35,7 @@ Historical Snowball dogfood recording in the real desktop app (not current-prere
 - 🤝 Conflict-safe editing, claim-generation fencing and exact-report review that preserve drafts when the task or its acceptance context changes.
 - 🎨 A References canvas, local media, team presence and an epic journal.
 - 💾 Local SQLite storage. No cloud, accounts or telemetry. JSON export/import and non-destructive archives.
-- 🌙 Light and dark paper themes, self-hosted fonts and optional paper-rustle sounds.
+- 🌙 Light and dark paper themes, self-hosted PT Serif Caption / PT Serif text, Shantell Sans handwriting (including Cyrillic), JetBrains Mono code and optional paper-rustle sounds.
 - 🗂️ Separate project boards, a visible project switcher and recoverable project archives.
 
 ## Screenshots

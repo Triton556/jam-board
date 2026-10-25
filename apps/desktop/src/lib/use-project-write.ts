@@ -18,11 +18,10 @@ export function useProjectWrite(scope: string, expectedProjectId?: string) {
     mounted = useRef(true),
     locked = useRef(false),
     invalidated = useRef(false);
-  const [changed, setChanged] = useState(false);
-  if (scope !== initialScope.current && !invalidated.current) {
-    invalidated.current = true;
-    setChanged(true);
-  }
+  const [projectChanged, setChanged] = useState(false);
+  // Fence a changed scope synchronously, without scheduling state during render.
+  if (scope !== initialScope.current) invalidated.current = true;
+  const changed = projectChanged || invalidated.current;
   useEffect(() => {
     mounted.current = true;
     const check = () => {
@@ -37,7 +36,10 @@ export function useProjectWrite(scope: string, expectedProjectId?: string) {
     };
     check();
     const unsubscribe = client.getQueryCache().subscribe((event) => {
-      if (event.query.queryKey[0] === "app") check();
+      // useQuery adds/updates observers during render. Only cache state updates
+      // can change the project; observer bookkeeping must not notify other UIs.
+      if (event.type === "updated" && event.query.queryKey[0] === "app")
+        check();
     });
     return () => {
       mounted.current = false;

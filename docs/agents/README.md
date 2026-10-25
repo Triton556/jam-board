@@ -4,8 +4,8 @@ This is the maintained map of **what people and agents can do**, how nested inte
 
 ## Read in this order
 
-1. [Human interaction tree](human-interactions.md): 46 stable route/action-family IDs and nested surfaces.
-2. [Agent action/state map](agent-actions.md): all 44 baseline MCP tools, human-only decisions, lifecycle, recovery and handover.
+1. [Human interaction tree](human-interactions.md): 82 stable route/action-family IDs (46 original plus BD01-BD20 and R09-R24, including 28 pending round-5 paths) and nested surfaces.
+2. [Agent action/state map](agent-actions.md): all 52 current MCP tools, human-only decisions, lifecycle, recovery and handover.
 3. [Behavioral and visual acceptance](acceptance-matrix.md): scenario IDs, functional assertions, visual states and honest result recording.
 4. [Known gaps / next work](known-gaps.md): observed source causes, planned changes and open choices.
 5. [UX evidence and decisions](ux-evidence.md): authoritative web sources applied to this application, not generic styling rules.
@@ -31,7 +31,7 @@ Human description is not the agent's entire implementation schema. A prepared pr
 
 ## Map ownership and completeness
 
-`human-interactions.md` covers the discovered route/action families, including hidden controls. `agent-actions.md` enumerates the entire 44-tool baseline rather than an illustrative subset. Neither claims to enumerate infinitely many content/state combinations. Every new route, action, agent tool, permission/state transition or hidden layer must add/update an ID and acceptance rows. Maintain existing IDs; mark retired behavior rather than silently reusing identifiers. If a code/contract change and this map disagree, investigate the source/live schema and update both; never invent compatibility or skip permission checks to match prose.
+`human-interactions.md` covers the discovered route/action families, including hidden controls. `agent-actions.md` enumerates the entire 52-tool current inventory rather than an illustrative subset. Neither claims to enumerate infinitely many content/state combinations. Every new route, action, agent tool, permission/state transition or hidden layer must add/update an ID and acceptance rows. Maintain existing IDs; mark retired behavior rather than silently reusing identifiers. If a code/contract change and this map disagree, investigate the source/live schema and update both; never invent compatibility or skip permission checks to match prose.
 
 ## Alpha29 validation handoff (2026-10-22)
 
@@ -50,10 +50,10 @@ acceptance, and does not validate every possible state or model response.
 
 ## Saved-answer continuation (alpha34)
 
-[Continue in brain chat](answer-continuation.md) is an explicit copy aid on confirmed
-answers and persisted Answered cards. It does not wake a finished client session,
-launch a worker, send a chat message or grant execution. CLI/API workspace ideas
-remain separate concepts, not implemented connection surfaces.
+[Continue in brain chat](answer-continuation.md) began as an explicit copy aid on
+confirmed answers and persisted Answered cards in alpha34. The current
+[brain dock](../brain-dock.md) adds a primary compose action that stages a scoped
+continuation; it still does not auto-send, wake a turn or grant execution.
 
 ## Alpha35 feedback and native-found overlay corrections
 
@@ -126,3 +126,21 @@ not its identity. The legacy full-playbook installer is replaced by a bundled
 project-scope install with review, preservation checks and outside-catalog backup.
 See [alpha41 verification](../verification/0.3.0-alpha.41.md) for actual results and
 blocked browser/native checks; do not transfer alpha40 pixel acceptance.
+
+## Current brain-dock increment
+
+[Brain dock](../brain-dock.md) is the authoritative contract for the implemented
+ACP chat, terminal and built-in API runtimes. The UI reaches the Tauri adapter and
+`jam-agents`; every runtime is project-pinned and uses ordinary MCP permissions.
+Board Refine/Continue/Ask brain actions stage composer drafts, never automatic
+Send or Start. Settings groups dock profiles before the external MCP disclosure.
+
+The human map extends BD01-BD03 through BD08; the agent map extends AG15-AG18.
+[UX01-UX09 and BC01-BC11](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
+cover board entry points, canvas/Inbox/task layout and every nested dock surface.
+Their functional and visual requirements remain not yet run for this increment;
+source/DOM/fake-agent evidence cannot substitute for pending browser/native QA.
+[Known gaps](known-gaps.md#brain-dock-integration-boundary) records live-provider,
+packaged cleanup, memory-only history and adapter limits. Historical 46-family
+and alpha40/41 results retain their exact source boundary, not this increment's
+acceptance. The seven canvas organization tools plus unlink_reference bring the current MCP inventory to 52.

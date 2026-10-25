@@ -141,7 +141,7 @@ it.each(["archive", "member", "edge"] as const)(
       await user.keyboard("{Escape}");
     }
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
     await act(async () => {
       await router.navigate({ to: "/projects" });
     });

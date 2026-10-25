@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { invalidatePlanning } from "../../lib/planning-queries";
 import { appQuery } from "../../lib/queries";
 import { StoryPicker } from "./PlanningControls";
+import { usePlanningDraft } from "./planning-draft";
 
 type CreationTarget =
   | { kind: "epic" }
@@ -24,13 +25,28 @@ export function NewPlanningDialog({
 }) {
   const [capturedTarget] = useState(target);
   const kind = capturedTarget.kind;
-  const [title, setTitle] = useState(""),
-    [story, setStory] = useState(
-      capturedTarget.kind === "task" ? (capturedTarget.storyKey ?? "") : "",
-    );
   const client = useQueryClient();
   const app = useQuery(appQuery);
   const projectId = useRef(app.data?.jam?.id);
+  const scopeId = projectId.current ?? app.data?.jam?.id;
+  const parent =
+    capturedTarget.kind === "story"
+      ? capturedTarget.epicKey
+      : capturedTarget.kind === "task"
+        ? (capturedTarget.storyKey ?? "")
+        : "";
+  const draftIdentity = scopeId
+    ? `${scopeId}:new:${kind}:${parent}`
+    : undefined;
+  const draft = usePlanningDraft(
+    {
+      title: "",
+      story:
+        capturedTarget.kind === "task" ? (capturedTarget.storyKey ?? "") : "",
+    },
+    draftIdentity,
+  );
+  const { title, story } = draft.value;
   const mounted = useRef(true),
     locked = useRef(false),
     invalidated = useRef(false);
@@ -61,6 +77,7 @@ export function NewPlanningDialog({
       title: string;
       storyKey: string;
       projectId: string;
+      draft: { title: string; story: string };
     }) => {
       if (invalidated.current) throw new Error("The current project changed.");
       if (capturedTarget.kind === "epic")
@@ -77,6 +94,10 @@ export function NewPlanningDialog({
       });
     },
     onSuccess: (entity, input) => {
+      const key = ["planning-draft", draftIdentity];
+      const cached = client.getQueryData<{ draft: typeof input.draft }>(key);
+      if (JSON.stringify(cached?.draft) === JSON.stringify(input.draft))
+        client.removeQueries({ queryKey: key, exact: true });
       invalidatePlanning(client);
       locked.current = false;
       if (
@@ -101,12 +122,19 @@ export function NewPlanningDialog({
     enableBeforeUnload: save.isPending,
   });
   const dismiss = () => {
-    if (!locked.current) close();
+    if (!locked.current) {
+      client.removeQueries({
+        queryKey: ["planning-draft", draftIdentity],
+        exact: true,
+      });
+      close();
+    }
   };
   const canCreate =
     !!title.trim() &&
     (kind !== "task" || !!story) &&
     !!app.data?.jam &&
+    !app.error &&
     !projectChanged &&
     !save.isPending;
   return (
@@ -121,7 +149,12 @@ export function NewPlanningDialog({
           projectId.current ??= id;
           if (projectId.current !== id) return;
           locked.current = true;
-          save.mutate({ title: title.trim(), storyKey: story, projectId: id });
+          save.mutate({
+            title: title.trim(),
+            storyKey: story,
+            projectId: id,
+            draft: { title, story },
+          });
         }}
       >
         <label>
@@ -136,7 +169,9 @@ export function NewPlanningDialog({
                   : "Story name"
             }
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) =>
+              draft.change({ title: e.target.value, story }, false)
+            }
             maxLength={140}
             disabled={save.isPending || projectChanged}
           />
@@ -148,8 +183,13 @@ export function NewPlanningDialog({
               <StoryPicker
                 label="Task story"
                 value={story}
-                onChange={setStory}
-                disabled={save.isPending || projectChanged}
+                onChange={(story) => draft.change({ title, story }, false)}
+                disabled={
+                  save.isPending ||
+                  projectChanged ||
+                  !app.data?.jam ||
+                  !!app.error
+                }
               />
             </div>
             <p className="muted">
@@ -175,7 +215,10 @@ export function NewPlanningDialog({
             <p role="alert">
               Could not check the current project: {app.error.message}
             </p>
-            <Button onClick={() => void app.refetch()}>
+            <Button
+              disabled={app.isFetching || save.isPending}
+              onClick={() => void app.refetch()}
+            >
               Retry project check
             </Button>
           </div>

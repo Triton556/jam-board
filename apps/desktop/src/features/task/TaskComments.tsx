@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Markdown } from "../../components/Markdown";
 import { Avatar, Button, Kbd, Stamp } from "../../components/ui";
+import { AutosizeTextarea } from "../../components/ui/AutosizeTextarea";
 import { api } from "../../lib/api";
 import { relativeTime } from "../../lib/time";
 import type { Member, TaskDetail } from "../../lib/types";
@@ -62,7 +63,7 @@ export function TaskComments({
       })}
       {!task.archivedAt && (
         <div className="comment-compose">
-          <textarea
+          <AutosizeTextarea
             aria-label="Write a comment"
             placeholder="What would you like to add or change?"
             maxLength={4000}

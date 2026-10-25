@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 44);
+    assert_eq!(actual.len(), 52);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -741,22 +741,27 @@ fn assert_session_context_compatibility(context: &serde_json::Value) {
     }
     let tolerant: TolerantOldContext = serde_json::from_value(context.clone()).unwrap();
     assert_eq!(tolerant.project_id, context["projectId"]);
-    let strict = serde_json::from_value::<StrictOldContext>(context.clone()).unwrap_err();
-    assert!(strict.to_string().contains("latestActivityCursor"));
+    // Either additive field can be encountered first, depending on feature-unified
+    // serde_json map ordering. The full current payload must still be rejected.
+    assert!(serde_json::from_value::<StrictOldContext>(context.clone()).is_err());
     let mut older_server = context.clone();
     older_server
         .as_object_mut()
         .unwrap()
         .remove("latestActivityCursor");
-    // A cached pre-alpha41 strict client must refresh its output schema too.
-    let strict_folder =
-        serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap_err();
-    assert!(strict_folder.to_string().contains("projectFolder"));
     older_server
         .as_object_mut()
         .unwrap()
         .remove("projectFolder");
     serde_json::from_value::<StrictOldContext>(older_server.clone()).unwrap();
+    // Check each named addition in isolation so the first-unknown-field error
+    // cannot depend on sorted versus insertion-preserving JSON object order.
+    for field in ["latestActivityCursor", "projectFolder"] {
+        let mut with_addition = older_server.clone();
+        with_addition[field] = context.get(field).unwrap().clone();
+        let strict = serde_json::from_value::<StrictOldContext>(with_addition).unwrap_err();
+        assert!(strict.to_string().contains(field));
+    }
     assert!(
         serde_json::from_value::<CrossVersionContext>(older_server)
             .unwrap()

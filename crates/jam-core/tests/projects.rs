@@ -327,7 +327,7 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
     let agent = s.identify_agent("Legacy worker", "codex").unwrap();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
-    c.execute_batch("DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
+    c.execute_batch("DROP TABLE ref_frame_links; ALTER TABLE ref_items DROP COLUMN verdict; ALTER TABLE ref_items DROP COLUMN archived_by; DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
     c.execute(
         "UPDATE tasks SET idempotency_key='legacy-token' WHERE id=?",
         [&legacy.task.id],
@@ -457,6 +457,7 @@ fn attachments_canvas_activity_and_member_ids_cannot_cross_a_bound_project() {
                 color: "blue".into(),
                 archived_at: None,
                 collapsed: false,
+                links: vec![],
             },
         )
         .unwrap();

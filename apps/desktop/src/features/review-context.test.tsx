@@ -226,10 +226,9 @@ it("a pending review draft keeps comments and obsolete test choices across expli
   const view = mount(task, await mockApi.listMembers());
   await user.click(screen.getByRole("button", { name: "Request changes…" }));
   const dialog = screen.getByRole("dialog");
-  await user.type(
-    within(dialog).getByRole("textbox"),
-    "Keep this concern in the review.",
-  );
+  // The fixture is prose; reconciliation, not individual key events, is under test.
+  await user.click(within(dialog).getByRole("textbox"));
+  await user.paste("Keep this concern in the review.");
   const first = within(dialog).getAllByRole("checkbox")[0];
   if (!first) throw new Error("Missing test checkbox");
   await user.click(first);
@@ -303,10 +302,8 @@ it("rereading inside Request changes exposes the full replacement report without
   const view = mount(task, await mockApi.listMembers());
   await user.click(screen.getByRole("button", { name: "Request changes…" }));
   const dialog = screen.getByRole("dialog");
-  await user.type(
-    within(dialog).getByRole("textbox"),
-    "Check the changed evidence, not just the summary.",
-  );
+  await user.click(within(dialog).getByRole("textbox"));
+  await user.paste("Check the changed evidence, not just the summary.");
   const fresh = await nextReport(task, {
     summaryMd: oldReport.summaryMd,
     changedFiles: ["fictional/replacement-proof.txt"],

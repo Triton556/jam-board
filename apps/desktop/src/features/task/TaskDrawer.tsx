@@ -1,6 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBlocker, useNavigate } from "@tanstack/react-router";
+import {
+  useBlocker,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import {
   Copy,
   Image as ImageIcon,
@@ -10,7 +14,17 @@ import {
   Package,
   Type,
 } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  startTransition,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Markdown } from "../../components/Markdown";
 import {
@@ -19,6 +33,7 @@ import {
   DateTimeInput,
   Dialog,
   Drawer,
+  DrawerHeading,
   IconButton,
   Kbd,
   type ModalFocusReturn,
@@ -28,9 +43,12 @@ import {
   TabPanels,
   Tabs,
   TagInput,
+  Tooltip,
+  useDrawerRestore,
 } from "../../components/ui";
 import { WorkingPill } from "../../components/ui/AgentWorking";
 import { PaperSkeleton, QueryError } from "../../components/ui/AsyncState";
+import { AutosizeTextarea } from "../../components/ui/AutosizeTextarea";
 import { Priority, priorities } from "../../components/ui/Priority";
 import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { RoughLine } from "../../components/ui/RoughLine";
@@ -44,7 +62,6 @@ import { JamError, labels, statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { useProjectWrite } from "../../lib/use-project-write";
 import { AssetLinkDialog } from "../assets/AssetLinkDialog";
-import { TaskExecutionNotice } from "../execution/TaskExecutionNotice";
 import { AgentPlan } from "../plan/AgentPlan";
 import { BrainHandoff } from "../plan/BrainHandoff";
 import { ReferencesSection } from "../references/ReferencesSection";
@@ -55,6 +72,9 @@ import { ReleaseClaim } from "./ReleaseClaim";
 import { Rounds } from "./Rounds";
 import { TaskComments } from "./TaskComments";
 import { TaskConflictDialog } from "./TaskConflictDialog";
+import { TaskPermissionStatus } from "./TaskPermissionStatus";
+import { TaskTitleInput, TaskTitlePreview } from "./TaskTitle";
+import "./task-status.css";
 import type { TaskFields } from "./task-form";
 import {
   briefSchema,
@@ -74,37 +94,110 @@ export function TaskDrawer({
   close(): void;
   returnFocus?: ModalFocusReturn;
 }) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  return (
+    <TaskDrawerSession
+      key={taskKey}
+      taskKey={taskKey}
+      close={close}
+      returnFocus={returnFocus}
+      modal={!/^\/references(?:\/|$)/.test(pathname)}
+    />
+  );
+}
+
+function TaskDrawerSession({
+  taskKey,
+  close,
+  returnFocus,
+  modal,
+}: {
+  taskKey: string;
+  close(): void;
+  returnFocus?: ModalFocusReturn;
+  modal: boolean;
+}) {
   const task = useQuery({
     queryKey: ["task", taskKey],
     queryFn: () => api.getTask(taskKey),
   });
-  if (task.data)
-    return (
-      <TaskEditor
-        key={taskKey}
-        task={task.data}
-        close={close}
-        returnFocus={returnFocus}
-      />
-    );
+  const [entered, setEntered] = useState(false);
+  const dismiss = useRef<(() => void) | null>(null);
   return (
-    <Drawer onClose={close} title={taskKey} returnFocus={returnFocus}>
-      {task.error ? (
-        <QueryError error={task.error} retry={() => void task.refetch()} />
-      ) : (
-        <PaperSkeleton label="Loading task" />
-      )}
-    </Drawer>
+    <TaskSurfaceContext.Provider value={dismiss}>
+      <Drawer
+        onClose={close}
+        title={taskKey}
+        returnFocus={returnFocus}
+        modal={modal}
+        onEntered={() => startTransition(() => setEntered(true))}
+        hideHeading={entered && !!task.data}
+        onRequestClose={(finish) =>
+          dismiss.current ? dismiss.current() : finish()
+        }
+      >
+        {(finish) =>
+          entered && task.data ? (
+            <TaskEditor
+              key={taskKey}
+              task={task.data}
+              close={finish}
+              frame={TaskEditorSurface}
+            />
+          ) : (
+            <div className="task-drawer-skeleton" aria-busy="true">
+              <TaskTitlePreview taskKey={taskKey} />
+              {task.error ? (
+                <QueryError
+                  error={task.error}
+                  retry={() => void task.refetch()}
+                />
+              ) : (
+                <PaperSkeleton label="Loading task" />
+              )}
+            </div>
+          )
+        }
+      </Drawer>
+    </TaskSurfaceContext.Provider>
   );
 }
+
+const TaskSurfaceContext = createContext<React.RefObject<
+  (() => void) | null
+> | null>(null);
+function TaskEditorSurface({
+  children,
+  ...heading
+}: ComponentProps<typeof Drawer>) {
+  const dismiss = useContext(TaskSurfaceContext);
+  useLayoutEffect(() => {
+    if (!dismiss) return;
+    dismiss.current = heading.onClose;
+    return () => {
+      dismiss.current = null;
+    };
+  }, [dismiss, heading.onClose]);
+  return (
+    <>
+      <DrawerHeading {...heading} />
+      {typeof children === "function" ? children(heading.onClose) : children}
+    </>
+  );
+}
+
 export function TaskEditor({
   task,
   close,
   returnFocus,
+  frame: Frame = Drawer,
 }: {
   task: TaskDetail;
   close(): void;
   returnFocus?: ModalFocusReturn;
+  frame?: (props: ComponentProps<typeof Drawer>) => React.ReactNode;
 }) {
   const { settings } = useBoardSettings();
   const navigate = useNavigate();
@@ -182,6 +275,10 @@ export function TaskEditor({
     withResolver: true,
     enableBeforeUnload: isDirty,
   });
+  const restoreDrawer = useDrawerRestore();
+  useEffect(() => {
+    if (blocker.status === "blocked") restoreDrawer?.();
+  }, [blocker.status, restoreDrawer]);
   const resetTask = (value: TaskDetail) => {
     seenVersions.current.add(value.updatedAt);
     setBase(value);
@@ -413,6 +510,7 @@ export function TaskEditor({
     });
   };
   const submitRef = useRef(() => {});
+  const editorRoot = useRef<HTMLFormElement>(null);
   submitRef.current = () => {
     if (
       isDirty &&
@@ -428,6 +526,15 @@ export function TaskEditor({
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        const drawer = editorRoot.current?.closest<HTMLElement>(".drawer");
+        if (
+          !drawer ||
+          drawer.inert ||
+          drawer.classList.contains("closing") ||
+          (drawer.getAttribute("aria-modal") !== "true" &&
+            !drawer.contains(document.activeElement))
+        )
+          return;
         e.preventDefault();
         submitRef.current();
       }
@@ -513,19 +620,30 @@ export function TaskEditor({
     [task.archivedAt],
   );
   const title = watch("title");
-  const titleInput = useRef<HTMLTextAreaElement | null>(null);
   const titleField = register("title");
-  // biome-ignore lint/correctness/useExhaustiveDependencies: RHF updates the DOM value; every title change must resize the textarea, including reload and conflict resolution.
-  useLayoutEffect(() => {
-    const element = titleInput.current;
-    if (element) {
-      element.style.height = "0px";
-      element.style.height = `${element.scrollHeight}px`;
-    }
-  }, [title]);
   const due = watch("dueAt");
   const values = watch();
   const readonly = !!task.archivedAt;
+  const saveDisabled =
+    !isDirty ||
+    !isValid ||
+    save.isPending ||
+    conflictRead.isPending ||
+    markPending ||
+    readonly;
+  const saveHelp = readonly
+    ? "Unarchive this task before editing."
+    : save.isPending
+      ? "Saving changes… Wait for the result."
+      : conflictRead.isPending
+        ? "Checking the latest task. Wait before saving."
+        : markPending
+          ? "Checking readiness. Wait before saving."
+          : !isValid
+            ? "Fix the highlighted fields before saving."
+            : !isDirty
+              ? "No unsaved changes."
+              : "Save changes · Ctrl+S";
   const actor =
     changes?.actor.name ??
     members.data?.find((m) => m.id === latest?.updatedBy)?.name ??
@@ -536,7 +654,7 @@ export function TaskEditor({
       .catch((error) => useUiStore.getState().error(String(error)));
   };
   return (
-    <Drawer
+    <Frame
       onClose={dismissDrawer}
       returnFocus={returnFocus}
       title={task.key}
@@ -546,7 +664,13 @@ export function TaskEditor({
         </IconButton>
       }
       actions={
-        <div className="task-menu" ref={menuRoot}>
+        <div className="task-menu task-heading-actions" ref={menuRoot}>
+          <div title="Save your description before asking the brain to read it.">
+            <BrainHandoff
+              scope={{ type: "task", id: task.id, key: task.key }}
+              disabled={readonly}
+            />
+          </div>
           <IconButton
             label="Task actions"
             aria-expanded={menu}
@@ -605,18 +729,8 @@ export function TaskEditor({
           </button>
         </div>
       )}
-      <div className="planning-tools">
-        <BrainHandoff
-          scope={{ type: "task", id: task.id, key: task.key }}
-          disabled={readonly}
-        />
-        <span className="small muted">
-          Save your description before asking the brain to read it.
-        </span>
-      </div>
-      {!readonly && <TaskExecutionNotice task={task} />}
-      <ReleaseClaim task={task} hasUnsavedEdits={isDirty} />
       <form
+        ref={editorRoot}
         id="task-form"
         onSubmit={handleSubmit((value) => submit(value))}
         className="task-form"
@@ -648,21 +762,20 @@ export function TaskEditor({
               {task.story.key} · {task.story.title}
             </Button>
           </div>
-          <textarea
-            className="task-title-input"
-            aria-label="Task title"
-            rows={2}
+          <TaskTitleInput
             {...titleField}
-            ref={(element) => {
-              titleField.ref(element);
-              titleInput.current = element;
-            }}
-            onInput={(e) => {
-              e.currentTarget.style.height = "0px";
-              e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-            }}
+            value={title}
             aria-invalid={!!errors.title}
           />
+        </fieldset>
+        <section
+          className="task-operational-status"
+          aria-label="Task actions and permission"
+        >
+          {!readonly && <TaskPermissionStatus task={task} />}
+          <ReleaseClaim task={task} hasUnsavedEdits={isDirty} compact />
+        </section>
+        <fieldset disabled={readonly || save.isPending || markPending}>
           {title.length > 120 && (
             <small className="title-count">{title.length}/140</small>
           )}
@@ -685,11 +798,12 @@ export function TaskEditor({
           </p>
           <TabPanels id={notesTabs} value={tab} items={["Write", "Preview"]}>
             {tab === "Write" ? (
-              <textarea
+              <AutosizeTextarea
                 aria-label="Description"
                 className="description-input"
                 placeholder="What should this task do, and what matters to you?"
                 {...register("descriptionMd")}
+                value={values.descriptionMd}
               />
             ) : (
               <Markdown>
@@ -963,21 +1077,23 @@ export function TaskEditor({
               <small className="mono">{asset.location}</small>
             </div>
             {!readonly && (
-              <Button
-                variant="ghost"
-                aria-label={`Unlink ${asset.name}`}
-                onClick={() =>
-                  void api
-                    .unlinkAsset({ assetId: asset.id, taskKey: task.key })
-                    .then(() => {
-                      invalidate();
-                      void client.invalidateQueries({ queryKey: ["assets"] });
-                    })
-                    .catch((e) => useUiStore.getState().error(String(e)))
-                }
-              >
-                ×
-              </Button>
+              <Tooltip text={`Unlink ${asset.name}`}>
+                <Button
+                  variant="ghost"
+                  aria-label={`Unlink ${asset.name}`}
+                  onClick={() =>
+                    void api
+                      .unlinkAsset({ assetId: asset.id, taskKey: task.key })
+                      .then(() => {
+                        invalidate();
+                        void client.invalidateQueries({ queryKey: ["assets"] });
+                      })
+                      .catch((e) => useUiStore.getState().error(String(e)))
+                  }
+                >
+                  ×
+                </Button>
+              </Tooltip>
             )}
           </div>
         ))}
@@ -1001,21 +1117,16 @@ export function TaskEditor({
           {isDirty ? "Unsaved changes" : "All changes saved"}
         </span>
         <Button onClick={close}>Cancel</Button>
-        <Button
-          type="submit"
-          form="task-form"
-          variant="primary"
-          disabled={
-            !isDirty ||
-            !isValid ||
-            save.isPending ||
-            conflictRead.isPending ||
-            markPending ||
-            readonly
-          }
-        >
-          Save <Kbd>Ctrl+S</Kbd>
-        </Button>
+        <Tooltip text={saveHelp}>
+          <Button
+            type="submit"
+            form="task-form"
+            variant="primary"
+            disabled={saveDisabled}
+          >
+            Save <Kbd>Ctrl+S</Kbd>
+          </Button>
+        </Tooltip>
       </div>
       {blocker.status === "blocked" && (
         <Dialog title="Discard changes?" onClose={() => blocker.reset?.()}>
@@ -1147,6 +1258,6 @@ export function TaskEditor({
           }}
         />
       )}
-    </Drawer>
+    </Frame>
   );
 }

@@ -1,7 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import hello from "../../assets/chibi/duo-hello-256.webp";
-import { Avatar, Button, Dialog, EmptyState, Stamp } from "../../components/ui";
+import {
+  Avatar,
+  Button,
+  Dialog,
+  EmptyState,
+  Stamp,
+  Tooltip,
+} from "../../components/ui";
+import { PaperSkeleton } from "../../components/ui/AsyncState";
 import {
   ColorSwatches,
   memberColors,
@@ -32,6 +40,21 @@ export function MemberDialog({
   const valid = !!name.trim() && name.length <= 40 && avatar.length <= 16;
   const write = useProjectWrite(`member:${member?.id ?? "new"}`);
   const dispatched = useRef(false);
+  const saveHelp = write.pending
+    ? "Saving teammate… Wait for the result."
+    : write.error
+      ? "Close and check the team before trying again."
+      : write.changed
+        ? "The project changed. Close and reopen this form."
+        : !name.trim()
+          ? "Enter a name to save this teammate."
+          : name.length > 40
+            ? "Use a name of 40 characters or fewer."
+            : avatar.length > 16
+              ? "Use an avatar of 16 characters or fewer."
+              : !write.ready
+                ? "Wait for the current project to load."
+                : "Save teammate";
   const submit = () => {
     if (!valid || write.error || write.isLocked()) return;
     dispatched.current = false;
@@ -70,7 +93,8 @@ export function MemberDialog({
         <label>
           Name
           <input
-            disabled={write.pending || write.checking}
+            data-autofocus
+            disabled={write.pending}
             readOnly={!write.ready || !!write.error}
             value={name}
             maxLength={40}
@@ -113,13 +137,15 @@ export function MemberDialog({
           <Button disabled={write.pending} onClick={() => write.dismiss(close)}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!valid || !write.ready || !!write.error}
-          >
-            Save teammate
-          </Button>
+          <Tooltip text={saveHelp}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!valid || !write.ready || !!write.error}
+            >
+              Save teammate
+            </Button>
+          </Tooltip>
         </div>
       </form>
     </Dialog>
@@ -152,83 +178,98 @@ export function TeamPage({
           </Button>
         </PageHeading>
       </div>
-      {members.error && <p role="alert">{members.error.message}</p>}
-      {(["human", "agent"] as const).map((kind) => (
-        <section className="team-section" key={kind}>
-          <h2>{kind === "human" ? "Humans" : "Agents"}</h2>
-          {kind === "agent" && (
-            <p className="muted">
-              Agents join automatically when they connect through MCP.{" "}
-              <Button variant="ghost" onClick={connect}>
-                How to connect →
-              </Button>
-            </p>
-          )}
-          <div className="team-grid">
-            {members.data
-              ?.filter((m) => m.kind === kind)
-              .map((m) => (
-                <article className="member-card" key={m.id}>
-                  <div className="member-top">
-                    <Avatar member={m} size={48} />
-                    <div>
-                      <h3>{m.name}</h3>
-                      {kind === "agent" && <AgentStatusLine member={m} />}
-                      <small className="mono muted">@{m.handle}</small>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      aria-label={`Edit ${m.name}`}
-                      onClick={() => setEdit(m)}
-                    >
-                      Edit
-                    </Button>
-                  </div>
-                  {kind === "agent" && (
-                    <div className="agent-presence">
-                      <Stamp>{m.client}</Stamp>
-                      {m.online ? (
-                        <span>
-                          <i className="online-dot" />
-                          Online
-                        </span>
-                      ) : (
-                        <small className="muted">
-                          last seen{" "}
-                          {m.lastSeenAt
-                            ? relativeTime(m.lastSeenAt, now)
-                            : "never"}
-                        </small>
-                      )}
-                    </div>
-                  )}
-                  <div className="working-tasks">
-                    {m.workingOn.map((t) => (
-                      <button
-                        type="button"
-                        key={t.key}
-                        onClick={() => openTask(t.key)}
-                        title={t.title}
+      {members.error && (
+        <div>
+          <p role="alert">
+            Could not load the team. {members.error.message}
+            {members.data && " Showing the last loaded team."}
+          </p>
+          <Button
+            disabled={members.isFetching}
+            onClick={() => void members.refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      {members.isPending && <PaperSkeleton label="Loading team…" />}
+      {members.data &&
+        (["human", "agent"] as const).map((kind) => (
+          <section className="team-section" key={kind}>
+            <h2>{kind === "human" ? "Humans" : "Agents"}</h2>
+            {kind === "agent" && (
+              <p className="muted">
+                Agents join automatically when they connect through MCP.{" "}
+                <Button variant="ghost" onClick={connect}>
+                  How to connect →
+                </Button>
+              </p>
+            )}
+            <div className="team-grid">
+              {members.data
+                ?.filter((m) => m.kind === kind)
+                .map((m) => (
+                  <article className="member-card" key={m.id}>
+                    <div className="member-top">
+                      <Avatar member={m} size={48} />
+                      <div>
+                        <h3>{m.name}</h3>
+                        {kind === "agent" && <AgentStatusLine member={m} />}
+                        <small className="mono muted">@{m.handle}</small>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        aria-label={`Edit ${m.name}`}
+                        onClick={() => setEdit(m)}
                       >
-                        Working on <b className="mono">{t.key}</b> · {t.title}
-                      </button>
-                    ))}
-                  </div>
-                  <WorkloadBar counts={m.counts} />
-                </article>
-              ))}
-          </div>
-          {!members.data?.some((m) => m.kind === kind) && (
-            <EmptyState
-              text={
-                kind === "agent"
-                  ? "Your AI teammates will join here"
-                  : "Every jam starts with a teammate"
-              }
-            />
-          )}
-        </section>
-      ))}
+                        Edit
+                      </Button>
+                    </div>
+                    {kind === "agent" && (
+                      <div className="agent-presence">
+                        <Stamp>{m.client}</Stamp>
+                        {m.online ? (
+                          <span>
+                            <i className="online-dot" />
+                            Online
+                          </span>
+                        ) : (
+                          <small className="muted">
+                            last seen{" "}
+                            {m.lastSeenAt
+                              ? relativeTime(m.lastSeenAt, now)
+                              : "never"}
+                          </small>
+                        )}
+                      </div>
+                    )}
+                    <div className="working-tasks">
+                      {m.workingOn.map((t) => (
+                        <button
+                          type="button"
+                          key={t.key}
+                          onClick={() => openTask(t.key)}
+                          title={t.title}
+                        >
+                          Working on <b className="mono">{t.key}</b> · {t.title}
+                        </button>
+                      ))}
+                    </div>
+                    <WorkloadBar counts={m.counts} />
+                  </article>
+                ))}
+            </div>
+            {!members.data?.some((m) => m.kind === kind) && (
+              <EmptyState
+                text={
+                  kind === "agent"
+                    ? "Your AI teammates will join here"
+                    : "Every jam starts with a teammate"
+                }
+              />
+            )}
+          </section>
+        ))}
       {edit && (
         <MemberDialog
           member={edit === true ? undefined : edit}

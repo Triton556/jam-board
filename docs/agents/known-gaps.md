@@ -1,11 +1,19 @@
 # Known gaps and next work
 
+Agent canvas organization is now exposed by seven additive MCP tools (AG14 /
+AC14). Canvas writes retain the desktop services' lack of CAS/idempotency tokens;
+callers must reread and reconcile uncertain responses. Grid is bounded to selected
+items in one frame and refuses insufficient space; it does not resize frames or
+rearrange unselected content. API/stdio evidence is separate from desktop/native
+highlight and toast acceptance, which remains unrun for this delta.
+
 [Index](README.md). Source baseline alpha28 `2b263795b31767da29db0b62dc81f4da19dfc4d1`; source inspection 2026-10-22. Priorities describe impact, not permission to mutate live user data. All runtime/native acceptance remains unexecuted by this documentation audit.
 
 ## Status ledger
 
-| Work | Status on 2026-10-22 | Completion evidence required |
+| Work | Dated checkpoint / current status | Completion evidence required |
 |---|---|---|
+| Brain-dock increment | Implemented source on feature/brain-dock; browser/native QA not yet run | BC01-BC11 / UX01-UX09; live providers, packaged cleanup and project/restart recovery |
 | Human-first Task/Story | Corrected alpha29 DOM closure and bounded native read-only evidence; native text entry blocked | HF01–HF06 functional + open-state visual evidence; preserve reports, readiness and drafts |
 | Reference frame grip/empty state | Alpha30 source/DOM; alpha32 source visual treatment; native pending | RF01, RF02 |
 | Direct note paper | Alpha30–36 canvas form was explicitly rejected by the user; alpha38 replaces it with direct placement/writing | RF03 including reopen/no-heading, autosave ambiguity, retained drafts and actual rendered appearance |
@@ -71,7 +79,7 @@ a diagnosis of the user's minimize/restore incident. Table/detail presence wordi
 is unchanged. Native write sequences remain unrun after the alpha29 input-tool
 capability error; DOM and hosted browser evidence must stay distinct. Status-menu
 clipping and disclosure ink have a narrow source repair awaiting exact native31.
-Raw session streaming and Story-level comments remain separate future/model work.
+Dock-owned structured chat events are now implemented; mirroring arbitrary external-client transcripts and Story-level comments remain separate work.
 
 ## Alpha32 visual/readability increment
 
@@ -101,12 +109,12 @@ project-write hook and backend contracts are not broadened.
 
 ## Alpha34 manual aid, not automatic wake
 
-Saved answers can be deliberately handed back to an existing brain chat through
-a copy-only prompt. Active MCP waits remain supported, but there is no adapter
-that starts a new model turn in a finished conversation. CLI/API/embedded-chat
-design is concept-only and not an implementation prerequisite or implicit grant.
-The prompt cannot guarantee that a model follows the instructions; real-client
-workflow observation is separate from DOM/clipboard checks.
+Alpha34 offered a copy-only saved-answer handoff. The current increment adds
+ACP/API chat and terminal runtimes, with primary Continue in brain chat staging
+an editable continuation and scope chip; copy remains secondary. Staging does not
+auto-send or wake a finished turn. Active MCP waits still only observe events.
+Model compliance and real-client workflow remain separate from DOM/clipboard
+checks; no continuation action grants Start.
 
 - Alpha34 native presence observation: the visible Board activity label refreshes
   and expires correctly, but an already-open browser-native title popup stays old
@@ -195,3 +203,81 @@ Exact alpha40 completed 103 hosted browser cases and 12 inspected synthetic
 PNGs. The named paper/pickup/guidance checks are observed; other families in the
 source ledger are not silently promoted to full visual acceptance. See the
 [terminal version record](../verification/0.3.0-alpha.40.md#terminal-hosted-and-rendered-result--2026-10-22).
+
+## Brain dock integration boundary
+
+ACP chat, terminal and built-in API chat are implemented in this increment; the
+[design contract](../brain-dock.md) and BC01-BC11 / UX01-UX09 define the current
+acceptance boundary. Fake ACP, provider fixtures, DOM and native process test
+files are available; this documentation pass does not claim new runtime passes.
+
+- Real adapters/providers and real login/credential round trips are not exercised
+  in CI. Tauri/webview event delivery, rendered interactions and actual-human
+  flows still need exact-version browser/native evidence.
+- Packaged-app process cleanup is unverified: test explicit Stop, startup
+  interruption, wrapper descendants, crash and application exit in the package.
+- Transcripts and terminal scrollback are bounded in memory only. Remount replay
+  is supported during the app process; there is no resume after application
+  restart or implemented ACP session/load recovery.
+- Built-in API chat uses only the jam-board MCP server. Extra MCP servers for API
+  chat, browser/computer inputs and multi-agent views remain future work. Local
+  voice input is specified for round 5; BD17-BD20 / RR09-RR12 remain implementation
+  in progress; not yet run for browser/native/human acceptance.
+- The codex-acp adapter has never been probed on this machine. A detected command
+  or available preset does not establish adapter startup or successful Codex auth.
+
+Custom terminal commands inherit the pinned board environment; only known
+Claude/Codex CLI paths have standardized MCP flags. The dock does not certify a
+custom executable's MCP support. Settings/API models and endpoints remain editable;
+no real provider availability is inferred from a stored profile or mock response.
+Tool permission and chat text never replace the board's human Start decision.
+
+## Round-5 Windows desktop test manifest — loader fix
+
+The 2026-10-26 Windows fix replaces the adjacent-manifest workaround. The new
+`voice_commands::tests::voice_wire_contract_has_eight_commands_and_exact_progress_payload`
+test calls `export_event_bindings`, retaining `event_bridge` and all registered
+commands in the library test harness. That pulls in the existing
+`tauri-plugin-dialog` → `rfd/common-controls-v6` → `TaskDialogIndirect`
+import. The plugins themselves were already present; retaining the command
+bridge in a library unit test exposed the missing activation context.
+
+The old `cargo:rustc-link-arg-tests` settings covered integration-test targets,
+not the library unit-test executable. `build.rs` now passes the checked-in
+`windows-test.manifest` through global MSVC `/MANIFEST:EMBED` and
+`/MANIFESTINPUT` arguments so library tests, integration tests, examples and
+application binaries all receive Common Controls v6. Tauri still builds the
+icons/version resources, with its separate manifest disabled to avoid duplicate
+`RT_MANIFEST` resources. `/MANIFESTUAC:NO` preserves the dependency-only
+policy of Tauri's previous default manifest. Other platforms keep Tauri defaults.
+
+Verification: two standalone harness probes linked against the same desktop
+library showed that a type-only test starts without a manifest (exit 0), while
+a test retaining binding export imports `TaskDialogIndirect` and exits
+`0xc0000139`. Microsoft `mt.exe` confirmed that the repaired Cargo library
+test and ordinary app binary contain an embedded Common Controls v6 dependency.
+The debug application links without duplicate manifest resources. Plain
+`cargo test --workspace` passed: **260 passed, 0 failed, 4 ignored**, including
+all 12 desktop library unit tests and 15 stdio integration tests.
+`cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`
+and `cargo build -p jam-board` passed. No dependency was added.
+
+The first workspace rerun also exposed a separate stale staged MCP sidecar:
+Tauri copied the bundled executable over `target/debug/jam-board-mcp.exe`,
+and that older copy rejected the current test database migration version.
+The generated sidecar was refreshed using the existing `prepare:sidecar` build
+and copy steps. Its Node wrapper hit sandbox `spawnSync rustc EPERM` after
+building the CLI, so the identical final file copy was completed in PowerShell.
+This is unrelated to Common Controls activation. Evidence is local under
+`test-visuals/round5/w2-workspace-manifest.log` and `w2-*-probe*`.
+No adjacent test manifest or custom harness wrapper is needed. This is loader
+and test execution evidence, not browser/webview or packaged-release acceptance.
+
+## Round-5 contract prose discrepancy
+
+The orchestrator-owned [brain-dock attachment contract](../brain-dock.md#phase-3--attachments)
+has an `AttachmentView` example without `previewUrl`, while its preceding session
+controls prose explicitly describes image attachment `previewUrl`. The contract
+owner should reconcile that example. This bookkeeping pass leaves both contracts
+unchanged; BD12-BD16 / RR04-RR08 are pending interaction inventory, not a schema
+change or an assertion that the attachment implementation has been accepted.

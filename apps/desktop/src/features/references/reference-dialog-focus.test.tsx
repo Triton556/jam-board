@@ -76,9 +76,15 @@ it.each([
     const summary = await screen.findByLabelText("Actions for Focus fixture");
     await userEvent.click(summary);
     await userEvent.click(screen.getByRole("button", { name: action }));
-    // The modal owns initial focus. Child React autoFocus must not replace its
-    // captured return target with an input that disappears on close.
-    expect(screen.getByRole("dialog", { name: title })).toHaveFocus();
+    // Focus the first field after the modal captures the visible return target.
+    expect(screen.getByRole("dialog", { name: title })).toBeVisible();
+    await waitFor(() =>
+      expect(
+        mode === "link"
+          ? screen.getByRole("combobox", { name: "Link to work" })
+          : screen.getByLabelText(mode === "tags" ? "Tags" : "Title"),
+      ).toHaveFocus(),
+    );
     if (mode === "caption")
       expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue(
         item.title,

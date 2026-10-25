@@ -10,15 +10,8 @@
   height: 100%;
   min-height: 500px;
 }
-.references-page .react-flow__viewport {
-  will-change: transform;
-}
-.references-page .react-flow__node-reference {
-  will-change: transform;
-}
-.references-page .react-flow__edges,
-.references-page .react-flow__node-frame,
-.references-page .react-flow__edgelabel-renderer {
+/* Releasing this hint after movement lets Chromium paint text at the final scale. */
+.references-page.reference-viewport-moving .react-flow__viewport {
   will-change: transform;
 }
 .reference-control-stack {
@@ -46,6 +39,7 @@
 }
 .reference-toolbar {
   z-index: 1;
+  gap: 8px;
 }
 .reference-toolbar .button {
   height: 32px;
@@ -238,14 +232,18 @@
   margin: 3px 0;
 }
 .kind-note .reference-caption {
-  font-family: Caveat, cursive;
-  font-size: 18px;
-  line-height: 1.25;
+  font-family: var(--font-hand);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
 }
-.kind-note .reference-caption h1,
-.kind-note .reference-caption h2 {
-  font-family: "Fraunces Variable", serif;
-  font-size: 23px;
+.kind-note .reference-caption .markdown {
+  line-height: inherit;
+}
+.kind-note .reference-caption :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-hand);
+  font-size: 18px;
+  font-weight: 700;
 }
 .reference-chips,
 .reference-tags {
@@ -267,7 +265,7 @@
   border-radius: 6px;
 }
 .reference-chips small {
-  font-family: "Manrope Variable", sans-serif;
+  font-family: var(--font-sans);
   color: var(--ink-2);
   font-size: 9px;
 }
@@ -280,7 +278,7 @@
   gap: 9px;
 }
 .reference-link-title {
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-size: 21px;
   text-align: left;
   background: none;
@@ -338,10 +336,14 @@
   height: 18px;
   accent-color: var(--ink);
 }
-.reference-audio span {
+.reference-audio > .mono {
   grid-column: 1 / -1;
   font-size: 10px;
   color: var(--ink-2);
+}
+.reference-audio > .tooltip-wrap:has(input) {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 .reference-audio button {
   border: 0;
@@ -354,7 +356,7 @@
   height: 100%;
   width: 100%;
   position: relative;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .reference-frame-outline {
   position: absolute;
@@ -385,7 +387,7 @@
   padding: 6px 12px;
   pointer-events: auto;
   color: var(--ink);
-  font-family: "Fraunces Variable", serif;
+  font-family: var(--font-display);
   font-size: 16px;
   line-height: 1.3;
   cursor: grab;
@@ -518,7 +520,7 @@
   background: var(--paper);
   color: var(--ink-2);
   padding: 2px 5px;
-  font-family: Caveat, cursive;
+  font-family: var(--font-hand);
   font-size: 16px;
   max-width: 240px;
 }
@@ -547,10 +549,13 @@
   pointer-events: none;
 }
 .reference-empty .empty-state {
-  pointer-events: auto;
+  pointer-events: none;
   background: color-mix(in srgb, var(--paper) 85%, transparent);
   border-radius: 20px;
   padding: 25px;
+}
+.reference-empty .button {
+  pointer-events: auto;
 }
 .reference-notice,
 .reference-connect-hint {
@@ -634,12 +639,21 @@
 }
 @media (max-width: 1200px) {
   .reference-toolbar {
-    gap: 0;
+    gap: 8px;
     padding: 5px;
   }
   .reference-toolbar .button {
     padding: 0 6px;
   }
+}
+.sticky-editor .sticky-finish {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+}
+.sticky-editor .sticky-add-heading {
+  min-height: 28px;
 }
 
 .reference-read-notice {
@@ -745,16 +759,19 @@
   box-shadow: none;
 }
 .sticky-editor .sticky-heading-input {
-  font-weight: 650;
+  font-family: var(--font-hand);
+  font-weight: 700;
   font-size: 16px;
   line-height: 1.4;
 }
 .sticky-editor .sticky-body-input {
+  font-family: var(--font-hand);
+  font-weight: 400;
   min-height: 70px;
   flex: 1;
-  resize: vertical;
+  resize: none;
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 .sticky-editor .sticky-heading-input:focus-visible,
 .sticky-editor .sticky-body-input:focus-visible {
@@ -762,7 +779,7 @@
 }
 .reference-sticky-paper:focus-within,
 .reference-card.kind-note:has(.sticky-editor:focus-within) {
-  outline: 2px solid var(--coral);
+  outline: 2px solid color-mix(in srgb, var(--coral) 45%, transparent);
   outline-offset: 2px;
 }
 .sticky-save-state {
@@ -802,11 +819,26 @@
   display: block;
   margin-bottom: 6px;
   font-size: 16px;
+  font-family: var(--font-hand);
+  font-weight: 700;
 }
 .reference-card-header .sticky-kind-label {
+  flex: 1;
   font-size: 11px;
   font-weight: 500;
   color: var(--ink-2);
+}
+.note-task-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.note-task-story-field {
+  display: grid;
+  gap: 8px;
 }
 .reference-note-placement {
   position: absolute;
@@ -865,4 +897,299 @@
     var(--reference-color, var(--butter)) 35%,
     var(--card)
   );
+}
+
+.reference-card-header > .sticky-note-title {
+  margin: 0;
+}
+.note-without-heading {
+  position: relative;
+}
+/* Direct manipulation and reference linking. */
+.reference-lightbox video {
+  max-width: 100%;
+  max-height: 75vh;
+}
+.reference-frame-tab.has-links {
+  flex-wrap: wrap;
+}
+.reference-frame-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 100%;
+  min-height: 32px;
+}
+.reference-frame-tab.compact .reference-frame-links {
+  flex-basis: auto;
+}
+.reference-link-pill .reference-popover-menu [role="menuitem"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reference-image {
+  margin: 0;
+  min-width: 0;
+}
+.reference-card,
+.reference-overview-hit,
+.reference-frame,
+.reference-note-text,
+.reference-image {
+  cursor: grab;
+  user-select: none;
+}
+.react-flow__node.dragging
+  :is(
+    .reference-card,
+    .reference-frame,
+    .reference-image,
+    .reference-note-text
+  ) {
+  cursor: grabbing;
+}
+.reference-card :is(button, summary, a, input, textarea) {
+  cursor: pointer;
+}
+.reference-card textarea {
+  cursor: text;
+  user-select: text;
+}
+.reference-verdict-toolbar {
+  position: static;
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.reference-card:hover > .reference-card-header > .reference-verdict-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.reference-card.selected > .reference-card-header > .reference-verdict-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.reference-card:has(:focus)
+  > .reference-card-header
+  > .reference-verdict-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.reference-verdict-toolbar > .tooltip-wrap {
+  display: inline-flex;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+}
+.reference-verdict-toolbar button {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin: -2px;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+}
+.reference-verdict-face {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+.reference-verdict-toolbar button:hover > .reference-verdict-face {
+  background: var(--paper-2);
+}
+.reference-verdict-toolbar
+  button[aria-pressed="true"]
+  > .reference-verdict-face {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+.reference-verdict-toolbar button:focus-visible {
+  outline: none;
+}
+.reference-verdict-toolbar button:focus-visible > .reference-verdict-face {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.reference-verdict-toolbar button:disabled {
+  opacity: 0.5;
+}
+.reference-verdict-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  padding: 4px;
+  margin: 0;
+  border: 1px solid var(--line-soft);
+  background: var(--paper);
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.reference-card-header {
+  gap: 4px;
+  padding: 4px 8px;
+}
+.reference-card-header > svg {
+  flex-shrink: 0;
+}
+.reference-card-header > .sticky-kind-label {
+  flex: 1;
+}
+.reference-card-header > .reference-menu {
+  flex: 0 0 auto;
+}
+.reference-frame-links .reference-link-pill > .tooltip-wrap > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.reference-frame-links .reference-link-pill > .tooltip-wrap > button:hover {
+  border-color: var(--ink-3);
+  background: var(--paper-2);
+}
+.reference-card-header .reference-menu > summary {
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+.reference-card .reference-text-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  align-self: flex-start;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.reference-card .reference-text-action:hover {
+  border-color: var(--line-soft);
+  background: var(--paper-2);
+}
+.reference-marquee {
+  position: absolute;
+  pointer-events: none;
+  z-index: 40;
+  border: 1px solid var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.reference-pick-banner {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.reference-pick-banner span {
+  flex: 1;
+}
+[data-board-ref-drop]:not(.references-section).board-ref-drag-over {
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
+  background: var(--paper-2);
+}
+.reference-file > .reference-text-action {
+  justify-content: flex-start;
+  justify-self: start;
+  text-align: left;
+}
+.reference-drag-preview {
+  position: fixed;
+  inset: auto;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 256px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-card);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-lift);
+  font: 400 13px var(--font-sans);
+  pointer-events: none;
+}
+.reference-drag-preview > svg {
+  flex-shrink: 0;
+}
+.reference-drag-preview > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reference-verdict-toolbar {
+    transition: none;
+  }
+}
+.note-without-heading .reference-card-header {
+  border-bottom-color: transparent;
+  background: transparent;
+}
+.note-without-heading > .reference-card-header > .reference-menu {
+  opacity: 0;
+  pointer-events: none;
+}
+.note-without-heading:hover > .reference-card-header > .reference-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
+.note-without-heading.selected > .reference-card-header > .reference-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
+.note-without-heading:has(:focus) > .reference-card-header > .reference-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
+.note-without-heading > .reference-card-header > .reference-menu[open] {
+  opacity: 1;
+  pointer-events: auto;
 }

@@ -1,0 +1,27 @@
+/* Intrinsic wrapping also responds to workspace width after the brain dock opens. */
+.execution-controls[data-state] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.execution-controls > .execution-heading {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.execution-controls > .execution-actions {
+  flex: 1 1 250px;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.execution-controls > .execution-heading > .small,
+.execution-controls > .execution-heading > .stamp,
+.execution-controls > .execution-actions > .button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.execution-controls > .execution-heading > .small:first-child,
+.execution-controls > .execution-actions > .small,
+.execution-controls > p,
+.execution-controls > .execution-help {
+  flex-basis: 100%;
+}

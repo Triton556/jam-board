@@ -1,21 +1,28 @@
 import type { Rect, Viewport } from "@xyflow/react";
 
-export function frameHeaderLayout(width: number, zoom: number) {
+export function frameHeaderLayout(width: number, zoom: number, linked = false) {
   const scale = Math.max(1, 0.75 / Math.max(0.1, zoom));
   const cssWidth = Math.max(200, width / scale);
   const compact = cssWidth < 320;
-  return { scale, cssWidth, compact, height: compact ? 84 : 46 };
+  return {
+    scale,
+    cssWidth,
+    compact,
+    height: (compact ? 84 : 46) + (linked ? 40 : 0),
+  };
 }
 
-export type FitReference = Rect & { frame?: { collapsed: boolean } };
+export type FitReference = Rect & {
+  frame?: { collapsed: boolean; linked?: boolean };
+};
 
 /** Reserve the taller header during Fit so a zoom-dependent row switch cannot clip it. */
 export function referenceFitBounds(nodes: FitReference[], zoom: number): Rect {
   const rectangles = nodes.map((node) => {
     if (!node.frame) return node;
-    const header = frameHeaderLayout(node.width, zoom);
+    const header = frameHeaderLayout(node.width, zoom, node.frame.linked);
     const width = Math.max(node.width, header.cssWidth * header.scale);
-    const height = 84 * header.scale;
+    const height = (node.frame.linked ? 124 : 84) * header.scale;
     return node.frame.collapsed
       ? { ...node, width, height: Math.max(node.height, height) }
       : {

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "../../components/ui";
+import { Tooltip } from "../../components/ui";
 
 /** Preserve readable columns; make their overflow discoverable without borrowing drag keys. */
 export function BoardOverflow({ children }: { children: ReactNode }) {
@@ -60,34 +60,46 @@ export function BoardOverflow({ children }: { children: ReactNode }) {
     canLeft = bounds.left > 1,
     canRight = bounds.max - bounds.left > 1;
   return (
-    <>
+    <div className="board-surface">
       {overflow && (
         <div className="board-overflow-controls">
-          <span id={hint}>
-            More columns{" "}
-            {canLeft && canRight
-              ? "on both sides"
-              : canRight
-                ? "to the right"
-                : "to the left"}
-            . Scroll across, or focus the board and use Left/Right or Home/End.
+          <span className="board-scroll-direction">
+            {canLeft && (
+              <Tooltip text="Scroll columns left · Focus the board and use Left/Right or Home/End.">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Scroll columns left"
+                  onClick={() => {
+                    scroll.current?.focus();
+                    move("left");
+                  }}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              </Tooltip>
+            )}
           </span>
-          <div className="button-row">
-            <Button
-              aria-label="Scroll board left"
-              disabled={!canLeft}
-              onClick={() => move("left")}
-            >
-              <ChevronLeft size={15} /> Left
-            </Button>
-            <Button
-              aria-label="Scroll board right"
-              disabled={!canRight}
-              onClick={() => move("right")}
-            >
-              Right <ChevronRight size={15} />
-            </Button>
-          </div>
+          <span className="board-scroll-direction">
+            {canRight && (
+              <Tooltip text="Scroll columns right · Focus the board and use Left/Right or Home/End.">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Scroll columns right"
+                  onClick={() => {
+                    scroll.current?.focus();
+                    move("right");
+                  }}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </Tooltip>
+            )}
+          </span>
+          <span id={hint} className="sr-only">
+            Scroll across, or focus the board and use Left/Right or Home/End.
+          </span>
         </div>
       )}
       <section
@@ -121,6 +133,6 @@ export function BoardOverflow({ children }: { children: ReactNode }) {
       >
         {children}
       </section>
-    </>
+    </div>
   );
 }

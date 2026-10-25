@@ -1,8 +1,18 @@
 # Saved answers and manual brain continuation
 
-Integrated in alpha34 after the alpha33 hidden-interaction repairs. This is a **manual copy aid**, not an embedded agent/chat integration.
+Integrated in alpha34 as a manual copy aid after the alpha33 hidden-interaction
+repairs. The current brain-dock increment supersedes the copy-only entry point.
 
-## Current behavior and scope
+## Current dock entry point
+
+Primary **Continue in brain chat** now stages an editable continuation and exact
+scope chip in the [brain dock](../brain-dock.md) composer; copy is secondary. It
+does not automatically send, start a session/turn, appoint a brain or grant Start.
+See H-I01/P06 and UX07/BC07 in the [current acceptance map](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending).
+Browser/native QA is not yet run for this increment. The older clipboard and
+observation requirements below retain their alpha34 evidence boundary.
+
+## Alpha34 copy behavior and scope (historical checkpoint)
 
 A successful human answer persists `question.answered` in the same transaction as
 the answer. An agent in an active `wait_for_answer` call can receive the answer;
@@ -42,7 +52,7 @@ Continue live waiting only while requested observation remains active; stop at
 its assigned stopping condition. These tools do not create a new monitoring
 assignment or keep a completed conversation alive.
 
-## Future integration is a separate concept, not implemented here
+## Historical integration research (not the current dock contract)
 
 Official [Codex App Server documentation](https://learn.chatgpt.com/docs/app-server#lifecycle-overview)
 distinguishes `thread/resume` (load an existing thread) from `turn/start` (begin

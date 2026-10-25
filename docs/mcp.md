@@ -1,6 +1,24 @@
 # Jam Board MCP
 
-Plan your project with your AI teammates. Both transports invoke the same `jam-core` services and SQLite transactions as the desktop application. There is no cloud service, account, or telemetry.
+Plan your project with your AI teammates. Both transports invoke the same `jam-core` services and SQLite transactions as the desktop application. Project records stay local with no hosted board service or telemetry; optional dock runtimes contact the selected model provider.
+
+## In-app brain dock
+
+The [brain-dock contract](brain-dock.md) describes explicit in-app ACP chat,
+terminal and built-in API sessions. Each dock runtime is an ordinary MCP client
+with the selected profile's `JAM_AGENT_NAME` and an immutable captured project.
+It receives jam-board wiring at startup; external-client setup below remains
+available inside Settings -> Agents -> External agents (MCP).
+
+Built-in API chat discovers only jam-board tools from its per-session sidecar.
+Explicitly read-only tools auto-run; writes ask Allow once, Always allow this
+tool for this session, or Reject. Tool permission does not approve board Start
+or bypass core project/claim/review validators. Starting a dock session launches
+the selected runtime explicitly; a planning prompt, Ready state or board Start
+operation does not. Refine/Continue/Ask brain stage editable composer drafts and
+context chips, never automatic Send. History replay is in memory only; no resume
+after app restart. Live adapters/providers and packaged cleanup remain pending
+[acceptance](agents/acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending).
 
 ## Build and connect
 
@@ -60,7 +78,7 @@ Replace the executable path with the absolute path shown in Settings → Agents.
 
 ### Connect, appoint, then authorize
 
-1. Choose the intended project in **Projects**, then open **Settings → Agents**.
+1. Choose the intended project in **Projects**, then open **Settings → Agents → External agents (MCP)**.
    Its displayed name and key identify the configuration you are about to copy.
 2. Choose one transport, apply the configuration in your agent client yourself,
    and restart/reconnect that session. Snippets share a connection name: replace
@@ -77,7 +95,7 @@ Replace the executable path with the absolute path shown in Settings → Agents.
 5. Prepare a planning prompt; refine questions, stories and tasks together. Brain
    appointment, Active plan status and Ready tasks do not grant execution. Start
    the chosen Story/Epic explicitly in Plan, or approve the brain's typed Inbox
-   request. The board never launches an operating-system agent process for you.
+   request. These board actions never launch an agent process; explicit dock New/start is separate.
 
 Switching the app's board only changes the UI; existing MCP sessions remain pinned.
 To connect another project, repeat steps 1–3 with that project's configuration.
@@ -116,7 +134,7 @@ The initialized `clientInfo.name` determines the client kind: names containing `
 
 Choose distinct stable names for independently configured brains and workers (for example `Planner` and `Worker-1`), replace the example name before applying the configuration, and reconnect. Names are normalized to lowercase, non-alphanumeric characters become hyphens, and leading/trailing hyphens are removed. Different capitalization or punctuation can therefore resolve to the same handle. The handle is global across projects, sessions and client kinds: it is not a per-process identifier or a new authentication credential.
 
-Connections sharing that handle share one member. Their tasks/presence/status are not independent worker sessions; `excludeSelf=true` filters events from that member, including peers sharing it. Use the documented `excludeSelf=false` coordination policy. A brain cannot independently review a report authored under its own identity. Native subagents that inherit one MCP connection also inherit its identity; separate tracking needs independently configured connections with distinct names, not merely a new chat. This app does not launch them or install their configuration. `get_session_context` reports project binding and cursor, not a caller-identity field; do not invent such a field when checking the connection.
+Connections sharing that handle share one member. Their tasks/presence/status are not independent worker sessions; `excludeSelf=true` filters events from that member, including peers sharing it. Use the documented `excludeSelf=false` coordination policy. A brain cannot independently review a report authored under its own identity. Native subagents that inherit one MCP connection also inherit its identity; separate tracking needs independently configured connections with distinct names, not merely a new chat. Explicit dock New/start can launch its selected profile and wire its session; board/MCP actions do not launch independent worker sessions or install external-client configuration. `get_session_context` reports project binding and cursor, not a caller-identity field; do not invent such a field when checking the connection.
 
 The command palette's **Set up agent connection (MCP)…** opens Settings → Agents rather than emitting a second unpinned configuration. The existing guarded setup flow captures the displayed project; switching boards still does not retarget an initialized session. Claude CLI snippets are PowerShell-quoted, as labelled in the UI; adapt deliberately for another shell instead of treating apostrophe doubling as portable shell syntax.
 
@@ -132,7 +150,7 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 - V2.2 refines needsInfo: a task flag and the list_tasks needsInfo filter cover only open questions scoped to that task. Story and epic questions stay at their own level. get_task adds ancestorQuestions (open story/epic questions); jam://task/{key} renders them under "Open questions above this task". Project questions remain Inbox items. This prevents an epic interview from flagging every card.
 - JSON exports use version 2 to retain hierarchy, briefs, reports, reviews, questions and references. Version-1 imports remain supported.
 
-## Tool contract (44 tools)
+## Tool contract (52 tools)
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means this session’s pinned project, not the board currently displayed in the UI. Reference items/questions use their returned IDs.
 
@@ -178,10 +196,18 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | set_status | text (0..120), scope? | Member; empty text clears the status/scope |
 | list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
 | wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | kind (asset/link/note); filePath? / url? / text?, title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
+| add_reference | kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
 | list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
-| link_reference | itemId, targetKey | RefItem |
+| link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
+| unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
 | update_reference | itemId; caption?, tags?, title? | RefItem |
+| get_canvas | epicKey?, frameId?, includeArchived?=false, limit?=100 (1..200), cursor? (nonnegative offset) | { frames, references, edges, total, truncated, nextCursor }; world x/y, text capped at 200 characters, linkedKeys capped at 50 with linkedKeysTruncated |
+| create_frame | title; epicKey?, x?, y?, w?=900, h?=600 | RefFrame; omitted x is placed right of content with 80 units clearance, omitted y=0 |
+| update_frame | id; title?, epicKey? (null unlinks), x?, y?, w?, h? | RefFrame; omitted fields unchanged |
+| connect_references | from, to (item IDs); label? | RefEdge; directed duplicates/self-edges refused, label max 240 characters |
+| update_connection | id, label | RefEdge; empty label clears it, max 240 characters |
+| remove_connection | id | { archived: true }; retains the connection record |
+| arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
 | list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
 | list_assets | kind?, query? | Asset[] with role=asset/reference |
 
@@ -300,7 +326,7 @@ get_project also returns top-level template, templateLabel (Game jam / Gamedev /
 
 Epic includes key/title/color/status, interview Markdown fields, participation (each_iteration/first_sketch/autonomous; default first_sketch), reviewer (none/final/stages; default none), nullable workerModel/brainMemberId, position and audit columns. Colors are m1..m6 assigned round-robin. update_epic preserves omitted fields; workerModel:null clears the model. A brain is an existing agent appointed by a human/current brain, or become_brain while unappointed. Appointment does not change the agent's model; the user chooses workerModel.
 
-Participation means: each meaningful iteration; first coherent sketch to correct direction, then autonomous refinement; or fully autonomous. Reviewer means none, one final pass, or agreed stages. These planning choices do not start work. The human starts a story or epic; within that authorized scope the brain can coordinate workers and review stages without a separate board approval per worker. The board never launches OS agent sessions itself. Any external runner must still honor the agreed scope, tool permissions and safety boundaries.
+Participation means: each meaningful iteration; first coherent sketch to correct direction, then autonomous refinement; or fully autonomous. Reviewer means none, one final pass, or agreed stages. These planning choices do not start work. The human starts a story or epic; within that authorized scope the brain can coordinate workers and review stages without a separate board approval per worker. Planning and board Start operations never launch OS agent sessions. Explicit dock New/start is a separate runtime action; every dock or external runner must still honor the agreed scope, tool permissions and safety boundaries.
 
 Story includes key/epicId/title/status, the six intent-card Markdown fields and acceptance: [{ id, criterion, mandatory, check }]. Acceptance IDs must be unique and text/check nonempty. Planning statuses are draft/active/done/archived. Activation requires goalMd + doneWhenMd for epics; outcomeMd + a mandatory acceptance criterion for stories. These fields cannot be cleared while active. Done requires all active children done, or a human/brain overrideReason recorded in activity. Humans can restore archived planning entities through status commands.
 
@@ -343,7 +369,7 @@ linkTo/targetKey address an epic, story or task. A frame implicitly links its it
 
 RefFrame stores id/jamId/epicId/title/x/y/w/h/color/collapsed. RefItem adds audit, kind/assetId/url/linkPreview/title/captionMd/tags, x/y/w/h/z/frameId and nullable JSON-string metadata (file size and cached audio peaks/duration). RefEdge connects items with an optional label; RefLink maps items to targets. The References screen uses React Flow and native commands for geometry, frame binding, edge labels, archival/restoration and per-human viewport settings. No hard-delete API exists.
 
-Remote previews are a separate explicit human action, never part of an MCP reference tool or canvas render. Fetching has a five-second deadline, a 2 MiB response cap and HTTP(S)-only redirects; only the page title and absolute og:image URL are retained. That remote image is not downloaded automatically. Clipboard images are encoded as PNG and written only into the data directory's references folder; other user files are never copied. Media URLs are granted per registered asset ID by Rust, without general frontend filesystem permission.
+Remote previews are a separate explicit human action, never part of an MCP reference tool or canvas render. Fetching has a five-second deadline, a 2 MiB response cap and HTTP(S)-only redirects; only the page title and absolute og:image URL are retained. That remote image is not downloaded automatically. Clipboard images are encoded as PNG and written only into the data directory's references folder; other local files are copied only when add_reference explicitly sets copy:true (up to 50 MiB). Media URLs are granted per registered asset ID by Rust, without general frontend filesystem permission.
 
 ## Resources and prompts
 
@@ -355,7 +381,7 @@ Three prompts are available:
 - work_on_next_task (optional tag): verify the pinned project and running story permission, pick Ready work, prefer own changes-requested tasks, read the full brief/context, claim, work and submit_report with evidence. Names brief-writing.md.
 - review_task: compare report evidence against brief tests, story acceptance and epic scope; accept or request changes, then publish status. Names task-brief-and-acceptance.md.
 
-The full playbook skill is not bundled in this stage. Prompts reference it by name without copying it.
+The board-owned jam://guide and jam://guide/operations resources serve the bundled standalone guide. Prompts refer to these resources; no external playbook is required.
 
 ## Live events and verification
 
@@ -395,4 +421,91 @@ The native `move_task` and `mark_ready` inputs now require **expectedUpdatedAt**
 
 A changed task returns `conflict` before any transition, review-round allocation, neighbor reordering, readiness override or activity is written. This also rejects a delayed decision after the same worker releases and reclaims the task. Keep override text, reread the authoritative task and reconcile intentionally; never replace the captured version on background refresh or automatically retry an old decision with a new version. A fresh explicit human manual Done remains distinct from reviewed acceptance, while a fresh move into In progress still needs a running scope.
 
-This is a required native-input change only: MCP movement/readiness still require both validators documented above. No database migration, new role, execution grant, or claim-generation change is introduced; schema 7 and existing data/import compatibility are unchanged.
+This is a required native-input change only: MCP movement/readiness still require both validators documented above. No database migration, new role, execution grant, or claim-generation change is introduced; that native-input increment left schema 7 and existing data/import compatibility unchanged. The current canvas-feedback increment adds schema 8 below.
+
+## Ideas canvas
+
+Read `get_canvas` before organizing the ideas board. Prefer frames per epic and
+preserve the human's manual layout unless asked to rearrange it. All seven tools
+use the session's pinned project and authenticated agent member; writes emit the
+same `reference.added`, `reference.linked` or `reference.updated` activity as the
+shared desktop services. They grant no execution authority and fetch no network data.
+
+`get_canvas` filters intersect: `epicKey` matches frames and their contents or
+references linked to that epic, its stories or tasks; `frameId` restricts to that
+frame and its references. Edges require both endpoints in the filtered reference
+set. Archived frames/items/edges are excluded by default; active children of an
+archived frame remain visible at their retained world position. Use
+`includeArchived:true` to inspect archived records. References expose title
+(including an empty note heading), kind, at most 200 Unicode characters of text,
+geometry, frameId and up to 50 sorted linkedKeys (including the active frame's
+epic), with `linkedKeysTruncated`.
+Frames include epicKey, collapsed and explicit links ({ targetKey, kind, title }).
+Items include verdict ("keep", "reject" or null); only the desktop human command
+set_reference_verdict can write it. With includeArchived:true, archivedAt and
+archivedBy ("human" or the agent's display name) identify soft deletion. Historical
+archive attribution is recovered from archive activity; without that evidence it
+remains null. Canvas
+delete archives and human undo restores the record and clears archive attribution.
+Notes include attachedTo: item IDs whose world bounds contain the note centre or
+overlap at least 30% of the note area. Relations are computed against the project
+canvas before paging or frame filtering, with frame offsets applied to both items.
+Edges include from, to and label.
+
+Pages contain at most `limit` total records across frames, then references, then
+edges, each group ordered by ID. `truncated:true` and `nextCursor` explicitly
+mark more records; pass that offset with the same filters. Paging is not a stable
+snapshot under concurrent edits: reconcile changed layouts before writing.
+A cursor beyond the filtered total fails. Reference text and legacy edge labels
+are clipped to 200/240 characters; use existing content reads for full note text.
+
+Frame and tool-input positions use canvas/world units, independent of zoom.
+`get_canvas` and `arrange_references` return reference x/y in world coordinates,
+with matching w, h and frameId. Shared storage retains frame-local x/y for framed
+references; world position is local position plus the frame origin. Omitting
+frameId preserves the parent; explicit null detaches. Omitting x/y preserves that world coordinate,
+including on reparent. `create_frame` defaults to 900 by 600 at y=0; omitted x is
+placed beyond the rightmost active frame/reference with 80 units clearance.
+`update_frame` accepts epicKey, including null to unlink it.
+
+`layout:"grid"` requires an explicit active frameId and items with no x/y.
+It preserves sizes and unselected occupants, starts below a 56-unit header and
+keeps 24-unit margins/gaps. If the deterministic packing cannot fit, resize the
+frame or choose fewer notes; no note or activity event from that batch is saved.
+Explicit positions need not fit inside frame bounds, matching desktop geometry.
+Canvas writes have no optimistic-concurrency or idempotency tokens. Read and
+reconcile uncertain outcomes before retrying. Connections are directed; an active
+same-direction duplicate or self-edge fails, reverse direction remains distinct.
+Removing a connection archives it; archived records are retained.
+
+Example (IDs must come from current reads):
+
+```json
+{"items":[{"itemId":"note-a"},{"itemId":"note-b"}],"frameId":"frame-id","layout":"grid"}
+```
+
+
+### Frame references, copied assets and moodboard feedback
+
+link_reference and unlink_reference accept exactly one of itemId or frameId plus
+targetKey. Frame links apply to all current and future children while the frame
+is active. They coexist with the legacy epicKey/epicId frame association.
+list_references includes explicit links to the selected target(s) and epic-frame
+inheritance; get_task also inherits its story and epic references. Each item
+appears once. A direct item link takes precedence; otherwise an inherited item
+has via:"frame", frameId and frameTitle. Unlink only removes that explicit
+relationship; other direct, frame or ancestor paths can still expose the item.
+Frames expose their explicit links in RefFrame.links. These writes use the same
+project checks and activity services as desktop link_ref_frame/unlink_ref_frame.
+
+add_reference { kind:"asset", filePath, copy:true } reads a local regular file,
+up to 50 MiB, and copies it into the database data directory's references folder,
+using the clipboard-<ULID>.<extension> naming pattern. Existing supported local
+file types remain accepted; extension and original title are retained. Missing,
+unreadable, non-file and oversized sources fail with filePath validation errors.
+A failed reference mutation removes its new copy. Omit copy or use false to retain
+the original path. No tool fetches a remote URL. Find/download candidates with
+the agent client's own authorized tools, then copy downloaded assets to keep
+references after temporary workspace cleanup.
+
+For the moodboard loop, read [the board-owned guide](../integrations/agent-skill/jam-board/SKILL.md#building-and-refining-a-moodboard).

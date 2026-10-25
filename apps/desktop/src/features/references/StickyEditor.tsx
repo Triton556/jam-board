@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
+import { Tooltip } from "../../components/ui";
 import { referenceLabel } from "./model";
 import { useStickyNote } from "./use-sticky-note";
 
@@ -23,6 +24,7 @@ export function StickyEditor({
   beginRef,
   editingChanged,
   unavailable = false,
+  headingInHeader = false,
 }: {
   item?: RefItem;
   projectId: string;
@@ -34,6 +36,7 @@ export function StickyEditor({
   beginRef?: RefObject<(() => void) | null>;
   editingChanged?(active: boolean): void;
   unavailable?: boolean;
+  headingInHeader?: boolean;
 }) {
   const [editing, setEditing] = useState(local);
   const note = useStickyNote({
@@ -117,14 +120,14 @@ export function StickyEditor({
   if (beginRef) beginRef.current = start;
   if (!editing)
     return (
-      <div className="reference-note-text reference-caption nodrag nopan">
+      <div className="reference-note-text reference-caption">
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Optional pointer shortcut; the adjacent native Edit button provides keyboard activation without nesting Markdown links. */}
         <div
           onDoubleClick={(event) => {
             if (!(event.target as HTMLElement).closest("a, button")) start();
           }}
         >
-          {note.value.title && (
+          {note.value.title && !headingInHeader && (
             <strong className="sticky-note-title">{note.value.title}</strong>
           )}
           {note.value.body ? (
@@ -136,7 +139,7 @@ export function StickyEditor({
         <button
           type="button"
           ref={opener}
-          className="ghost small sticky-edit-button"
+          className="ghost small sticky-edit-button sr-only focus:not-sr-only nodrag nopan"
           aria-label={`Edit note ${referenceLabel({ kind: "note", title: note.value.title, captionMd: note.value.body })}`}
           onClick={start}
           onKeyDown={(event) => {
@@ -206,23 +209,31 @@ export function StickyEditor({
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          className="sticky-finish"
-          aria-label={
+        <Tooltip
+          text={
             note.current() || note.value.body || note.value.title
               ? "Finish editing note"
               : "Remove empty paper"
           }
-          onClick={() => void finish(true)}
-          disabled={note.pending}
         >
-          {note.current() || note.value.body || note.value.title ? (
-            <Check size={15} />
-          ) : (
-            <X size={15} />
-          )}
-        </button>
+          <button
+            type="button"
+            className="sticky-finish"
+            aria-label={
+              note.current() || note.value.body || note.value.title
+                ? "Finish editing note"
+                : "Remove empty paper"
+            }
+            onClick={() => void finish(true)}
+            disabled={note.pending}
+          >
+            {note.current() || note.value.body || note.value.title ? (
+              <Check size={15} />
+            ) : (
+              <X size={15} />
+            )}
+          </button>
+        </Tooltip>
       </div>
       {heading && (
         <input

@@ -3,6 +3,52 @@
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Explicit frame links to epics/stories/tasks, inherited reference provenance and
+  MCP unlink_reference (52 tools total); human Keep / Not this verdicts, archive
+  attribution and computed note feedback links in get_canvas. Asset references
+  can copy local files up to 50 MiB into managed references storage. Schema 8
+  preserves existing data and frame links in export/import.
+- Brain dock with explicit project-pinned sessions: ACP chat for Claude Code,
+  Codex and OpenCode; a terminal; and built-in API chat for OpenRouter, z.ai or
+  custom OpenAI-compatible endpoints. Session pickers, streaming transcripts,
+  thoughts/tools/plans, permissions, context chips, commands and model/mode
+  controls share the dock. CLI sign-in and API-key connection editors provide
+  auth recovery; secrets use the OS credential store and expose status only.
+- Seven canvas MCP tools: get_canvas, create_frame, update_frame,
+  connect_references, update_connection, remove_connection and arrange_references.
+  Agents can inspect layout, group by epic, connect notes and arrange an atomic
+  grid with project isolation and activity. Arrange and read results use world
+  coordinates; stored frame-local geometry remains unchanged.
+- Dock entry points: heading Refine with brain, primary Open in brain chat and
+  Continue in brain chat, note-menu Ask brain about this, selection context chips
+  and Ask brain (selection count). These stage editable prompts/context without
+  sending or granting Start; copy remains secondary where offered.
+
+### Changed
+- Canvas creation puts Note · N first and File/Link/Note under Add. N and empty
+  New note enter placement; double-clicking empty canvas opens focused local
+  paper at the pointer, with blank paper unsaved. Notes have simpler resting
+  labels, softer focus and no resize grip. Create task from note supports editable
+  prefill, cancel without mutations and link-only recovery after task creation.
+- Inbox Questions heading, Refresh and receipt share a row; Start requests use
+  the same content column. Task drawer breadcrumbs/title precede compact claim
+  and permission controls; one Why? retains both explanations.
+- Settings -> Agents shows Brain dock connections first; older external MCP
+  setup is grouped in one collapsed External agents (MCP) disclosure whose state
+  is remembered per session.
+- Typography uses PT Serif Caption for UI (bold via PT Serif 700), PT Serif for
+  display, Shantell Sans for notes/handwriting and JetBrains Mono for monospace.
+
+### Verification boundary
+- This is an unreleased source increment, without a version bump. Interaction
+  inventory and functional/visual acceptance are mapped in
+  [the agent docs](docs/agents/README.md) and [brain-dock contract](docs/brain-dock.md).
+  Browser/native QA, real adapters/providers and packaged-app process cleanup
+  remain pending; transcripts are in memory only, with no app-restart resume.
+
 ## [0.3.0-alpha.41] - 2026-10-23
 
 ### Changed

@@ -3,6 +3,8 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { mockApi } from "../../lib/mock-bridge";
+import { useUiStore } from "../../lib/ui-store";
+import { draftKey, useBrainState } from "../brain/brain-store";
 import {
   AnswerContinuation,
   answerContinuationPrompt,
@@ -14,6 +16,15 @@ beforeEach(async () => {
   vi.restoreAllMocks();
   mockApi.setLatency(0);
   await mockApi.resetDemo();
+  useBrainState.setState({
+    projectId: (await mockApi.appState()).jam?.id ?? null,
+    sessions: [],
+    selected: { chat: null, terminal: null },
+    drafts: {},
+    events: {},
+    tab: "chat",
+  });
+  useUiStore.setState({ brainDockOpen: false });
   mockApi.calls.length = 0;
 });
 async function question() {
@@ -64,7 +75,7 @@ it("IDs-only continuation preserves authority and is bounded in size", async () 
   expect(prompt).not.toContain(q.bodyMd);
   expect(prompt.split(/\s+/).length).toBeLessThan(180);
 });
-it("persisted Answered card offers copy-only prompt without a save receipt", async () => {
+it("persisted Answered card retains its copy-only fallback without a save receipt", async () => {
   const q = await answered();
   const user = userEvent.setup();
   const write = vi.spyOn(navigator.clipboard, "writeText");
@@ -73,7 +84,7 @@ it("persisted Answered card offers copy-only prompt without a save receipt", asy
     name: `Question: ${q.title}`,
   });
   await user.click(
-    within(card).getByRole("button", { name: "Continue in brain chat" }),
+    within(card).getByRole("button", { name: "Show continuation prompt" }),
   );
   const before = mockApi.calls.length;
   await user.click(
@@ -87,6 +98,26 @@ it("persisted Answered card offers copy-only prompt without a save receipt", asy
   expect(
     within(card).getByText(/finished chat is not automatically awakened/),
   ).toBeVisible();
+});
+it("H-I01 Continue in brain chat stages the exact saved-answer prompt without copying, sending or board writes", async () => {
+  const q = await answered();
+  const user = userEvent.setup();
+  const copy = vi.spyOn(navigator.clipboard, "writeText");
+  await view(<AnswerContinuation question={q} />);
+  const before = mockApi.calls.length;
+  const button = screen.getByRole("button", { name: "Continue in brain chat" });
+  expect(button).toHaveClass("primary");
+  expect(
+    screen.getByRole("button", { name: "Copy continuation prompt" }),
+  ).toHaveClass("secondary");
+  await user.click(button);
+  expect(useUiStore.getState().brainDockOpen).toBe(true);
+  expect(useBrainState.getState().drafts[draftKey()]).toEqual({
+    text: answerContinuationPrompt(q),
+    context: [],
+  });
+  expect(copy).not.toHaveBeenCalled();
+  expect(mockApi.calls.slice(before)).toEqual([]);
 });
 it.each(["open", "withdrawn"])(
   "%s question has no saved-answer prompt",
@@ -157,7 +188,7 @@ it("copy failure preserves text and pending copy is singleflight", async () => {
     .mockRejectedValue(new Error("Denied"));
   await view(<AnswerContinuation question={q} />);
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   await user.click(
     screen.getByRole("button", { name: "Copy continuation prompt" }),
@@ -189,7 +220,7 @@ it("project ABA invalidates pending copy feedback and closes old preview", async
   );
   const { client } = await view(<AnswerContinuation question={q} />);
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   await user.click(
     screen.getByRole("button", { name: "Copy continuation prompt" }),
@@ -202,7 +233,7 @@ it("project ABA invalidates pending copy feedback and closes old preview", async
   await act(async () => finish());
   expect(screen.queryByRole("textbox")).toBeNull();
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   expect(screen.queryByRole("status")).toBeNull();
   expect(screen.getByRole("textbox")).toHaveValue(answerContinuationPrompt(q));
@@ -226,7 +257,7 @@ it("confirmed answer gives a continuation receipt without authorizing or sending
     screen.getByText(/Answer saved/, { selector: '[role="status"]' }),
   ).toHaveTextContent("Answer saved");
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   expect(
     screen.getByRole("textbox", { name: "Continuation prompt" }),
@@ -258,7 +289,7 @@ it("unmount during copy cannot announce into a replacement card", async () => {
   );
   const first = await view(<AnswerContinuation question={q} />);
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   await user.click(
     screen.getByRole("button", { name: "Copy continuation prompt" }),
@@ -266,7 +297,7 @@ it("unmount during copy cannot announce into a replacement card", async () => {
   first.unmount();
   await view(<AnswerContinuation question={q} />);
   await user.click(
-    screen.getByRole("button", { name: "Continue in brain chat" }),
+    screen.getByRole("button", { name: "Show continuation prompt" }),
   );
   await act(async () => finish());
   expect(screen.queryByRole("status")).toBeNull();

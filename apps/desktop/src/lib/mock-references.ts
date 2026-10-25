@@ -133,6 +133,8 @@ export class MockReferences {
     }
     const index = d.items.filter((i) => i.frameId === frame?.id).length;
     const item = {
+      verdict: null,
+      archivedBy: null,
       id: crypto.randomUUID(),
       jamId: this.c.jam(),
       position: d.items.length * 1024,
@@ -230,11 +232,14 @@ export class MockReferences {
     const row = rows.find((r) => r.id === input.id);
     if (!row) throw new JamError("not_found", "Canvas record not found");
     row.archivedAt = input.archived ? new Date().toISOString() : null;
+    if (input.kind === "item")
+      this.item(input.id).archivedBy = input.archived ? "human" : null;
     this.change("reference.updated", input.id);
   }
   async frame(input: Partial<RefFrame> & Pick<RefFrame, "title" | "x" | "y">) {
     await this.c.call("create_ref_frame", input);
     const f = {
+      links: [],
       id: crypto.randomUUID(),
       jamId: this.c.jam(),
       epicId: null,

@@ -190,6 +190,10 @@
   background: var(--sky);
   border-color: var(--line);
 }
+.link-options button[data-active="true"] {
+  outline: 2px solid var(--coral);
+  outline-offset: -3px;
+}
 .team-heading {
   display: flex;
   align-items: center;
@@ -257,7 +261,7 @@
   margin-right: 6px;
 }
 .online-dot {
-  animation: online-soft 2s infinite;
+  animation: online-soft calc(var(--motion-slow) * 8) var(--ease-out) infinite;
 }
 .status-dot {
   background: var(--ink-3);
@@ -405,9 +409,7 @@
   box-shadow: var(--shadow-lift);
 }
 .fresh-event {
-  animation:
-    event-arrive 200ms var(--ease),
-    event-glow 4s var(--ease);
+  animation: event-arrive var(--motion-base) var(--ease-out);
 }
 .settings-layout {
   display: grid;
@@ -473,6 +475,7 @@
   margin: 6px 0 0;
 }
 .field-label {
+  font-weight: 700;
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -490,30 +493,41 @@
 }
 .switch-label {
   display: flex;
+  min-height: 28px;
   align-items: center;
   gap: 9px;
   font-size: 14px;
   white-space: nowrap;
 }
 .switch {
+  position: relative;
   width: 36px;
-  height: 20px;
-  padding: 2px;
+  height: 28px;
+  padding: 7px 3px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  inset: 4px 0;
   border: 1px solid var(--line-soft);
   border-radius: 20px;
   background: var(--paper-2);
-  cursor: pointer;
 }
 .switch span {
+  position: relative;
   display: block;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: var(--card);
   border: 1px solid var(--line-soft);
-  transition: transform 120ms;
+  transition: transform var(--motion-fast) var(--ease-out);
 }
-.switch[aria-checked="true"] {
+.switch[aria-checked="true"]::before {
   background: var(--leaf);
 }
 .switch[aria-checked="true"] span {
@@ -665,7 +679,7 @@
 }
 .settings-row-label {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
   padding-top: 8px;
 }
 .settings-row-label small {
@@ -762,7 +776,7 @@
 }
 @keyframes online-soft {
   50% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 15%, transparent);
+    opacity: 0.5;
   }
 }
 @keyframes event-arrive {
@@ -775,14 +789,7 @@
     opacity: 1;
   }
 }
-@keyframes event-glow {
-  from {
-    background: color-mix(in srgb, var(--actor-color) 15%, var(--card));
-  }
-  to {
-    background: var(--card);
-  }
-}
+
 @media (prefers-reduced-motion: reduce) {
   .online-dot,
   .fresh-event {
@@ -850,7 +857,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fresh-event {
-    animation: event-glow 4s steps(1, end);
+    animation: none;
   }
 }
 

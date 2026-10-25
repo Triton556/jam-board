@@ -24,6 +24,7 @@ import { ProjectSettings } from "./settings/ProjectSettings";
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
+  useRouterState: () => "/board?task=JB-1",
   useBlocker: () => ({}),
 }));
 function must<T>(value: T | null | undefined): T {
@@ -287,17 +288,21 @@ it("existing-reference picker locks duplicate links and recovers failure without
       .mockResolvedValueOnce(item),
     user = userEvent.setup();
   await mount(<ReferencesSection targetKey="JB-1" epicKey="JB-E1" />);
-  await user.click(screen.getByRole("button", { name: "Add reference" }));
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("menuitem", { name: "From canvas…" }));
+  await user.click(screen.getByRole("tab", { name: "Items" }));
   await user.type(
     screen.getByLabelText("Search canvas"),
     "Fictional reference choice",
   );
-  const choice = await screen.findByRole("button", {
+  const choice = await screen.findByRole("checkbox", {
     name: "Fictional reference choice",
   });
+  await user.click(choice);
+  const confirmLink = screen.getByRole("button", { name: "Link 1" });
   act(() => {
-    fireEvent.click(choice);
-    fireEvent.click(choice);
+    fireEvent.click(confirmLink);
+    fireEvent.click(confirmLink);
     fireEvent.keyDown(window, { key: "Escape" });
   });
   await waitFor(() => expect(link).toHaveBeenCalledOnce());
@@ -311,7 +316,7 @@ it("existing-reference picker locks duplicate links and recovers failure without
   expect(screen.getByLabelText("Search canvas")).toHaveValue(
     "Fictional reference choice",
   );
-  await user.click(choice);
+  await user.click(confirmLink);
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
@@ -563,12 +568,15 @@ it("a reference section changed to another work item gets a fresh guarded picker
   }
   await mount(<Host />);
   await user.click(screen.getByRole("button", { name: "Different target" }));
-  await user.click(screen.getByRole("button", { name: "Add reference" }));
-  const choice = await screen.findByRole("button", {
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("menuitem", { name: "From canvas…" }));
+  await user.click(screen.getByRole("tab", { name: "Items" }));
+  const choice = await screen.findByRole("checkbox", {
     name: "Fictional target switch",
   });
   expect(choice).toBeEnabled();
   await user.click(choice);
+  await user.click(screen.getByRole("button", { name: "Link 1" }));
   await waitFor(() => expect(link).toHaveBeenCalledOnce());
   expect(link.mock.calls[0]?.[1]).toBe("JB-2");
 });
