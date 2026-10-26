@@ -92,9 +92,18 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
       </div>
     );
   return (
-    <fieldset
+    // biome-ignore lint/a11y/useSemanticElements: The image body is also a canvas drag surface; a native button would block dragging.
+    <div
       className="reference-image"
+      role="button"
+      tabIndex={0}
       aria-label={`Open ${title}`}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        runtime.lightbox(url, title);
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         runtime.lightbox(url, title);
@@ -122,7 +131,7 @@ function ScopedImageMedia({ url, title }: { url: string; title: string }) {
           else setFailed(true);
         }}
       />
-    </fieldset>
+    </div>
   );
 }
 export function AudioMedia({ url, item }: { url: string; item: RefItem }) {

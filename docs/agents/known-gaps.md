@@ -281,3 +281,14 @@ controls prose explicitly describes image attachment `previewUrl`. The contract
 owner should reconcile that example. This bookkeeping pass leaves both contracts
 unchanged; BD12-BD16 / RR04-RR08 are pending interaction inventory, not a schema
 change or an assertion that the attachment implementation has been accepted.
+
+## Alpha42 release repair follow-up
+
+On `9bc438e`, Ubuntu functional Chromium passed 98/104: lazy task drawer Escape
+and focus, Theme input assertions, keyboard image preview and fitted presence
+copy failed. All six reproduced with bundled Chromium in the isolated Windows
+release worktree. The lazy-shell dismissal race and missing keyboard image action
+are product repairs; Theme/whole-text assertions were stale. Later note Edit and
+frame-label assertions also follow the current round-5 contracts. Exact reruns,
+full CI mirror and hosted results are recorded in alpha42 verification. Native
+install/upgrade, live providers and OS-specific usability remain unrun.

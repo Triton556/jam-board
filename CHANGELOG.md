@@ -55,6 +55,10 @@ interaction walk.
 - Linux voice runtime ZIP inspection/extraction uses libarchive's `bsdtar`
   instead of GNU tar; Ubuntu CI installs the required `libarchive-tools` package.
 - Table filter geometry remains stable when selected status labels become bold.
+- Closing a loading task/story drawer cannot be cancelled by the editor module
+  finishing its load; Escape returns focus for keyboard reopening.
+- Canvas image previews support Enter/Space while retaining body dragging and
+  pointer double-click activation.
 
 ### Verification boundary
 - Round-5 final gates passed after the recorded fixes; mock-browser UI evidence

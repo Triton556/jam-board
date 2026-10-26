@@ -316,3 +316,10 @@ Source/API evidence: crates/jam-core/tests/reference_feedback.rs and
 crates/jam-mcp/src/canvas_tests.rs; stdio protocol coverage in
 crates/jam-mcp-cli/tests/stdio.rs. Browser/native and human acceptance remain
 separate and require the UI worker/QA evidence.
+
+## Alpha42 release repair boundary
+
+The loading-drawer close and keyboard image-preview repairs change human paths
+H-D01/H-R05 only. Agent actions/states, captured project identity, execution grants,
+presence semantics, reference writes and persisted data are unchanged. Browser
+fixtures' explicit Start actions remain fixture authorization, not an agent grant.

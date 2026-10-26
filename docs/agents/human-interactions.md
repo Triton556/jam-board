@@ -275,3 +275,14 @@ a prompt automatically. Matched acceptance IDs are RR01–RR28.
 | R22 | Frame target chips | Frame title tab -> linked target chip -> target drawer; show up to two chips then +N count | Show exact linked targets without making chips drag handles; open correct epic/story/task; account for removed/archived/project-changed targets without retargeting | [Canvas references](../canvas-references.md) | RR26 | implementation in progress; not yet run |
 | R23 | Archive and undo feedback | Selected canvas item -> delete/archive -> Undo -> restored item | Deletion soft-archives rather than hard-deletes; record human attribution for agent feedback; Undo restores record/geometry and clears archive attribution; uncertain result is reconciled | [Canvas references](../canvas-references.md) | RR27 | implementation in progress; not yet run |
 | R24 | Sticky note feedback placement | Move sticky note over reference -> release -> agent reads attachedTo | Compute world coordinates with frame offsets; centre inside or overlap >=30% of note area attaches feedback; no extra relation UI; moving away removes computed relation | [Canvas references](../canvas-references.md) | RR28 | implementation in progress; not yet run |
+
+## Alpha42 release repair: H-D01 / H-B01 / H-R04 / H-R05
+
+A loading task/story drawer closes its route immediately on Escape, backdrop or
+Close, so resolution of the lazy module cannot replace a closing shell and reopen
+it. Loaded editors retain animated exit and dirty/pending guards. Image bodies
+keep canvas dragging and double-click preview, with a focusable Enter/Space
+preview action. Resting note Edit is a keyboard-revealed control; pointer editing
+uses the note's double-click or Actions menu. Presence may fit whole words with
+an ellipsis; its tooltip retains the full live text. Evidence is recorded in the
+[alpha42 verification](../verification/0.3.0-alpha.42.md).

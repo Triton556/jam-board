@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { lazy, useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { LazyDrawerBoundary } from "./LazyBoundary";
 
@@ -12,6 +13,50 @@ const pending = new Promise(() => {});
 function Loading(): never {
   throw pending;
 }
+
+it("H-D01: Escape while the editor module is loading survives module resolution and restores the opener", async () => {
+  route.pathname = "/board";
+  let resolve!: (module: { default: () => React.ReactNode }) => void;
+  const module = new Promise<{ default: () => React.ReactNode }>((done) => {
+    resolve = done;
+  });
+  const Editor = lazy(() => module);
+  const close = vi.fn();
+  function Host() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open task
+        </button>
+        {open && (
+          <LazyDrawerBoundary
+            title="JB-12"
+            kind="task"
+            close={() => {
+              close();
+              setOpen(false);
+            }}
+          >
+            <Editor />
+          </LazyDrawerBoundary>
+        )}
+      </>
+    );
+  }
+  render(<Host />);
+  const opener = screen.getByRole("button", { name: "Open task" });
+  opener.focus();
+  fireEvent.click(opener);
+  expect(screen.getByRole("dialog")).toHaveFocus();
+  fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+  await act(async () =>
+    resolve({ default: () => <div role="dialog">Loaded editor</div> }),
+  );
+  expect(close).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(opener).toHaveFocus();
+});
 afterEach(() =>
   document.head.querySelector("[data-drawer-loading-test]")?.remove(),
 );
