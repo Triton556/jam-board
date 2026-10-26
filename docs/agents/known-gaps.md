@@ -5,13 +5,16 @@
 RF02 found the bounded header's 320px/40% controls at 20.48 screen pixels. The
 follow-up separates control target size from header scale, with overflow actions
 in a menu and Fit reserving the taller row. Full local CI/browser results are
-recorded in the W1 verification addendum; native-package observation is separate.
+recorded in the [alpha43 verification](../verification/0.3.0-alpha.43.md), including
+the folded W1 addendum; native-package observation is separate.
 
 RC07 removes all diagnostic flags and round-6 rendering experiments except
 gesture viewport promotion, following 108 controlled QA runs. The selected
 configuration measured 72.7/72.0 FPS and 6 long frames on 132/500 items. This
-remains above the standing <=5 target; timing and screenshots of the simplified
-source await QA. Bounded headers, standard minimap colours and model/draft
+remains above the standing <=5 target. Final `c8ac628` mock QA measured
+70.33/71.05 FPS and 10/8 long frames on 132/500 items: close to alpha.42 but
+still failing the target. Both-theme header/minimap/selection screenshots passed
+their scoped observations. Bounded headers, standard minimap colours and model/draft
 correctness remain. The following earlier experiment notes are historical and
 superseded; they do not describe the current renderer.
 
@@ -46,7 +49,7 @@ The profile-driven RC03 repair removes continuous frame/control rerenders, uses
 one delegated canvas tooltip, memoizes Markdown and applies content-visibility to
 far shells. Unit render counters do not establish the browser speedup: timing,
 layerization reduction, label/tooltip appearance, native dragging and human
-usability await fresh QA. See [W1 verification](../verification/round6-w1-canvas.md).
+usability await fresh QA. See [folded W1 verification](../verification/0.3.0-alpha.43.md#folded-w1-working-record-historical).
 
 Agent canvas organization is now exposed by seven additive MCP tools (AG14 /
 AC14). Canvas writes retain the desktop services' lack of CAS/idempotency tokens;
