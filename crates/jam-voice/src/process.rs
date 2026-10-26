@@ -1,10 +1,11 @@
 //! Windows Job ownership ties the sidecar and its descendants to the app.
 //! No shell or additional dependency is needed.
-use crate::{Result, err};
+use crate::Result;
 
 #[cfg(windows)]
 mod windows {
     use super::*;
+    use crate::err;
     use std::ffi::c_void;
     type Handle = *mut c_void;
     #[repr(C)]
