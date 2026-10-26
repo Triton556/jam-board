@@ -1,5 +1,6 @@
 // NT01 hosted-browser scenarios. Added/typechecked; NOT RUN in cloud lane.
 import { expect, test } from "@playwright/test";
+import { setTheme } from "./assertions";
 
 for (const theme of ["light", "dark"] as const) {
   test(`NT01 ${theme}: expired toast remains in bell, keyboard return and exact View`, async ({
@@ -9,9 +10,7 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Load demo jam", exact: true })
       .click();
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     await page.evaluate(() =>
       window.__jamMock.simulateAgent({
         action: "task.created",

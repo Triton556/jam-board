@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { openExternalAgents } from "./assertions";
 
 test("board connection prompt stays neutral, remembers its code folder and reports clipboard failure", async ({
   page,
@@ -21,6 +22,7 @@ test("board connection prompt stays neutral, remembers its code folder and repor
   });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await openExternalAgents(page);
   const section = page.locator(".settings-card").filter({
     has: page.getByRole("heading", {
       name: "Connect an agent to this board",
@@ -53,6 +55,7 @@ test("board connection prompt stays neutral, remembers its code folder and repor
   expect(prompt).toContain("C:/Projects/Small game");
   await page.getByRole("button", { name: "Project", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await openExternalAgents(page);
   await expect(section.getByText("C:/Projects/Small game")).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {

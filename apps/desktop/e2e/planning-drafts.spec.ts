@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { markdownReadView, openAgentPlan } from "./assertions";
 
 for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
-  test(`queued ${field} saves retain their entity target across SPA navigation`, async ({
+  test(`${field === "acceptance" ? "single-flight" : "queued"} ${field} saves retain their entity target across SPA navigation`, async ({
     page,
   }) => {
     const epic = field === "epicMarkdown";
@@ -59,9 +59,12 @@ for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
         await page
           .getByRole("textbox", { name: "Criterion 1", exact: true })
           .fill(value);
-        await page
-          .getByRole("button", { name: "Save acceptance", exact: true })
-          .click();
+        const save = page.getByRole("button", {
+          name: "Save acceptance",
+          exact: true,
+        });
+        if (value === "First submitted save") await save.click();
+        else await expect(save).toBeDisabled();
       } else {
         await page
           .getByRole("button", { name: `Edit ${label}`, exact: true })
@@ -92,6 +95,20 @@ for (const field of ["acceptance", "storyMarkdown", "epicMarkdown"] as const) {
     await page.evaluate(() =>
       Reflect.get(window, "targetedSaves")[0].release(),
     );
+    if (field === "acceptance") {
+      // F02 retains a newer draft but never queues another acceptance mutation.
+      await page.evaluate((url) => {
+        window.history.pushState({}, "", url);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }, url());
+      await openAgentPlan(page);
+      await expect(
+        page.getByRole("textbox", { name: "Criterion 1", exact: true }),
+      ).toHaveValue("Second submitted save");
+      await page
+        .getByRole("button", { name: "Save acceptance", exact: true })
+        .click();
+    }
     await expect
       .poll(() =>
         page.evaluate(() => Reflect.get(window, "targetedSaves").length),

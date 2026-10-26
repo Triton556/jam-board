@@ -7,6 +7,10 @@ AG12/AG14 full records, world geometry, project scope, selections and staged/dro
 payloads remain model-based. Standard Flow virtualization changes presentation
 only. It never archives references, launches work or grants Send/Start authority.
 Earlier RC01�RC06 rendering strategies are historical, superseded by RC07.
+Alpha.42 release-gate follow-up changes browser test contracts and H-T01 filter
+caption sizing only. AG action/state identities, project pinning, execution
+grants and mutation validators are unchanged; browser failures do not grant a
+release or native-acceptance exception.
 
 [Index](README.md) · Baseline alpha28 `2b263795b31767da29db0b62dc81f4da19dfc4d1`, inspected 2026-10-22. Alpha29 human-first layout does not change this tool/authority contract. [Canonical MCP contract](../mcp.md) and live tool schemas take precedence for argument details.
 
@@ -319,3 +323,10 @@ Source/API evidence: crates/jam-core/tests/reference_feedback.rs and
 crates/jam-mcp/src/canvas_tests.rs; stdio protocol coverage in
 crates/jam-mcp-cli/tests/stdio.rs. Browser/native and human acceptance remain
 separate and require the UI worker/QA evidence.
+
+## Alpha42 release repair boundary
+
+The loading-drawer close and keyboard image-preview repairs change human paths
+H-D01/H-R05 only. Agent actions/states, captured project identity, execution grants,
+presence semantics, reference writes and persisted data are unchanged. Browser
+fixtures' explicit Start actions remain fixture authorization, not an agent grant.

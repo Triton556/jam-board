@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setTheme } from "./assertions";
 
 test("AC04/AS03 saved answer stays durable; manual continuation copies IDs without starting work", async ({
   page,
@@ -54,7 +55,7 @@ test("AC04/AS03 saved answer stays durable; manual continuation copies IDs witho
   await page.reload();
   await page.getByRole("radio", { name: "Answered", exact: true }).click();
   await expect(card).toContainText(answer);
-  await card.getByRole("button", { name: "Continue in brain chat" }).click();
+  await card.getByRole("button", { name: "Show continuation prompt" }).click();
   const preview = card.getByRole("textbox", { name: "Continuation prompt" });
   const prompt = await preview.inputValue();
   for (const id of [
@@ -92,9 +93,7 @@ test("AC04/AS03 saved answer stays durable; manual continuation copies IDs witho
     ),
   ).toEqual([]);
   for (const theme of ["light", "dark"] as const) {
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     await preview.scrollIntoViewIfNeeded();
     const geometry = await preview.evaluate((element) => {
       const bounds = element.getBoundingClientRect();

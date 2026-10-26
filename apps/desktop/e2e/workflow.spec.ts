@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openExternalAgents } from "./assertions";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -51,6 +52,7 @@ test("agent setup distinguishes connection, skill and planning without starting 
 }) => {
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await openExternalAgents(page);
   await expect(
     page.getByText("Manual connection and role setup", { exact: true }),
   ).toBeVisible();

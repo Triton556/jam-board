@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setTheme } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -36,7 +37,7 @@ test("flat cards, assignee colors and opt-in estimates", async ({ page }) => {
     ["light", 14],
     ["dark", 16],
   ] as const) {
-    await page.getByLabel("Theme", { exact: true }).selectOption(theme);
+    await setTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     expect(
       await first.evaluate((e, percent) => {

@@ -15,7 +15,6 @@ All notable changes to Jam Board are documented here. The format follows
 ### Fixed
 - Frame headers stay within their frame at every zoom, including 20/19.9%.
 - Standard minimap frames remain transparent and item colours follow both themes.
-- Linux Clippy failure from a Windows-only voice process error-helper import.
 
 ## [0.3.0-alpha.42] - 2026-10-26
 
@@ -60,6 +59,17 @@ interaction walk.
   is remembered per session.
 - Typography uses PT Serif Caption for UI (bold via PT Serif 700), PT Serif for
   display, Shantell Sans for notes/handwriting and JetBrains Mono for monospace.
+
+### Fixed
+- Linux Clippy failures from Windows-only voice/agent imports, batch-launcher
+  tests and terminal cursor-handshake mutability.
+- Linux voice runtime ZIP inspection/extraction uses libarchive's `bsdtar`
+  instead of GNU tar; Ubuntu CI installs the required `libarchive-tools` package.
+- Table filter geometry remains stable when selected status labels become bold.
+- Closing a loading task/story drawer cannot be cancelled by the editor module
+  finishing its load; Escape returns focus for keyboard reopening.
+- Canvas image previews support Enter/Space while retaining body dragging and
+  pointer double-click activation.
 
 ### Verification boundary
 - Round-5 final gates passed after the recorded fixes; mock-browser UI evidence

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openExternalAgents } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -104,6 +105,7 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   await demo(page);
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await openExternalAgents(page);
   await page.getByRole("tab", { name: "Claude Code · HTTP" }).click();
   const captured = await page.evaluate(() => window.__jamMock.appState());
   const token = await page.evaluate(() => window.__jamMock.revealMcpToken());
