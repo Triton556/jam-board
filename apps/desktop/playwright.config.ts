@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 const port = Number(process.env.JAM_BOARD_TEST_PORT ?? 1420);
+const perfPort = Number(process.env.JAM_BOARD_PERF_PORT ?? 1422);
 export default defineConfig({
   outputDir: "../../.dev-data/playwright",
   testDir: "./e2e",
@@ -23,12 +24,12 @@ export default defineConfig({
     {
       name: "perf",
       testMatch: "**/perf/*.spec.ts",
-      use: { baseURL: "http://127.0.0.1:1422", trace: "off" },
+      use: { baseURL: `http://127.0.0.1:${perfPort}`, trace: "off" },
     },
     {
       name: "perf-canvas",
       testMatch: "**/perf-canvas/*.spec.ts",
-      use: { baseURL: "http://127.0.0.1:1422", trace: "off" },
+      use: { baseURL: `http://127.0.0.1:${perfPort}`, trace: "off" },
     },
   ],
   webServer: [
@@ -39,10 +40,9 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command:
-        "npm run build -- --outDir ../../.dev-data/perf-dist && npx vite preview --outDir ../../.dev-data/perf-dist --host 127.0.0.1 --port 1422 --strictPort",
+      command: `npm run build -- --outDir ../../.dev-data/perf-dist && npx vite preview --outDir ../../.dev-data/perf-dist --host 127.0.0.1 --port ${perfPort} --strictPort`,
       env: { VITE_MOCK_BRIDGE: "1" },
-      url: "http://127.0.0.1:1422",
+      url: `http://127.0.0.1:${perfPort}`,
       reuseExistingServer: false,
       timeout: 120000,
     },

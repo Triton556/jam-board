@@ -13,6 +13,11 @@
 | RC07 | H-R02/R07; AG12/AG14 | Gesture-only promotion with standard Flow virtualization/minimap, direct zoom, shared tooltips and unmemoized Markdown; no runtime flags | References subtree, TypeScript, Biome and production build checked for this source. QA must confirm timing and screenshots; matrix medians are evidence for selecting the strategy, not acceptance of changed source. |
 
 [W1 record](../verification/round6-w1-canvas.md); QA matrix: test-visuals/round6/qa-canvas/flags/report.md.
+Alpha.42 H-T01 / VS02 follow-up: status filtering must retain the same filter
+geometry when bold emphasis changes. `e2e/polish.spec.ts` checks exact boxes;
+the caption reserves both font weights. Windows Chrome/mock targeted check
+passed; hosted CI and native acceptance remain separate gates. Other observed
+release browser failures stay recorded in the version verification record.
 
 [Index](README.md) · Human map IDs below use prefix **H-** (for example H-D11 refers to D11 in the human map); AG IDs refer to the agent map. Stable IDs are test contracts, not pass claims.
 
@@ -414,3 +419,20 @@ The shared hidden-surface gates in the human map apply to every row.
 | RR26 | H-R22: Frame title tab -> linked target chip -> target drawer; show up to two chips then +N count | Show exact linked targets without making chips drag handles; open correct epic/story/task; account for removed/archived/project-changed targets without retargeting | Zero/one/two/many chips, long labels, focus/tooltips, low zoom and stale target | Contract inventory only; browser/native/human observations pending | implementation in progress; not yet run |
 | RR27 | H-R23: Selected canvas item -> delete/archive -> Undo -> restored item | Deletion soft-archives rather than hard-deletes; record human attribution for agent feedback; Undo restores record/geometry and clears archive attribution; uncertain result is reconciled | Archive receipt, undo pending/error, restored verdict/position, multiple selection and project-change refusal | Contract inventory only; browser/native/human observations pending | implementation in progress; not yet run |
 | RR28 | H-R24: Move sticky note over reference -> release -> agent reads attachedTo | Compute world coordinates with frame offsets; centre inside or overlap >=30% of note area attaches feedback; no extra relation UI; moving away removes computed relation | Overlapping note/item in different frames, exact/below threshold, no-overlap, readable note and zoom-independent placement | Contract inventory only; browser/native/human observations pending | implementation in progress; not yet run |
+
+## Alpha42 release repair acceptance
+
+KB03 / H-D01 / H-B01: Escape during lazy-module loading must still close after
+module resolution, return focus to the original card and allow keyboard reopening.
+`components/ui/drawer-loading.test.tsx` covers the delayed module; the existing
+`drawer-motion.test.tsx`, `board-return-focus.test.tsx` and `e2e/board.spec.ts`
+retain loaded-editor, dirty and route return coverage.
+
+H-R05 / RR13: `Media.test.tsx` and `e2e/v23.spec.ts` cover focusable image preview,
+Enter/Space, double-click and body dragging. Frame inheritance is checked through
+persisted frame membership and the accessible linked-target label; the retired
+inline "via frame" text is not a canvas requirement. RF03 checks both themes,
+CustomSelect persistence and keyboard-revealed note Edit. Presence assertions
+check the full tooltip and active mode, with numeric animation duration tolerance
+for browser serialization. Results and unrun native boundaries are in alpha42's
+verification record; these rows do not establish native usability.

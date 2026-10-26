@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectWorkingText } from "./assertions";
 
 test("working presence is live and scoped; cleared/offline cards remain explicitly unconfirmed", async ({
   page,
@@ -21,7 +22,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
     return task.key;
   });
   const card = page.locator(`[data-testid="task-card"][data-key="${key}"]`);
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · task activity unconfirmed",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -43,9 +46,14 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       }),
     key,
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · implementing snow tiles",
-    { timeout: 1000 },
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "active",
   );
   await expect(card.locator(".working-ring")).toHaveCount(1);
   await expect(card.locator(".working-pencil")).toHaveCount(1);
@@ -60,7 +68,7 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
     dash: getComputedStyle(el.querySelector("circle") as Element)
       .strokeDasharray,
   }));
-  expect(state.duration).toBe("8s");
+  expect(Number.parseFloat(state.duration)).toBeCloseTo(8, 3);
   expect(state.dash).toBe("4px, 3px");
   await page.goto(`/table?q=${key}`);
   const row = page.locator(`[data-task-key="${key}"]`);
@@ -68,10 +76,13 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
   await expect(row.locator(".working-ring")).toHaveCSS("width", "16px");
   const paintedRing = page.locator(`[data-working-keys~="${key}"]`);
   await expect(paintedRing).toHaveAttribute("data-mode", "active");
-  await expect(page.locator(".table-working-rotor")).toHaveCSS(
-    "animation-duration",
-    "8s",
-  );
+  expect(
+    Number.parseFloat(
+      await page
+        .locator(".table-working-rotor")
+        .evaluate((element) => getComputedStyle(element).animationDuration),
+    ),
+  ).toBeCloseTo(8, 3);
   const ringBox = await paintedRing.boundingBox();
   const avatarBox = await row.locator(".table-avatar").boundingBox();
   expect(ringBox).not.toBeNull();
@@ -88,16 +99,16 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       ),
     ).toBeLessThan(1);
   }
-  const firstRotation = await page
+  const firstOpacity = await page
     .locator(".table-working-rotor")
-    .evaluate((el) => getComputedStyle(el).strokeDashoffset);
+    .evaluate((el) => getComputedStyle(el).opacity);
   await expect
     .poll(() =>
       page
         .locator(".table-working-rotor")
-        .evaluate((el) => getComputedStyle(el).strokeDashoffset),
+        .evaluate((el) => getComputedStyle(el).opacity),
     )
-    .not.toBe(firstRotation);
+    .not.toBe(firstOpacity);
   await row.click();
   await expect(page.getByTestId("working-pill")).toContainText(
     "Worker is working · implementing snow tiles",
@@ -124,7 +135,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
     "data-mode",
     "quiet",
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · last update 42 min ago",
   );
   await expect(card.locator(".working-ring")).toHaveCount(0);
@@ -154,7 +167,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       text: "planning next steps",
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · task activity unconfirmed",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -174,7 +189,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       text: "checking another brief",
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · active elsewhere",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -188,7 +205,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       text: "",
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · task activity unconfirmed",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -208,7 +227,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       lastSeenAt: new Date(Date.now() - 121000).toISOString(),
     }),
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · task activity unconfirmed",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -233,7 +254,11 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       key,
     });
   }, key);
-  await expect(card.getByTestId("working-line")).toHaveText("Awaiting review");
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
+    "Awaiting review",
+  );
   await expect(card.locator(".working-ring")).toHaveCount(0);
   await expect(card.locator(".working-pencil")).toHaveCSS(
     "animation-name",
@@ -253,7 +278,9 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       }),
     key,
   );
-  await expect(card.getByTestId("working-line")).toContainText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Awaiting review · Reader last reported 0 min ago: Reading evidence",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(
@@ -313,7 +340,9 @@ test("reduced motion stays readable and offscreen work animations pause", async 
     "stroke-dashoffset",
     "0px",
   );
-  await expect(card.getByTestId("working-line")).toContainText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "implementing snow tiles",
   );
   await expect(card.getByTestId("working-line")).toHaveAttribute(

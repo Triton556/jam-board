@@ -10,7 +10,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.getByRole("button", { name: "Load demo jam" }).click();
   await page.goto("/references");
   await expect(
-    page.getByText("Drop images, sounds, videos or links here"),
+    page.getByText("Double-click anywhere to jot an idea"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByRole("button", { name: "File…", exact: true }).click();
@@ -72,7 +72,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.getByRole("button", { name: "Create frame", exact: true }).click();
   await expect(page.locator(".reference-frame-tab")).toHaveCSS(
     "font-family",
-    '"Fraunces Variable", serif',
+    /PT Serif/,
   );
   await page.getByRole("button", { name: "Fit view · F" }).click();
   await page.waitForTimeout(350);
@@ -108,9 +108,17 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.mouse.move(frame.x + 130, frame.y + 130, { steps: 14 });
   await page.mouse.up();
   await page.waitForTimeout(650);
-  await expect(page.locator(`[data-reference-id="${ids.note}"]`)).toContainText(
-    "via frame",
-  );
+  await expect
+    .poll(() =>
+      page.evaluate(async (ids) => {
+        const canvas = await window.__jamMock.referenceCanvas();
+        return canvas.items.find((item) => item.id === ids.note)?.frameId;
+      }, ids),
+    )
+    .toBe(ids.frame);
+  await expect(
+    page.locator(`[data-reference-id="${ids.note}"]`),
+  ).toHaveAttribute("aria-label", /linked to JB-E1/);
   const before = await page.evaluate(async () => {
     const d = await window.__jamMock.referenceCanvas();
     return d.items.find((i) => i.kind === "note")?.x;

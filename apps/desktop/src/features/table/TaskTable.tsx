@@ -247,8 +247,11 @@ export function TaskTable({
                   })
                 }
               >
-                <Stamp style={{ background: `var(--st-${status})` }}>
-                  {labels[status]}
+                <Stamp
+                  data-label={labels[status]}
+                  style={{ background: `var(--st-${status})` }}
+                >
+                  <span>{labels[status]}</span>
                 </Stamp>
               </button>
             );
