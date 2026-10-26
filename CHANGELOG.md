@@ -5,6 +5,26 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.43] - 2026-10-26
+
+Session history and resume, tools per connection, web MCP, cloud speech and
+provider retry. Canvas rendering returns close to alpha.42 responsiveness with
+bounded headers; the five-long-frame target remains unmet.
+
+### Added
+- Project-scoped session history with search, rename, delete/Undo, read-only
+  replay, supported native resume and transcript continuation into a new session.
+- Tools per connection: locked-on board access, optional Web/Browser presets,
+  Desktop trust disclosure and custom stdio/HTTP MCP servers. Built-in API chat
+  supports multiple MCP servers without a failed server blocking ordinary chat.
+- `jam-web-mcp` sidecar for configured web search, with provider/key settings.
+- Optional cloud speech through Groq, OpenAI or a custom compatible endpoint,
+  alongside local transcription; provider keys remain in the credential store.
+- Plain provider errors, expandable details, manual retry/model recovery and
+  bounded automatic retry with countdown and Stop.
+- Startup probe and a recorded Windows startup baseline; release checklist and
+  `scripts/ci-local.ps1` mirror the Windows CI gates and add functional Chromium.
+
 ### Changed
 - References uses gesture-only viewport promotion after the idle-machine matrix;
   diagnostic flags and other round-6 rendering experiments are removed. Keeps
@@ -17,6 +37,16 @@ All notable changes to Jam Board are documented here. The format follows
   headers move secondary actions into a menu while staying inside frame bounds.
 - Frame headers stay within their frame at every zoom, including 20/19.9%.
 - Standard minimap frames remain transparent and item colours follow both themes.
+- History Undo remains usable inside the history surface; clear-history actions
+  align with dialog conventions, disabled Web Test explains its requirement,
+  and history overflow controls retain a 28px minimum target.
+
+### Verification boundary
+- Windows local gates and retained browser/mock, packaged-startup and canvas
+  timing evidence are recorded separately in
+  [alpha43 verification](docs/verification/0.3.0-alpha.43.md). No live provider/key
+  or real-agent packaged-app acceptance is claimed. Final canvas medians are
+  8–10 frames over 20 ms per gesture, above the target of 5; Linux requires CI.
 
 ## [0.3.0-alpha.42] - 2026-10-26
 
