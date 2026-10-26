@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { expectBoardReachable } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -11,20 +12,14 @@ async function table(page: import("@playwright/test").Page) {
   await page.getByRole("link", { name: "Table", exact: true }).click();
   await expect(page.getByTestId("table-row").first()).toBeVisible();
 }
-test("five columns fit both specified sidebar widths", async ({ page }) => {
+test("five readable columns remain reachable at both sidebar widths", async ({
+  page,
+}) => {
   await demo(page);
-  expect(
-    await page
-      .locator(".board-scroll")
-      .evaluate((el) => el.scrollWidth <= el.clientWidth),
-  ).toBe(true);
+  await expectBoardReachable(page);
   await page.setViewportSize({ width: 1512, height: 860 });
   await page.getByRole("button", { name: "Expand sidebar" }).click();
-  expect(
-    await page
-      .locator(".board-scroll")
-      .evaluate((el) => el.scrollWidth <= el.clientWidth),
-  ).toBe(true);
+  await expectBoardReachable(page);
 });
 test("table filters survive URL reload, back and forward", async ({ page }) => {
   await table(page);

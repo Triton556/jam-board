@@ -195,7 +195,10 @@ test("RF04 note actions edit directly and retain menu/dialog dismissal ownership
   );
   for (const action of ["Tags", "Link to…"]) {
     await summary.click();
-    await page.getByRole("button", { name: action, exact: true }).click();
+    await page
+      .locator(".reference-menu[open]")
+      .getByRole("button", { name: action, exact: true })
+      .click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);

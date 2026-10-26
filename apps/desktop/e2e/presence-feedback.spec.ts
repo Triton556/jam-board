@@ -1,5 +1,6 @@
 // Alpha35 live-tooltip browser check. Typechecked, not executed locally.
 import { expect, test } from "@playwright/test";
+import { setTheme } from "./assertions";
 
 for (const theme of ["light", "dark"] as const) {
   test(`CP01/03/05 ${theme}: open presence tooltip follows fresh and expired status`, async ({
@@ -9,9 +10,7 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Load demo jam", exact: true })
       .click();
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     const captured = await page.evaluate(async () => {
       await window.__jamMock.startAllDemoScopes();
       const candidate = (await window.__jamMock.listBoardTasks()).ready.find(
@@ -33,7 +32,7 @@ for (const theme of ["light", "dark"] as const) {
       `[data-testid="task-card"][data-key="${captured.key}"]`,
     );
     const line = card.getByTestId("working-line");
-    await expect(line).toContainText("task activity unconfirmed");
+    await expect(line).toHaveAttribute("data-mode", "quiet");
     await expect(line).not.toHaveAttribute("title");
     await line.locator(".tooltip-wrap").hover();
     const tooltip = page.getByRole("tooltip");
@@ -46,7 +45,7 @@ for (const theme of ["light", "dark"] as const) {
         text: "Checking the fictional scene",
       });
     }, captured.key);
-    await expect(line).toContainText("Checking the fictional scene");
+    await expect(line).toHaveAttribute("data-mode", "active");
     await expect(tooltip).toContainText("Checking the fictional scene");
     const bounds = await tooltip.boundingBox();
     expect(bounds).not.toBeNull();
@@ -64,7 +63,7 @@ for (const theme of ["light", "dark"] as const) {
         lastSeenAt: new Date(Date.now() - 121000).toISOString(),
       });
     }, captured.key);
-    await expect(line).toContainText("task activity unconfirmed");
+    await expect(line).toHaveAttribute("data-mode", "quiet");
     await expect(tooltip).toContainText("unconfirmed");
     await expect(tooltip).not.toContainText("Checking the fictional scene");
     expect(

@@ -41,7 +41,12 @@ test("AG02 scoped Refine modes preserve local wishes and never mutate the board"
   await expect(handoff.getByRole("status")).toContainText(
     "Nothing was sent or saved to the board",
   );
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(short);
+  expect(
+    (await page.evaluate(() => navigator.clipboard.readText())).replace(
+      /\r\n/g,
+      "\n",
+    ),
+  ).toBe(short);
   await page.keyboard.press("Escape");
   await expect(
     task.getByRole("button", { name: "Refine with brain" }),

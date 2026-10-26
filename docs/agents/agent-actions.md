@@ -1,5 +1,10 @@
 # Agent actions, state and recovery
 
+Alpha.42 release-gate follow-up changes browser test contracts and H-T01 filter
+caption sizing only. AG action/state identities, project pinning, execution
+grants and mutation validators are unchanged; browser failures do not grant a
+release or native-acceptance exception.
+
 [Index](README.md) · Baseline alpha28 `2b263795b31767da29db0b62dc81f4da19dfc4d1`, inspected 2026-10-22. Alpha29 human-first layout does not change this tool/authority contract. [Canonical MCP contract](../mcp.md) and live tool schemas take precedence for argument details.
 
 ## Actor / state interaction map

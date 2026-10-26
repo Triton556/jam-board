@@ -54,6 +54,7 @@ interaction walk.
   tests and terminal cursor-handshake mutability.
 - Linux voice runtime ZIP inspection/extraction uses libarchive's `bsdtar`
   instead of GNU tar; Ubuntu CI installs the required `libarchive-tools` package.
+- Table filter geometry remains stable when selected status labels become bold.
 
 ### Verification boundary
 - Round-5 final gates passed after the recorded fixes; mock-browser UI evidence

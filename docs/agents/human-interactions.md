@@ -1,5 +1,10 @@
 # Human interaction map
 
+Alpha.42 release-gate follow-up: H-T01 status filters reserve both normal and
+bold caption widths so selecting a status does not shift neighboring controls.
+See the version verification record for the Windows Chrome result and remaining
+browser failures; no native acceptance is implied.
+
 The current brain-dock increment adds in-app sessions and board entry points,
 canvas organization (AG14 / AC14), and the UX changes marked below. It supersedes
 older copy-only/no-session descriptions for those paths. Source inventory is not
