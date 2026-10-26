@@ -19,7 +19,12 @@ and adds both-theme overflow-menu hit testing, neighbor bounds and Edit recovery
 | RC06 | H-R02/R07; AG12/AG14 | Historical mock/dev flags and ablation matrix | QA completed 108 idle-machine runs; flags and harness retired by RC07. Evidence remains in QA flags reports. |
 | RC07 | H-R02/R07; AG12/AG14 | Gesture-only promotion with standard Flow virtualization/minimap, direct zoom, shared tooltips and unmemoized Markdown; no runtime flags | References subtree, TypeScript, Biome and production build checked for this source. QA must confirm timing and screenshots; matrix medians are evidence for selecting the strategy, not acceptance of changed source. |
 
-[W1 record](../verification/round6-w1-canvas.md); QA matrix: test-visuals/round6/qa-canvas/flags/report.md.
+[Alpha43 record, including folded W1 history](../verification/0.3.0-alpha.43.md);
+QA matrix: test-visuals/round6/qa-canvas/flags/report.md. Final `c8ac628` mock QA
+observed bounded >=24px headers and themed minimap/selection/route focus in both
+themes. RC02/RC07 performance remains FAIL: medians 10/8 long frames on 132/500
+items versus the <=5 target. This supersedes the pending final-source timing and
+screenshot statements in those rows; native/human acceptance remains separate.
 Alpha.42 H-T01 / VS02 follow-up: status filtering must retain the same filter
 geometry when bold emphasis changes. `e2e/polish.spec.ts` checks exact boxes;
 the caption reserves both font weights. Windows Chrome/mock targeted check

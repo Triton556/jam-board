@@ -5,7 +5,7 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.3.0-alpha.43] - 2026-10-26
+## [0.3.0-alpha.43] - 2026-10-27
 
 Session history and resume, tools per connection, web MCP, cloud speech and
 provider retry. Canvas rendering returns close to alpha.42 responsiveness with
