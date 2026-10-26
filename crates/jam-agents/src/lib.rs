@@ -45,7 +45,7 @@ pub(crate) fn err(message: impl Into<String>) -> AgentError {
 
 #[cfg(test)]
 mod auth_tests;
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod launcher_tests;
 #[cfg(test)]
 mod tests;

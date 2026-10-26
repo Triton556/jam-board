@@ -5,9 +5,6 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-- Linux Clippy failure from a Windows-only voice process error-helper import.
-
 ## [0.3.0-alpha.42] - 2026-10-26
 
 Brain dock, local voice input, canvas linking and feedback, and fixes from the
@@ -51,6 +48,10 @@ interaction walk.
   is remembered per session.
 - Typography uses PT Serif Caption for UI (bold via PT Serif 700), PT Serif for
   display, Shantell Sans for notes/handwriting and JetBrains Mono for monospace.
+
+### Fixed
+- Linux Clippy failures from Windows-only voice/agent imports, batch-launcher
+  tests and terminal cursor-handshake mutability.
 
 ### Verification boundary
 - Round-5 final gates passed after the recorded fixes; mock-browser UI evidence
