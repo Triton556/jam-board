@@ -2,6 +2,12 @@
 
 ## Round 6 W1: H-R07/R11/R12/R20/R23 and H-BD15
 
+RF02 follow-up: H-R02 frame controls keep at least 24 screen pixels at every
+supported zoom. When their enlarged targets cannot fit, the bounded header keeps
+the title and a Frame actions menu for linking, collapse/expand, editing,
+archiving and linked work. Menu dismissal returns focus to its trigger; Edit
+keeps the dialog's opener ownership. Fit reserves the larger control row.
+
 RC07 selects gesture-only viewport promotion from QA's 108-run matrix. The seven
 other round-6 rendering paths and runtime flags are removed. Standard React Flow
 virtualizes nodes/edges, with active note drafts retaining their mounted owners.

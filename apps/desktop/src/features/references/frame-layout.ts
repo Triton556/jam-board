@@ -11,11 +11,17 @@ export function frameHeaderLayout(width: number, zoom: number, linked = false) {
   const scale = frameHeaderScale(width, zoom);
   const cssWidth = width / scale;
   const compact = cssWidth < 320;
+  // Scaling the bounded header must never scale its targets below 24 screen px.
+  const controlSize = Math.max(32, 24 / (Math.max(0.1, zoom) * scale));
+  const overflow = 26 + 4 * controlSize + 3 * 4 > cssWidth;
+  const linkedHeight = linked && !overflow ? controlSize + 8 : 0;
   return {
     scale,
     cssWidth,
     compact,
-    height: (compact ? 84 : 46) + (linked ? 40 : 0),
+    controlSize,
+    overflow,
+    height: (compact ? 52 + controlSize : 14 + controlSize) + linkedHeight,
   };
 }
 
@@ -29,7 +35,11 @@ export function referenceFitBounds(nodes: FitReference[], zoom: number): Rect {
     if (!node.frame) return node;
     const header = frameHeaderLayout(node.width, zoom, node.frame.linked);
     const width = Math.max(node.width, header.cssWidth * header.scale);
-    const height = (node.frame.linked ? 124 : 84) * header.scale;
+    const height =
+      (52 +
+        header.controlSize +
+        (node.frame.linked && !header.overflow ? header.controlSize + 8 : 0)) *
+      header.scale;
     return node.frame.collapsed
       ? { ...node, width, height: Math.max(node.height, height) }
       : {

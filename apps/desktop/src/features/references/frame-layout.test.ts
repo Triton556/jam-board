@@ -8,6 +8,26 @@ import {
 
 // Deterministic geometry only. Browser/native typography and hit testing are separate gates.
 describe("RF02 title-priority frame header", () => {
+  it.each(
+    [280, 320, 880].flatMap((width) =>
+      [0.2, 0.4, 1].map((zoom) => [width, zoom]),
+    ),
+  )(
+    "keeps 24px screen controls within a %spx frame at zoom %s",
+    (width, zoom) => {
+      const header = frameHeaderLayout(width, zoom);
+      expect(header.controlSize * header.scale * zoom).toBeGreaterThanOrEqual(
+        24,
+      );
+      expect(header.cssWidth * header.scale).toBeLessThanOrEqual(width + 0.001);
+      const controls = header.overflow ? 1 : 4;
+      // Header padding/borders and inter-control gaps must fit too.
+      expect(
+        26 + controls * header.controlSize + (controls - 1) * 4,
+      ).toBeLessThanOrEqual(header.cssWidth + 0.001);
+      expect(header.overflow).toBe(width * zoom < 120);
+    },
+  );
   it("RC04 20% -> 19.9% keeps header width inside the frame and changes scale continuously", () => {
     for (const width of [280, 320, 880]) {
       const before = frameHeaderLayout(width, 0.2, true);
@@ -24,9 +44,10 @@ describe("RF02 title-priority frame header", () => {
       ).toBeLessThan(1);
     }
   });
-  it("reserves a separate linked-target row at compact and full zoom", () => {
+  it("reserves linked-target rows when inline and moves links into an overflowing frame menu", () => {
     expect(frameHeaderLayout(800, 1, true).height).toBe(86);
-    expect(frameHeaderLayout(280, 0.4, true).height).toBe(124);
+    expect(frameHeaderLayout(320, 0.4, true).height).toBe(135);
+    expect(frameHeaderLayout(280, 0.4, true).overflow).toBe(true);
     const bounds = referenceFitBounds(
       [
         {
@@ -39,7 +60,7 @@ describe("RF02 title-priority frame header", () => {
       ],
       0.4,
     );
-    expect(bounds.height).toBe(124 * (280 / 200));
+    expect(bounds.height).toBeCloseTo(132.8);
   });
   it.each([0.39, 0.4, 0.49, 0.75, 1, 2, 4])(
     "keeps a 320px frame's title out of the controls row at narrow zoom %s",
@@ -55,7 +76,7 @@ describe("RF02 title-priority frame header", () => {
         expect((header.cssWidth - 54) * header.scale * zoom).toBeGreaterThan(
           Math.min(100, (320 * zoom) / 2),
         );
-        expect(header.height).toBe(84);
+        expect(header.height).toBe(52 + header.controlSize);
       }
     },
   );

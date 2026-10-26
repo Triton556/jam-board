@@ -541,6 +541,7 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             ? palette(frame.color)
             : "var(--line)",
           opacity: data.dim ? 0.15 : 1,
+          "--frame-control-size": `${header.controlSize}px`,
           minHeight: frame.collapsed ? header.height * header.scale : undefined,
         } as React.CSSProperties
       }
@@ -586,54 +587,132 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           </span>
         </div>
         <div className="reference-frame-actions">
-          <Tooltip text="Link frame to work">
-            <button
-              type="button"
-              className="nodrag"
-              aria-label="Link frame to work"
-              onClick={() => c.linkFrame?.(frame)}
+          {header.overflow ? (
+            <ReferencePopover
+              label={`Frame actions for ${frame.title}`}
+              trigger={<MoreHorizontal size={16} />}
             >
-              <Link size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip
-            text={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
-          >
-            <button
-              type="button"
-              className="nodrag"
-              aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
-              onClick={() => c.collapse(frame)}
-            >
-              {frame.collapsed ? (
-                <ChevronRight size={16} />
-              ) : (
-                <ChevronDown size={16} />
+              {(close) => (
+                <>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      close();
+                      c.linkFrame?.(frame);
+                    }}
+                  >
+                    Link frame to work
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      close();
+                      c.collapse(frame);
+                    }}
+                  >
+                    {frame.collapsed ? "Expand" : "Collapse"} {frame.title}
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      close();
+                      c.editFrame(frame);
+                    }}
+                  >
+                    Edit frame {frame.title}
+                  </button>
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      close();
+                      c.archive("frame", frame.id);
+                    }}
+                  >
+                    Archive frame {frame.title}
+                  </button>
+                  {links.map((link) => (
+                    <div key={link.targetKey}>
+                      <button
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          close();
+                          c.open(link.targetKey);
+                        }}
+                      >
+                        Open {link.targetKey} · {link.title}
+                      </button>
+                      <button
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          close();
+                          c.unlinkFrame?.(frame, link.targetKey);
+                        }}
+                      >
+                        Remove link to {link.targetKey}
+                      </button>
+                    </div>
+                  ))}
+                </>
               )}
-            </button>
-          </Tooltip>
-          <Tooltip text={`Edit frame ${frame.title}`}>
-            <button
-              type="button"
-              className="nodrag"
-              aria-label={`Edit frame ${frame.title}`}
-              onClick={() => c.editFrame(frame)}
-            >
-              <MoreHorizontal size={15} />
-            </button>
-          </Tooltip>
-          <Tooltip text={`Archive frame ${frame.title}`}>
-            <button
-              type="button"
-              className="nodrag"
-              aria-label={`Archive frame ${frame.title}`}
-              onClick={() => c.archive("frame", frame.id)}
-            >
-              <Archive size={15} />
-            </button>
-          </Tooltip>
+            </ReferencePopover>
+          ) : (
+            <>
+              <Tooltip text="Link frame to work">
+                <button
+                  type="button"
+                  className="nodrag"
+                  aria-label="Link frame to work"
+                  onClick={() => c.linkFrame?.(frame)}
+                >
+                  <Link size={16} />
+                </button>
+              </Tooltip>
+              <Tooltip
+                text={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+              >
+                <button
+                  type="button"
+                  className="nodrag"
+                  aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
+                  onClick={() => c.collapse(frame)}
+                >
+                  {frame.collapsed ? (
+                    <ChevronRight size={16} />
+                  ) : (
+                    <ChevronDown size={16} />
+                  )}
+                </button>
+              </Tooltip>
+              <Tooltip text={`Edit frame ${frame.title}`}>
+                <button
+                  type="button"
+                  className="nodrag"
+                  aria-label={`Edit frame ${frame.title}`}
+                  onClick={() => c.editFrame(frame)}
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+              </Tooltip>
+              <Tooltip text={`Archive frame ${frame.title}`}>
+                <button
+                  type="button"
+                  className="nodrag"
+                  aria-label={`Archive frame ${frame.title}`}
+                  onClick={() => c.archive("frame", frame.id)}
+                >
+                  <Archive size={15} />
+                </button>
+              </Tooltip>
+            </>
+          )}
         </div>
-        {!!links.length && (
+        {!!links.length && !header.overflow && (
           <div className="reference-frame-links nodrag">
             {links.slice(0, visibleLinks).map((link) => (
               <ReferencePopover

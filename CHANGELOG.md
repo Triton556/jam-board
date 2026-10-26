@@ -13,6 +13,8 @@ All notable changes to Jam Board are documented here. The format follows
   virtualization; active note drafts remain retained.
 
 ### Fixed
+- Frame header controls retain 24px screen targets when zoomed out; narrow
+  headers move secondary actions into a menu while staying inside frame bounds.
 - Frame headers stay within their frame at every zoom, including 20/19.9%.
 - Standard minimap frames remain transparent and item colours follow both themes.
 

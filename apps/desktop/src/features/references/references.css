@@ -442,6 +442,21 @@
   color: var(--ink-2);
   cursor: pointer;
 }
+.reference-frame-actions :where(.tooltip-wrap) > button {
+  min-width: var(--frame-control-size, 32px);
+  min-height: var(--frame-control-size, 32px);
+}
+.reference-frame-actions :where(.tooltip-wrap > button) > svg {
+  width: calc(var(--frame-control-size, 32px) / 2);
+  height: calc(var(--frame-control-size, 32px) / 2);
+}
+.reference-frame-tab :where(.reference-popover-menu) button {
+  display: block;
+  min-width: 0;
+  min-height: 32px;
+  padding: 8px 12px;
+  text-align: left;
+}
 .reference-frame-tab button:hover {
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -1064,7 +1079,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 28px;
+  min-width: var(--frame-control-size, 32px);
+  min-height: var(--frame-control-size, 32px);
   padding: 4px 8px;
   border: 1px solid var(--line-soft);
   border-radius: 999px;

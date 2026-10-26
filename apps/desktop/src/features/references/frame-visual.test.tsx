@@ -1,4 +1,5 @@
 // RF02: behavioral DOM/drawing calls only; native geometry and visual hierarchy are separate gates.
+import { readFileSync } from "node:fs";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { ReactNode } from "react";
@@ -74,6 +75,76 @@ function Frame({
     />
   );
 }
+it.each(
+  [280, 320, 880].flatMap((width) =>
+    [0.2, 0.4, 1].map((zoom) => [width, zoom]),
+  ),
+)(
+  "RF02 %spx frame at zoom %s keeps screen targets, title and bounded header with reachable actions",
+  (width, zoom) => {
+    camera.zoom = zoom;
+    const actions = runtime();
+    const value = { ...frame, w: width };
+    const { container } = render(
+      <ReactFlowProvider>
+        <style>
+          {readFileSync("src/features/references/references.css", "utf8")}
+        </style>
+        <CanvasContext.Provider value={actions}>
+          <Frame value={value} />
+        </CanvasContext.Provider>
+      </ReactFlowProvider>,
+    );
+    const header = container.querySelector<HTMLElement>(".reference-frame-tab");
+    if (!header) throw Error("Missing frame header");
+    const scale = Number(header.style.transform.match(/[\d.]+/)?.[0]);
+    expect(Number.parseFloat(header.style.width) * scale).toBeCloseTo(width);
+    expect(container.querySelector(".reference-frame-title")).toHaveTextContent(
+      value.title,
+    );
+    const buttons = container.querySelectorAll<HTMLButtonElement>(
+      ".reference-frame-actions .tooltip-wrap > button",
+    );
+    for (const button of buttons) {
+      const style = getComputedStyle(button);
+      expect(
+        Number.parseFloat(style.minWidth) * scale * zoom,
+      ).toBeGreaterThanOrEqual(24);
+      expect(
+        Number.parseFloat(style.minHeight) * scale * zoom,
+      ).toBeGreaterThanOrEqual(24);
+    }
+    const more = screen.queryByRole("button", {
+      name: `Frame actions for ${value.title}`,
+    });
+    expect(buttons).toHaveLength(width * zoom < 120 ? 1 : 4);
+    if (more) {
+      expect(
+        screen.queryByRole("button", { name: `Archive frame ${value.title}` }),
+      ).toBeNull();
+      for (const name of [
+        `Collapse ${value.title}`,
+        `Edit frame ${value.title}`,
+        `Archive frame ${value.title}`,
+      ]) {
+        fireEvent.click(more);
+        const command = screen.getByRole("menuitem", { name });
+        expect(
+          Number.parseFloat(getComputedStyle(command).minHeight),
+        ).toBeGreaterThanOrEqual(24);
+        fireEvent.click(command);
+        expect(screen.queryByRole("menu")).toBeNull();
+        expect(more).toHaveFocus();
+      }
+      expect(actions.collapse).toHaveBeenCalledExactlyOnceWith(value);
+      expect(actions.editFrame).toHaveBeenCalledExactlyOnceWith(value);
+      expect(actions.archive).toHaveBeenCalledExactlyOnceWith(
+        "frame",
+        value.id,
+      );
+    }
+  },
+);
 it.each([1, 0.75, 0.4, 0.39])(
   "RF02 frame title and full grip remain present at zoom %s; actions retain their exact target",
   (zoom) => {
