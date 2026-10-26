@@ -52,6 +52,8 @@ interaction walk.
 ### Fixed
 - Linux Clippy failures from Windows-only voice/agent imports, batch-launcher
   tests and terminal cursor-handshake mutability.
+- Linux voice runtime ZIP inspection/extraction uses libarchive's `bsdtar`
+  instead of GNU tar; Ubuntu CI installs the required `libarchive-tools` package.
 
 ### Verification boundary
 - Round-5 final gates passed after the recorded fixes; mock-browser UI evidence

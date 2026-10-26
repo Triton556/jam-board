@@ -298,7 +298,10 @@ fn tar() -> std::process::Command {
     #[cfg(windows)]
     let exe = PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into()))
         .join("System32/tar.exe");
-    #[cfg(not(windows))]
+    // GNU tar cannot inspect the ZIP runtimes. Use libarchive, as Windows does.
+    #[cfg(target_os = "linux")]
+    let exe = PathBuf::from("bsdtar");
+    #[cfg(not(any(windows, target_os = "linux")))]
     let exe = PathBuf::from("tar");
     let mut cmd = std::process::Command::new(exe);
     hide(&mut cmd);
@@ -306,7 +309,11 @@ fn tar() -> std::process::Command {
 }
 fn extract(archive: &Path, staging: &Path) -> Result<()> {
     // Never allow absolute paths, traversal or links from a downloaded archive.
-    let names = tar().arg("-tf").arg(archive).output()?;
+    let names = tar().arg("-tf").arg(archive).output().map_err(|error| {
+        err(format!(
+            "Cannot start whisper.cpp archive tool (Linux requires bsdtar from libarchive-tools): {error}"
+        ))
+    })?;
     let details = tar().arg("-tvf").arg(archive).output()?;
     if !names.status.success() || !details.status.success() {
         return Err(err("Cannot inspect whisper.cpp archive"));
