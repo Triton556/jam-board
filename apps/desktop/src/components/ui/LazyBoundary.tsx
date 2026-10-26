@@ -75,6 +75,9 @@ function DrawerLoadState({ failed = false }: { failed?: boolean }) {
     <Drawer
       title={state.title}
       onClose={state.close}
+      // The lazy editor can replace this shell during its exit animation.
+      // Close the route now so resolving the module cannot cancel dismissal.
+      onRequestClose={state.close}
       closeLabel={`Close ${state.kind}`}
       returnFocus={state.returnFocus}
       modal={state.kind !== "task" || !/^\/references(?:\/|$)/.test(pathname)}

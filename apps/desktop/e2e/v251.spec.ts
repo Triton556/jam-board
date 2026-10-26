@@ -46,9 +46,14 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       }),
     key,
   );
-  await expect(card.getByTestId("working-line")).toHaveText(
+  await expectWorkingText(
+    page,
+    card.getByTestId("working-line"),
     "Worker · implementing snow tiles",
-    { timeout: 1000 },
+  );
+  await expect(card.getByTestId("working-line")).toHaveAttribute(
+    "data-mode",
+    "active",
   );
   await expect(card.locator(".working-ring")).toHaveCount(1);
   await expect(card.locator(".working-pencil")).toHaveCount(1);
@@ -63,7 +68,7 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
     dash: getComputedStyle(el.querySelector("circle") as Element)
       .strokeDasharray,
   }));
-  expect(state.duration).toBe("8s");
+  expect(Number.parseFloat(state.duration)).toBeCloseTo(8, 3);
   expect(state.dash).toBe("4px, 3px");
   await page.goto(`/table?q=${key}`);
   const row = page.locator(`[data-task-key="${key}"]`);
@@ -71,10 +76,13 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
   await expect(row.locator(".working-ring")).toHaveCSS("width", "16px");
   const paintedRing = page.locator(`[data-working-keys~="${key}"]`);
   await expect(paintedRing).toHaveAttribute("data-mode", "active");
-  await expect(page.locator(".table-working-rotor")).toHaveCSS(
-    "animation-duration",
-    "8s",
-  );
+  expect(
+    Number.parseFloat(
+      await page
+        .locator(".table-working-rotor")
+        .evaluate((element) => getComputedStyle(element).animationDuration),
+    ),
+  ).toBeCloseTo(8, 3);
   const ringBox = await paintedRing.boundingBox();
   const avatarBox = await row.locator(".table-avatar").boundingBox();
   expect(ringBox).not.toBeNull();
@@ -91,16 +99,16 @@ test("working presence is live and scoped; cleared/offline cards remain explicit
       ),
     ).toBeLessThan(1);
   }
-  const firstRotation = await page
+  const firstOpacity = await page
     .locator(".table-working-rotor")
-    .evaluate((el) => getComputedStyle(el).strokeDashoffset);
+    .evaluate((el) => getComputedStyle(el).opacity);
   await expect
     .poll(() =>
       page
         .locator(".table-working-rotor")
-        .evaluate((el) => getComputedStyle(el).strokeDashoffset),
+        .evaluate((el) => getComputedStyle(el).opacity),
     )
-    .not.toBe(firstRotation);
+    .not.toBe(firstOpacity);
   await row.click();
   await expect(page.getByTestId("working-pill")).toContainText(
     "Worker is working · implementing snow tiles",

@@ -106,19 +106,10 @@ it("task module pending keeps a closable focused drawer and cannot reopen after 
   );
   expect(close).toHaveFocus();
   async function dismiss(drawer: HTMLElement, action: () => void) {
-    const queued = new Set(idle.keys());
     action();
-    await state(() => expect(drawer).toHaveClass("closed"));
-    const teardown = [...idle].filter(([id]) => !queued.has(id));
-    expect(teardown).toHaveLength(1);
-    // Run this drawer's idle removal, keeping unrelated app prefetch deferred.
-    await act(async () => {
-      for (const [id, callback] of teardown) {
-        idle.delete(id);
-        callback({ didTimeout: false, timeRemaining: () => 16 });
-      }
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    // Loading shells leave immediately: a resolved module must not replace a
+    // closing fallback before an animation/idle callback can close its route.
+    // Unrelated app prefetch remains deferred in the stubbed idle queue.
     await state(() =>
       expect(router.state.location.search.task).toBeUndefined(),
     );

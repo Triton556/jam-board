@@ -89,11 +89,13 @@ for (const theme of ["light", "dark"] as const) {
     await page.reload();
     await expect(
       page.getByRole("combobox", { name: "Theme", exact: true }),
-    ).toHaveValue(theme);
+    ).toContainText(theme === "dark" ? "Dark" : "Light");
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.evaluate(() => document.fonts.ready);
     const persisted = page.locator(`[data-reference-id="${created.id}"]`);
-    await persisted.getByRole("button", { name: /^Edit note / }).click();
+    const edit = persisted.getByRole("button", { name: /^Edit note / });
+    await edit.focus();
+    await edit.press("Enter");
     const reopenedBody = persisted.getByRole("textbox", { name: "Note text" });
     await expect(reopenedBody).toHaveValue(bodyText);
     await expect(
@@ -127,7 +129,11 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Escape");
     await expect(reopenedBody).toHaveCount(0);
     const saved = page.locator(`[data-reference-id="${created.id}"]`);
-    await saved.getByRole("button", { name: "Edit note Lantern idea" }).click();
+    const editSaved = saved.getByRole("button", {
+      name: "Edit note Lantern idea",
+    });
+    await editSaved.focus();
+    await editSaved.press("Enter");
     const reopened = saved.getByRole("textbox", { name: "Note text" });
     await expect(reopened).toBeFocused();
     await expect(reopened).toHaveValue(bodyText);

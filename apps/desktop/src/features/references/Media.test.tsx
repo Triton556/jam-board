@@ -130,12 +130,20 @@ describe("VS03 media source and lifetime (DOM, not native clarity)", () => {
     Object.defineProperty(window, "devicePixelRatio", { value: 2 });
     fireEvent(window, new Event("resize"));
     expect(screen.getByRole("img")).toHaveAttribute("src", "original");
-    const body = screen.getByRole("group", { name: "Open Reference" });
+    const body = screen.getByRole("button", { name: "Open Reference" });
     expect(body).not.toHaveClass("nodrag");
     fireEvent.click(body);
     expect(lightbox).not.toHaveBeenCalled();
     fireEvent.doubleClick(body);
     expect(lightbox).toHaveBeenCalledWith("original", "Reference");
+    lightbox.mockClear();
+    body.focus();
+    expect(body).toHaveFocus();
+    for (const key of ["Enter", " "]) {
+      fireEvent.keyDown(body, { key });
+      expect(lightbox).toHaveBeenLastCalledWith("original", "Reference");
+    }
+    expect(lightbox).toHaveBeenCalledTimes(2);
   });
   it("thumbnail error falls back once; original failure is explicit and retry reloads original", async () => {
     render(view());
