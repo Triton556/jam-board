@@ -2,6 +2,10 @@
 
 ## Round 6 W1: AG12/AG14 presentation boundary
 
+RF02 changes human frame-control sizing and disclosure only. AG12/AG14 records,
+geometry mutations, project scope and execution grants remain unchanged; opening
+the overflow menu never performs a mutation.
+
 RC07 removes the diagnostic renderer flags and selects gesture-only promotion;
 AG12/AG14 full records, world geometry, project scope, selections and staged/drop
 payloads remain model-based. Standard Flow virtualization changes presentation

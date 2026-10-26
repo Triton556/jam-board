@@ -315,3 +315,59 @@ will run it. No release version, commit, push or publication changed.
 
 RC07: QA's 108 idle-machine runs selected gesture-only promotion: 132/500 items measured 72.68/72.04 FPS and 6/6 long frames, versus all-on 54.22/35.18 FPS and 53/69 (qa-canvas/flags/report.md, ranking.md, full-table.md).
 Ship that path; delete the seven other rendering paths and flags, keep bounded headers, standard minimap colours, model/focus/draft fixes and fixture/trace tooling; simplified-source timing/screenshots await QA, and the <=5 target remains unmet by the measured winner.
+
+## RF02 frame hit targets — 2026-10-26
+
+Baseline: `13ce4fb` on `feature/round-6`. The width-capped header made a 320px
+frame's 32px control paint at 20.48 screen pixels at 40% zoom. Header width
+remains capped; control size is now at least `24 / (zoom * headerScale)` logical
+pixels. Icons follow the target size. If four targets plus padding/gaps cannot
+fit, the title remains and one Frame actions menu contains link, collapse/expand,
+edit, archive and linked-work commands. The shared top-layer menu keeps its own
+screen-sized targets and opener focus. Fit/collapsed bounds reserve the taller
+control row, with no model/schema or gesture-promotion change.
+
+Unit coverage includes 280/320/880px widths at 20%, 40% and 100% zoom, CSS-derived
+target dimensions, bounded headers, command dispatch and focus return. Original
+RF02 23.9px browser assertions remain unchanged; after Fit, the collapse action
+follows the overflow menu when necessary. Added both-theme browser checks cover
+20/40/100% targets, neighbor bounds, menu hit testing, Escape and Edit recovery.
+Targeted RF02: 4/4 passed; light/dark Fit and open-menu screenshots inspected.
+
+Full scripts/ci-local.ps1 completed with exit 0: 18 PASS, 5 expected SKIP.
+Rust workspace: 314 passed, 4 existing opt-in tests ignored. Vitest: 1,216 tests
+in 166 files passed. Functional Chromium: 106/106, including all four RF02 cases.
+Debug desktop build produced target/debug/jam-board.exe. A final npm run check
+also passed all 435 files without warnings after icon-selector specificity
+cleanup; functional browser and desktop-build gates used that final CSS.
+
+| ci-local gate | Result |
+|---|---|
+| Workflow synchronization guard | PASS |
+| Checkout current tree | SKIP (no reset) |
+| Linux Tauri dependencies | SKIP (Linux only) |
+| Stable Rust setup | PASS |
+| Hosted Rust cache | SKIP (local cache) |
+| Node 22 setup | PASS |
+| npm ci | PASS |
+| Release versions and script tests | PASS |
+| Prepare sidecar | PASS |
+| Isolated MCP contract smoke | PASS |
+| cargo fmt | PASS |
+| cargo clippy, all targets, -D warnings | PASS |
+| cargo test --workspace | PASS |
+| npm run check | PASS |
+| App TypeScript | PASS |
+| Browser TypeScript | PASS |
+| npm test | PASS |
+| Install Chromium | PASS |
+| Functional browser scenarios | PASS |
+| Manual production table benchmark | SKIP (manual only) |
+| Debug desktop build | PASS |
+| Retain local diagnostics | PASS |
+| Hosted screenshot upload | SKIP (hosted only) |
+
+Raw gate table/log: test-visuals/round6/w1/ci-local-rf02.log. Final light/dark Fit
+and open-menu screenshots are copied under W1 and inspected. This is Windows
+local/mock browser evidence and a native build, not native usability or hosted
+Linux acceptance. No version, push or publication change is made.

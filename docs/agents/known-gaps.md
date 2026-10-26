@@ -2,6 +2,11 @@
 
 ## Round 6 W1: selected rendering evidence boundary
 
+RF02 found the bounded header's 320px/40% controls at 20.48 screen pixels. The
+follow-up separates control target size from header scale, with overflow actions
+in a menu and Fit reserving the taller row. Full local CI/browser results are
+recorded in the W1 verification addendum; native-package observation is separate.
+
 RC07 removes all diagnostic flags and round-6 rendering experiments except
 gesture viewport promotion, following 108 controlled QA runs. The selected
 configuration measured 72.7/72.0 FPS and 6 long frames on 132/500 items. This

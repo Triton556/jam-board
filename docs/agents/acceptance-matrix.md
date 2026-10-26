@@ -2,6 +2,13 @@
 
 ## Round 6 W1: selected canvas rendering path
 
+RF02 hit-target follow-up (H-R02; AG12/AG14): 280/320/880px frames at 20/40/100%
+keep >=24px screen targets inside their own width. Insufficient room reveals one
+Frame actions menu, retaining every action, keyboard dismissal/focus and dialog
+return. `frame-layout.test.ts` and `frame-visual.test.tsx` cover geometry/actions;
+`e2e/reference-header-recovery.spec.ts` keeps the original 23.9px browser checks
+and adds both-theme overflow-menu hit testing, neighbor bounds and Edit recovery.
+
 | ID | Human / agent paths | Required behavior | Evidence boundary |
 |---|---|---|---|
 | RC01 | H-R07/R11/R12/R20/R23, H-BD15; AG12/AG14 | Full-model selection, marquee/cancel, keyboard navigation, grouped undo, drop payloads and active drafts survive standard Flow virtualization | canvas-gestures.test.tsx, sticky-interruptions.test.tsx and retained selection/editor suites; mock event evidence, browser/native pending. Bespoke overscan culling retired by RC07. |
