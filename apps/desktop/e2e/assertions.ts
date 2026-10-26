@@ -6,6 +6,16 @@ export async function expectWorkingText(
   line: Locator,
   text: string,
 ) {
+  // A claimed card can cross columns after hover's initial stability sample.
+  // Wait for Motion's layout transform to finish before placing the pointer.
+  await expect
+    .poll(() =>
+      line.evaluate((element) => {
+        const card = element.closest('[data-testid="task-card"]');
+        return card ? getComputedStyle(card).transform : "none";
+      }),
+    )
+    .toBe("none");
   await line.locator(".tooltip-wrap").hover();
   await expect(page.getByRole("tooltip")).toContainText(text);
   await page.mouse.move(0, 0);
