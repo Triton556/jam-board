@@ -10,8 +10,10 @@ mod execution_commands;
 mod m5_commands;
 mod skill_commands;
 mod skill_runner;
+mod startup_probe;
 mod v2_commands;
 mod voice_commands;
+mod web_commands;
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct McpCallsChanged {}
 
@@ -28,8 +30,10 @@ pub struct BoardChanged {
 pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
     macro_rules! desktop_commands {
         ($($extra:ident),*) => { tauri_specta::collect_commands![
-            voice_commands::voice_status,voice_commands::voice_prepare,voice_commands::voice_settings_save,voice_commands::voice_install,voice_commands::voice_cancel_install,voice_commands::voice_remove,voice_commands::voice_transcribe,voice_commands::voice_unload,
-            agent_commands::agent_model_catalog,agent_commands::add_agent_attachment,agent_commands::remove_agent_attachment,agent_commands::agent_profiles,agent_commands::save_agent_profile,agent_commands::delete_agent_profile,agent_commands::set_agent_secret,agent_commands::clear_agent_secret,agent_commands::agent_sessions,agent_commands::start_agent_session,agent_commands::send_agent_prompt,agent_commands::cancel_agent_turn,agent_commands::resolve_agent_permission,agent_commands::set_agent_config_option,agent_commands::stop_agent_session,agent_commands::agent_session_history,agent_commands::terminal_write,agent_commands::terminal_resize,agent_commands::terminal_snapshot,
+            web_commands::web_search_settings,web_commands::save_web_search_settings,web_commands::set_web_search_key,web_commands::clear_web_search_key,web_commands::test_web_search,
+            voice_commands::voice_set_cloud_key,voice_commands::voice_clear_cloud_key,voice_commands::voice_status,voice_commands::voice_prepare,voice_commands::voice_settings_save,voice_commands::voice_install,voice_commands::voice_cancel_install,voice_commands::voice_remove,voice_commands::voice_transcribe,voice_commands::voice_unload,
+            agent_commands::agent_history,agent_commands::agent_history_events,agent_commands::resume_agent_session,agent_commands::rename_agent_history,agent_commands::delete_agent_history,agent_commands::clear_agent_history,agent_commands::agent_history_settings,agent_commands::save_agent_history_settings,
+            agent_commands::agent_model_catalog,agent_commands::add_agent_attachment,agent_commands::remove_agent_attachment,agent_commands::agent_profiles,agent_commands::save_agent_profile,agent_commands::delete_agent_profile,agent_commands::set_agent_secret,agent_commands::clear_agent_secret,agent_commands::agent_sessions,agent_commands::start_agent_session,agent_commands::send_agent_prompt,agent_commands::retry_agent_turn,agent_commands::cancel_agent_turn,agent_commands::resolve_agent_permission,agent_commands::set_agent_config_option,agent_commands::stop_agent_session,agent_commands::agent_session_history,agent_commands::terminal_write,agent_commands::terminal_resize,agent_commands::terminal_snapshot,
             skill_commands::pick_folder,skill_commands::skill_saved_path,skill_commands::skill_check,skill_commands::cancel_skill,skill_commands::run_skill,
             canvas_commands::reference_canvas,canvas_commands::canvas_geometry,canvas_commands::canvas_archive,canvas_commands::reference_metadata,canvas_commands::update_ref_edge,canvas_commands::clipboard_reference,canvas_commands::fetch_reference_preview,canvas_commands::clear_reference_preview,canvas_commands::canvas_viewport,canvas_commands::reference_media,
             v2_commands::set_reference_verdict,v2_commands::link_ref_frame,v2_commands::unlink_ref_frame,v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
@@ -70,6 +74,7 @@ pub fn export_event_bindings(path: &std::path::Path) -> Result<(), Box<dyn std::
 }
 
 pub fn run() {
+    let startup_probe = startup_probe::StartupProbe::from_env();
     let mut context = tauri::generate_context!();
     let development_dir = std::env::var_os("JAM_BOARD_DATA_DIR")
         .map(std::path::PathBuf::from)
@@ -90,9 +95,28 @@ pub fn run() {
         "/../src/bindings.ts"
     )))
     .expect("export event types");
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    let bridge_handler = bridge.invoke_handler();
+    let builder = if let Some(probe) = startup_probe {
+        let probe_handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
+            tauri::generate_handler![startup_probe::startup_first_paint];
+        builder
+            .manage(probe)
+            .append_invoke_initialization_script(
+                "document.addEventListener('DOMContentLoaded', () => { import('/startup-probe.js').then(probe => probe.observeFirstPaint(window.__TAURI_INTERNALS__.invoke)).catch(console.error); }, { once: true });",
+            )
+            .invoke_handler(move |invoke| {
+                if invoke.message.command() == "startup_first_paint" {
+                    probe_handler(invoke)
+                } else {
+                    bridge_handler(invoke)
+                }
+            })
+    } else {
+        builder.invoke_handler(bridge_handler)
+    };
+    builder
         .manage(skill_commands::SkillRuntime::default())
-        .invoke_handler(bridge.invoke_handler())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
@@ -111,6 +135,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
+            if let Some(probe) = app.try_state::<startup_probe::StartupProbe>() {
+                probe.window_created();
+            }
             bridge.mount_events(app);
             let data_dir = if let Some(dir) = std::env::var_os("JAM_BOARD_DATA_DIR") {
                 std::path::PathBuf::from(dir)
@@ -143,6 +170,7 @@ pub fn run() {
             app.manage(runtime.clone());
             app.manage(agent_commands::manager(store.clone(), app.handle().clone()));
             app.manage(voice_commands::manager(&data_dir, app.handle().clone())?);
+            app.manage(Arc::new(jam_web_mcp::config::WebConfig::new(&data_dir)));
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = runtime.listen_stdio().await {
                     tracing::error!(%e,"Cannot receive stdio call metadata");

@@ -5,15 +5,21 @@ import {
   type VoiceInstallProgress,
   type VoiceLanguage,
   type VoiceModel,
-  type VoiceSettingsInput_Deserialize,
-  type VoiceStatus,
 } from "../bindings";
+import type { VoiceSettingsInput, VoiceStatus } from "./agent-dock-cloud";
 import { mockVoiceApi } from "./agent-dock-voice-mock";
 import { JamError } from "./types";
 
 export type VoiceApi = {
   status(): Promise<VoiceStatus>;
-  save(input: VoiceSettingsInput_Deserialize): Promise<VoiceStatus>;
+  save(input: VoiceSettingsInput): Promise<VoiceStatus>;
+  setCloudKey(
+    provider: import("./agent-dock-cloud").CloudProvider,
+    key: string,
+  ): Promise<unknown>;
+  clearCloudKey(
+    provider: import("./agent-dock-cloud").CloudProvider,
+  ): Promise<unknown>;
   install(model: VoiceModel, device: VoiceDevice): Promise<unknown>;
   cancelInstall(): Promise<unknown>;
   remove(model: VoiceModel): Promise<unknown>;
@@ -49,6 +55,10 @@ export const voiceApi: VoiceApi =
     : {
         status: () => unwrap(commands.voiceStatus()),
         save: (input) => unwrap(commands.voiceSettingsSave(input)),
+        setCloudKey: (provider, key) =>
+          unwrap(commands.voiceSetCloudKey(provider, key)),
+        clearCloudKey: (provider) =>
+          unwrap(commands.voiceClearCloudKey(provider)),
         install: (model, device) =>
           unwrap(commands.voiceInstall(model, device)),
         cancelInstall: () => unwrap(commands.voiceCancelInstall()),

@@ -1,3 +1,4 @@
+use crate::{CloudSettings, CloudStatus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -104,6 +105,10 @@ impl Default for VoiceSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceSettingsInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<VoiceEngine>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud: Option<CloudSettings>,
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<VoiceModel>,
@@ -114,6 +119,8 @@ pub struct VoiceSettingsInput {
 impl From<VoiceSettings> for VoiceSettingsInput {
     fn from(settings: VoiceSettings) -> Self {
         Self {
+            engine: None,
+            cloud: None,
             enabled: settings.enabled,
             model: Some(settings.model),
             device: settings.device,
@@ -133,10 +140,12 @@ pub enum VoiceState {
     Ready,
     Error,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "kebab-case")]
 pub enum VoiceEngine {
+    #[default]
     LocalWhisper,
+    Cloud,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -144,6 +153,7 @@ pub struct VoiceStatus {
     #[serde(flatten)]
     pub settings: VoiceSettings,
     pub engine: VoiceEngine,
+    pub cloud: Option<CloudStatus>,
     pub installed_models: Vec<String>,
     pub runtime_installed: bool,
     pub gpu_available: bool,

@@ -8,6 +8,8 @@ import type {
   AgentProfileView,
 } from "../../lib/agent-dock-api";
 import { useUiStore } from "../../lib/ui-store";
+import { BrainAgentSettings } from "./BrainAgentSettings";
+import { BrainTools } from "./BrainTools";
 import { profileGroups, profileStatus, profilesQuery } from "./brain-profiles";
 import { optionCategory } from "./brain-settings";
 
@@ -108,6 +110,7 @@ export function BrainConnections() {
           refresh={refresh}
         />
       )}
+      <BrainAgentSettings />
     </section>
   );
 }
@@ -116,11 +119,13 @@ export function ConnectionEditor({
   close,
   refresh,
   initialFocus = "key",
+  setupWeb,
 }: {
   profile: AgentProfileView | null;
   close(): void;
   refresh(): Promise<unknown>;
   initialFocus?: "key" | "model";
+  setupWeb?: () => void;
 }) {
   const keyInput = useRef<HTMLInputElement>(null);
   const modelInput = useRef<HTMLInputElement>(null);
@@ -169,6 +174,7 @@ export function ConnectionEditor({
     model: profile?.model ?? "",
     effort: profile?.effort ?? "",
     effortStyle: profile?.effortStyle ?? "none",
+    extraMcpServers: profile?.extraMcpServers ?? [],
   });
   const cachedOptions = useUiStore(
     (state) => state.brainPreferences[profile?.id ?? ""]?.options,
@@ -292,10 +298,11 @@ export function ConnectionEditor({
               model: input.model || null,
               effort: input.effort ?? "",
             });
-            if (profile)
+            setInput((input) => ({ ...input, id: savedProfile.id }));
+            if (savedProfile)
               for (const [key, value] of entered) {
                 try {
-                  await agentDockApi.setSecret(profile.id, key, value);
+                  await agentDockApi.setSecret(savedProfile.id, key, value);
                   setSaved((current) => ({ ...current, [key]: true }));
                 } catch {
                   throw new Error(
@@ -312,10 +319,26 @@ export function ConnectionEditor({
           });
         }}
       >
-        {profile?.secretKeys.map((secret) => (
+        {[
+          ...(profile?.secretKeys ?? []),
+          ...(input.extraMcpServers ?? []).flatMap((server) =>
+            server.http?.bearerSecretKey &&
+            !profile?.secretKeys.some(
+              (key) => key.key === server.http?.bearerSecretKey,
+            )
+              ? [
+                  {
+                    key: server.http.bearerSecretKey,
+                    label: `${server.name} bearer token`,
+                    isSet: false,
+                  },
+                ]
+              : [],
+          ),
+        ].map((secret) => (
           <div className="brain-secret brain-field" key={secret.key}>
             <label>
-              API key
+              {secret.key.startsWith("MCP_") ? secret.label : "API key"}
               <input
                 ref={keyInput}
                 type="password"
@@ -340,7 +363,8 @@ export function ConnectionEditor({
                     void run(async () => {
                       setKeys({});
                       try {
-                        await agentDockApi.clearSecret(profile.id, secret.key);
+                        if (input.id)
+                          await agentDockApi.clearSecret(input.id, secret.key);
                       } catch {
                         throw new Error(
                           "Could not remove the API key. Try again.",
@@ -518,6 +542,17 @@ export function ConnectionEditor({
               </div>
             </>
           )}
+        <BrainTools
+          servers={input.extraMcpServers ?? []}
+          change={(extraMcpServers) =>
+            setInput((input) => ({ ...input, extraMcpServers }))
+          }
+          secret={(key, value) =>
+            setKeys((keys) => ({ ...keys, [key]: value }))
+          }
+          disabled={pending}
+          setupWeb={setupWeb ?? close}
+        />
         <details
           ref={advanced}
           className="brain-advanced"

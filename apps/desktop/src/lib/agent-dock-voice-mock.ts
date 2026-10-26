@@ -1,4 +1,5 @@
-import type { VoiceInstallProgress, VoiceStatus } from "../bindings";
+import type { VoiceInstallProgress } from "../bindings";
+import type { VoiceStatus } from "./agent-dock-cloud";
 import type { VoiceApi } from "./agent-dock-voice";
 
 const delay = (ms: number) =>
@@ -6,6 +7,7 @@ const delay = (ms: number) =>
 const defaults = (): VoiceStatus => ({
   enabled: false,
   engine: "local-whisper",
+  cloud: null,
   model: "fast",
   installedModels: [],
   runtimeInstalled: false,
@@ -21,7 +23,9 @@ const defaults = (): VoiceStatus => ({
 let status = defaults();
 let chosen = false;
 let generation = 0;
-let scenario: "normal" | "permission-denied" | "server-error" = "normal";
+let scenario: "normal" | "permission-denied" | "server-error" | "cloud-401" =
+  "normal";
+const cloudKeys = new Set<string>();
 const listeners = new Set<(progress: VoiceInstallProgress) => void>();
 const modelBytes = (model: string) =>
   model === "fast"
@@ -40,6 +44,7 @@ export function setMockVoice(
   generation++;
   chosen = false;
   scenario = failure;
+  cloudKeys.clear();
   status = { ...defaults(), ...next };
 }
 export function mockVoicePermissionDenied() {
@@ -56,11 +61,24 @@ export const mockVoiceApi: VoiceApi = {
     if (input.model != null) chosen = true;
     const model =
       input.model ??
-      (input.enabled && !chosen ? recommendedModel : status.model);
-    status = { ...status, ...input, model, recommendedModel, error: null };
+      (input.enabled && !status.enabled && !chosen && input.engine !== "cloud"
+        ? recommendedModel
+        : status.model);
+    status = {
+      ...status,
+      ...input,
+      engine: input.engine ?? status.engine,
+      cloud: input.cloud
+        ? { ...input.cloud, keySet: cloudKeys.has(input.cloud.provider) }
+        : status.cloud,
+      model,
+      recommendedModel,
+      error: null,
+    };
     status.state = !status.enabled
       ? "off"
-      : status.installedModels.includes(model) && status.runtimeInstalled
+      : status.engine === "cloud" ||
+          (status.installedModels.includes(model) && status.runtimeInstalled)
         ? "idle"
         : "not_installed";
     return structuredClone(status);
@@ -97,6 +115,7 @@ export const mockVoiceApi: VoiceApi = {
         : "not_installed";
   },
   prepare: async () => {
+    if (status.engine === "cloud") return;
     const token = generation;
     status.state = "loading";
     void delay(1800).then(() => {
@@ -105,6 +124,11 @@ export const mockVoiceApi: VoiceApi = {
   },
   transcribe: async () => {
     await delay(1600);
+    if (
+      status.engine === "cloud" &&
+      (scenario === "cloud-401" || !status.cloud?.keySet)
+    )
+      throw Error("Check the API key");
     if (scenario === "server-error")
       throw Error("Local Whisper stopped responding. Try dictation again.");
     status.state = "ready";
@@ -112,6 +136,14 @@ export const mockVoiceApi: VoiceApi = {
       text: "Create a task to review the board layout.",
       durationMs: 1600,
     };
+  },
+  setCloudKey: async (provider, _key) => {
+    cloudKeys.add(provider);
+    if (status.cloud?.provider === provider) status.cloud.keySet = true;
+  },
+  clearCloudKey: async (provider) => {
+    cloudKeys.delete(provider);
+    if (status.cloud?.provider === provider) status.cloud.keySet = false;
   },
   onProgress: (cb) => {
     listeners.add(cb);

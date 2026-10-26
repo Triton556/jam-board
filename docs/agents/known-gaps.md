@@ -1,5 +1,48 @@
 # Known gaps and next work
 
+## Round 6 W1: selected rendering evidence boundary
+
+RC07 removes all diagnostic flags and round-6 rendering experiments except
+gesture viewport promotion, following 108 controlled QA runs. The selected
+configuration measured 72.7/72.0 FPS and 6 long frames on 132/500 items. This
+remains above the standing <=5 target; timing and screenshots of the simplified
+source await QA. Bounded headers, standard minimap colours and model/draft
+correctness remain. The following earlier experiment notes are historical and
+superseded; they do not describe the current renderer.
+
+Clean idle-machine QA now confirms a regression: identical 132-item fixture at
+DPR 1 is 72 FPS / 7 long frames on alpha.42 versus 53 FPS / 54 on current source;
+500 items produce about 33 FPS / 68–69 long frames. Paint (9.0 ms/frame) and
+Layerize (8.8) dominate scripting (5.6). These observations supersede the pending
+idle-measurement state below; they do not identify a source-level cause. RC06
+adds ablation switches and a matrix for QA without selecting a new rendering
+strategy. See `test-visuals/round6/qa-canvas/clean/report.md` and the W1 record.
+
+The orchestrator reports that the last two performance measurements overlapped
+the release worker's full CI mirror and are not comparable. Further performance
+work is stopped pending QA measurement on an idle machine. RC05 only corrects
+minimap fills; its light/dark computed-style DOM tests do not establish timing.
+
+Second-pass QA still failed timing (46–61 median long-frame intervals across
+DPR samples) and found overlapping 19.9% frame headers. RC04 repairs the numeric
+bucket discontinuity with bounded continuous CSS sizing and consolidates camera
+subscriptions, minimap rectangles and off-screen handle anchors. Existing DPR
+traces identify very large viewport Paint clips; a bounded overscan clip is now
+applied. Updated browser performance/paint/header/minimap acceptance remains
+pending; uncontrolled load prevents attributing the prior DPR 2 slowdown.
+
+Heavy card content and edge paths now cull with one viewport of overscan.
+Lightweight Flow shells and frames deliberately remain mounted for keyboard
+focus, model operations and the minimap. Active note drafts remain mounted
+without disabling other content culling. The 500-item / 50-frame / 200-edge
+mock and headed trace script are available. QA measured 62–71 frames above 20 ms
+after the initial culling implementation; that version failed the <=5 target.
+The profile-driven RC03 repair removes continuous frame/control rerenders, uses
+one delegated canvas tooltip, memoizes Markdown and applies content-visibility to
+far shells. Unit render counters do not establish the browser speedup: timing,
+layerization reduction, label/tooltip appearance, native dragging and human
+usability await fresh QA. See [W1 verification](../verification/round6-w1-canvas.md).
+
 Agent canvas organization is now exposed by seven additive MCP tools (AG14 /
 AC14). Canvas writes retain the desktop services' lack of CAS/idempotency tokens;
 callers must reread and reconcile uncertain responses. Grid is bounded to selected

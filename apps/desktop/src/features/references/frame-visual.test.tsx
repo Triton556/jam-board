@@ -13,6 +13,7 @@ vi.mock("@xyflow/react", async (original) => ({
   ...(await original<typeof import("@xyflow/react")>()),
   useStore: (selector: (state: { transform: number[] }) => unknown) =>
     selector({ transform: [0, 0, camera.zoom] }),
+  useStoreApi: () => ({ getState: () => ({ transform: [0, 0, camera.zoom] }) }),
   ViewportPortal: ({ children }: { children: ReactNode }) => <>{children}</>,
   useOnViewportChange: () => {},
 }));
@@ -249,8 +250,8 @@ it("RF02 native-sized narrow frame keeps title above controls and collapsed boun
     </ReactFlowProvider>,
   );
   const root = container.querySelector<HTMLElement>(".reference-frame");
-  expect(Number.parseFloat(root?.style.minHeight ?? "")).toBeCloseTo(
-    (84 * 0.75) / 0.49,
+  expect(Number.parseFloat(root?.style.minHeight ?? "0")).toBeCloseTo(
+    84 * (0.75 / 0.49),
   );
   expect(container.querySelector(".reference-frame-outline")).toBeNull();
   expect(

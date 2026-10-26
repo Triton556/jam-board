@@ -1,5 +1,21 @@
 # Human interaction map
 
+## Round 6 W1: H-R07/R11/R12/R20/R23 and H-BD15
+
+RC07 selects gesture-only viewport promotion from QA's 108-run matrix. The seven
+other round-6 rendering paths and runtime flags are removed. Standard React Flow
+virtualizes nodes/edges, with active note drafts retaining their mounted owners.
+H-R02 frame headers remain continuously width-capped at every zoom. H-R07 uses
+the standard minimap with transparent frames and themed item colours.
+
+Ctrl/Cmd+A, Shift marquee, group Undo/Redo and drawer/brain drop payloads use model
+IDs, independently of mounted cards. Tab reveals a virtualized next item before
+focusing it; Enter reveals an off-screen note before editing. Existing overview,
+verdicts and draft/recovery paths remain. Shared tooltips and direct zoom updates
+are restored. DOM/mock tests do not establish native/browser screenshot quality;
+QA will confirm the selected source's timing and screenshots. RC01�RC06 rendering
+experiments in the historical W1 record are superseded by RC07.
+
 The current brain-dock increment adds in-app sessions and board entry points,
 canvas organization (AG14 / AC14), and the UX changes marked below. It supersedes
 older copy-only/no-session descriptions for those paths. Source inventory is not

@@ -4,9 +4,12 @@ import type {
   VoiceDevice,
   VoiceInstallProgress,
   VoiceModel,
-  VoiceSettingsInput_Deserialize,
-  VoiceStatus,
 } from "../../bindings";
+import {
+  cloudProviderName,
+  type VoiceSettingsInput,
+  type VoiceStatus,
+} from "../../lib/agent-dock-cloud";
 import { voiceApi } from "../../lib/agent-dock-voice";
 
 export const voiceModels = {
@@ -97,7 +100,7 @@ export async function cancelVoiceInstall() {
     useVoiceState.setState({ error: String(error) });
   }
 }
-export function saveVoice(change: Partial<VoiceSettingsInput_Deserialize>) {
+export function saveVoice(change: Partial<VoiceSettingsInput>) {
   const status = useVoiceState.getState().status;
   if (!status) return Promise.resolve();
   // A model field records an explicit human choice in the backend. Never echo it from status.
@@ -107,6 +110,7 @@ export function saveVoice(change: Partial<VoiceSettingsInput_Deserialize>) {
       device: status.device,
       language: status.language,
       idleUnloadMinutes: status.idleUnloadMinutes,
+      engine: status.engine,
       ...change,
     });
     useVoiceState.setState({ status: next });
@@ -114,6 +118,8 @@ export function saveVoice(change: Partial<VoiceSettingsInput_Deserialize>) {
 }
 export function voiceStatusLine(status: VoiceStatus) {
   if (!status.enabled) return "Voice input is off";
+  if (status.engine === "cloud")
+    return `Audio is sent to ${cloudProviderName(status.cloud?.provider)} for transcription.`;
   if (
     !status.runtimeInstalled ||
     !status.installedModels.includes(status.model)

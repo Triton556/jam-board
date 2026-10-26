@@ -14,5 +14,6 @@ limitations, planned work and the evidence needed to accept a change.
   Separate DOM/mock, hosted browser, native package and human observations;
   builds and hashes alone do not establish usability.
 - Keep release-style versions, changelog and verification records consistent.
+  Follow [the release checklist](docs/release.md) when preparing or publishing a release.
   Record unrun or blocked checks honestly; never transfer a previous build's
   acceptance to changed code without checking the affected behavior.

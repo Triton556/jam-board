@@ -5,7 +5,16 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- References uses gesture-only viewport promotion after the idle-machine matrix;
+  diagnostic flags and other round-6 rendering experiments are removed. Keeps
+  the repeatable 500-item mock fixture and headed trace script.
+- Model select-all and off-screen keyboard focus work with standard React Flow
+  virtualization; active note drafts remain retained.
+
 ### Fixed
+- Frame headers stay within their frame at every zoom, including 20/19.9%.
+- Standard minimap frames remain transparent and item colours follow both themes.
 - Linux Clippy failure from a Windows-only voice process error-helper import.
 
 ## [0.3.0-alpha.42] - 2026-10-26

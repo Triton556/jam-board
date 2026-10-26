@@ -81,6 +81,7 @@ import {
   type ReferenceChoice,
 } from "./linking";
 import { stopReferenceAudio } from "./Media";
+import { referenceMiniMapColor } from "./minimap-color";
 import type { UndoAction } from "./model";
 import {
   debounceSave,
@@ -92,7 +93,6 @@ import {
   pasteContent,
   readingOrder,
   referenceKind,
-  referenceKindColors,
   referenceLabel,
   worldPosition,
 } from "./model";
@@ -1441,7 +1441,7 @@ function Canvas() {
         onKeyDownCapture={(e) => {
           if (
             (e.target as HTMLElement).closest(
-              'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="dialog"],dialog',
+              'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="dialog"],dialog,.react-flow__minimap',
             )
           )
             return;
@@ -1472,6 +1472,13 @@ function Canvas() {
           )
             return;
           const key = e.key.toLowerCase();
+          if ((e.ctrlKey || e.metaKey) && key === "a") {
+            e.preventDefault();
+            e.stopPropagation();
+            setNodes((ns) => ns.map((n) => ({ ...n, selected: !n.hidden })));
+            setSelectedEdges([]);
+            return;
+          }
           if ((e.ctrlKey || e.metaKey) && key === "z") {
             e.preventDefault();
             e.stopPropagation();
@@ -1502,14 +1509,28 @@ function Canvas() {
               index = ordered.findIndex((n) => n.id === focusNode?.id),
               next = ordered[index + (e.shiftKey ? -1 : 1)];
             if (next) {
+              e.preventDefault();
+              const focusNext = () =>
+                container.current
+                  ?.querySelector<HTMLElement>(
+                    `[data-id="${CSS.escape(next.id)}"]`,
+                  )
+                  ?.focus({ preventScroll: true });
               const element = container.current?.querySelector<HTMLElement>(
                 `[data-id="${CSS.escape(next.id)}"]`,
               );
               if (element) {
-                e.preventDefault();
-                element.focus({ preventScroll: true });
-                return;
+                focusNext();
+              } else {
+                void flow
+                  .fitView({
+                    nodes: [{ id: next.id }],
+                    maxZoom: 1,
+                    duration: 0,
+                  })
+                  .then(() => requestAnimationFrame(focusNext));
               }
+              return;
             }
           }
           if (!selected.length) {
@@ -1537,13 +1558,24 @@ function Canvas() {
           if (e.key === "Enter") {
             const n = focusNode ?? selected[0];
             if (n?.type === "reference") {
-              if (n.data.item.kind === "note")
-                container.current
-                  ?.querySelector<HTMLButtonElement>(
+              if (n.data.item.kind === "note") {
+                const edit = () =>
+                  container.current
+                    ?.querySelector<HTMLButtonElement>(
+                      `[data-id="${CSS.escape(n.id)}"] .sticky-edit-button`,
+                    )
+                    ?.click();
+                if (
+                  container.current?.querySelector(
                     `[data-id="${CSS.escape(n.id)}"] .sticky-edit-button`,
                   )
-                  ?.click();
-              else {
+                )
+                  edit();
+                else
+                  void flow
+                    .fitView({ nodes: [{ id: n.id }], maxZoom: 1, duration: 0 })
+                    .then(() => requestAnimationFrame(edit));
+              } else {
                 const item = n.data.item,
                   kind = referenceKind(item, n.data.path);
                 if (kind === "link")
@@ -1611,8 +1643,7 @@ function Canvas() {
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          // An active editor owns an unsaved draft even when panned offscreen.
-          // Restore normal viewport virtualization as soon as editing ends.
+          // Keep an active note draft mounted while Flow virtualizes idle nodes.
           onlyRenderVisibleElements={editingNotes.size === 0}
           minZoom={0.1}
           maxZoom={4}
@@ -1840,12 +1871,7 @@ function Canvas() {
             <MiniMap
               pannable
               zoomable
-              nodeColor={(node) => {
-                const data = node.data as Partial<import("./Nodes").ItemData>;
-                return node.type === "frame" || !data.item
-                  ? "transparent"
-                  : referenceKindColors[referenceKind(data.item, data.path)];
-              }}
+              nodeColor={referenceMiniMapColor}
               maskColor="color-mix(in srgb, var(--paper) 65%, transparent)"
             />
           )}

@@ -265,3 +265,113 @@ impl AttachmentMedia for DesktopAttachmentMedia {
             .map_err(|_| AgentError("Cannot revoke attachment preview".into()))
     }
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_history(
+    limit: Option<u32>,
+    query: Option<String>,
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<HistoryEntry>> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    runtime
+        .agent_history(&mcp.data_dir, &project.id, limit, query.as_deref())
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_history_events(
+    entry_id: String,
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<AgentDockEvent>> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let dir = mcp.data_dir.clone();
+    let runtime = runtime.inner().clone();
+    tokio::task::spawn_blocking(move || runtime.history_events(&dir, &project.id, &entry_id))
+        .await
+        .map_err(internal)?
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn resume_agent_session(
+    entry_id: String,
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<AgentSessionView> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    runtime
+        .resume(&mcp.data_dir, &project.id, &entry_id)
+        .await
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_agent_history(
+    entry_id: String,
+    title: String,
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    runtime
+        .rename_history(&mcp.data_dir, &project.id, &entry_id, &title)
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_agent_history(
+    entry_id: String,
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    runtime
+        .delete_history(&mcp.data_dir, &project.id, &entry_id)
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_agent_history(
+    state: State<'_, DesktopState>,
+    mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    let project = state.store.active_jam().map_err(ApiError::from)?;
+    runtime
+        .clear_history(&mcp.data_dir, &project.id)
+        .map_err(internal)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_history_settings(
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<HistorySettings> {
+    Ok(runtime.history_settings())
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn save_agent_history_settings(
+    keep_history: bool,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<HistorySettings> {
+    runtime
+        .save_history_settings(HistorySettings { keep_history })
+        .map_err(internal)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn retry_agent_turn(
+    session_id: String,
+    runtime: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    runtime.retry(&session_id).await.map_err(internal)
+}

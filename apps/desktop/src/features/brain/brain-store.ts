@@ -66,10 +66,14 @@ export const useBrainState = create<BrainState>((set) => ({
             .slice(-4000),
         },
         sessions:
-          event.kind === "status"
+          event.kind === "status" || event.kind === "retrying"
             ? s.sessions.map((session) =>
                 session.id === event.sessionId
-                  ? { ...session, status: event.status }
+                  ? {
+                      ...session,
+                      status:
+                        event.kind === "retrying" ? "running" : event.status,
+                    }
                   : session,
               )
             : s.sessions,

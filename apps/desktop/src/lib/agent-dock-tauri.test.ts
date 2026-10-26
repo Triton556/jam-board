@@ -10,6 +10,19 @@ beforeEach(() => {
   native.invoke.mockReset().mockResolvedValue(undefined);
   native.listen.mockReset();
 });
+it("R6-E12 uses the generated retry command and preserves a plain rejection", async () => {
+  await tauriDockApi.retryTurn("s");
+  expect(native.invoke.mock.calls).toEqual([
+    ["retry_agent_turn", { sessionId: "s" }],
+  ]);
+  native.invoke.mockRejectedValueOnce({
+    code: "busy",
+    message: "Turn already running",
+  });
+  await expect(tauriDockApi.retryTurn("s")).rejects.toThrow(
+    "Turn already running",
+  );
+});
 it("uses all sixteen exact native command names and camelCase argument envelopes", async () => {
   const profile = { label: "Custom", kind: "acp" as const };
   const prompt = {

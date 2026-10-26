@@ -13,7 +13,8 @@ import { CanvasContext, type CanvasRuntime } from "./runtime";
 // Geometry is not under test. Keep the actual note, editor and action menu.
 vi.mock("@xyflow/react", async (original) => ({
   ...(await original<typeof import("@xyflow/react")>()),
-  useStore: () => false,
+  useStore: (select: (state: { transform: number[] }) => unknown) =>
+    select({ transform: [0, 0, 1] }),
   Handle: () => null,
   NodeResizer: () => null,
 }));

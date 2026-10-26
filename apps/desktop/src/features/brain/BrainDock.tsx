@@ -5,10 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import laptop from "../../assets/chibi/danil-laptop-256.webp";
 import { Button, IconButton } from "../../components/ui";
 import { agentDockApi } from "../../lib/agent-dock";
-import type { AgentProfileView } from "../../lib/agent-dock-api";
+import type { AgentProfileView, HistoryEntry } from "../../lib/agent-dock-api";
 import { appQuery } from "../../lib/queries";
 import { useUiStore } from "../../lib/ui-store";
 import { ConnectionEditor } from "./BrainConnections";
+import { BrainHistory, HistoryTranscript } from "./BrainHistory";
 import { BrainLauncher, ControlPopover } from "./BrainSessionControls";
 import {
   LazyBrainChat as BrainChat,
@@ -34,6 +35,10 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
   const [creating, setCreating] = useState(false);
   const [launcherProfile, setLauncherProfile] = useState<string>();
   const [picker, setPicker] = useState(false);
+  const [past, setPast] = useState<HistoryEntry | null>(null);
+  useEffect(() => {
+    if (past && past.projectId !== state.projectId) setPast(null);
+  }, [state.projectId, past]);
   const [menu, setMenu] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -123,6 +128,12 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
     // An open task drawer captures keyboard events on document. The dock is a
     // separate sibling surface; keep its Tab and Escape within this surface.
     const siblingKeys = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        event.target instanceof Element &&
+        event.target.closest(".brain-history-menu")
+      )
+        return;
       if (
         event.key === "Escape" &&
         panel.current?.querySelector("[data-voice-take]")
@@ -360,6 +371,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             <IconButton
               label={terminal ? "New terminal" : "New chat"}
               onClick={() => {
+                setPast(null);
                 setLauncherProfile(session?.profileId);
                 setCreating(true);
                 setPicker(false);
@@ -385,14 +397,16 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
               }}
             >
               <span>
-                {session
-                  ? [
-                      session.title,
-                      sessionModel(state.events[session.id] ?? []),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : "New session"}
+                {past
+                  ? past.title
+                  : session
+                    ? [
+                        session.title,
+                        sessionModel(state.events[session.id] ?? []),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : "New session"}
               </span>
               <ChevronDown size={14} />
             </button>
@@ -408,6 +422,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                       type="button"
                       key={s.id}
                       onClick={() => {
+                        setPast(null);
                         useBrainState.setState({
                           selected: { ...state.selected, [state.tab]: s.id },
                         });
@@ -426,6 +441,20 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                   ))
                 ) : (
                   <p>No sessions yet</p>
+                )}
+                {!terminal && (
+                  <BrainHistory
+                    open={(entry) => {
+                      setPast(entry);
+                      setPicker(false);
+                      setCreating(false);
+                    }}
+                    resumed={() => {
+                      setPast(null);
+                      setPicker(false);
+                      setCreating(false);
+                    }}
+                  />
                 )}
               </ControlPopover>
             )}
@@ -448,7 +477,12 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
               >
                 <button
                   type="button"
-                  disabled={!session || pending || session.status === "stopped"}
+                  disabled={
+                    !!past ||
+                    !session ||
+                    pending ||
+                    session.status === "stopped"
+                  }
                   onClick={() => {
                     if (session)
                       void run(() => agentDockApi.stopSession(session.id));
@@ -462,6 +496,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                     type="button"
                     disabled={
                       !session ||
+                      !!past ||
                       pending ||
                       ["stopped", "failed"].includes(session.status)
                     }
@@ -506,7 +541,18 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             </button>
           </div>
         )}
-        {creating && !terminal ? (
+        {past && !terminal ? (
+          <HistoryTranscript
+            key={past.id}
+            entry={past}
+            close={() => setPast(null)}
+            resumed={() => {
+              setPast(null);
+              setCreating(false);
+              setFocusEpoch((v) => v + 1);
+            }}
+          />
+        ) : creating && !terminal ? (
           <BrainLauncher
             profiles={profiles.data ?? []}
             initialProfileId={launcherProfile ?? session?.profileId}
@@ -575,7 +621,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             }}
           />
         )}
-        {session && !creating && (
+        {session && !creating && !past && (
           <div className="brain-cwd" title={session.cwd}>
             Project workspace · {session.cwd}
           </div>
@@ -586,6 +632,10 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
           key={editingProfile.id}
           profile={editingProfile}
           initialFocus={editorFocus}
+          setupWeb={() => {
+            setEditingProfile(null);
+            connections();
+          }}
           close={() => setEditingProfile(null)}
           refresh={() =>
             client.invalidateQueries({ queryKey: profilesQuery.queryKey })

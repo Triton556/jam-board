@@ -1,5 +1,19 @@
 # Behavioral and visual acceptance matrix
 
+## Round 6 W1: selected canvas rendering path
+
+| ID | Human / agent paths | Required behavior | Evidence boundary |
+|---|---|---|---|
+| RC01 | H-R07/R11/R12/R20/R23, H-BD15; AG12/AG14 | Full-model selection, marquee/cancel, keyboard navigation, grouped undo, drop payloads and active drafts survive standard Flow virtualization | canvas-gestures.test.tsx, sticky-interruptions.test.tsx and retained selection/editor suites; mock event evidence, browser/native pending. Bespoke overscan culling retired by RC07. |
+| RC02 | H-R07 | Exact repeatable 500-item / 50-frame / 200-edge fixture; headed production trace, 3 seconds ? 3 runs; report FPS, >20ms and maximum frame | busy-board.test.ts and trace-panzoom.cjs. The standing <=5 long-frame target was not met by the matrix winner (6); selected source awaits QA. |
+| RC03 | H-R02/R07; AG12/AG14 | Historical frame buckets, delegated tooltips, Markdown memo and shell containment | Retired by RC07 after matrix comparison; their implementation-only counters/tests were removed. Shared tooltip/editor behavior tests remain. |
+| RC04 | H-R02/R07 | Smooth frame headers fit their frame at 20/19.9% and all supported zooms; Fit reserves header bounds | frame-layout.test.ts and frame-visual.test.tsx. RAF camera bridge, model minimap and paint clip retired by RC07. |
+| RC05 | H-R07 | Standard Flow minimap keeps transparent frames and note/image/link colours in both themes | minimap-color.test.tsx asserts computed fills with actual library CSS/theme tokens before and after pan/zoom; screenshot QA pending. |
+| RC06 | H-R02/R07; AG12/AG14 | Historical mock/dev flags and ablation matrix | QA completed 108 idle-machine runs; flags and harness retired by RC07. Evidence remains in QA flags reports. |
+| RC07 | H-R02/R07; AG12/AG14 | Gesture-only promotion with standard Flow virtualization/minimap, direct zoom, shared tooltips and unmemoized Markdown; no runtime flags | References subtree, TypeScript, Biome and production build checked for this source. QA must confirm timing and screenshots; matrix medians are evidence for selecting the strategy, not acceptance of changed source. |
+
+[W1 record](../verification/round6-w1-canvas.md); QA matrix: test-visuals/round6/qa-canvas/flags/report.md.
+
 [Index](README.md) · Human map IDs below use prefix **H-** (for example H-D11 refers to D11 in the human map); AG IDs refer to the agent map. Stable IDs are test contracts, not pass claims.
 
 **Initial audit status, 2026-10-22:** all execution rows below are **NOT RUN by this documentation audit**. Alpha29 implementation/test files may exist; release owner records their actual terminal results separately with exact version. Source inspection verifies inventory/causes, not native interaction quality.

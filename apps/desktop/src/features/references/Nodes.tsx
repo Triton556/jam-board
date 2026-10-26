@@ -526,18 +526,12 @@ export const ReferenceFrame = memo(function ReferenceFrame({
 }: NodeProps<FrameNode>) {
   const { frame } = data,
     c = useCanvas();
+  const frameWidth = width ?? frame.w ?? 800;
   const zoom = useStore((s) => s.transform[2]);
   const overview = zoom < 0.4;
   const links = frameTargets(frame);
-  const visibleLinks =
-    (width ?? frame.w ?? 800) / Math.max(1, 0.75 / Math.max(0.1, zoom)) < 360
-      ? 1
-      : 2;
-  const header = frameHeaderLayout(
-    width ?? frame.w ?? 800,
-    zoom,
-    links.length > 0,
-  );
+  const header = frameHeaderLayout(frameWidth, zoom, links.length > 0);
+  const visibleLinks = header.compact ? 1 : 2;
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -608,7 +602,6 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             <button
               type="button"
               className="nodrag"
-              title={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
               aria-label={`${frame.collapsed ? "Expand" : "Collapse"} ${frame.title}`}
               onClick={() => c.collapse(frame)}
             >
@@ -623,7 +616,6 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             <button
               type="button"
               className="nodrag"
-              title={`Edit frame ${frame.title}`}
               aria-label={`Edit frame ${frame.title}`}
               onClick={() => c.editFrame(frame)}
             >
@@ -634,7 +626,6 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             <button
               type="button"
               className="nodrag"
-              title={`Archive frame ${frame.title}`}
               aria-label={`Archive frame ${frame.title}`}
               onClick={() => c.archive("frame", frame.id)}
             >

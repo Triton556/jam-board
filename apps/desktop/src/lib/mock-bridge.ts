@@ -283,6 +283,19 @@ export class MockBridge implements JamApi {
     return this.canvasViewportValue;
   };
   private canvasViewportValue: string | null = null;
+  /** Disposable mock-only References fixture. Call before entering /references,
+   * or use Refresh references afterwards. Existing tasks and project stay put. */
+  async seedBusyBoard() {
+    this.assets = this.assets.filter(
+      (asset) => !asset.id.startsWith("perf-asset-"),
+    );
+    await this.seedBulkReferences(500, 50, 200);
+    for (const [index, item] of this.canvasData.items.entries())
+      item.verdict =
+        index % 11 === 0 ? "keep" : index % 13 === 0 ? "reject" : null;
+    this.canvasViewportValue = JSON.stringify({ x: 80, y: 90, zoom: 1 });
+    this.checkpoint();
+  }
   async seedBulkReferences(count = 500, frameCount = 40, edgeCount = 300) {
     await this.call("seed_bulk_references", { count, frameCount, edgeCount });
     if (import.meta.env.VITE_MOCK_BRIDGE !== "1" && !import.meta.env.DEV)

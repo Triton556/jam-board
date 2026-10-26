@@ -1,4 +1,5 @@
 // Event-handler integration with a mocked ReactFlow surface; real pointer QA is separate.
+// RC01: MODEL cases deliberately omit off-screen card DOM from this surface.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -18,6 +19,19 @@ import type { FrameNode, ItemNode } from "./Nodes";
 import { ReferencesPage } from "./ReferencesPage";
 import { VerdictToolbar } from "./VerdictToolbar";
 
+// Deliberately omit off-screen card DOM to test model-based selection/focus.
+function inMockViewport(
+  rect: { x: number; y: number; width: number; height: number },
+  _camera: unknown,
+) {
+  return (
+    rect.x <= 1000 &&
+    rect.y <= 600 &&
+    rect.x + rect.width >= 0 &&
+    rect.y + rect.height >= 0
+  );
+}
+
 type CanvasNode = FrameNode | ItemNode;
 type FlowProps = ComponentProps<
   typeof import("@xyflow/react").ReactFlow<CanvasNode>
@@ -25,6 +39,7 @@ type FlowProps = ComponentProps<
 const surface = vi.hoisted(() => ({
   props: null as FlowProps | null,
   navigate: vi.fn(),
+  section: undefined as string | undefined,
 }));
 const nativeDrop = vi.hoisted(() => ({
   callback: null as
@@ -50,7 +65,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useNavigate: () => surface.navigate,
-  useRouterState: () => undefined,
+  useRouterState: () => surface.section,
   useBlocker: () => ({}),
 }));
 vi.mock("./OverviewScene", () => ({ OverviewScene: () => null }));
@@ -62,10 +77,28 @@ vi.mock("@xyflow/react", async (original) => ({
       <div className="react-flow__pane">
         {props.nodes?.map((node) => (
           <div key={node.id} className="react-flow__node" data-id={node.id}>
-            <span>{node.id}</span>
-            <button type="button">Control {node.id}</button>
-            {node.type === "reference" && (
-              <VerdictToolbar item={node.data.item} />
+            {inMockViewport(
+              {
+                x:
+                  node.position.x +
+                  (props.nodes?.find((n) => n.id === node.parentId)?.position
+                    .x ?? 0),
+                y:
+                  node.position.y +
+                  (props.nodes?.find((n) => n.id === node.parentId)?.position
+                    .y ?? 0),
+                width: node.width ?? 240,
+                height: node.height ?? 180,
+              },
+              { width: 1000, height: 600, transform: [0, 0, 1] },
+            ) && (
+              <>
+                <span>{node.id}</span>
+                <button type="button">Control {node.id}</button>
+                {node.type === "reference" && (
+                  <VerdictToolbar item={node.data.item} />
+                )}
+              </>
             )}
           </div>
         ))}
@@ -83,7 +116,7 @@ const flow = {
   getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
   screenToFlowPosition: (point: { x: number; y: number }) => point,
   getZoom: () => 1,
-  fitView: async () => true,
+  fitView: vi.fn(async (_options?: unknown) => true),
   setViewport: async () => true,
 };
 beforeEach(async () => {
@@ -92,6 +125,8 @@ beforeEach(async () => {
   mockApi.calls.length = 0;
   canvasPick.set(null);
   surface.navigate.mockClear();
+  surface.section = undefined;
+  flow.fitView.mockClear();
   Object.defineProperty(document, "elementsFromPoint", {
     configurable: true,
     value: vi.fn(() => []),
@@ -149,6 +184,7 @@ function props() {
   if (!surface.props) throw Error("Missing flow");
   return surface.props;
 }
+
 function node(id: string) {
   const row = props().nodes?.find((value) => value.id === id);
   if (!row) throw Error("Missing node");
@@ -540,20 +576,23 @@ it("Shift body/title click is handled once and does not reach ReactFlow's second
   expect(nativeClick).not.toHaveBeenCalled();
 });
 it.each(["move", "delete", "verdict", "link"] as const)(
-  "one Undo and Redo cover the complete two-item %s action",
+  "MODEL one Undo and Redo cover the two-item %s action including a culled item",
   async (kind) => {
     const f = await mount();
     const second = await mockApi.addReference({
       kind: "note",
       title: "Second",
       text: "Second",
-      x: 100,
+      x: 6000,
       y: 300,
     });
     await f.client.invalidateQueries({ queryKey: ["references"] });
     await waitFor(() =>
       expect(props().nodes?.some((row) => row.id === second.id)).toBe(true),
     );
+    expect(
+      document.querySelector(`[data-id="${second.id}"]`)?.childElementCount,
+    ).toBe(0);
     act(() =>
       props().onNodesChange?.(
         [f.item.id, second.id].map((id) => ({
@@ -599,11 +638,11 @@ it.each(["move", "delete", "verdict", "link"] as const)(
           changed
             ? [
                 [72, 104],
-                [132, 324],
+                [6032, 324],
               ]
             : [
                 [40, 80],
-                [100, 300],
+                [6000, 300],
               ],
         );
       if (kind === "delete")
@@ -629,6 +668,174 @@ it.each(["move", "delete", "verdict", "link"] as const)(
     await waitFor(() => check(true));
   },
 );
+it("MODEL select-all and Shift marquee include model nodes without card DOM; Escape restores selection", async () => {
+  const f = await mount();
+  const far = await mockApi.addReference({
+    kind: "note",
+    title: "Far away",
+    text: "Far",
+    x: 6000,
+    y: 300,
+  });
+  await f.client.invalidateQueries({ queryKey: ["references"] });
+  await waitFor(() =>
+    expect(props().nodes?.some((n) => n.id === far.id)).toBe(true),
+  );
+  const canvas = document.querySelector(".references-page") as HTMLElement;
+  expect(
+    document.querySelector(`[data-id="${far.id}"]`)?.childElementCount,
+  ).toBe(0);
+  fireEvent.keyDown(canvas, { key: "a", ctrlKey: true });
+  expect(node(far.id).selected).toBe(true);
+  expect(props().nodes?.every((n) => n.hidden || n.selected)).toBe(true);
+  act(() =>
+    props().onNodesChange?.(
+      props().nodes?.map((n) => ({
+        type: "select",
+        id: n.id,
+        selected: false,
+      })) ?? [],
+    ),
+  );
+  fireEvent.pointerDown(canvas, {
+    button: 0,
+    shiftKey: true,
+    clientX: 5900,
+    clientY: 200,
+  });
+  fireEvent.pointerMove(window, { clientX: 6500, clientY: 600 });
+  expect(node(far.id).selected).toBe(true);
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(node(far.id).selected).toBe(false);
+  expect(document.querySelector(".reference-marquee")).toBeNull();
+});
+
+it.each(["drawer-JB-1", "brain-composer"])(
+  "MODEL drag to %s carries the whole selection including culled content",
+  async (dropTarget) => {
+    const f = await mount();
+    const far = await mockApi.addReference({
+      kind: "note",
+      title: "Far away",
+      text: "Far payload",
+      x: 6000,
+      y: 300,
+    });
+    await f.client.invalidateQueries({ queryKey: ["references"] });
+    await waitFor(() =>
+      expect(props().nodes?.some((n) => n.id === far.id)).toBe(true),
+    );
+    const target = document.createElement("div");
+    target.dataset.boardRefDrop = dropTarget;
+    document.body.append(target);
+    vi.spyOn(document, "elementsFromPoint").mockReturnValue([target]);
+    const receive = vi.fn();
+    window.addEventListener("jam:board-ref-drop", receive, { once: true });
+    dragStart(f.item.id);
+    const dragged = [node(f.item.id), node(far.id)];
+    act(() =>
+      props().onNodeDrag?.(
+        new MouseEvent("mousemove", { clientX: 900, clientY: 200 }),
+        node(f.item.id),
+        dragged,
+      ),
+    );
+    expect(target).toHaveClass("board-ref-drag-over");
+    act(() =>
+      props().onNodeDragStop?.(
+        new MouseEvent("mouseup", { clientX: 900, clientY: 200 }),
+        node(f.item.id),
+        dragged,
+      ),
+    );
+    expect(receive.mock.calls[0]?.[0].detail).toEqual({
+      target: dropTarget,
+      refs: [
+        {
+          uri: `jam://reference/${f.item.id}`,
+          label: "Candidate",
+          text: "Candidate",
+        },
+        {
+          uri: `jam://reference/${far.id}`,
+          label: "Far away",
+          text: "Far payload",
+        },
+      ],
+    });
+    expect(target).not.toHaveClass("board-ref-drag-over");
+    expect(mockApi.calls.some((c) => c.command === "canvas_geometry")).toBe(
+      false,
+    );
+    target.remove();
+  },
+);
+
+it("MODEL an offscreen route target selects the model node and requests focus viewport", async () => {
+  const far = await mockApi.addReference({
+    kind: "note",
+    title: "Far away",
+    text: "Far",
+    x: 6000,
+    y: 300,
+  });
+  surface.section = far.id;
+  await mount();
+  await waitFor(() =>
+    expect(flow.fitView).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: [{ id: far.id }] }),
+    ),
+  );
+  expect(node(far.id).selected).toBe(true);
+});
+
+it("MODEL Tab reveals a virtualized next item before focus; keyboard movement uses its model selection", async () => {
+  const f = await mount();
+  const far = await mockApi.addReference({
+    kind: "note",
+    title: "Far away",
+    text: "Far",
+    x: 6000,
+    y: 300,
+  });
+  await f.client.invalidateQueries({ queryKey: ["references"] });
+  await waitFor(() =>
+    expect(props().nodes?.some((n) => n.id === far.id)).toBe(true),
+  );
+  const shell = document.querySelector(
+    `[data-id="${f.item.id}"]`,
+  ) as HTMLElement;
+  const farShell = document.querySelector(
+    `[data-id="${far.id}"]`,
+  ) as HTMLElement;
+  shell.tabIndex = 0;
+  farShell.tabIndex = 0;
+  const parent = farShell.parentElement;
+  farShell.remove();
+  flow.fitView.mockImplementationOnce(async () => {
+    parent?.append(farShell);
+    return true;
+  });
+  shell.focus();
+  fireEvent.keyDown(shell, { key: "Tab" });
+  await waitFor(() => expect(farShell).toHaveFocus());
+  expect(flow.fitView).toHaveBeenCalledWith({
+    nodes: [{ id: far.id }],
+    maxZoom: 1,
+    duration: 0,
+  });
+  expect(farShell.childElementCount).toBe(0);
+  act(() =>
+    props().onNodesChange?.([{ type: "select", id: far.id, selected: true }]),
+  );
+  fireEvent.keyDown(farShell, { key: "ArrowRight" });
+  await waitFor(async () =>
+    expect(
+      (await mockApi.referenceCanvas()).items.find((n) => n.id === far.id)?.x,
+    ).toBe(6008),
+  );
+});
+
 it("a failed second group move compensates the first and restores both visible nodes", async () => {
   const f = await mount();
   const second = await mockApi.addReference({

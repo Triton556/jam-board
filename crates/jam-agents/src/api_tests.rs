@@ -47,6 +47,7 @@ impl ToolSource for FakeTools {
 }
 struct HttpReply {
     status: u16,
+    retry_after: Option<String>,
     chunks: Vec<String>,
     hold: bool,
 }
@@ -58,6 +59,7 @@ impl HttpReply {
             .collect::<Vec<_>>();
         chunks.push("data: [DONE]\n\n".into());
         Self {
+            retry_after: None,
             status: 200,
             chunks,
             hold: false,
@@ -66,6 +68,7 @@ impl HttpReply {
     fn error(status: u16, message: &str) -> Self {
         Self {
             status,
+            retry_after: None,
             chunks: vec![json!({"error":{"message":message}}).to_string()],
             hold: false,
         }
@@ -115,7 +118,7 @@ impl FakeHttp {
                             .strip_prefix("content-length:")
                             .map(|v| v.trim().parse::<usize>().unwrap())
                     })
-                    .unwrap();
+                    .unwrap_or(0);
                 while bytes.len() < header_end + length {
                     let n = socket.read(&mut buf).await.unwrap();
                     assert!(n > 0);
@@ -123,7 +126,11 @@ impl FakeHttp {
                 }
                 sent.send(Captured {
                     path: headers.lines().next().unwrap().to_string(),
-                    body: serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap(),
+                    body: if length == 0 {
+                        Value::Null
+                    } else {
+                        serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap()
+                    },
                     headers,
                 })
                 .unwrap();
@@ -132,11 +139,16 @@ impl FakeHttp {
                 } else {
                     reply.chunks.iter().map(String::len).sum::<usize>()
                 };
-                socket.write_all(format!("HTTP/1.1 {} Fake\r\nContent-Type: text/event-stream\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n", reply.status).as_bytes()).await.unwrap();
-                for chunk in reply.chunks {
+                let retry_after = reply
+                    .retry_after
+                    .as_ref()
+                    .map(|v| format!("Retry-After: {v}\r\n"))
+                    .unwrap_or_default();
+                socket.write_all(format!("HTTP/1.1 {} Fake\r\nContent-Type: text/event-stream\r\n{retry_after}Content-Length: {length}\r\nConnection: close\r\n\r\n", reply.status).as_bytes()).await.unwrap();
+                'chunks: for chunk in reply.chunks {
                     for bytes in chunk.as_bytes().chunks(7) {
                         if socket.write_all(bytes).await.is_err() {
-                            return;
+                            break 'chunks;
                         }
                         tokio::task::yield_now().await;
                     }
@@ -332,8 +344,8 @@ async fn api_401_reports_auth_required_and_redacts_provider_error() {
 }
 
 #[tokio::test]
-async fn api_rate_limit_and_server_errors_do_not_retry() {
-    for status in [429, 503] {
+async fn api_permanent_status_errors_do_not_retry() {
+    for status in [400, 413] {
         let mut server = FakeHttp::new(vec![HttpReply::error(status, "Provider busy")]).await;
         let s = session(SessionStatus::Starting);
         start_with_source(s.clone(), config(&server), Arc::new(FakeTools::default()))
@@ -345,7 +357,7 @@ async fn api_rate_limit_and_server_errors_do_not_retry() {
             .await
             .unwrap();
         wait_for(&s, ended).await;
-        assert!(events(&s).iter().any(|e| matches!(&e.event, AgentEventKind::Error { message, .. } if message.contains("Provider busy") && message.contains(&status.to_string()))));
+        assert!(events(&s).iter().any(|e| matches!(&e.event, AgentEventKind::Error { detail: Some(detail), .. } if detail.contains("Provider busy") && detail.contains(&status.to_string()))));
         assert!(server.requests.recv().await.is_some());
         assert!(server.requests.try_recv().is_err());
         s.connector().unwrap().stop().await.unwrap();
@@ -355,6 +367,7 @@ async fn api_rate_limit_and_server_errors_do_not_retry() {
 #[tokio::test]
 async fn api_cancel_mid_stream_aborts_http_and_emits_cancelled() {
     let mut server = FakeHttp::new(vec![HttpReply {
+        retry_after: None,
         status: 200,
         chunks: vec![format!("data: {}\n\n", delta("Partial response"))],
         hold: true,
@@ -763,3 +776,516 @@ async fn bc13_api_image_url_transport_and_nonvision_refusal_before_http() {
     s.stop.cancel();
     s.finished.cancelled().await;
 }
+
+#[tokio::test]
+async fn multi_server_namespaces_routes_and_permission_matrix() {
+    let board = Arc::new(FakeTools::default());
+    let web = Arc::new(FakeTools::default());
+    let custom = Arc::new(FakeTools::default());
+    let source = MultiTools {
+        servers: vec![
+            ServerTools {
+                name: "jam-board".into(),
+                trust: false,
+                source: board.clone(),
+                tools: board.list().await.unwrap(),
+            },
+            ServerTools {
+                name: "web".into(),
+                trust: true,
+                source: web.clone(),
+                tools: web.list().await.unwrap(),
+            },
+            ServerTools {
+                name: "custom".into(),
+                trust: false,
+                source: custom.clone(),
+                tools: custom.list().await.unwrap(),
+            },
+        ],
+    };
+    let tools = source.list().await.unwrap();
+    assert_eq!(tools.len(), 6);
+    for (name, direct) in [
+        ("jam-board__read_board", true),
+        ("jam-board__write_note", false),
+        ("web__read_board", true),
+        ("web__write_note", false),
+        ("custom__read_board", false),
+        ("custom__write_note", false),
+    ] {
+        assert_eq!(
+            tools.iter().find(|t| t.name == name).unwrap().read_only,
+            direct,
+            "{name}"
+        );
+    }
+    source
+        .call("web__read_board".into(), json!({"project":"one"}))
+        .await
+        .unwrap();
+    assert_eq!(web.calls.lock().unwrap()[0].0, "read_board");
+    assert!(board.calls.lock().unwrap().is_empty());
+    assert!(
+        source
+            .call("missing__read_board".into(), json!({}))
+            .await
+            .is_err()
+    );
+    assert!(source.call("web__missing".into(), json!({})).await.is_err());
+    source.shutdown().await;
+    assert!(web.stopped.load(Ordering::SeqCst));
+}
+#[tokio::test]
+async fn api_external_read_hint_requires_trust_and_rejection_never_dispatches() {
+    let mut server = FakeHttp::new(vec![
+        HttpReply::stream(vec![json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"external","function":{"name":"custom__read_board","arguments":"{}"}}]},"finish_reason":"tool_calls"}]})]),
+        HttpReply::stream(vec![delta("Declined."), end("stop")]),
+    ]).await;
+    let s = session(SessionStatus::Starting);
+    let fake = Arc::new(FakeTools::default());
+    let source = Arc::new(MultiTools {
+        servers: vec![ServerTools {
+            name: "custom".into(),
+            trust: false,
+            tools: fake.list().await.unwrap(),
+            source: fake.clone(),
+        }],
+    });
+    start_with_source(s.clone(), config(&server), source)
+        .await
+        .unwrap();
+    s.connector()
+        .unwrap()
+        .prompt(vec![PromptPart::Text {
+            text: "Read".into(),
+        }])
+        .await
+        .unwrap();
+    wait_for(&s, |e| {
+        e.iter()
+            .any(|e| matches!(e.event, AgentEventKind::PermissionRequest { .. }))
+    })
+    .await;
+    assert!(fake.calls.lock().unwrap().is_empty());
+    let request = s
+        .inner
+        .lock()
+        .unwrap()
+        .permissions
+        .keys()
+        .next()
+        .cloned()
+        .unwrap();
+    s.resolve(&request, Some("reject".into())).unwrap();
+    wait_for(&s, ended).await;
+    assert!(fake.calls.lock().unwrap().is_empty());
+    let first = server.requests.recv().await.unwrap();
+    assert_eq!(
+        first.body["tools"][0]["function"]["name"],
+        "custom__read_board"
+    );
+    s.connector().unwrap().stop().await.unwrap();
+}
+#[tokio::test]
+async fn api_resume_command_restores_transcript_truncates_results_and_continues_after_failed_mcp() {
+    let mut server = FakeHttp::new(vec![
+        HttpReply {
+            retry_after: None,
+            status: 200,
+            chunks: vec![json!({"data":[{"id":"fictional-model","tools":true}]}).to_string()],
+            hold: false,
+        },
+        HttpReply::stream(vec![delta("Continued."), end("stop")]),
+    ])
+    .await;
+    let s = session(SessionStatus::Stopped);
+    let database = Arc::new(jam_core::Store::open(s.board.data_dir.join("resume.db")).unwrap());
+    let manager = SessionManager::new(
+        database,
+        Arc::new(crate::tests::MemoryCredentials::default()),
+        |_| {},
+        |_| {},
+    );
+    let profile = manager
+        .profiles
+        .save(AgentProfileInput {
+            label: "Stub API".into(),
+            kind: RuntimeKind::Api,
+            base_url: Some(Some(server.base.clone())),
+            model: Some(Some("fictional-model".into())),
+            secret_keys: Some(vec![SecretKey {
+                key: "API_KEY".into(),
+                label: "API key".into(),
+            }]),
+            ..Default::default()
+        })
+        .unwrap();
+    manager
+        .profiles
+        .set_secret(&profile.id, "API_KEY", "fake-secret-for-tests")
+        .unwrap();
+    let history = manager
+        .history_store(&s.board.data_dir, &s.board.project_id)
+        .unwrap();
+    let record = crate::history::StoredHistory {
+        entry: HistoryEntry {
+            id: "saved-entry".into(),
+            project_id: s.board.project_id.clone(),
+            profile_id: profile.id.clone(),
+            profile_label: profile.label,
+            kind: HistoryKind::Api,
+            title: "Previous conversation".into(),
+            created_at: crate::session::now(),
+            updated_at: crate::session::now(),
+            model: profile.model.clone(),
+            effort: None,
+            agent_session_id: None,
+            resumable: Resumable::Transcript,
+            message_count: 0,
+        },
+        board: s.board.clone(),
+        cwd: s.view().cwd,
+        profile: manager.profiles.get(&profile.id).unwrap(),
+        renamed: false,
+        has_user_message: false,
+        last_agent_message_id: None,
+    };
+    let mut writer = history.create(record).unwrap().unwrap();
+    for (i, event) in [
+        AgentEventKind::UserMessage {
+            message_id: "u1".into(),
+            content: vec![PromptPart::Text {
+                text: "Previous request".into(),
+            }],
+            context_preamble: Some("Original context".into()),
+        },
+        AgentEventKind::AgentMessageDelta {
+            message_id: "a1".into(),
+            text: "Previous ".into(),
+        },
+        AgentEventKind::AgentMessageDelta {
+            message_id: "a1".into(),
+            text: "answer".into(),
+        },
+        AgentEventKind::ToolCall {
+            tool_name: Some("jam-board__read_board".into()),
+            tool_call_id: "t1".into(),
+            title: "Read board".into(),
+            tool_kind: "read".into(),
+            status: "pending".into(),
+            input: Some(json!({"project":"one"})),
+            content: None,
+            locations: None,
+        },
+        AgentEventKind::ToolCallUpdate {
+            tool_call_id: "t1".into(),
+            title: None,
+            status: Some("completed".into()),
+            content: None,
+            output: Some(json!({"content":[{"type":"text","text":"界".repeat(4000)}]})),
+        },
+        AgentEventKind::TurnEnd {
+            stop_reason: "end_turn".into(),
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        writer
+            .append(
+                &AgentDockEvent {
+                    session_id: "saved-entry".into(),
+                    seq: i as u64 + 1,
+                    at: crate::session::now(),
+                    event,
+                },
+                &s.view(),
+            )
+            .unwrap();
+    }
+    drop(writer);
+    let view = manager
+        .resume(&s.board.data_dir, &s.board.project_id, "saved-entry")
+        .await
+        .unwrap();
+    assert_eq!(view.cwd, s.view().cwd);
+    assert_eq!(view.id, "saved-entry");
+    let replay = manager.history(&view.id).unwrap();
+    assert_eq!(
+        replay
+            .iter()
+            .filter(|e| matches!(e.event, AgentEventKind::Error { .. }))
+            .count(),
+        1
+    );
+    assert!(replay.iter().any(|e| matches!(&e.event, AgentEventKind::Status { message: Some(m), .. } if m.starts_with("Resumed "))));
+    assert!(
+        manager
+            .resume(&s.board.data_dir, &s.board.project_id, "saved-entry")
+            .await
+            .is_err()
+    );
+    manager
+        .prompt(SendAgentPromptInput {
+            session_id: view.id.clone(),
+            content: vec![PromptPart::Text {
+                text: "Continue".into(),
+            }],
+        })
+        .await
+        .unwrap();
+    wait_for(&manager.get(&view.id).unwrap(), |e| e.iter().any(|e| matches!(&e.event, AgentEventKind::AgentMessageDelta { text, .. } if text == "Continued."))).await;
+    let _catalogue = server.requests.recv().await.unwrap();
+    let request = server.requests.recv().await.unwrap();
+    let messages = request.body["messages"].as_array().unwrap();
+    assert!(
+        messages
+            .iter()
+            .any(|m| m["role"] == "user" && m.to_string().contains("Previous request"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|m| m["role"] == "assistant" && m["content"] == "Previous answer")
+    );
+    let result = messages.iter().find(|m| m["role"] == "tool").unwrap()["content"]
+        .as_str()
+        .unwrap();
+    assert!(result.len() <= 8192);
+    assert!(result.ends_with("[Tool result truncated to 8 KB for resume]"));
+    manager.stop(&view.id).await.unwrap();
+    let persisted = history.events("saved-entry").unwrap();
+    assert_eq!(
+        persisted
+            .iter()
+            .filter(|e| matches!(e.event, AgentEventKind::UserMessage { .. }))
+            .count(),
+        2
+    );
+    assert_eq!(history.list(None, None).unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn http_mcp_handshake_bearer_session_routing_and_split_sse() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        for step in 0..5 {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = vec![];
+            let mut chunk = [0u8; 4096];
+            let header_end = loop {
+                let n = socket.read(&mut chunk).await.unwrap();
+                assert!(n > 0);
+                bytes.extend_from_slice(&chunk[..n]);
+                if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
+                    break end + 4;
+                }
+            };
+            let headers = String::from_utf8(bytes[..header_end].to_vec())
+                .unwrap()
+                .to_lowercase();
+            assert!(headers.contains("authorization: bearer fixture-bearer"));
+            if step > 0 {
+                assert!(headers.contains("mcp-session-id: fixture-session"));
+            }
+            if step == 4 {
+                assert!(headers.starts_with("delete /mcp"));
+                socket
+                    .write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+                    .await
+                    .unwrap();
+                break;
+            }
+            let length = headers
+                .lines()
+                .find_map(|l| {
+                    l.strip_prefix("content-length:")
+                        .map(|s| s.trim().parse::<usize>().unwrap())
+                })
+                .unwrap();
+            while bytes.len() < header_end + length {
+                let n = socket.read(&mut chunk).await.unwrap();
+                bytes.extend_from_slice(&chunk[..n]);
+            }
+            let request: Value =
+                serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap();
+            let result = match step {
+                0 => {
+                    assert_eq!(request["method"], "initialize");
+                    json!({"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"fixture","version":"1"}})
+                }
+                1 => {
+                    assert_eq!(request["method"], "notifications/initialized");
+                    socket.write_all(b"HTTP/1.1 202 Accepted\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
+                    continue;
+                }
+                2 => {
+                    assert_eq!(request["method"], "tools/list");
+                    json!({"tools":[{"name":"read","inputSchema":{"type":"object"},"annotations":{"readOnlyHint":true}}]})
+                }
+                3 => {
+                    assert_eq!(request["method"], "tools/call");
+                    assert_eq!(request["params"]["name"], "read");
+                    json!({"content":[{"type":"text","text":"Read completed 界"}]})
+                }
+                _ => unreachable!(),
+            };
+            let response = json!({"jsonrpc":"2.0","id":request["id"],"result":result});
+            let (content_type, body) = if step == 3 {
+                (
+                    "text/event-stream",
+                    format!("event: message\r\ndata: {response}\r\n\r\n"),
+                )
+            } else {
+                ("application/json", response.to_string())
+            };
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nMcp-Session-Id: fixture-session\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            socket.write_all(headers.as_bytes()).await.unwrap();
+            for bytes in body.as_bytes().chunks(3) {
+                socket.write_all(bytes).await.unwrap();
+                tokio::task::yield_now().await;
+            }
+        }
+    });
+    let s = session(SessionStatus::Starting);
+    let source = HttpTools::connect(
+        &s,
+        &McpHttp {
+            url,
+            bearer_secret_key: Some("MCP_HTTP_TOKEN".into()),
+        },
+        Some("fixture-bearer".into()),
+    )
+    .await
+    .unwrap();
+    let tools = source.list().await.unwrap();
+    assert_eq!(tools[0].name, "read");
+    assert!(tools[0].read_only);
+    let result = source.call("read".into(), json!({})).await.unwrap();
+    assert_eq!(result["content"][0]["text"], "Read completed 界");
+    source.shutdown().await;
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn multi_server_connects_real_stdio_children_and_skips_one_failed_server() {
+    let s = session(SessionStatus::Starting);
+    let fixture = s.board.data_dir.join("fixture-mcp.cjs");
+    std::fs::write(&fixture, r#"
+const readline = require('node:readline');
+readline.createInterface({ input: process.stdin }).on('line', line => {
+ const q = JSON.parse(line); if (q.id === undefined) return;
+ let result;
+ if(q.method === 'initialize') result = { protocolVersion: q.params.protocolVersion, capabilities: {tools:{}}, serverInfo: {name:'fixture',version:'1'} };
+ else if(q.method === 'tools/list') result = { tools: [{name:'read', inputSchema:{type:'object'}, annotations:{readOnlyHint:true}}] };
+ else if(q.method === 'tools/call') result = {content:[{type:'text',text:process.env.FIXTURE_SERVER + ':' + (process.env.FIXTURE_API_KEY || 'absent')}]};
+ else if(q.method === 'resources/read') result = {contents:[{uri:'jam://guide',text:'Fixture guide'}]};
+ else return;
+ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:q.id,result})+'\n');
+});
+"#).unwrap();
+    let command = which::which("node").unwrap().to_string_lossy().into_owned();
+    let make = |name: &str, trust| McpEntry {
+        enabled: true,
+        name: name.into(),
+        command: command.clone(),
+        args: vec![fixture.to_string_lossy().into_owned()],
+        env: vec![Env {
+            name: "FIXTURE_SERVER".into(),
+            value: name.into(),
+        }],
+        trust_read_only: Some(trust),
+        ..Default::default()
+    };
+    let missing = McpEntry {
+        enabled: true,
+        name: "broken".into(),
+        command: s
+            .board
+            .data_dir
+            .join("does-not-exist")
+            .to_string_lossy()
+            .into_owned(),
+        ..Default::default()
+    };
+    let source = MultiTools::connect(
+        &s,
+        &[make("jam-board", false), make("web", true), missing],
+        &[Env {
+            name: "FIXTURE_API_KEY".into(),
+            value: "must-not-reach-child".into(),
+        }],
+    )
+    .await;
+    let tools = source.list().await.unwrap();
+    assert_eq!(tools.len(), 2);
+    assert_eq!(tools[0].name, "jam-board__read");
+    assert_eq!(tools[1].name, "web__read");
+    assert_eq!(
+        source.call("web__read".into(), json!({})).await.unwrap()["content"][0]["text"],
+        "web:absent"
+    );
+    assert_eq!(
+        events(&s)
+            .iter()
+            .filter(|e| matches!(e.event, AgentEventKind::Error { .. }))
+            .count(),
+        1
+    );
+    source.shutdown().await;
+}
+
+#[tokio::test]
+async fn api_resume_does_not_reactivate_interrupted_permissions_or_pending_tools() {
+    let server = FakeHttp::new(vec![]).await;
+    let s = session(SessionStatus::Starting);
+    let replay = [
+        AgentEventKind::ToolCall {
+            tool_name: Some("custom__write".into()),
+            tool_call_id: "old-tool".into(),
+            title: "Old write".into(),
+            tool_kind: "other".into(),
+            status: "pending".into(),
+            input: Some(json!({})),
+            content: None,
+            locations: None,
+        },
+        AgentEventKind::PermissionRequest {
+            request_id: "old-permission".into(),
+            tool_call_id: Some("old-tool".into()),
+            title: "Old write".into(),
+            options: vec![],
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(i, event)| AgentDockEvent {
+        session_id: s.view().id,
+        seq: i as u64 + 1,
+        at: crate::session::now(),
+        event,
+    })
+    .collect();
+    {
+        let mut inner = s.inner.lock().unwrap();
+        inner.resume_events = replay;
+        inner.seq = 2;
+    }
+    let tools = Arc::new(FakeTools::default());
+    start_with_source(s.clone(), config(&server), tools.clone())
+        .await
+        .unwrap();
+    assert!(events(&s).iter().any(|e| matches!(&e.event, AgentEventKind::PermissionResolved { request_id, option_id: None } if request_id == "old-permission")));
+    assert!(events(&s).iter().any(|e| matches!(&e.event, AgentEventKind::ToolCallUpdate { tool_call_id, status: Some(status), .. } if tool_call_id == "old-tool" && status == "failed")));
+    assert!(s.inner.lock().unwrap().permissions.is_empty());
+    assert!(tools.calls.lock().unwrap().is_empty());
+    s.connector().unwrap().stop().await.unwrap();
+}
+
+#[path = "api_retry_tests.rs"]
+mod retry_tests;

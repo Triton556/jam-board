@@ -1,7 +1,7 @@
 use crate::*;
 use futures::future::BoxFuture;
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -10,6 +10,7 @@ use tokio::sync::oneshot;
 pub(crate) type Reply = oneshot::Sender<Result<()>>;
 pub(crate) enum Control {
     Prompt(Vec<PromptPart>, Reply),
+    Retry(Reply),
     Cancel(Reply),
     Config(String, String, Reply),
 }
@@ -18,6 +19,9 @@ pub(crate) enum Control {
 /// without adding a desktop dependency or changing the dock protocol.
 pub trait Connector: Send + Sync {
     fn prompt(&self, content: Vec<PromptPart>) -> BoxFuture<'_, Result<()>>;
+    fn retry(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async { Err(err("This session cannot retry a chat turn")) })
+    }
     fn cancel(&self) -> BoxFuture<'_, Result<()>>;
     fn config(&self, option: String, value: String) -> BoxFuture<'_, Result<()>>;
     fn stop(&self) -> BoxFuture<'_, Result<()>>;
@@ -34,12 +38,20 @@ pub(crate) struct PendingPermission {
     pub options: Vec<String>,
     pub reply: oneshot::Sender<Option<String>>,
 }
+#[derive(Clone)]
+pub(crate) struct LastPrompt {
+    pub content: Vec<PromptPart>,
+    pub preamble: Option<String>,
+}
 pub(crate) struct SessionInner {
     pub view: AgentSessionView,
     pub events: VecDeque<AgentDockEvent>,
     pub seq: u64,
     pub permissions: BTreeMap<String, PendingPermission>,
     pub first_prompt: bool,
+    pub last_prompt: Option<LastPrompt>,
+    pub last_turn_failed: bool,
+    pub last_failure_code: Option<AgentErrorCode>,
     pub message_id: Option<(String, String)>,
     pub scrollback: String,
     pub config: BTreeMap<String, ConfigOption>,
@@ -48,9 +60,13 @@ pub(crate) struct SessionInner {
     pub cancelling: bool,
     pub text_pending: String,
     pub attachments: BTreeMap<String, (AttachmentView, bool)>,
+    pub resume_events: Vec<AgentDockEvent>,
+    pub resume_native_id: Option<String>,
+    pub replaying: bool,
 }
 pub(crate) struct Session {
     pub inner: Mutex<SessionInner>,
+    pub history_writer: Mutex<Option<crate::history::HistoryWriter>>,
     pub board: BoardContext,
     pub connector: Mutex<Option<Arc<dyn Connector>>>,
     pub secrets: Vec<String>,
@@ -173,6 +189,41 @@ impl Session {
         if inner.events.len() == 5_000 {
             inner.events.pop_front();
         }
+        if !inner.replaying {
+            let mut writer = self.history_writer.lock().expect("history writer lock");
+            if let Some(active) = writer.as_mut()
+                && let Err(e) = active.append(&event, &inner.view)
+            {
+                // Surface one failure and stop retrying writes for this session.
+                *writer = None;
+                let error = AgentDockEvent {
+                    session_id: inner.view.id.clone(),
+                    seq: inner.seq + 1,
+                    at: now(),
+                    event: AgentEventKind::Error {
+                        code: None,
+                        retryable: false,
+                        retry_after_ms: None,
+                        message: "Cannot save chat history".into(),
+                        detail: Some(self.redact(&e.to_string())),
+                    },
+                };
+                inner.seq += 1;
+                inner.events.push_back(event.clone());
+                inner.events.push_back(error.clone());
+                (self.dock_sink)(event);
+                (self.dock_sink)(error);
+                return;
+            }
+        }
+        if let Some(writer) = self
+            .history_writer
+            .lock()
+            .expect("history writer lock")
+            .as_ref()
+        {
+            inner.view.title = writer.record.entry.title.clone();
+        }
         inner.events.push_back(event.clone());
         (self.dock_sink)(event);
     }
@@ -200,6 +251,9 @@ impl Session {
         }
         self.status(SessionStatus::Failed, Some(message.into()));
         self.emit(AgentEventKind::Error {
+            code: None,
+            retryable: false,
+            retry_after_ms: None,
             message: message.into(),
             detail,
         });
@@ -326,11 +380,24 @@ impl Session {
 
 pub struct SessionManager {
     pub profiles: Profiles,
+    store: Arc<jam_core::Store>,
+    history_enabled: Arc<std::sync::atomic::AtomicBool>,
+    history_lock: Arc<Mutex<()>>,
+    resuming: Mutex<BTreeSet<String>>,
     attachment_media: Option<Arc<dyn AttachmentMedia>>,
     sessions: Mutex<BTreeMap<String, Arc<Session>>>,
     dock_sink: DockSink,
     terminal_sink: TerminalSink,
     shutting_down: std::sync::atomic::AtomicBool,
+}
+struct ResumeReservation<'a> {
+    entries: &'a Mutex<BTreeSet<String>>,
+    id: &'a str,
+}
+impl Drop for ResumeReservation<'_> {
+    fn drop(&mut self) {
+        self.entries.lock().expect("resume lock").remove(self.id);
+    }
 }
 impl SessionManager {
     pub fn new(
@@ -339,8 +406,18 @@ impl SessionManager {
         dock_sink: impl Fn(AgentDockEvent) + Send + Sync + 'static,
         terminal_sink: impl Fn(AgentTerminalOutput) + Send + Sync + 'static,
     ) -> Self {
+        let keep = store
+            .setting("agent_keep_history")
+            .ok()
+            .flatten()
+            .as_deref()
+            != Some("false");
         Self {
-            profiles: Profiles::new(store, credentials),
+            profiles: Profiles::new(store.clone(), credentials),
+            store,
+            history_enabled: Arc::new(std::sync::atomic::AtomicBool::new(keep)),
+            history_lock: Arc::new(Mutex::new(())),
+            resuming: Mutex::new(BTreeSet::new()),
             attachment_media: None,
             sessions: Mutex::new(BTreeMap::new()),
             dock_sink: Arc::new(dock_sink),
@@ -374,10 +451,21 @@ impl SessionManager {
         board: BoardContext,
         input: StartAgentSessionInput,
     ) -> Result<AgentSessionView> {
+        self.start_saved(board, input, None).await
+    }
+    async fn start_saved(
+        &self,
+        board: BoardContext,
+        input: StartAgentSessionInput,
+        saved: Option<crate::history::StoredHistory>,
+    ) -> Result<AgentSessionView> {
         if self.shutting_down.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(err("The agent runtime is shutting down"));
         }
-        let mut profile = self.profiles.get(&input.profile_id)?;
+        let mut profile = match &saved {
+            Some(record) => record.profile.clone(),
+            None => self.profiles.get(&input.profile_id)?,
+        };
         if let Some(model) = input.model {
             profile.model = Some(model);
         }
@@ -389,7 +477,7 @@ impl SessionManager {
         {
             return Err(err("A model is required for API profiles"));
         }
-        if !board.sidecar_path.is_file() {
+        if profile.kind != RuntimeKind::Api && !board.sidecar_path.is_file() {
             return Err(err(
                 "Jam Board MCP sidecar not found; build or reinstall the app before starting an agent",
             ));
@@ -420,7 +508,16 @@ impl SessionManager {
             None
         };
         let cwd = choose_cwd(&board, input.cwd.as_deref())?;
-        let entries = mcp_entries(&board, &profile.agent_name, &profile.extra_mcp_servers)?;
+        let mut entries = mcp_entries(&board, &profile.agent_name, &profile.extra_mcp_servers)?;
+        for entry in &mut entries {
+            if let Some(key) = entry
+                .http
+                .as_ref()
+                .and_then(|h| h.bearer_secret_key.as_ref())
+            {
+                entry.bearer_token = self.profiles.credentials.get(&profile.id, key)?;
+            }
+        }
         let mut env = self.profiles.child_env(&profile)?;
         env.extend(entries[0].env.clone());
         // A custom terminal wrapper has no universal CLI flags. Give it the
@@ -445,6 +542,14 @@ impl SessionManager {
         if let Some(key) = api_key.as_ref().filter(|s| !s.is_empty()) {
             secrets.push(key.clone());
         }
+        secrets.extend(entries.iter().filter_map(|e| e.bearer_token.clone()));
+        secrets.extend(
+            entries
+                .iter()
+                .flat_map(|e| e.env.iter())
+                .filter(|e| crate::profiles::is_secret_name(&e.name))
+                .map(|e| e.value.clone()),
+        );
         secrets.extend(
             std::env::vars()
                 .filter(|(k, _)| crate::profiles::is_secret_name(k))
@@ -453,25 +558,108 @@ impl SessionManager {
         );
         secrets.sort_by_key(|v| std::cmp::Reverse(v.len()));
         secrets.dedup();
-        let session = Arc::new(Session {
-            inner: Mutex::new(SessionInner {
-                view: AgentSessionView {
-                    id: ulid::Ulid::generate().to_string(),
-                    profile_id: profile.id.clone(),
+        let history_store = self.history_store(&board.data_dir, &board.project_id)?;
+        let resume_events = if let Some(record) = &saved {
+            history_store.events_for_resume(&record.entry.id)?
+        } else {
+            vec![]
+        };
+        let view = AgentSessionView {
+            id: saved
+                .as_ref()
+                .map(|r| r.entry.id.clone())
+                .unwrap_or_else(|| ulid::Ulid::generate().to_string()),
+            profile_id: profile.id.clone(),
+            project_id: board.project_id.clone(),
+            kind: profile.kind,
+            title: saved
+                .as_ref()
+                .map(|r| r.entry.title.clone())
+                .unwrap_or_else(|| profile.label.clone()),
+            status: SessionStatus::Starting,
+            cwd: cwd.to_string_lossy().into_owned(),
+            created_at: now(),
+            capabilities: Capabilities::default(),
+            model: profile.model.clone(),
+            effort: profile.effort.clone(),
+        };
+        let record = saved
+            .clone()
+            .unwrap_or_else(|| crate::history::StoredHistory {
+                entry: HistoryEntry {
+                    id: view.id.clone(),
                     project_id: board.project_id.clone(),
-                    kind: profile.kind,
+                    profile_id: profile.id.clone(),
+                    profile_label: profile.label.clone(),
+                    kind: if profile.kind == RuntimeKind::Api {
+                        HistoryKind::Api
+                    } else {
+                        HistoryKind::Acp
+                    },
                     title: profile.label.clone(),
-                    status: SessionStatus::Starting,
-                    cwd: cwd.to_string_lossy().into_owned(),
-                    created_at: now(),
-                    capabilities: Capabilities::default(),
+                    created_at: view.created_at.clone(),
+                    updated_at: view.created_at.clone(),
                     model: profile.model.clone(),
                     effort: profile.effort.clone(),
+                    agent_session_id: None,
+                    resumable: if profile.kind == RuntimeKind::Api {
+                        Resumable::Transcript
+                    } else {
+                        Resumable::None
+                    },
+                    message_count: 0,
                 },
+                board: board.clone(),
+                cwd: view.cwd.clone(),
+                profile: profile.clone(),
+                renamed: false,
+                has_user_message: false,
+                last_agent_message_id: None,
+            });
+        let writer = if profile.kind == RuntimeKind::Terminal {
+            None
+        } else {
+            history_store.create(record)?
+        };
+        let mut last_prompt = None;
+        let mut last_turn_failed = false;
+        let mut last_failure_code = None;
+        for event in &resume_events {
+            match &event.event {
+                AgentEventKind::UserMessage {
+                    content,
+                    context_preamble,
+                    ..
+                } => {
+                    last_prompt = Some(LastPrompt {
+                        content: content.clone(),
+                        preamble: context_preamble.clone(),
+                    });
+                    last_turn_failed = false;
+                }
+                AgentEventKind::Error {
+                    code: Some(code), ..
+                } => {
+                    last_turn_failed = true;
+                    last_failure_code = Some(*code);
+                }
+                AgentEventKind::TurnEnd { stop_reason } if stop_reason != "error" => {
+                    last_turn_failed = false;
+                }
+                _ => {}
+            }
+        }
+        let session = Arc::new(Session {
+            history_writer: Mutex::new(writer),
+            inner: Mutex::new(SessionInner {
+                view,
                 events: VecDeque::new(),
-                seq: 0,
+                seq: resume_events.last().map_or(0, |e| e.seq),
                 permissions: BTreeMap::new(),
-                first_prompt: true,
+                first_prompt: saved.is_none(),
+                last_prompt,
+                last_turn_failed,
+                last_failure_code,
                 message_id: None,
                 scrollback: String::new(),
                 config: BTreeMap::new(),
@@ -480,6 +668,11 @@ impl SessionManager {
                 cancelling: false,
                 text_pending: String::new(),
                 attachments: BTreeMap::new(),
+                resume_events,
+                resume_native_id: saved
+                    .as_ref()
+                    .and_then(|r| r.entry.agent_session_id.clone()),
+                replaying: saved.is_some() && profile.kind == RuntimeKind::Acp,
             }),
             board,
             connector: Mutex::new(None),
@@ -532,6 +725,7 @@ impl SessionManager {
             }
         };
         if let Err(e) = started {
+            session.inner.lock().expect("session lock").replaying = false;
             let message = session.redact(&e.to_string());
             if session.stop.is_cancelled() {
                 session.status(SessionStatus::Stopped, None);
@@ -541,7 +735,129 @@ impl SessionManager {
             session.finished.cancel();
             return Err(err(message));
         }
+        if saved.is_some() {
+            session.inner.lock().expect("session lock").replaying = false;
+            session.status(SessionStatus::Ready, Some(format!("Resumed {}", now())));
+        }
         Ok(session.view())
+    }
+    pub fn history_settings(&self) -> HistorySettings {
+        HistorySettings {
+            keep_history: self
+                .history_enabled
+                .load(std::sync::atomic::Ordering::SeqCst),
+        }
+    }
+    pub fn save_history_settings(&self, settings: HistorySettings) -> Result<HistorySettings> {
+        let _guard = self
+            .history_lock
+            .lock()
+            .map_err(|_| err("History lock unavailable"))?;
+        self.store.set_setting(
+            "agent_keep_history",
+            if settings.keep_history {
+                "true"
+            } else {
+                "false"
+            },
+        )?;
+        self.history_enabled
+            .store(settings.keep_history, std::sync::atomic::Ordering::SeqCst);
+        Ok(settings)
+    }
+    pub(crate) fn history_store(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+    ) -> Result<crate::history::HistoryStore> {
+        crate::history::HistoryStore::new(
+            dir,
+            project_id,
+            self.history_enabled.clone(),
+            self.history_lock.clone(),
+        )
+    }
+    pub fn agent_history(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        limit: Option<u32>,
+        query: Option<&str>,
+    ) -> Result<Vec<HistoryEntry>> {
+        self.history_store(dir, project_id)?.list(limit, query)
+    }
+    pub fn history_events(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        entry_id: &str,
+    ) -> Result<Vec<AgentDockEvent>> {
+        self.history_store(dir, project_id)?.events(entry_id)
+    }
+    pub fn rename_history(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        entry_id: &str,
+        title: &str,
+    ) -> Result<()> {
+        self.history_store(dir, project_id)?.rename(entry_id, title)
+    }
+    pub fn delete_history(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        entry_id: &str,
+    ) -> Result<()> {
+        self.history_store(dir, project_id)?.delete(entry_id)
+    }
+    pub fn clear_history(&self, dir: &std::path::Path, project_id: &str) -> Result<()> {
+        self.history_store(dir, project_id)?.clear()
+    }
+    pub async fn resume(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        entry_id: &str,
+    ) -> Result<AgentSessionView> {
+        {
+            let mut entries = self
+                .resuming
+                .lock()
+                .map_err(|_| err("Resume lock unavailable"))?;
+            if !entries.insert(entry_id.into()) {
+                return Err(err("This session is already resuming"));
+            }
+        }
+        let _reservation = ResumeReservation {
+            entries: &self.resuming,
+            id: entry_id,
+        };
+        let record = self.history_store(dir, project_id)?.load(entry_id)?;
+        if record.entry.project_id != project_id || record.board.project_id != project_id {
+            return Err(err("History belongs to another project"));
+        }
+        if record.entry.resumable == Resumable::None {
+            return Err(err(
+                "This agent supports only a read-only transcript; continue in a new session",
+            ));
+        }
+        if let Ok(session) = self.get(entry_id)
+            && !matches!(
+                session.view().status,
+                SessionStatus::Stopped | SessionStatus::Failed
+            )
+        {
+            return Err(err("This session is already open"));
+        }
+        let input = StartAgentSessionInput {
+            profile_id: record.profile.id.clone(),
+            cwd: Some(record.cwd.clone()),
+            model: record.entry.model.clone(),
+            effort: record.entry.effort.clone(),
+        };
+        self.start_saved(record.board.clone(), input, Some(record))
+            .await
     }
     pub async fn model_catalog(
         &self,
@@ -571,6 +887,9 @@ impl SessionManager {
             .connector()?
             .prompt(input.content)
             .await
+    }
+    pub async fn retry(&self, id: &str) -> Result<()> {
+        self.get(id)?.connector()?.retry().await
     }
     pub async fn cancel(&self, id: &str) -> Result<()> {
         let s = self.get(id)?;
@@ -674,7 +993,7 @@ pub(crate) async fn kill_tree(pid: u32) -> Result<()> {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        // History is memory-only; attachment originals have the same lifetime.
+        // Attachment copies have the process session lifetime; the text transcript is persistent.
         let _ = crate::attachments::cleanup(self);
     }
 }

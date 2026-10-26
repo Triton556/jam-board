@@ -39,9 +39,11 @@ import {
   attachmentRefusal,
   TranscriptAttachment,
 } from "./BrainAttachments";
+import { BrainProviderError, BrainRetryStatus } from "./BrainProviderError";
 import { SessionControls, useModelCatalog } from "./BrainSessionControls";
 import { BrainVoiceInput } from "./BrainVoiceInput";
 import { profilesQuery } from "./brain-profiles";
+import { activeRetry, latestTurnError } from "./brain-retry";
 import {
   configDivider,
   optionCategory,
@@ -387,10 +389,18 @@ export function BrainChat({
   const [jump, setJump] = useState(false);
   const [limit, setLimit] = useState(350);
   const [streamingSeq, setStreamingSeq] = useState<number | null>(null);
+  const [modelRequest, setModelRequest] = useState(0);
+  const failed = latestTurnError(events);
+  const modelOffered = sessionOptions(events).some(
+    (option) => optionCategory(option) === "model",
+  );
   const latest = events.at(-1);
   const auth = events
     .filter((event): event is EventOf<"auth"> => event.kind === "auth")
     .at(-1);
+  const authError =
+    failed?.error.code === "auth" &&
+    (!auth || auth.seq < failed.error.seq || auth.state !== "ok");
   useEffect(() => {
     if (latest?.kind !== "agent_message_delta") {
       setStreamingSeq(null);
@@ -402,6 +412,10 @@ export function BrainChat({
   }, [latest]);
   // Collapse delta/update events into stable rows; history stays available in memory.
   const rows = events.filter((event, index) => {
+    if (event.kind === "status")
+      return (
+        !!event.message && /^(Resumed |History truncated)/.test(event.message)
+      );
     if (event.kind === "config_options") return !!configDivider(events, index);
     if (
       event.kind === "agent_message_delta" ||
@@ -422,6 +436,7 @@ export function BrainChat({
       "available_commands",
       "config_options",
       "auth",
+      "retrying",
     ].includes(event.kind);
   });
   useLayoutEffect(() => {
@@ -463,10 +478,14 @@ export function BrainChat({
         }}
       >
         <div className="brain-transcript-content" ref={content}>
-          {auth?.state === "required" && (
+          {(auth?.state === "required" || authError) && (
             <div className="brain-auth">
               <strong>{session.title} isn't signed in</strong>
-              <p>{auth.label}</p>
+              <p>
+                {auth?.state === "required"
+                  ? auth.label
+                  : "Check the API key or sign in"}
+              </p>
               <div className="button-row">
                 {apiKeyAccess ? (
                   <Button variant="primary" onClick={editConnection}>
@@ -509,6 +528,12 @@ export function BrainChat({
           )}
           {rows.slice(-limit).map((event) => {
             const key = `${event.sessionId}:${event.seq}`;
+            if (event.kind === "status")
+              return (
+                <div key={key} className="brain-config-divider">
+                  {event.message}
+                </div>
+              );
             if (event.kind === "config_options")
               return (
                 <div key={key} className="brain-config-divider">
@@ -637,7 +662,7 @@ export function BrainChat({
                 </div>
               );
             if (event.kind === "turn_end")
-              return event.stopReason === "end_turn" ? null : (
+              return ["end_turn", "error"].includes(event.stopReason) ? null : (
                 <p key={key} className="muted">
                   {(
                     {
@@ -651,21 +676,22 @@ export function BrainChat({
               );
             if (event.kind === "error")
               return (
-                <div key={key} className="brain-error" role="alert">
-                  <p>{event.message}</p>
-                  {event.detail && (
-                    <details>
-                      <summary>Details</summary>
-                      <pre>{event.detail}</pre>
-                    </details>
-                  )}
-                  <Button variant="secondary" onClick={() => void restart()}>
-                    Restart session
-                  </Button>
-                  <Button variant="ghost" onClick={connections}>
-                    Connections…
-                  </Button>
-                </div>
+                <BrainProviderError
+                  key={key}
+                  event={event}
+                  active={failed?.error.seq === event.seq}
+                  failedTurn={
+                    failed?.error.seq === event.seq && failed.failedTurn
+                  }
+                  ready={session.status === "ready"}
+                  switchModel={
+                    modelOffered
+                      ? () => setModelRequest((value) => value + 1)
+                      : undefined
+                  }
+                  restart={restart}
+                  connections={connections}
+                />
               );
             return null;
           })}
@@ -690,6 +716,7 @@ export function BrainChat({
         events={events}
         restart={restart}
         focusEpoch={focusEpoch}
+        modelRequest={modelRequest}
       />
     </>
   );
@@ -699,11 +726,13 @@ export function BrainComposer({
   events,
   restart,
   focusEpoch = 0,
+  modelRequest = 0,
 }: {
   session: AgentSessionView;
   events: AgentDockEvent[];
   restart(): Promise<void>;
   focusEpoch?: number;
+  modelRequest?: number;
 }) {
   const tasks = useQuery(tasksQuery);
   const epics = useQuery(epicsQuery);
@@ -788,9 +817,10 @@ export function BrainComposer({
     return () =>
       window.removeEventListener("brain-dismiss-suggestions", dismiss);
   }, []);
-  const running = ["running", "awaiting_permission", "starting"].includes(
-    session.status,
-  );
+  const retrying = activeRetry(events, session.status);
+  const running =
+    !!retrying ||
+    ["running", "awaiting_permission", "starting"].includes(session.status);
   const items = [
     ...Object.values(tasks.data ?? {})
       .flat()
@@ -957,6 +987,7 @@ export function BrainComposer({
       }}
       onDrop={() => setBoardOver(false)}
     >
+      {retrying && <BrainRetryStatus key={retrying.seq} event={retrying} />}
       <div className="brain-context-chips">
         {context.map((item) => (
           <span className="brain-chip" key={item.uri}>
@@ -1098,6 +1129,7 @@ export function BrainComposer({
           options={options}
           disabled={pending || running || configuring}
           fail={setError}
+          openModelEpoch={modelRequest}
         />
         {running ? (
           <Button

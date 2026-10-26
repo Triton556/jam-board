@@ -2193,6 +2193,7 @@ dependencies = [
  "agent-client-protocol",
  "futures",
  "jam-core",
+ "jam-web-mcp",
  "keyring",
  "portable-pty",
  "reqwest 0.12.28",
@@ -2217,6 +2218,7 @@ dependencies = [
  "jam-core",
  "jam-mcp",
  "jam-voice",
+ "jam-web-mcp",
  "percent-encoding",
  "serde",
  "serde_json",
@@ -2299,6 +2301,25 @@ dependencies = [
  "specta",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "jam-web-mcp"
+version = "0.3.0-alpha.42"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "http",
+ "keyring",
+ "reqwest 0.12.28",
+ "rmcp",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "tokio",
+ "ulid",
 ]
 
 [[package]]

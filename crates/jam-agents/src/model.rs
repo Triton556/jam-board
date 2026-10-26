@@ -52,6 +52,7 @@ pub struct AgentProfileView {
     pub available: bool,
     pub unavailable_reason: Option<String>,
     pub built_in: bool,
+    pub extra_mcp_servers: Vec<crate::McpEntry>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
@@ -226,6 +227,18 @@ pub enum AuthState {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentErrorCode {
+    RateLimited,
+    Overloaded,
+    Auth,
+    ContextTooLong,
+    Network,
+    Provider,
+    Agent,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(
     tag = "kind",
@@ -253,6 +266,8 @@ pub enum AgentEventKind {
         text: String,
     },
     ToolCall {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tool_name: Option<String>,
         tool_call_id: String,
         title: String,
         tool_kind: String,
@@ -304,7 +319,19 @@ pub enum AgentEventKind {
     TurnEnd {
         stop_reason: String,
     },
+    Retrying {
+        attempt: u32,
+        max_attempts: u32,
+        delay_ms: u64,
+        code: AgentErrorCode,
+    },
     Error {
+        #[serde(default)]
+        code: Option<AgentErrorCode>,
+        #[serde(default)]
+        retryable: bool,
+        #[serde(default)]
+        retry_after_ms: Option<u64>,
         message: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,

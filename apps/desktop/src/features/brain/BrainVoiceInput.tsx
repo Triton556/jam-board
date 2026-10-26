@@ -77,6 +77,12 @@ export function BrainVoiceInput({
   useEffect(() => {
     if (status?.enabled === false) machine.current?.cancel();
   }, [status?.enabled]);
+  const engineScope = `${status?.engine}:${status?.cloud?.provider}`;
+  const previousEngineScope = useRef(engineScope);
+  useEffect(() => {
+    if (engineScope !== previousEngineScope.current) machine.current?.cancel();
+    previousEngineScope.current = engineScope;
+  }, [engineScope]);
   const install = () => {
     if (!status) return;
     void installVoice(status.model, status.device);
@@ -90,8 +96,10 @@ export function BrainVoiceInput({
     if (active) return;
     if (
       !status.enabled ||
-      !status.runtimeInstalled ||
-      !status.installedModels.includes(status.model) ||
+      (status.engine !== "cloud" &&
+        (!status.runtimeInstalled ||
+          !status.installedModels.includes(status.model))) ||
+      (status.engine === "cloud" && !status.cloud?.keySet) ||
       status.state === "installing"
     ) {
       setOpen(true);
@@ -245,8 +253,9 @@ export function BrainVoiceInput({
               <MicOff size={16} />
             ) : status.state === "error" ? (
               <CircleAlert size={16} className="brain-failure" />
-            ) : !status.runtimeInstalled ||
-              !status.installedModels.includes(status.model) ? (
+            ) : status.engine !== "cloud" &&
+              (!status.runtimeInstalled ||
+                !status.installedModels.includes(status.model)) ? (
               <Download size={16} />
             ) : (
               <Mic size={16} />
@@ -296,7 +305,10 @@ export function BrainVoiceInput({
                   <Button onClick={() => void cancelVoiceInstall()}>
                     Cancel download
                   </Button>
+                ) : status.engine === "cloud" && !status.cloud?.keySet ? (
+                  <p>Add an API key in Voice settings to start dictation.</p>
                 ) : status.enabled &&
+                  status.engine !== "cloud" &&
                   (!status.runtimeInstalled ||
                     !status.installedModels.includes(status.model)) ? (
                   <Button variant="primary" disabled={busy} onClick={install}>
