@@ -97,7 +97,7 @@ pub(crate) async fn start(
             .master
             .try_clone_reader()
             .map_err(|_| err("Cannot read terminal output"))?;
-        let mut writer = pair
+        let writer = pair
             .master
             .take_writer()
             .map_err(|_| err("Cannot open terminal input"))?;
@@ -109,10 +109,12 @@ pub(crate) async fn start(
         // initial origin even when xterm has not attached yet, otherwise a
         // very short command can deadlock ClosePseudoConsole waiting for DSR.
         #[cfg(windows)]
-        {
+        let writer = {
+            let mut writer = writer;
             let _ = writer.write_all(b"\x1b[1;1R");
             let _ = writer.flush();
-        }
+            writer
+        };
         let tree = match child
             .process_id()
             .map(crate::process::ProcessTree::attach)

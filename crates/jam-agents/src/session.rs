@@ -3,7 +3,6 @@ use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::{Arc, Mutex},
-    time::Duration,
 };
 use tokio::sync::oneshot;
 
@@ -649,6 +648,8 @@ impl SessionManager {
 pub(crate) async fn kill_tree(pid: u32) -> Result<()> {
     #[cfg(windows)]
     {
+        use std::time::Duration;
+
         let mut cmd = tokio::process::Command::new("taskkill.exe");
         cmd.args(["/PID", &pid.to_string(), "/T", "/F"])
             .creation_flags(0x08000000);
