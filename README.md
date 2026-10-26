@@ -213,7 +213,9 @@ The frontend refreshes affected query caches, animates agent changes and preserv
 For larger boards, see [the disposable data-volume and performance checks](docs/performance.md).
 
 Requirements: Rust stable (edition 2024), Node.js 22 or newer, and on Windows MSVC
-Build Tools 2022 plus WebView2. Linux build dependencies are in the CI workflow;
+Build Tools 2022 plus WebView2. Linux voice runtime ZIP extraction requires
+`bsdtar` (`sudo apt-get install libarchive-tools` on Ubuntu); a missing tool
+returns an explicit error. Linux build dependencies are in the CI workflow;
 the controlled Linux runtime checks and remaining platform limits are recorded in
 the [verification notes](docs/verification/). Use the committed lockfiles.
 
