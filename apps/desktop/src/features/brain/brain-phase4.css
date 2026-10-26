@@ -205,6 +205,7 @@
   grid-column: 1 / -1;
 }
 .brain-popover .brain-history-actions button {
+  min-width: 28px;
   padding: 4px 6px;
 }
 .brain-history-row {

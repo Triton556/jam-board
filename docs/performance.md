@@ -48,12 +48,21 @@ initial-JS budget stays as a cheap build guard; bundle bytes are not a startup-t
 baseline or usability claim.
 No human action, agent state or execution grant changes in this diagnostic path.
 
-Owner-machine baseline — **QA pending; no timings measured here**:
+Owner-machine baseline — QA measured seven launches of the alpha.42 release/NSIS
+build at `c8ac628` on Windows (Ryzen 5 7535HS / RTX 4060 Laptop):
 
 | Build / machine / OS / WebView | Runs | Group | Window median / p90 (ms) | First paint median / p90 (ms) |
 |---|---:|---|---|---|
-| Pending | 1 | Cold (first launch) | — | — |
-| Pending | 6 | Warm (remaining launches) | — | — |
+| alpha.42 / c8ac628; Ryzen 5 7535HS / RTX 4060 Laptop; Windows 11 Pro 22631; WebView2 155.0.4283.62; High performance | 1 | Cold (first measured launch) | 539.70 / 539.70 | 1652.88 / 1652.88 |
+| Same | 6 | Warm (remaining launches) | 573.53 / 594.72 | 1046.21 / 1093.11 |
+
+Here, cold means the first measured launch after fixture preparation and a native
+payload smoke launch, without flushing OS/WebView caches.
+QA measured `target/release/jam-board.exe` from that build with desktop applications
+open, no concurrent build and no per-launch CPU gate. Raw receipts and independently
+recomputed statistics are retained in `test-visuals/round6/qa-final/startup/`;
+the QA report is `test-visuals/round6/qa-final/report.md`. These are baseline
+observations, not a controlled boot-cold comparison or a latency guarantee.
 
 ## Routine correctness
 
