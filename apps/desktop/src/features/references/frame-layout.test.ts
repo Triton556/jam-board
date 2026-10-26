@@ -8,6 +8,22 @@ import {
 
 // Deterministic geometry only. Browser/native typography and hit testing are separate gates.
 describe("RF02 title-priority frame header", () => {
+  it("RC04 20% -> 19.9% keeps header width inside the frame and changes scale continuously", () => {
+    for (const width of [280, 320, 880]) {
+      const before = frameHeaderLayout(width, 0.2, true);
+      const after = frameHeaderLayout(width, 0.199, true);
+      expect(after.cssWidth * after.scale).toBeLessThanOrEqual(width + 0.001);
+      expect(Math.abs(after.scale - before.scale) / before.scale).toBeLessThan(
+        0.01,
+      );
+      expect(
+        Math.abs(
+          after.height * after.scale * 0.199 -
+            before.height * before.scale * 0.2,
+        ),
+      ).toBeLessThan(1);
+    }
+  });
   it("reserves a separate linked-target row at compact and full zoom", () => {
     expect(frameHeaderLayout(800, 1, true).height).toBe(86);
     expect(frameHeaderLayout(280, 0.4, true).height).toBe(124);
@@ -23,19 +39,21 @@ describe("RF02 title-priority frame header", () => {
       ],
       0.4,
     );
-    expect(bounds.height).toBe(124 * (0.75 / 0.4));
+    expect(bounds.height).toBe(124 * (280 / 200));
   });
   it.each([0.39, 0.4, 0.49, 0.75, 1, 2, 4])(
     "keeps a 320px frame's title out of the controls row at narrow zoom %s",
     (zoom) => {
       const header = frameHeaderLayout(320, zoom);
-      expect(header.scale * zoom).toBeGreaterThanOrEqual(0.75);
+      expect(header.scale * zoom).toBeGreaterThanOrEqual(
+        Math.min(0.75, (zoom * 320) / 200),
+      );
       expect(header.cssWidth).toBeGreaterThanOrEqual(200);
       expect(header.compact).toBe(zoom < 0.75);
       if (header.compact) {
         // Header padding24 + border2 + grip20 + gap8 leaves meaningful title room.
         expect((header.cssWidth - 54) * header.scale * zoom).toBeGreaterThan(
-          100,
+          Math.min(100, (320 * zoom) / 2),
         );
         expect(header.height).toBe(84);
       }

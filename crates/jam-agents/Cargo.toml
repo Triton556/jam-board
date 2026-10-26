@@ -22,3 +22,5 @@ futures = "0.3"
 tokio-util = { version = "0.7", features = ["compat", "codec"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 rmcp = { workspace = true, features = ["client", "transport-child-process"] }
+
+jam-web-mcp = { path = "../jam-web-mcp" }

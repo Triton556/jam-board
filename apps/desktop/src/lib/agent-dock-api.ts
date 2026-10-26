@@ -1,4 +1,7 @@
-export type RuntimeKind = "acp" | "terminal" | "api";
+﻿export type RuntimeKind = "acp" | "terminal" | "api";
+export type ProviderErrorCode = import("../bindings").AgentErrorCode;
+export type McpServer = import("../bindings").McpEntry_Serialize;
+export type HistoryEntry = import("../bindings").HistoryEntry;
 export type AgentProfileView = {
   id: string;
   label: string;
@@ -17,6 +20,7 @@ export type AgentProfileView = {
   available: boolean;
   unavailableReason: string | null; // detection result
   builtIn: boolean; // presets cannot be deleted, only hidden/edited
+  extraMcpServers?: McpServer[];
 };
 export type AgentProfileInput = Partial<
   Omit<
@@ -65,13 +69,13 @@ export type ModelCatalog = import("../bindings").ModelCatalog_Serialize;
 export type AttachmentSource = import("../bindings").AttachmentSource;
 export type AttachmentView = import("../bindings").AttachmentView;
 export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
-  | { kind: "status"; status: SessionStatus; message?: string }
+  | { kind: "status"; status: SessionStatus; message?: string | null }
   | { kind: "auth"; state: "ok" | "required" | "unknown"; label: string }
   | {
       kind: "user_message";
       messageId: string;
       content: PromptPart[];
-      contextPreamble?: string;
+      contextPreamble?: string | null;
     }
   | { kind: "agent_message_delta"; messageId: string; text: string }
   | { kind: "agent_thought_delta"; messageId: string; text: string }
@@ -82,15 +86,15 @@ export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
       toolKind: string;
       status: string;
       input?: unknown;
-      content?: string;
-      locations?: string[];
+      content?: string | null;
+      locations?: string[] | null;
     }
   | {
       kind: "tool_call_update";
       toolCallId: string;
-      title?: string;
-      status?: string;
-      content?: string;
+      title?: string | null;
+      status?: string | null;
+      content?: string | null;
       output?: unknown;
     }
   | {
@@ -98,13 +102,13 @@ export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
       entries: {
         content: string;
         status: "pending" | "in_progress" | "completed";
-        priority?: string;
+        priority?: string | null;
       }[];
     }
   | {
       kind: "permission_request";
       requestId: string;
-      toolCallId?: string;
+      toolCallId?: string | null;
       title: string;
       options: {
         optionId: string;
@@ -122,7 +126,21 @@ export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
       options: ConfigOption[];
     }
   | { kind: "turn_end"; stopReason: string }
-  | { kind: "error"; message: string; detail?: string }
+  | {
+      kind: "retrying";
+      attempt: number;
+      maxAttempts: number;
+      delayMs: number;
+      code: ProviderErrorCode;
+    }
+  | {
+      kind: "error";
+      message: string;
+      detail?: string | null;
+      code?: ProviderErrorCode | null;
+      retryable?: boolean;
+      retryAfterMs?: number | null;
+    }
 );
 
 export interface AgentDockApi {
@@ -143,6 +161,7 @@ export interface AgentDockApi {
     content: PromptPart[];
   }): Promise<void>;
   cancelTurn(sessionId: string): Promise<void>;
+  retryTurn(sessionId: string): Promise<void>;
   resolvePermission(input: {
     sessionId: string;
     requestId: string;

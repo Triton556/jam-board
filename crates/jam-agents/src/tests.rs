@@ -59,6 +59,7 @@ pub(crate) fn session_with_media(
 ) -> Arc<Session> {
     let board = board();
     Arc::new(Session {
+        history_writer: Mutex::new(None),
         inner: Mutex::new(SessionInner {
             view: AgentSessionView {
                 id: "session-a".into(),
@@ -77,6 +78,9 @@ pub(crate) fn session_with_media(
             seq: 0,
             permissions: BTreeMap::new(),
             first_prompt: true,
+            last_prompt: None,
+            last_turn_failed: false,
+            last_failure_code: None,
             message_id: None,
             scrollback: String::new(),
             config: BTreeMap::new(),
@@ -85,6 +89,9 @@ pub(crate) fn session_with_media(
             cancelling: false,
             text_pending: String::new(),
             attachments: BTreeMap::new(),
+            resume_events: vec![],
+            resume_native_id: None,
+            replaying: false,
         }),
         board,
         connector: Mutex::new(None),

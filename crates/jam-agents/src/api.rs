@@ -38,14 +38,20 @@ impl McpTools {
     async fn connect(
         session: &Session,
         entry: &McpEntry,
-        env: &[Env],
+        _env: &[Env],
     ) -> Result<Arc<dyn ToolSource>> {
         use rmcp::ServiceExt;
-        let mut command = tokio::process::Command::new(&entry.command);
+        if let Some(http) = &entry.http {
+            return HttpTools::connect(session, http, entry.bearer_token.clone()).await;
+        }
+        let (executable, args) = crate::profiles::mcp_launch_command(&entry.command, &entry.args)?;
+        let (executable, args, launcher_env) =
+            crate::launcher::terminal_launcher(executable.to_string_lossy().into_owned(), args)?;
+        let mut command = tokio::process::Command::new(executable);
         command
-            .args(&entry.args)
+            .args(args)
+            .envs(launcher_env.iter().map(|e| (&e.name, &e.value)))
             .current_dir(&session.view().cwd)
-            .envs(env.iter().map(|e| (&e.name, &e.value)))
             .envs(entry.env.iter().map(|e| (&e.name, &e.value)))
             .kill_on_drop(true);
         #[cfg(windows)]
@@ -142,6 +148,421 @@ impl ToolSource for McpTools {
     }
 }
 
+/// Streamable HTTP uses the existing TLS-enabled client, with redirects disabled so bearer
+/// credentials cannot be forwarded to another endpoint. POST JSON and SSE responses are supported.
+struct HttpTools {
+    client: reqwest::Client,
+    url: String,
+    token: Option<String>,
+    session_id: Mutex<Option<String>>,
+    protocol: Mutex<String>,
+    next_id: std::sync::atomic::AtomicU64,
+}
+impl HttpTools {
+    async fn connect(
+        session: &Session,
+        http: &McpHttp,
+        token: Option<String>,
+    ) -> Result<Arc<dyn ToolSource>> {
+        crate::wiring::validate_mcp_url(&http.url)?;
+        let source = Arc::new(Self {
+            client: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(Duration::from_secs(30))
+                .build()
+                .map_err(|_| err("Cannot initialize MCP HTTP client"))?,
+            url: http.url.clone(),
+            token,
+            session_id: Mutex::new(None),
+            protocol: Mutex::new("2025-03-26".into()),
+            next_id: std::sync::atomic::AtomicU64::new(1),
+        });
+        tokio::select! {
+            _ = session.stop.cancelled() => return Err(err("Session stopped during MCP startup")),
+            result = source.request("initialize", json!({"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"JamBoard","version":env!("CARGO_PKG_VERSION")}})) => {
+                let response = result?;
+                let version = response["protocolVersion"].as_str().filter(|v| ["2025-03-26", "2025-06-18", "2025-11-25"].contains(v)).ok_or_else(|| err("MCP HTTP server negotiated an unsupported protocol version"))?;
+                *source.protocol.lock().expect("HTTP MCP protocol lock") = version.into();
+            }
+        }
+        source.notification("notifications/initialized").await?;
+        Ok(source)
+    }
+    fn builder(&self, method: reqwest::Method) -> reqwest::RequestBuilder {
+        let mut request = self
+            .client
+            .request(method, &self.url)
+            .header("Accept", "application/json, text/event-stream")
+            .header(
+                "MCP-Protocol-Version",
+                self.protocol
+                    .lock()
+                    .expect("HTTP MCP protocol lock")
+                    .as_str(),
+            );
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        if let Some(id) = self
+            .session_id
+            .lock()
+            .expect("HTTP MCP session lock")
+            .as_ref()
+        {
+            request = request.header("Mcp-Session-Id", id);
+        }
+        request
+    }
+    async fn notification(&self, method: &str) -> Result<()> {
+        let response = self
+            .builder(reqwest::Method::POST)
+            .json(&json!({"jsonrpc":"2.0","method":method}))
+            .send()
+            .await
+            .map_err(|_| err("MCP HTTP notification failed"))?;
+        if !response.status().is_success() {
+            return Err(err("MCP HTTP notification was rejected"));
+        }
+        Ok(())
+    }
+    async fn request(&self, method: &str, params: Value) -> Result<Value> {
+        let id = self
+            .next_id
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let response = self
+            .builder(reqwest::Method::POST)
+            .json(&json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}))
+            .send()
+            .await
+            .map_err(|_| err("Cannot reach MCP HTTP server"))?;
+        if !response.status().is_success() {
+            return Err(err(format!(
+                "MCP HTTP server returned {}",
+                response.status().as_u16()
+            )));
+        }
+        if let Some(value) = response.headers().get("Mcp-Session-Id") {
+            let value = value
+                .to_str()
+                .map_err(|_| err("Invalid MCP HTTP session ID"))?;
+            if value.len() > 4096 {
+                return Err(err("MCP HTTP session ID is too long"));
+            }
+            *self.session_id.lock().expect("HTTP MCP session lock") = Some(value.into());
+        }
+        let sse = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|s| s.starts_with("text/event-stream"));
+        let mut stream = response.bytes_stream();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|_| err("MCP HTTP response interrupted"))?;
+            if bytes.len() + chunk.len() > 20 * 1024 * 1024 {
+                return Err(err("MCP HTTP response exceeded 20 MB"));
+            }
+            bytes.extend_from_slice(&chunk);
+            if sse {
+                while let Some(end) = bytes
+                    .windows(2)
+                    .position(|s| s == b"\n\n")
+                    .or_else(|| bytes.windows(4).position(|s| s == b"\r\n\r\n"))
+                {
+                    let length = if bytes[end] == b'\r' { 4 } else { 2 };
+                    let frame = String::from_utf8_lossy(&bytes[..end]);
+                    let data = frame
+                        .lines()
+                        .filter_map(|l| l.strip_prefix("data:").map(str::trim_start))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let result = if data.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::from_str::<Value>(&data)?)
+                    };
+                    bytes.drain(..end + length);
+                    if let Some(value) = result
+                        && value["id"] == id
+                    {
+                        return http_rpc_result(value);
+                    }
+                }
+            }
+        }
+        if sse {
+            return Err(err("MCP HTTP stream ended before the response"));
+        }
+        let value: Value = serde_json::from_slice(&bytes)?;
+        if value["id"] != id {
+            return Err(err("MCP HTTP response ID did not match"));
+        }
+        http_rpc_result(value)
+    }
+}
+fn http_rpc_result(value: Value) -> Result<Value> {
+    if value.get("error").is_some() {
+        return Err(err("MCP server reported a protocol error"));
+    }
+    value
+        .get("result")
+        .cloned()
+        .ok_or_else(|| err("Missing MCP HTTP result"))
+}
+impl ToolSource for HttpTools {
+    fn list(&self) -> BoxFuture<'_, Result<Vec<ApiTool>>> {
+        Box::pin(async move {
+            let mut tools = vec![];
+            let mut cursor: Option<String> = None;
+            for _ in 0..100 {
+                let result = self
+                    .request(
+                        "tools/list",
+                        cursor
+                            .as_ref()
+                            .map(|s| json!({"cursor":s}))
+                            .unwrap_or(json!({})),
+                    )
+                    .await?;
+                for tool in result["tools"]
+                    .as_array()
+                    .ok_or_else(|| err("Invalid MCP tools list"))?
+                {
+                    tools.push(ApiTool {
+                        name: tool["name"]
+                            .as_str()
+                            .ok_or_else(|| err("Invalid MCP tool name"))?
+                            .into(),
+                        description: tool["description"].as_str().unwrap_or_default().into(),
+                        schema: tool["inputSchema"].clone(),
+                        read_only: tool["annotations"]["readOnlyHint"] == true,
+                    });
+                }
+                cursor = result["nextCursor"].as_str().map(str::to_owned);
+                if cursor.is_none() {
+                    return Ok(tools);
+                }
+            }
+            Err(err("MCP tool pagination exceeded 100 pages"))
+        })
+    }
+    fn guide(&self) -> BoxFuture<'_, Result<String>> {
+        Box::pin(async { Ok(String::new()) })
+    }
+    fn call(&self, name: String, arguments: Value) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move {
+            self.request("tools/call", json!({"name":name,"arguments":arguments}))
+                .await
+        })
+    }
+    fn shutdown(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if self
+                .session_id
+                .lock()
+                .expect("HTTP MCP session lock")
+                .is_some()
+            {
+                let _ = self.builder(reqwest::Method::DELETE).send().await;
+            }
+        })
+    }
+}
+
+struct ServerTools {
+    name: String,
+    trust: bool,
+    source: Arc<dyn ToolSource>,
+    tools: Vec<ApiTool>,
+}
+struct MultiTools {
+    servers: Vec<ServerTools>,
+}
+impl MultiTools {
+    async fn connect(session: &Session, entries: &[McpEntry], env: &[Env]) -> Arc<dyn ToolSource> {
+        let mut servers = vec![];
+        for entry in entries.iter().filter(|e| e.enabled) {
+            let source = McpTools::connect(session, entry, env).await;
+            match source {
+                Ok(source) => {
+                    match tokio::time::timeout(Duration::from_secs(30), source.list()).await {
+                        Ok(Ok(tools)) => servers.push(ServerTools {
+                            name: entry.name.clone(),
+                            trust: entry.trusts_read_only(),
+                            source,
+                            tools,
+                        }),
+                        _ => {
+                            source.shutdown().await;
+                            server_error(session, &entry.name);
+                        }
+                    }
+                }
+                Err(_) => server_error(session, &entry.name),
+            }
+        }
+        Arc::new(Self { servers })
+    }
+}
+fn server_error(session: &Session, name: &str) {
+    session.emit(AgentEventKind::Error {
+        code: None,
+        retryable: false,
+        retry_after_ms: None,
+        message: format!("Cannot connect MCP server {name}; chat will continue without it"),
+        detail: None,
+    });
+}
+fn direct_tool(server: &str, read_only_hint: bool, trust: bool) -> bool {
+    read_only_hint && (server == "jam-board" || trust)
+}
+impl ToolSource for MultiTools {
+    fn list(&self) -> BoxFuture<'_, Result<Vec<ApiTool>>> {
+        Box::pin(async move {
+            Ok(self
+                .servers
+                .iter()
+                .flat_map(|server| {
+                    server.tools.iter().map(move |tool| {
+                        let mut tool = tool.clone();
+                        tool.name = format!("{}__{}", server.name, tool.name);
+                        tool.read_only = direct_tool(&server.name, tool.read_only, server.trust);
+                        tool
+                    })
+                })
+                .collect())
+        })
+    }
+    fn guide(&self) -> BoxFuture<'_, Result<String>> {
+        Box::pin(async move {
+            match self.servers.iter().find(|s| s.name == "jam-board") {
+                Some(s) => s.source.guide().await,
+                None => Ok(String::new()),
+            }
+        })
+    }
+    fn call(&self, name: String, arguments: Value) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move {
+            let (server, tool) = name
+                .split_once("__")
+                .ok_or_else(|| err("Invalid namespaced MCP tool"))?;
+            let server = self
+                .servers
+                .iter()
+                .find(|s| s.name == server && s.tools.iter().any(|t| t.name == tool))
+                .ok_or_else(|| err("Unknown MCP server or tool"))?;
+            server.source.call(tool.into(), arguments).await
+        })
+    }
+    fn shutdown(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            for server in &self.servers {
+                server.source.shutdown().await;
+            }
+        })
+    }
+}
+/// Reconstruct provider messages from dock events; thoughts, permissions and statuses are not model messages.
+fn truncate_tool_result(value: &str) -> String {
+    const NOTE: &str = "\n[Tool result truncated to 8 KB for resume]";
+    if value.len() <= 8192 {
+        value.into()
+    } else {
+        format!("{}{}", bounded(value, 8192 - NOTE.len()), NOTE)
+    }
+}
+fn transcript_messages(events: &[AgentDockEvent]) -> Vec<Value> {
+    let mut messages: Vec<Value> = vec![];
+    let mut assistant_id = String::new();
+    for event in events {
+        match &event.event {
+            AgentEventKind::UserMessage {
+                content,
+                context_preamble,
+                ..
+            } => {
+                let mut blocks = vec![];
+                if let Some(text) = context_preamble {
+                    blocks.push(json!({"type":"text","text":text}));
+                }
+                for part in content {
+                    match part {
+                        PromptPart::Text { text } | PromptPart::BoardRef { text, .. } => {
+                            blocks.push(json!({"type":"text","text":text}))
+                        }
+                        PromptPart::Image { .. } | PromptPart::Attachment { .. } => blocks.push(
+                            json!({"type":"text","text":"[Attachment from previous session]"}),
+                        ),
+                    }
+                }
+                messages.push(json!({"role":"user","content":blocks}));
+                assistant_id.clear();
+            }
+            AgentEventKind::AgentMessageDelta { message_id, text } => {
+                if assistant_id == *message_id
+                    && messages
+                        .last()
+                        .is_some_and(|m| m["role"] == "assistant" && m.get("tool_calls").is_none())
+                {
+                    let last = messages.last_mut().expect("assistant message");
+                    let mut content = last["content"].as_str().unwrap_or_default().to_string();
+                    content.push_str(text);
+                    last["content"] = json!(content);
+                } else {
+                    messages.push(json!({"role":"assistant","content":text}));
+                    assistant_id = message_id.clone();
+                }
+            }
+            AgentEventKind::ToolCall {
+                tool_call_id,
+                input,
+                tool_name: Some(name),
+                ..
+            } => {
+                settle_pending_tools(&mut messages);
+                messages.push(json!({"role":"assistant","content":null,"tool_calls":[{"id":tool_call_id,"type":"function","function":{"name":name,"arguments":input.clone().unwrap_or(json!({})).to_string()}}]}));
+                assistant_id.clear();
+            }
+            AgentEventKind::ToolCallUpdate {
+                tool_call_id,
+                status: Some(status),
+                output,
+                content,
+                ..
+            } if (status == "completed" || status == "failed")
+                && messages.last().is_some_and(|m| {
+                    m["role"] == "assistant"
+                        && m["tool_calls"]
+                            .as_array()
+                            .is_some_and(|calls| calls.iter().any(|c| c["id"] == *tool_call_id))
+                }) =>
+            {
+                let result = output
+                    .as_ref()
+                    .map(tool_result_text)
+                    .or_else(|| content.clone())
+                    .unwrap_or_default();
+                messages.push(json!({"role":"tool","tool_call_id":tool_call_id,"content":truncate_tool_result(&result)}));
+            }
+            AgentEventKind::Error { code: Some(_), .. } => {
+                if !assistant_id.is_empty()
+                    && messages
+                        .last()
+                        .is_some_and(|m| m["role"] == "assistant" && m.get("tool_calls").is_none())
+                {
+                    messages.pop();
+                }
+                assistant_id.clear();
+            }
+            AgentEventKind::TurnEnd { .. } => {
+                assistant_id.clear();
+            }
+            _ => {}
+        }
+    }
+    settle_pending_tools(&mut messages);
+    messages
+}
 pub(crate) struct ApiConfig {
     pub base_url: String,
     pub model: String,
@@ -173,6 +594,7 @@ impl ApiConfig {
     }
 }
 struct Prompt {
+    retry: bool,
     content: Vec<Value>,
     cancel: CancellationToken,
     reply: Reply,
@@ -186,15 +608,18 @@ struct ApiConnector {
     effort_style: EffortStyle,
     catalog: ModelCatalog,
 }
-impl Connector for ApiConnector {
-    fn prompt(&self, content: Vec<PromptPart>) -> BoxFuture<'_, Result<()>> {
-        Box::pin(async move {
-            let session = self
-                .session
-                .upgrade()
-                .ok_or_else(|| err("API session is disconnected"))?;
-            let (blocks, selection) = crate::acp::prepare_prompt_with_selection(&session, content)?;
-            let content = blocks
+impl ApiConnector {
+    async fn enqueue(&self, content: Option<Vec<PromptPart>>) -> Result<()> {
+        let session = self
+            .session
+            .upgrade()
+            .ok_or_else(|| err("API session is disconnected"))?;
+        let retry = content.is_none();
+        let (blocks, selection) = match content {
+            Some(content) => crate::acp::prepare_prompt_with_selection(&session, content)?,
+            None => crate::acp::prepare_retry_with_selection(&session)?,
+        };
+        let content = blocks
                 .into_iter()
                 .map(|block| {
                     let value = serde_json::to_value(block)?;
@@ -207,23 +632,31 @@ impl Connector for ApiConnector {
                     })
                 })
                 .collect::<std::result::Result<Vec<_>, _>>()?;
-            let cancel = CancellationToken::new();
-            *self.current.lock().expect("turn lock") = Some(cancel.clone());
-            if session.inner.lock().expect("session lock").cancelling {
-                cancel.cancel();
-            }
-            let (reply, rx) = oneshot::channel();
-            self.tx
-                .send(Prompt {
-                    content,
-                    model: selection.model.unwrap_or_default(),
-                    effort: selection.effort,
-                    cancel,
-                    reply,
-                })
-                .map_err(|_| err("API session is disconnected"))?;
-            rx.await.map_err(|_| err("API session is disconnected"))?
-        })
+        let cancel = CancellationToken::new();
+        *self.current.lock().expect("turn lock") = Some(cancel.clone());
+        if session.inner.lock().expect("session lock").cancelling {
+            cancel.cancel();
+        }
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(Prompt {
+                content,
+                retry,
+                model: selection.model.unwrap_or_default(),
+                effort: selection.effort,
+                cancel,
+                reply,
+            })
+            .map_err(|_| err("API session is disconnected"))?;
+        rx.await.map_err(|_| err("API session is disconnected"))?
+    }
+}
+impl Connector for ApiConnector {
+    fn prompt(&self, content: Vec<PromptPart>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.enqueue(Some(content)))
+    }
+    fn retry(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.enqueue(None))
     }
     fn cancel(&self) -> BoxFuture<'_, Result<()>> {
         Box::pin(async {
@@ -311,9 +744,9 @@ pub(crate) async fn start(
         catalog,
     };
     config.endpoint()?;
-    let source = McpTools::connect(&session, &entries[0], &env)
+    let source = MultiTools::connect(&session, &entries, &env)
         .with_subscriber(tracing::subscriber::NoSubscriber::default())
-        .await?;
+        .await;
     start_with_source(session, config, source).await
 }
 pub(crate) async fn start_with_source(
@@ -322,6 +755,59 @@ pub(crate) async fn start_with_source(
     source: Arc<dyn ToolSource>,
 ) -> Result<()> {
     let endpoint = config.endpoint()?;
+    {
+        let mut inner = session.inner.lock().expect("session lock");
+        let replay = inner.resume_events.clone();
+        for event in replay {
+            if inner.events.len() == 5000 {
+                inner.events.pop_front();
+            }
+            inner.events.push_back(event.clone());
+            (session.dock_sink)(event);
+        }
+    }
+    let mut interrupted_permissions = BTreeSet::new();
+    let mut interrupted_tools = BTreeSet::new();
+    for event in &session.inner.lock().expect("session lock").resume_events {
+        match &event.event {
+            AgentEventKind::PermissionRequest { request_id, .. } => {
+                interrupted_permissions.insert(request_id.clone());
+            }
+            AgentEventKind::PermissionResolved { request_id, .. } => {
+                interrupted_permissions.remove(request_id);
+            }
+            AgentEventKind::ToolCall {
+                tool_call_id,
+                status,
+                ..
+            } if status != "completed" && status != "failed" => {
+                interrupted_tools.insert(tool_call_id.clone());
+            }
+            AgentEventKind::ToolCallUpdate {
+                tool_call_id,
+                status: Some(status),
+                ..
+            } if status == "completed" || status == "failed" => {
+                interrupted_tools.remove(tool_call_id);
+            }
+            _ => {}
+        }
+    }
+    for request_id in interrupted_permissions {
+        session.emit(AgentEventKind::PermissionResolved {
+            request_id,
+            option_id: None,
+        });
+    }
+    for tool_call_id in interrupted_tools {
+        session.emit(AgentEventKind::ToolCallUpdate {
+            tool_call_id,
+            title: None,
+            status: Some("failed".into()),
+            content: Some("Interrupted before resume; inspect the result before retrying.".into()),
+            output: None,
+        });
+    }
     let setup = async {
         let tools = source.list().await?;
         let guide = tokio::time::timeout(Duration::from_secs(5), source.guide())
@@ -374,10 +860,16 @@ pub(crate) async fn start_with_source(
     session.status(SessionStatus::Ready, None);
     tokio::spawn(async move {
         let mut history = vec![json!({"role":"system","content":system})];
+        let replay = std::mem::take(&mut session.inner.lock().expect("session lock").resume_events);
+        history.extend(transcript_messages(&replay));
         let mut allowed = BTreeSet::new();
         loop {
             let prompt = tokio::select! { biased; _ = session.stop.cancelled() => break, prompt = rx.recv() => match prompt { Some(p) => p, None => break } };
-            history.push(json!({"role":"user","content":prompt.content}));
+            if !prompt.retry {
+                history.push(json!({"role":"user","content":prompt.content}));
+            }
+            // A retry reuses the original user message and completed tool results.
+            // The failed request's partial assistant output was never committed to history.
             let _ = prompt.reply.send(Ok(()));
             let turn_config = ApiConfig {
                 model: prompt.model,
@@ -399,11 +891,8 @@ pub(crate) async fn start_with_source(
             let stop_reason = match result {
                 Ok(reason) => reason,
                 Err(e) => {
-                    session.emit(AgentEventKind::Error {
-                        message: session.redact(&e.to_string()),
-                        detail: None,
-                    });
-                    "end_turn"
+                    crate::provider_errors::emit_failure(&session, e);
+                    "error"
                 }
             };
             for id in progress {
@@ -538,6 +1027,166 @@ impl Completion {
         Ok(text.into())
     }
 }
+async fn request_with_retry(
+    session: &Session,
+    client: &reqwest::Client,
+    endpoint: &reqwest::Url,
+    config: &ApiConfig,
+    body: &Value,
+) -> std::result::Result<Completion, crate::provider_errors::ProviderFailure> {
+    for attempt in 0..=2 {
+        let mut output_started = false;
+        match request_completion(session, client, endpoint, config, body, &mut output_started).await
+        {
+            Ok(completion) => return Ok(completion),
+            Err(failure) => {
+                if attempt == 2
+                    || output_started
+                    || !failure.retryable
+                    || failure.retry_after_ms.is_some_and(|ms| ms > 30_000)
+                {
+                    return Err(failure);
+                }
+                let delay_ms =
+                    failure
+                        .retry_after_ms
+                        .unwrap_or(if attempt == 0 { 2000 } else { 6000 });
+                session.emit(AgentEventKind::Retrying {
+                    attempt: attempt + 2,
+                    max_attempts: 3,
+                    delay_ms,
+                    code: failure.code,
+                });
+                // The enclosing turn selects against both cancellation tokens; dropping this
+                // future cancels the wait and prevents dispatching the next model request.
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+        }
+    }
+    unreachable!("bounded model attempts")
+}
+async fn request_completion(
+    session: &Session,
+    client: &reqwest::Client,
+    endpoint: &reqwest::Url,
+    config: &ApiConfig,
+    body: &Value,
+    output_started: &mut bool,
+) -> std::result::Result<Completion, crate::provider_errors::ProviderFailure> {
+    use crate::provider_errors::{ProviderFailure, classify};
+    let response = client
+        .post(endpoint.clone())
+        .bearer_auth(&config.key)
+        .json(body)
+        .send()
+        .await
+        .map_err(|_| ProviderFailure::network("Cannot reach the API provider"))?;
+    let status = response.status();
+    if !status.is_success() {
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let mut bytes = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(chunk) => {
+                    let remaining = (64 * 1024usize).saturating_sub(bytes.len());
+                    bytes.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+                    if bytes.len() == 64 * 1024 {
+                        break;
+                    }
+                }
+                Err(_) => break, // Retain the HTTP classification even if the error body is interrupted.
+            }
+        }
+        let body = serde_json::from_slice::<Value>(&bytes)
+            .unwrap_or_else(|_| json!(String::from_utf8_lossy(&bytes)));
+        let failure = classify(
+            Some(status.as_u16()),
+            &body,
+            retry_after.as_deref(),
+            AgentErrorCode::Provider,
+        );
+        if failure.code == AgentErrorCode::Auth {
+            session.emit(AgentEventKind::Auth {
+                state: AuthState::Required,
+                label: failure.detail.clone(),
+            });
+        }
+        return Err(failure);
+    }
+    session.emit(AgentEventKind::Auth {
+        state: AuthState::Ok,
+        label: "API connection authenticated".into(),
+    });
+    let message_id = ulid::Ulid::generate().to_string();
+    let mut decoder = SseDecoder::default();
+    let mut completion = Completion::default();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| ProviderFailure::network("Provider stream disconnected"))?;
+        for event in decoder.push(&chunk)? {
+            apply_provider_event(session, &message_id, &mut completion, event, output_started)?;
+        }
+        if completion.done {
+            break;
+        }
+    }
+    if !completion.done {
+        for event in decoder.finish()? {
+            apply_provider_event(session, &message_id, &mut completion, event, output_started)?;
+        }
+    }
+    session.flush_text();
+    if !completion.done && completion.finish.is_none() {
+        return Err(ProviderFailure::network(
+            "Provider stream ended before completing the response",
+        ));
+    }
+    Ok(completion)
+}
+fn apply_provider_event(
+    session: &Session,
+    message_id: &str,
+    completion: &mut Completion,
+    event: SseEvent,
+    output_started: &mut bool,
+) -> std::result::Result<(), crate::provider_errors::ProviderFailure> {
+    if let SseEvent::Data(value) = &event {
+        if let Some(error) = value.get("error") {
+            let failure =
+                crate::provider_errors::classify(None, error, None, AgentErrorCode::Provider);
+            if failure.code == AgentErrorCode::Auth {
+                session.emit(AgentEventKind::Auth {
+                    state: AuthState::Required,
+                    label: failure.detail.clone(),
+                });
+            }
+            return Err(failure);
+        }
+        if value["choices"].as_array().is_some_and(|choices| {
+            choices.iter().any(|choice| {
+                choice["delta"].as_object().is_some_and(|delta| {
+                    delta.iter().any(|(key, value)| {
+                        key != "role"
+                            && !value.is_null()
+                            && value.as_str() != Some("")
+                            && value.as_array().is_none_or(|a| !a.is_empty())
+                    })
+                })
+            })
+        }) {
+            *output_started = true;
+        }
+    }
+    let text = completion.apply(event)?;
+    session.stream_text(message_id, &text);
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_turn(
     session: &Session,
@@ -550,7 +1199,7 @@ async fn run_turn(
     history: &mut Vec<Value>,
     allowed: &mut BTreeSet<String>,
     progress: &mut BTreeSet<String>,
-) -> Result<&'static str> {
+) -> std::result::Result<&'static str, crate::provider_errors::ProviderFailure> {
     let functions = tools.iter().map(|t| json!({"type":"function","function":{"name":t.name,"description":t.description,"parameters":t.schema}})).collect::<Vec<_>>();
     for _ in 0..32 {
         let mut body =
@@ -565,72 +1214,7 @@ async fn run_turn(
                 .iter()
                 .any(|m| m.id == config.model && m.reasoning),
         );
-        let response = client
-            .post(endpoint.clone())
-            .bearer_auth(&config.key)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|_| err("Cannot reach the API provider"))?;
-        let status = response.status();
-        if !status.is_success() {
-            let mut body = Vec::new();
-            let mut stream = response.bytes_stream();
-            while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(|_| err("Cannot read provider error response"))?;
-                let remaining = (64 * 1024usize).saturating_sub(body.len());
-                body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
-                if body.len() == 64 * 1024 {
-                    break;
-                }
-            }
-            let message = serde_json::from_slice::<Value>(&body)
-                .ok()
-                .map(|v| provider_message(v.get("error").unwrap_or(&v)))
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| bounded(&String::from_utf8_lossy(&body), 2000));
-            if status.as_u16() == 401 || status.as_u16() == 403 {
-                session.emit(AgentEventKind::Auth {
-                    state: AuthState::Required,
-                    label: format!("HTTP {}: {}", status.as_u16(), message),
-                });
-            }
-            return Err(err(format!(
-                "API provider returned HTTP {}: {}",
-                status.as_u16(),
-                message
-            )));
-        }
-        session.emit(AgentEventKind::Auth {
-            state: AuthState::Ok,
-            label: "API connection authenticated".into(),
-        });
-        let message_id = ulid::Ulid::generate().to_string();
-        let mut decoder = SseDecoder::default();
-        let mut completion = Completion::default();
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|_| {
-                err("Provider stream disconnected; no automatic retry was attempted")
-            })?;
-            for event in decoder.push(&chunk)? {
-                let text = completion.apply(event)?;
-                session.stream_text(&message_id, &text);
-            }
-            if completion.done {
-                break;
-            }
-        }
-        if !completion.done {
-            for event in decoder.finish()? {
-                let text = completion.apply(event)?;
-                session.stream_text(&message_id, &text);
-            }
-        }
-        session.flush_text();
-        if !completion.done && completion.finish.is_none() {
-            return Err(err("Provider stream ended before completing the response"));
-        }
+        let completion = request_with_retry(session, client, endpoint, config, &body).await?;
         if completion.finish.as_deref() == Some("length") {
             history.push(json!({"role":"assistant","content":completion.text}));
             return Ok("max_tokens");
@@ -653,6 +1237,7 @@ async fn run_turn(
             let title = friendly_title(&call.name, parsed.as_ref());
             progress.insert(call.id.clone());
             session.emit(AgentEventKind::ToolCall {
+                tool_name: Some(call.name.clone()),
                 tool_call_id: call.id.clone(),
                 title: title.clone(),
                 tool_kind: "other".into(),
@@ -738,9 +1323,10 @@ async fn run_turn(
             progress.remove(&call.id);
         }
     }
-    Err(err(
-        "API turn reached the 32-round tool limit; inspect the conversation before continuing",
-    ))
+    Err(
+        err("API turn reached the 32-round tool limit; inspect the conversation before continuing")
+            .into(),
+    )
 }
 fn friendly_title(name: &str, args: Option<&Value>) -> String {
     let summary = args

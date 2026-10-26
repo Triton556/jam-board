@@ -1,0 +1,43 @@
+.brain-provider-error {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-input);
+  background: var(--paper-2);
+  overflow-wrap: anywhere;
+}
+.brain-provider-error pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--ink-2);
+  max-height: 240px;
+  overflow: auto;
+}
+.brain-provider-error .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.brain-provider-error.past {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.brain-provider-error.past > summary {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  list-style-position: inside;
+}
+.brain-retry-status {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}

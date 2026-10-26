@@ -1,8 +1,13 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-export function MarkdownContent({ children }: { children: string }) {
+export const MarkdownContent = memo(function MarkdownContent({
+  children,
+}: {
+  children: string;
+}) {
   return (
     <div className="markdown">
       <ReactMarkdown
@@ -30,4 +35,4 @@ export function MarkdownContent({ children }: { children: string }) {
       </ReactMarkdown>
     </div>
   );
-}
+});

@@ -1,8 +1,15 @@
 import type { Rect, Viewport } from "@xyflow/react";
 
+export function frameHeaderScale(width: number, zoom: number): number {
+  return Math.min(
+    Math.max(1, 0.75 / Math.max(0.1, zoom)),
+    Math.max(1, width / 200),
+  );
+}
+
 export function frameHeaderLayout(width: number, zoom: number, linked = false) {
-  const scale = Math.max(1, 0.75 / Math.max(0.1, zoom));
-  const cssWidth = Math.max(200, width / scale);
+  const scale = frameHeaderScale(width, zoom);
+  const cssWidth = width / scale;
   const compact = cssWidth < 320;
   return {
     scale,

@@ -4,6 +4,15 @@ import type {
   AgentProfileView,
   AgentSessionView,
 } from "./agent-dock-api";
+import {
+  recordMockHistoryEvent,
+  resetMockPhase4,
+} from "./agent-dock-phase4-mock";
+import {
+  resetMockProviderScenarios,
+  runMockProviderTurn,
+  setMockProviderScenario,
+} from "./agent-dock-retry-mock";
 import { api } from "./api";
 import { JamError } from "./types";
 
@@ -266,6 +275,8 @@ export async function simulateMockCrash(sessionId: string) {
 }
 /** Reset only disposable dock fixtures; never touches the board. */
 export function resetMockDock() {
+  resetMockProviderScenarios();
+  resetMockPhase4();
   for (const turn of turns.values()) {
     turn.cancelled = true;
     turn.resume?.();
@@ -289,6 +300,9 @@ function emit(sessionId: string, payload: Payload) {
     ...payload,
   } as AgentDockEvent;
   histories.set(sessionId, [...history, event].slice(-4000));
+  const session = sessions.get(sessionId);
+  const profile = profiles.find((p) => p.id === session?.profileId);
+  if (session && profile) recordMockHistoryEvent(session, profile, event);
   if (payload.kind === "status")
     Object.assign(sessions.get(sessionId) ?? {}, { status: payload.status });
   for (const cb of listeners) cb(event);
@@ -321,6 +335,7 @@ async function stream(id: string, count: number) {
     return true;
   };
   try {
+    if (await runMockProviderTurn(id, turn, emit)) return;
     if (
       !(await step({
         kind: "agent_thought_delta",
@@ -453,9 +468,10 @@ export const mockDockApi: AgentDockApi = {
     if (index >= 0) profiles.splice(index, 1);
   },
   setSecret: async (id, key, _value) => {
-    const secret = profiles
-      .find((p) => p.id === id)
-      ?.secretKeys.find((s) => s.key === key);
+    const owner = profiles.find((p) => p.id === id);
+    if (owner && !owner.secretKeys.some((s) => s.key === key))
+      owner.secretKeys.push({ key, label: "Bearer token", isSet: false });
+    const secret = owner?.secretKeys.find((s) => s.key === key);
     if (secret) {
       secret.isSet = true;
       for (const session of sessions.values())
@@ -552,6 +568,12 @@ export const mockDockApi: AgentDockApi = {
       );
       configs.set(s.id, options);
       emit(s.id, { kind: "config_options", options: structuredClone(options) });
+      for (const server of p.extraMcpServers ?? [])
+        if (server.enabled && /fail|missing/.test(server.command))
+          emit(s.id, {
+            kind: "error",
+            message: `Could not connect to ${server.name}. Chat can continue without this tool server.`,
+          });
     }
     return structuredClone(s);
   },
@@ -605,6 +627,42 @@ export const mockDockApi: AgentDockApi = {
     turns.delete(id);
     emit(id, { kind: "turn_end", stopReason: "cancelled" });
     emit(id, { kind: "status", status: "ready" });
+  },
+  retryTurn: async (id) => {
+    const session = requireSession(id);
+    const app = await api.appState();
+    if (session.projectId !== app.jam?.id)
+      throw new JamError(
+        "project_mismatch",
+        "This session belongs to another project.",
+      );
+    if (session.status !== "ready" || turns.has(id))
+      throw new JamError("busy", "Wait for this turn to finish.");
+    const history = histories.get(id) ?? [];
+    const user = history
+      .filter((event) => event.kind === "user_message")
+      .at(-1);
+    const error = history.filter((event) => event.kind === "error").at(-1);
+    if (!user || !error || error.seq < user.seq)
+      throw new JamError("no_failed_turn", "There is no failed turn to retry.");
+    if (
+      history
+        .slice(history.indexOf(error) + 1)
+        .some(
+          (event) =>
+            event.kind === "retrying" ||
+            (event.kind === "status" && event.status === "running") ||
+            (event.kind === "turn_end" && event.stopReason !== "error"),
+        )
+    )
+      throw new JamError("no_failed_turn", "There is no failed turn to retry.");
+    if (Date.now() < Date.parse(error.at) + (error.retryAfterMs ?? 0))
+      throw new JamError("rate_limited", "Wait before retrying this request.");
+    setMockProviderScenario(id, "normal");
+    const count = (counts.get(id) ?? 0) + 1;
+    counts.set(id, count);
+    emit(id, { kind: "status", status: "running" });
+    void stream(id, count);
   },
   resolvePermission: async ({ sessionId, requestId, optionId }) => {
     const turn = turns.get(sessionId);
@@ -738,3 +796,24 @@ export const mockDockApi: AgentDockApi = {
     };
   },
 };
+export function restoreMockTranscript(
+  sessionId: string,
+  events: AgentDockEvent[],
+  title?: string,
+) {
+  if (title) Object.assign(sessions.get(sessionId) ?? {}, { title });
+  const current = histories.get(sessionId) ?? [];
+  histories.set(
+    sessionId,
+    [...events, ...current].map((event, index) => ({
+      ...event,
+      sessionId,
+      seq: index + 1,
+    })),
+  );
+  emit(sessionId, {
+    kind: "status",
+    status: "ready",
+    message: `Resumed ${new Date().toLocaleString()}`,
+  });
+}

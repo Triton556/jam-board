@@ -470,9 +470,145 @@ descriptions, a model catalog (with vision/reasoning flags), attachments with
 thumbnails, and voice with fake download progress and a canned transcription,
 so every phase-3 state can be reached in a browser.
 
+## Phase 4 — history and resume
+
+People come back to a conversation after a restart, so dock sessions are kept
+and can be resumed.
+
+- Every ACP and API session gets a local history entry:
+  `<data dir>/agent-history/<projectId>/<entryId>.json` (metadata) and
+  `<entryId>.events.jsonl` (the same `AgentDockEvent`s the dock rendered). Not in
+  the board database, not in exports. Terminal sessions are not kept. Events
+  never contain secrets by construction; what people type is theirs.
+- Settings → Agents: "Keep chat history" (on by default) and "Clear history for
+  this project".
+- `HistoryEntry = { id, projectId, profileId, profileLabel, kind: "acp" | "api",
+  title, createdAt, updatedAt, model, effort, agentSessionId: string | null,
+  resumable: "native" | "transcript" | "none", messageCount }`.
+- Commands: `agent_history({ limit?, query? })` → `HistoryEntry[]` (current
+  project, newest first); `agent_history_events({ entryId })` →
+  `AgentDockEvent[]`; `resume_agent_session({ entryId })` → `AgentSessionView`;
+  `rename_agent_history({ entryId, title })`; `delete_agent_history({ entryId })`.
+- Resume:
+  - ACP agent advertising `loadSession`: start the agent with the same cwd and
+    MCP wiring and call `session/load` with `agentSessionId`; the agent replays
+    its history; the dock shows the replay plus a divider "Resumed <date>" and
+    keeps appending to the same entry (`resumable: "native"`).
+  - API chat: rebuild the message list from the stored transcript (user text,
+    assistant text, tool calls and results; results over 8 KB truncated with a
+    note) and continue (`resumable: "transcript"`).
+  - ACP agent without `loadSession`: read-only transcript (`resumable: "none"`)
+    with "Continue in a new session", which starts a session and **stages** (never
+    sends) an editable summary prompt: the last user messages and the final agent
+    answer.
+- Title: first line of the first user message (≤ 60 characters), renameable.
+- UI: the session picker gains a **History** section (search; Today / This week /
+  Older), rows show title, connection · model, relative time and a resumable
+  badge, with Resume / Open / Rename / Delete. Opening a past entry never starts
+  a process until Resume.
+
+## Phase 4 — tools per connection (MCP servers)
+
+- The connection editor gets a **Tools** section: the MCP servers attached to
+  this connection, each with a switch. `jam-board` is always on and not
+  removable.
+- Presets, all off by default:
+  - **Web (Jam Board)** — the bundled `jam-web-mcp` sidecar (below).
+  - **Browser** — Playwright MCP (`npx -y @playwright/mcp@latest`): the agent
+    opens and drives its own separate browser.
+  - **Desktop (advanced)** — a desktop-control MCP command the person supplies;
+    no bundled default; danger notice "The agent can see and control your
+    screen. Turn it on only while you need it."
+  - **Custom** — stdio command/args/env, or an HTTP URL with an optional bearer
+    secret kept in the credential store.
+- Applied to ACP sessions (`session/new` `mcpServers`), Claude/Codex terminal
+  CLIs (their MCP flags) and, new in this phase, built-in API chat through a
+  multi-server MCP client.
+- API chat tool names are `<server>__<tool>`. Permission: jam-board read-only
+  tools run directly as today; other servers' tools run directly only when the
+  tool carries the MCP annotation `readOnlyHint: true` **and** the server's
+  "Trust read-only tools" is on (default on for the Web preset, off otherwise);
+  everything else goes through the permission card.
+- Profile `extraMcpServers[]` gains `enabled`, `preset`, `trustReadOnly`, and an
+  `http` variant `{ url, bearerSecretKey? }`.
+
+## Phase 4 — web tools (`jam-web-mcp`)
+
+A bundled stdio MCP server (crate `crates/jam-web-mcp`, shipped as a sidecar
+like `jam-board-mcp`) so any connection — including API chat via OpenRouter or
+z.ai — can search the web and collect images, e.g. for the moodboard loop in
+[canvas references](canvas-references.md).
+
+- Tools:
+  - `web_search { query, kind: "web" | "images", count?: 1..20 }` →
+    `{ title, url, snippet?, imageUrl?, thumbnailUrl?, width?, height?, source }[]`
+    (`readOnlyHint`).
+  - `read_page { url, maxChars?: ≤ 50 000 }` → readable text, title, og:image
+    (`readOnlyHint`).
+  - `download_image { url, filename? }` → `{ path, mimeType, bytes, width?,
+    height?, sourceUrl }` saved under `JAM_WEB_DOWNLOAD_DIR`
+    (`<data dir>/web-downloads/<projectId>/`); it writes a file, so it is not
+    read-only.
+- Search providers (`JAM_WEB_PROVIDER`): `brave` (web + image search, secret
+  `BRAVE_API_KEY`) and `tavily` (web + images, secret `TAVILY_API_KEY`). Keys
+  live in the credential store and are injected only into this child's
+  environment. Settings → Agents → **Web search**: provider, key (set / not set),
+  "Test". Without a provider `web_search` returns a clear error;
+  `read_page` and `download_image` still work.
+- Safety: http/https only; every hop (≤ 3 redirects) must resolve to a public
+  address (no loopback, private, link-local, CGNAT, multicast); 15 s timeout;
+  `read_page` reads ≤ 2 MB, text only; `download_image` requires an `image/*`
+  type, ≤ 15 MB, and a recognised PNG/JPEG/WebP/GIF/AVIF signature; user agent
+  `JamBoard/<version>`.
+
+## Phase 4 — cloud speech engine
+
+- Settings → Voice → **Engine**: Local Whisper (default) / Cloud.
+- Cloud = any OpenAI-compatible `/audio/transcriptions` endpoint. Presets: Groq
+  (`https://api.groq.com/openai/v1`, default model `whisper-large-v3-turbo`),
+  OpenAI (`https://api.openai.com/v1`, default model `gpt-4o-mini-transcribe`),
+  Custom (base URL + model). Model is editable; key in the credential store
+  (`voice:<provider>:API_KEY`).
+- The popover status line and Settings say "Audio is sent to <provider> for
+  transcription." `voice_prepare` is a no-op; nothing to unload.
+- `VoiceStatus` gains `engine: "local-whisper" | "cloud"` (already a field) and
+  `cloud: { provider: "groq" | "openai" | "custom", baseUrl, model, keySet } | null`;
+  `voice_settings_save` accepts the engine and cloud fields; new
+  `voice_set_cloud_key({ provider, key })` and `voice_clear_cloud_key({ provider })`.
+- Errors in plain words: 401 → "Check the API key"; 413 → "Recording too long for
+  this provider"; network → "Can't reach <provider>".
+
+## Phase 4 — provider errors and retry
+
+Providers fail transiently (rate limits, "model at capacity", dropped streams).
+The dock says what happened in plain words and offers the next step.
+
+- `error` events gain `code: "rate_limited" | "overloaded" | "auth" |
+  "context_too_long" | "network" | "provider" | "agent" | null`,
+  `retryable: boolean` and `retryAfterMs: number | null`. Classification uses
+  HTTP status (429, 503, 529, 401/403, 413), provider error bodies (e.g. "at
+  capacity", "overloaded", "rate limit", context length) and ACP error data.
+- **API chat auto-retry**: a model request that fails before any output with a
+  retryable code is retried automatically up to 2 times (backoff 2 s, then 6 s,
+  or `Retry-After` when ≤ 30 s). Each wait emits
+  `{ kind: "retrying", attempt, maxAttempts, delayMs, code }`. Tool calls that
+  already ran in the turn are never re-executed; only the model request repeats.
+  A stream that fails after output started is not retried automatically.
+- **ACP agents** retry inside the agent; the dock shows their final error.
+- **Error card** in the transcript: plain title by code ("The model is busy right
+  now", "Rate limit reached", "Check the API key or sign in", "The conversation is
+  too long for this model", "Can't reach the provider"), the provider's own text
+  under "Details", and actions:
+  - **Retry** — `retry_agent_turn({ sessionId })` re-sends the last user message
+    with its attachments and context (API chat discards the failed partial
+    answer); disabled with a countdown while `retryAfterMs` runs.
+  - **Switch model** — opens the Model · Effort chip (shown for `overloaded`,
+    `rate_limited`, `context_too_long`).
+  - **Sign in / Add key** for `auth` (existing auth card).
+- While an auto-retry waits, the composer shows "Retrying in 6 s (2/3)…" with
+  Stop, and the Brain button state stays "working".
+
 ## Later (kept in mind, not built)
 
-Audio prompt content for agents that accept it, a cloud speech engine,
-browser and computer-use MCP servers per profile, session resume via ACP
-`session/load`, extra MCP servers for API chat, web tools for API chat,
-multi-agent views.
+Audio prompt content for agents that accept it, multi-agent views, a bundled
+desktop-control MCP server.

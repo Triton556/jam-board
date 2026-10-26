@@ -477,11 +477,13 @@ export function SessionControls({
   options,
   disabled,
   fail,
+  openModelEpoch = 0,
 }: {
   session: AgentSessionView;
   options: ConfigOption[];
   disabled: boolean;
   fail(error: string): void;
+  openModelEpoch?: number;
 }) {
   const profiles = useQuery({
     queryKey: ["agentDockProfiles"],
@@ -492,6 +494,13 @@ export function SessionControls({
   const [open, setOpen] = useState<"model" | "access" | "more" | null>(null);
   const [busy, setBusy] = useState(false);
   const model = options.find((o) => optionCategory(o) === "model");
+  const lastModelRequest = useRef(0);
+  useEffect(() => {
+    if (openModelEpoch > lastModelRequest.current && model && !disabled) {
+      lastModelRequest.current = openModelEpoch;
+      setOpen("model");
+    }
+  }, [openModelEpoch, model, disabled]);
   const effort = options.find((o) => optionCategory(o) === "thought_level");
   const access = options.find((o) => optionCategory(o) === "mode");
   const other = options.filter(

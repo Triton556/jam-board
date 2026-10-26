@@ -54,6 +54,7 @@ vi.mock("./voice-capture", async (original) => ({
 const ready = (): VoiceStatus => ({
   enabled: true,
   engine: "local-whisper",
+  cloud: null,
   model: "balanced",
   installedModels: ["balanced"],
   runtimeInstalled: true,
@@ -453,4 +454,57 @@ it("H-BD17 closing the dock releases a take; read failures offer Retry without l
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   await waitFor(() => expect(useVoiceState.getState().status).not.toBeNull());
   await refreshVoice();
+});
+it("R6-V03 cloud mic shows its provider, bypasses local downloads and displays the 401 recovery message", async () => {
+  f.status = {
+    ...ready(),
+    engine: "cloud",
+    runtimeInstalled: false,
+    installedModels: [],
+    cloud: {
+      provider: "groq",
+      baseUrl: "https://api.groq.com/openai/v1",
+      model: "whisper-large-v3-turbo",
+      keySet: true,
+    },
+  };
+  vi.mocked(voiceApi.transcribe).mockRejectedValueOnce(
+    Error("Check the API key"),
+  );
+  const mic = await mount();
+  await waitFor(() => expect(mic).toBeEnabled());
+  fireEvent.focus(mic);
+  expect(
+    screen.getByText("Audio is sent to Groq for transcription."),
+  ).toBeVisible();
+  expect(screen.queryByRole("button", { name: /^Download/ })).toBeNull();
+  fireEvent.click(mic);
+  await screen.findByRole("meter");
+  fireEvent.keyDown(
+    screen.getByRole("textbox", { name: "Message the brain" }),
+    { code: "Space", ctrlKey: true },
+  );
+  expect(await screen.findByText("Check the API key")).toBeVisible();
+  expect(
+    screen.getByRole("textbox", { name: "Message the brain" }),
+  ).toHaveValue("");
+});
+it("R6-V04 changing the engine cancels a captured take before transcription", async () => {
+  const mic = await mount();
+  await waitFor(() => expect(mic).toBeEnabled());
+  fireEvent.click(mic);
+  await screen.findByRole("meter");
+  f.status = {
+    ...ready(),
+    engine: "cloud",
+    cloud: {
+      provider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-4o-mini-transcribe",
+      keySet: true,
+    },
+  };
+  await act(() => refreshVoice());
+  expect(f.release).toHaveBeenCalled();
+  expect(voiceApi.transcribe).not.toHaveBeenCalled();
 });

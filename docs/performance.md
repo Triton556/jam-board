@@ -6,6 +6,55 @@ Timing results are observations of the stated machine/build/workload, not produc
 latency guarantees. Browser frame timing, DOM correctness and database timing are
 separate kinds of evidence.
 
+## Startup time
+
+Measure a release desktop app from the first Rust entry into `run` to the first
+visible paint of real route content. `processToWindowMs` records native window
+creation (the initially hidden window exists at setup); `processToFirstPaintMs`
+records the frontend `jam:first-paint` mark after a data-backed board/plan or the
+welcome view commits, the window becomes visible, and two animation frames pass.
+It excludes IPC delivery time. This is a practical first-screen proxy, not a
+compositor presentation timestamp or proof that every deferred feature is ready.
+
+Close other Jam Board instances, then run from the repository root:
+
+```powershell
+./scripts/measure-startup.ps1 -Executable ./target/release/jam-board.exe -Runs 7
+```
+
+Keep the matching `jam-board-mcp.exe` sidecar beside the executable. The script
+seeds the real fictional demo using that sidecar in a unique throwaway data
+directory, then reuses that directory for all measured launches. It never copies
+an installed user's data. Evidence stays under `test-visuals/round6/w6/`: raw JSON
+lines and the fixture in a unique subdirectory, plus the latest `startup.json`.
+An existing app instance, missing receipt, failed launch or 60-second timeout
+fails the run. The retained fixture allows investigation; cleanup is manual.
+
+The first measured launch is labelled **cold** (one sample); the remaining six
+are **warm**. Cold does not mean flushed OS/WebView caches: demo seeding and
+earlier machine activity can warm those caches. Median uses the middle value or
+mean of the middle pair; p90 uses nearest rank. A single cold sample has identical
+median and p90. Record machine, Windows/WebView version, power mode, app version,
+source revision and concurrent load when comparing runs.
+
+The runtime probe requires `JAM_BOARD_STARTUP_PROBE=1` and a writable path in
+`JAM_BOARD_STARTUP_OUT`. It appends exactly one JSON line with
+`processToWindowMs`, `processToFirstPaintMs`, `route`, and `version`.
+`JAM_BOARD_STARTUP_EXIT=1` exits after a successful write; otherwise the app stays
+open. Without the probe flag Rust installs no probe state or initialization
+script. The standalone helper is imported from packaged assets only by that
+opt-in native script; it adds no JavaScript to the initial chunk. The 250 KB
+initial-JS budget stays as a cheap build guard; bundle bytes are not a startup-time
+baseline or usability claim.
+No human action, agent state or execution grant changes in this diagnostic path.
+
+Owner-machine baseline — **QA pending; no timings measured here**:
+
+| Build / machine / OS / WebView | Runs | Group | Window median / p90 (ms) | First paint median / p90 (ms) |
+|---|---:|---|---|---|
+| Pending | 1 | Cold (first launch) | — | — |
+| Pending | 6 | Warm (remaining launches) | — | — |
+
 ## Routine correctness
 
 `cargo test --workspace` includes a small real-Store volume fixture covering counts,

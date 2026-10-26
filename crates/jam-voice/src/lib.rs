@@ -1,6 +1,8 @@
-//! Local-only dictation. Downloading assets is separate from sending audio;
-//! inference uses a proxy-free client restricted to our loopback sidecar.
+//! Local and opt-in cloud dictation. Downloading assets is separate from sending audio;
+//! Local inference uses a proxy-free client restricted to our loopback sidecar.
+mod cloud;
 mod download;
+pub use cloud::*;
 mod model;
 mod process;
 mod wav;
@@ -53,6 +55,8 @@ struct Inner {
     physical_cores: usize,
     client: reqwest::Client,
     inference: reqwest::Client,
+    cloud_client: reqwest::Client,
+    credentials: Arc<dyn VoiceCredentials>,
     sources: download::Sources,
     progress: ProgressCallback,
     #[cfg(test)]
@@ -61,6 +65,8 @@ struct Inner {
     fixture_process: bool,
 }
 struct State {
+    engine: VoiceEngine,
+    cloud: Option<CloudSettings>,
     settings: VoiceSettings,
     model_chosen: bool,
     state: VoiceState,
@@ -71,6 +77,10 @@ struct State {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredSettings {
+    #[serde(default)]
+    engine: VoiceEngine,
+    #[serde(default)]
+    cloud: Option<CloudSettings>,
     #[serde(flatten)]
     settings: VoiceSettings,
     #[serde(default)]
@@ -132,13 +142,15 @@ impl LocalWhisper {
             model: VoiceDevice::Auto.recommended_model(gpu).into(),
             ..Default::default()
         };
+        let mut engine = VoiceEngine::LocalWhisper;
+        let mut cloud = None;
         let (settings, model_chosen, settings_error) = match std::fs::read(&path) {
             Ok(bytes) => match serde_json::from_slice::<StoredSettings>(&bytes) {
-                Ok(stored) if stored.settings.idle_unload_minutes != Some(0) => (stored.settings, stored.model_chosen.unwrap_or(true), None),
+                Ok(stored) if stored.settings.idle_unload_minutes != Some(0) => { engine = stored.engine; cloud = stored.cloud; (stored.settings, stored.model_chosen.unwrap_or(true), None) },
                 _ => (defaults, false, Some("Voice settings could not be read. Voice input is off; save settings to repair them.".to_owned())),
             },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                persist(&root, &defaults, false)?;
+                persist(&root, &defaults, false, engine, &cloud)?;
                 (defaults, false, None)
             },
             Err(e) => return Err(e.into()),
@@ -147,6 +159,8 @@ impl LocalWhisper {
             inner: Arc::new(Inner {
                 root,
                 state: Mutex::new(State {
+                    engine,
+                    cloud,
                     settings,
                     model_chosen,
                     state: VoiceState::Idle,
@@ -172,6 +186,12 @@ impl LocalWhisper {
                     .redirect(reqwest::redirect::Policy::none())
                     .timeout(Duration::from_secs(300))
                     .build()?,
+                cloud_client: reqwest::Client::builder()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .connect_timeout(Duration::from_secs(20))
+                    .timeout(Duration::from_secs(300))
+                    .build()?,
+                credentials: cloud::unavailable_credentials(),
                 sources,
                 progress,
                 #[cfg(test)]
@@ -212,22 +232,47 @@ impl LocalWhisper {
         if input.idle_unload_minutes == Some(0) {
             return Err(err("Idle unload minutes must be positive or null"));
         }
-        if !input.enabled {
-            self.cancel_install();
+        if let Some(cloud) = &input.cloud {
+            cloud.validate()?;
         }
-        // Disable kills immediately, including during model warm-up or inference.
-        if !input.enabled {
+        // Disable or an engine/config switch invalidates in-flight results immediately.
+        let stop = !input.enabled
+            || input
+                .engine
+                .is_some_and(|engine| engine != self.lock().engine)
+            || input
+                .cloud
+                .as_ref()
+                .is_some_and(|cloud| self.lock().cloud.as_ref() != Some(cloud));
+        if stop {
+            self.cancel_install();
             self.inner.use_generation.fetch_add(1, Ordering::SeqCst);
             let mut state = self.lock();
-            state.settings.enabled = false;
+            if !input.enabled {
+                state.settings.enabled = false;
+            }
             state.server.take();
         }
         let _operation = self.inner.operation.lock().await;
         self.ensure_open()?;
+        let (engine, cloud) = {
+            let state = self.lock();
+            let engine = input.engine.unwrap_or(state.engine);
+            let cloud = input
+                .cloud
+                .clone()
+                .or_else(|| state.cloud.clone())
+                .or_else(|| (engine == VoiceEngine::Cloud).then(|| CloudProvider::Groq.preset()));
+            (engine, cloud)
+        };
         let (model, model_chosen) = {
             let state = self.lock();
             let model = input.model.unwrap_or_else(|| {
-                if input.enabled && !state.model_chosen {
+                if input.enabled
+                    && !state.model_chosen
+                    && engine == VoiceEngine::LocalWhisper
+                    && input.engine.is_none()
+                {
                     input.device.recommended_model(self.inner.gpu).into()
                 } else {
                     state.settings.model
@@ -235,7 +280,9 @@ impl LocalWhisper {
             });
             (
                 model,
-                state.model_chosen || input.model.is_some() || input.enabled,
+                state.model_chosen
+                    || input.model.is_some()
+                    || (input.enabled && engine == VoiceEngine::LocalWhisper),
             )
         };
         let settings = VoiceSettings {
@@ -245,13 +292,15 @@ impl LocalWhisper {
             language: input.language,
             idle_unload_minutes: input.idle_unload_minutes,
         };
-        persist(&self.inner.root, &settings, model_chosen)?;
+        persist(&self.inner.root, &settings, model_chosen, engine, &cloud)?;
         {
             let mut state = self.lock();
-            if settings != state.settings {
+            if settings != state.settings || state.engine != engine || state.cloud != cloud {
                 self.inner.use_generation.fetch_add(1, Ordering::SeqCst);
                 state.server.take();
             }
+            state.engine = engine;
+            state.cloud = cloud;
             state.settings = settings;
             state.model_chosen = model_chosen;
             if state.server.is_none() {
@@ -314,6 +363,9 @@ impl LocalWhisper {
             if !state.settings.enabled {
                 return Err(err("Voice input is disabled"));
             }
+            if state.engine == VoiceEngine::Cloud {
+                return Ok(());
+            }
             if let Some(server) = &mut state.server
                 && server.alive()?
             {
@@ -365,6 +417,9 @@ impl LocalWhisper {
                 return Ok(server.url());
             }
             state.server.take();
+            if state.engine == VoiceEngine::Cloud {
+                return Err(err("Local voice runtime is inactive"));
+            }
             let settings = &state.settings;
             if settings.device == VoiceDevice::Gpu && !self.inner.gpu {
                 return Err(err("An NVIDIA driver is required for GPU voice input"));
@@ -594,6 +649,12 @@ impl SpeechToText for LocalWhisper {
         let runtime_installed = find_server(&self.runtime_dir(state.settings.device)).is_some();
         let current = if !state.settings.enabled {
             VoiceState::Off
+        } else if state.engine == VoiceEngine::Cloud {
+            if state.state == VoiceState::Error {
+                VoiceState::Error
+            } else {
+                VoiceState::Idle
+            }
         } else if matches!(
             state.state,
             VoiceState::Installing | VoiceState::Loading | VoiceState::Error
@@ -608,7 +669,20 @@ impl SpeechToText for LocalWhisper {
         };
         Ok(VoiceStatus {
             settings: state.settings.clone(),
-            engine: VoiceEngine::LocalWhisper,
+            engine: state.engine,
+            cloud: state
+                .cloud
+                .clone()
+                .map(|settings| {
+                    self.inner
+                        .credentials
+                        .get(settings.provider)
+                        .map(|key| CloudStatus {
+                            settings,
+                            key_set: key.is_some_and(|k| !k.is_empty()),
+                        })
+                })
+                .transpose()?,
             installed_models,
             runtime_installed,
             gpu_available: self.inner.gpu,
@@ -664,14 +738,26 @@ impl SpeechToText for LocalWhisper {
             armed: true,
         };
         let generation = self.inner.use_generation.load(Ordering::SeqCst);
-        let result = self.infer(input, generation).await;
+        let cloud = self.lock().engine == VoiceEngine::Cloud;
+        let result = if cloud {
+            self.infer_cloud(input, generation).await
+        } else {
+            self.infer(input, generation).await
+        };
         if let Err(error) = &result {
             self.fail(error);
+        } else if cloud {
+            let mut state = self.lock();
+            state.state = VoiceState::Idle;
+            state.error = None;
         }
         cleanup.armed = false;
         result
     }
     async fn unload(&self) -> Result<()> {
+        if self.lock().engine == VoiceEngine::Cloud {
+            return Ok(());
+        }
         self.inner.use_generation.fetch_add(1, Ordering::SeqCst);
         self.lock().server.take();
         let _operation = self.inner.operation.lock().await;
@@ -682,11 +768,19 @@ impl SpeechToText for LocalWhisper {
     }
 }
 
-fn persist(root: &Path, settings: &VoiceSettings, model_chosen: bool) -> Result<()> {
+fn persist(
+    root: &Path,
+    settings: &VoiceSettings,
+    model_chosen: bool,
+    engine: VoiceEngine,
+    cloud: &Option<CloudSettings>,
+) -> Result<()> {
     use std::io::Write;
     let temporary = root.join("settings.json.tmp");
     let mut file = std::fs::File::create(&temporary)?;
     file.write_all(&serde_json::to_vec_pretty(&StoredSettings {
+        engine,
+        cloud: cloud.clone(),
         settings: settings.clone(),
         model_chosen: Some(model_chosen),
     })?)?;

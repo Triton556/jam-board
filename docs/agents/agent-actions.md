@@ -1,5 +1,13 @@
 # Agent actions, state and recovery
 
+## Round 6 W1: AG12/AG14 presentation boundary
+
+RC07 removes the diagnostic renderer flags and selects gesture-only promotion;
+AG12/AG14 full records, world geometry, project scope, selections and staged/drop
+payloads remain model-based. Standard Flow virtualization changes presentation
+only. It never archives references, launches work or grants Send/Start authority.
+Earlier RC01�RC06 rendering strategies are historical, superseded by RC07.
+
 [Index](README.md) · Baseline alpha28 `2b263795b31767da29db0b62dc81f4da19dfc4d1`, inspected 2026-10-22. Alpha29 human-first layout does not change this tool/authority contract. [Canonical MCP contract](../mcp.md) and live tool schemas take precedence for argument details.
 
 ## Actor / state interaction map

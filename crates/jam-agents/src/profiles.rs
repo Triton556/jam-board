@@ -96,7 +96,7 @@ impl Profile {
 }
 /// Commands are argv, never shell scripts. Accept an executable/path and optional
 /// quoted tokens, preserving Windows backslashes; args remains the preferred UI.
-fn command_tokens(command: &str) -> Result<Vec<String>> {
+pub(crate) fn command_tokens(command: &str) -> Result<Vec<String>> {
     if std::path::Path::new(command).is_file() {
         return Ok(vec![command.into()]);
     }
@@ -128,7 +128,7 @@ fn command_tokens(command: &str) -> Result<Vec<String>> {
 }
 pub struct Profiles {
     store: Arc<Store>,
-    credentials: Arc<dyn CredentialStore>,
+    pub(crate) credentials: Arc<dyn CredentialStore>,
     lock: Mutex<()>,
 }
 impl Profiles {
@@ -144,6 +144,12 @@ impl Profiles {
         if let Some(json) = self.store.setting(SETTINGS_KEY)? {
             let mut saved_json: serde_json::Value = serde_json::from_str(&json)?;
             for p in saved_json.as_array_mut().into_iter().flatten() {
+                for server in p["extraMcpServers"].as_array_mut().into_iter().flatten() {
+                    // Entries saved before switches existed were explicitly configured and enabled.
+                    if server.get("enabled").is_none() {
+                        server["enabled"] = serde_json::json!(true);
+                    }
+                }
                 if p.get("effortStyle").is_none() {
                     p["effortStyle"] = serde_json::json!(match p["id"].as_str() {
                         Some("api-openrouter") => "openrouter",
@@ -227,6 +233,14 @@ impl Profiles {
             available: reason.as_deref().is_none_or(|s| s == "via npx"),
             unavailable_reason: reason,
             built_in,
+            extra_mcp_servers: p
+                .extra_mcp_servers
+                .into_iter()
+                .map(|mut entry| {
+                    entry.trust_read_only = Some(entry.trusts_read_only());
+                    entry
+                })
+                .collect(),
         })
     }
     pub fn list(&self) -> Result<Vec<AgentProfileView>> {
@@ -308,6 +322,16 @@ impl Profiles {
                 "An executable command is required; pass arguments separately",
             ));
         }
+        for mcp in &p.extra_mcp_servers {
+            if let Some(key) = mcp.http.as_ref().and_then(|h| h.bearer_secret_key.as_ref())
+                && !p.secret_keys.iter().any(|k| &k.key == key)
+            {
+                p.secret_keys.push(SecretKey {
+                    key: key.clone(),
+                    label: format!("{} bearer token", mcp.name),
+                });
+            }
+        }
         for key in &p.secret_keys {
             validate_key(&key.key)?;
         }
@@ -332,8 +356,22 @@ impl Profiles {
             if mcp.name == "jam-board" {
                 return Err(err("The jam-board MCP entry cannot be overridden"));
             }
-            if !std::path::Path::new(&mcp.command).is_absolute() {
-                return Err(err("Extra MCP server commands must be absolute paths"));
+            if mcp.name.is_empty()
+                || !mcp
+                    .name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+                || mcp.name.contains("__")
+            {
+                return Err(err("Invalid MCP server name"));
+            }
+            if let Some(http) = &mcp.http {
+                crate::wiring::validate_mcp_url(&http.url)?;
+                if let Some(key) = &http.bearer_secret_key {
+                    validate_key(key)?;
+                }
+            } else if mcp.enabled && matches!(mcp.preset, McpPreset::Custom | McpPreset::Desktop) {
+                command_tokens(&mcp.command)?;
             }
             for env in &mcp.env {
                 validate_key(&env.name)?;
@@ -347,6 +385,10 @@ impl Profiles {
                     ));
                 }
             }
+        }
+        let mut names = std::collections::BTreeSet::new();
+        if p.extra_mcp_servers.iter().any(|e| !names.insert(&e.name)) {
+            return Err(err("MCP server names must be unique"));
         }
         if p.kind != RuntimeKind::Api {
             command_tokens(&p.command)?;
@@ -574,4 +616,16 @@ fn presets() -> BTreeMap<String, Profile> {
         )
     })
     .collect()
+}
+
+/// Resolve an MCP command independently of profile credentials or runtime presets.
+pub(crate) fn mcp_launch_command(
+    command: &str,
+    args: &[String],
+) -> Result<(std::path::PathBuf, Vec<String>)> {
+    let mut tokens = command_tokens(command)?;
+    let path =
+        which::which(tokens.remove(0)).map_err(|_| err("MCP executable not found on PATH"))?;
+    tokens.extend_from_slice(args);
+    Ok((path, tokens))
 }

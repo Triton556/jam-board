@@ -5,6 +5,13 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
+	webSearchSettings: () => typedError<WebSearchSettings, ApiError_Serialize>(__TAURI_INVOKE("web_search_settings")),
+	saveWebSearchSettings: (input: WebSearchSettingsInput) => typedError<WebSearchSettings, ApiError_Serialize>(__TAURI_INVOKE("save_web_search_settings", { input })),
+	setWebSearchKey: (provider: Provider, key: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_web_search_key", { provider, key })),
+	clearWebSearchKey: (provider: Provider) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("clear_web_search_key", { provider })),
+	testWebSearch: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("test_web_search")),
+	voiceSetCloudKey: (provider: CloudProvider, key: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_set_cloud_key", { provider, key })),
+	voiceClearCloudKey: (provider: CloudProvider) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_clear_cloud_key", { provider })),
 	voiceStatus: () => typedError<VoiceStatus, ApiError_Serialize>(__TAURI_INVOKE("voice_status")),
 	voicePrepare: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_prepare")),
 	voiceSettingsSave: (input: VoiceSettingsInput_Deserialize) => typedError<VoiceStatus, ApiError_Serialize>(__TAURI_INVOKE("voice_settings_save", { input })),
@@ -13,17 +20,26 @@ export const commands = {
 	voiceRemove: (model: "fast" | "balanced" | "best" | null) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_remove", { model })),
 	voiceTranscribe: (wavBase64: string, language: "auto" | "ru" | "en" | null, initialPrompt: string | null) => typedError<Transcription, ApiError_Serialize>(__TAURI_INVOKE("voice_transcribe", { wavBase64, language, initialPrompt })),
 	voiceUnload: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("voice_unload")),
+	agentHistory: (limit: number | null, query: string | null) => typedError<HistoryEntry[], ApiError_Serialize>(__TAURI_INVOKE("agent_history", { limit, query })),
+	agentHistoryEvents: (entryId: string) => typedError<AgentDockEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("agent_history_events", { entryId })),
+	resumeAgentSession: (entryId: string) => typedError<AgentSessionView, ApiError_Serialize>(__TAURI_INVOKE("resume_agent_session", { entryId })),
+	renameAgentHistory: (entryId: string, title: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("rename_agent_history", { entryId, title })),
+	deleteAgentHistory: (entryId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("delete_agent_history", { entryId })),
+	clearAgentHistory: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("clear_agent_history")),
+	agentHistorySettings: () => typedError<HistorySettings, ApiError_Serialize>(__TAURI_INVOKE("agent_history_settings")),
+	saveAgentHistorySettings: (keepHistory: boolean) => typedError<HistorySettings, ApiError_Serialize>(__TAURI_INVOKE("save_agent_history_settings", { keepHistory })),
 	agentModelCatalog: (input: AgentModelCatalogInput_Deserialize) => typedError<ModelCatalog_Serialize, ApiError_Serialize>(__TAURI_INVOKE("agent_model_catalog", { input })),
 	addAgentAttachment: (input: AddAgentAttachmentInput) => typedError<AttachmentView, ApiError_Serialize>(__TAURI_INVOKE("add_agent_attachment", { input })),
 	removeAgentAttachment: (input: RemoveAgentAttachmentInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("remove_agent_attachment", { input })),
-	agentProfiles: () => typedError<AgentProfileView[], ApiError_Serialize>(__TAURI_INVOKE("agent_profiles")),
-	saveAgentProfile: (input: AgentProfileInput_Deserialize) => typedError<AgentProfileView, ApiError_Serialize>(__TAURI_INVOKE("save_agent_profile", { input })),
+	agentProfiles: () => typedError<AgentProfileView_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("agent_profiles")),
+	saveAgentProfile: (input: AgentProfileInput_Deserialize) => typedError<AgentProfileView_Serialize, ApiError_Serialize>(__TAURI_INVOKE("save_agent_profile", { input })),
 	deleteAgentProfile: (profileId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("delete_agent_profile", { profileId })),
 	setAgentSecret: (profileId: string, key: string, value: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_agent_secret", { profileId, key, value })),
 	clearAgentSecret: (profileId: string, key: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("clear_agent_secret", { profileId, key })),
 	agentSessions: () => typedError<AgentSessionView[], ApiError_Serialize>(__TAURI_INVOKE("agent_sessions")),
 	startAgentSession: (input: StartAgentSessionInput_Deserialize) => typedError<AgentSessionView, ApiError_Serialize>(__TAURI_INVOKE("start_agent_session", { input })),
 	sendAgentPrompt: (input: SendAgentPromptInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("send_agent_prompt", { input })),
+	retryAgentTurn: (sessionId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("retry_agent_turn", { sessionId })),
 	cancelAgentTurn: (sessionId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("cancel_agent_turn", { sessionId })),
 	resolveAgentPermission: (input: ResolveAgentPermissionInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("resolve_agent_permission", { input })),
 	setAgentConfigOption: (input: SetAgentConfigOptionInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("set_agent_config_option", { input })),
@@ -232,11 +248,13 @@ export type AgentDockEvent_Serialize = {
 	at: string,
 } & AgentEventKind_Serialize;
 
+export type AgentErrorCode = "rate_limited" | "overloaded" | "auth" | "context_too_long" | "network" | "provider" | "agent";
+
 export type AgentEventKind = AgentEventKind_Serialize | AgentEventKind_Deserialize;
 
-export type AgentEventKind_Deserialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { commands?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "tool_call"; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; label?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; state?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "plan"; entries: PlanEntry_Deserialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; options?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "config_options"; options: ConfigOption_Deserialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "turn_end"; stopReason: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "error"; message: string; detail?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never };
+export type AgentEventKind_Deserialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { attempt?: never; code?: never; commands?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "tool_call"; toolName?: string | null; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { attempt?: never; code?: never; commands?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; label?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { attempt?: never; code?: never; commands?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never; toolKind?: never; toolName?: never } | ({ kind: "plan"; entries: PlanEntry_Deserialize[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; output?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never; toolName?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; options?: never; output?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { attempt?: never; code?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "config_options"; options: ConfigOption_Deserialize[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "turn_end"; stopReason: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "retrying"; attempt: number; maxAttempts: number; delayMs: number; code: AgentErrorCode }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "error"; code?: AgentErrorCode | null; retryable?: boolean; retryAfterMs?: number | null; message: string; detail?: string | null }) & { attempt?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never };
 
-export type AgentEventKind_Serialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { commands?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "tool_call"; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; label?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { commands?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; state?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "plan"; entries: PlanEntry_Serialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; options?: never; output?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "config_options"; options: ConfigOption_Serialize[] }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "turn_end"; stopReason: string }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never } | ({ kind: "error"; message: string; detail?: string | null }) & { commands?: never; content?: never; contextPreamble?: never; entries?: never; input?: never; label?: never; locations?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never };
+export type AgentEventKind_Serialize = ({ kind: "status"; status: SessionStatus; message?: string | null }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string | null }) & { attempt?: never; code?: never; commands?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "agent_message_delta"; messageId: string; text: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "agent_thought_delta"; messageId: string; text: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "tool_call"; toolName?: string | null; toolCallId: string; title: string; toolKind: string; status: string; input?: JsonPayload | null; content?: string | null; locations?: string[] | null }) & { attempt?: never; code?: never; commands?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; label?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never } | ({ kind: "tool_call_update"; toolCallId: string; title?: string | null; status?: string | null; content?: string | null; output?: JsonPayload | null }) & { attempt?: never; code?: never; commands?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; stopReason?: never; text?: never; toolKind?: never; toolName?: never } | ({ kind: "plan"; entries: PlanEntry_Serialize[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "permission_request"; requestId: string; toolCallId?: string | null; title: string; options: PermissionOption[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; output?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; toolKind?: never; toolName?: never } | ({ kind: "permission_resolved"; requestId: string; optionId: string | null }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; options?: never; output?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "available_commands"; commands: AvailableCommand[] }) & { attempt?: never; code?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "config_options"; options: ConfigOption_Serialize[] }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "auth"; state: AuthState; label: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "turn_end"; stopReason: string }) & { attempt?: never; code?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "retrying"; attempt: number; maxAttempts: number; delayMs: number; code: AgentErrorCode }) & { commands?: never; content?: never; contextPreamble?: never; detail?: never; entries?: never; input?: never; label?: never; locations?: never; message?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; retryAfterMs?: never; retryable?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never } | ({ kind: "error"; code: AgentErrorCode | null; retryable: boolean; retryAfterMs: number | null; message: string; detail?: string | null }) & { attempt?: never; commands?: never; content?: never; contextPreamble?: never; delayMs?: never; entries?: never; input?: never; label?: never; locations?: never; maxAttempts?: never; messageId?: never; optionId?: never; options?: never; output?: never; requestId?: never; state?: never; status?: never; stopReason?: never; text?: never; title?: never; toolCallId?: never; toolKind?: never; toolName?: never };
 
 export type AgentModelCatalogInput = AgentModelCatalogInput_Serialize | AgentModelCatalogInput_Deserialize;
 
@@ -268,7 +286,7 @@ export type AgentProfileInput_Deserialize = {
 	hidden?: boolean | null,
 	/**  Optional declarations for custom credentials, never credential values. */
 	secretKeys?: SecretKey[] | null,
-	extraMcpServers?: McpEntry[] | null,
+	extraMcpServers?: McpEntry_Deserialize[] | null,
 };
 
 export type AgentProfileInput_Serialize = {
@@ -287,10 +305,12 @@ export type AgentProfileInput_Serialize = {
 	hidden?: boolean | null,
 	/**  Optional declarations for custom credentials, never credential values. */
 	secretKeys?: SecretKey[] | null,
-	extraMcpServers?: McpEntry[] | null,
+	extraMcpServers?: McpEntry_Serialize[] | null,
 };
 
-export type AgentProfileView = {
+export type AgentProfileView = AgentProfileView_Serialize | AgentProfileView_Deserialize;
+
+export type AgentProfileView_Deserialize = {
 	id: string,
 	label: string,
 	kind: RuntimeKind,
@@ -308,6 +328,28 @@ export type AgentProfileView = {
 	available: boolean,
 	unavailableReason: string | null,
 	builtIn: boolean,
+	extraMcpServers: McpEntry_Deserialize[],
+};
+
+export type AgentProfileView_Serialize = {
+	id: string,
+	label: string,
+	kind: RuntimeKind,
+	preset: string | null,
+	agentName: string,
+	command: string | null,
+	args: string[],
+	baseUrl: string | null,
+	model: string | null,
+	effort: string | null,
+	effortStyle: EffortStyle,
+	env: Env[],
+	hidden: boolean,
+	secretKeys: SecretView[],
+	available: boolean,
+	unavailableReason: string | null,
+	builtIn: boolean,
+	extraMcpServers: McpEntry_Serialize[],
 };
 
 export type AgentSessionView = {
@@ -560,6 +602,18 @@ export type ChangesInput = {
 	cursor: number,
 	epicKey: string | null,
 };
+
+export type CloudProvider = "groq" | "openai" | "custom";
+
+export type CloudSettings = {
+	provider: CloudProvider,
+	baseUrl: string,
+	model: string,
+};
+
+export type CloudStatus = {
+	keySet: boolean,
+} & CloudSettings;
 
 export type Comment = {
 	id: string,
@@ -814,6 +868,28 @@ export type GeometryInput = {
 	h: number | null,
 };
 
+export type HistoryEntry = {
+	id: string,
+	projectId: string,
+	profileId: string,
+	profileLabel: string,
+	kind: HistoryKind,
+	title: string,
+	createdAt: string,
+	updatedAt: string,
+	model: string | null,
+	effort: string | null,
+	agentSessionId: string | null,
+	resumable: Resumable,
+	messageCount: number,
+};
+
+export type HistoryKind = "acp" | "api";
+
+export type HistorySettings = {
+	keepHistory: boolean,
+};
+
 export type InstallPhase = "runtime" | "model";
 
 export type Jam = {
@@ -844,12 +920,43 @@ export type LinkedTask = {
 
 export type McpCallsChanged = Record<string, never>;
 
-export type McpEntry = {
+export type McpEntry = McpEntry_Serialize | McpEntry_Deserialize;
+
+export type McpEntry_Deserialize = {
+	enabled?: boolean,
+	preset?: McpPreset,
+	trustReadOnly?: boolean | null,
+	http?: McpHttp_Deserialize | null,
+	name: string,
+	command?: string,
+	args?: string[],
+	env?: Env[],
+};
+
+export type McpEntry_Serialize = {
+	enabled: boolean,
+	preset: McpPreset,
+	trustReadOnly: boolean | null,
+	http?: McpHttp_Serialize | null,
 	name: string,
 	command: string,
 	args: string[],
 	env: Env[],
 };
+
+export type McpHttp = McpHttp_Serialize | McpHttp_Deserialize;
+
+export type McpHttp_Deserialize = {
+	url: string,
+	bearerSecretKey?: string | null,
+};
+
+export type McpHttp_Serialize = {
+	url: string,
+	bearerSecretKey?: string | null,
+};
+
+export type McpPreset = "web" | "browser" | "desktop" | "custom";
 
 export type McpStatus = {
 	projectId: string | null,
@@ -1064,6 +1171,8 @@ export type ProjectSummary = {
 } & Jam;
 
 export type PromptPart = { type: "attachment"; attachmentId: string } | { type: "text"; text: string } | { type: "board_ref"; uri: string; label: string; text: string } | { type: "image"; mimeType: string; data: string };
+
+export type Provider = "brave" | "tavily";
 
 export type Question = {
 	id: string,
@@ -1325,6 +1434,8 @@ export type ResolveExecutionRequest = {
 	decision: ExecutionDecision,
 	expectedRevision: string,
 };
+
+export type Resumable = "native" | "transcript" | "none";
 
 export type Review = {
 	id: string,
@@ -1683,7 +1794,7 @@ export type Transcription = {
 
 export type VoiceDevice = "auto" | "cpu" | "gpu";
 
-export type VoiceEngine = "local-whisper";
+export type VoiceEngine = "local-whisper" | "cloud";
 
 export type VoiceInstallProgress = {
 	phase: InstallPhase,
@@ -1710,6 +1821,8 @@ export type VoiceSettingsInput = VoiceSettingsInput_Serialize | VoiceSettingsInp
 
 /**  Omitting model preserves a saved choice, or uses the recommendation on first enable. */
 export type VoiceSettingsInput_Deserialize = {
+	engine?: VoiceEngine | null,
+	cloud?: CloudSettings | null,
 	enabled: boolean,
 	model?: VoiceModel | null,
 	device: VoiceDevice,
@@ -1719,6 +1832,8 @@ export type VoiceSettingsInput_Deserialize = {
 
 /**  Omitting model preserves a saved choice, or uses the recommendation on first enable. */
 export type VoiceSettingsInput_Serialize = {
+	engine?: VoiceEngine | null,
+	cloud?: CloudSettings | null,
 	enabled: boolean,
 	model?: VoiceModel | null,
 	device: VoiceDevice,
@@ -1730,6 +1845,7 @@ export type VoiceState = "off" | "not_installed" | "installing" | "idle" | "load
 
 export type VoiceStatus = {
 	engine: VoiceEngine,
+	cloud: CloudStatus | null,
 	installedModels: string[],
 	runtimeInstalled: boolean,
 	gpuAvailable: boolean,
@@ -1738,6 +1854,15 @@ export type VoiceStatus = {
 	error: string | null,
 	diskBytes: number,
 } & VoiceSettings;
+
+export type WebSearchSettings = {
+	provider: Provider | null,
+	keySet: boolean,
+};
+
+export type WebSearchSettingsInput = {
+	provider: Provider | null,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

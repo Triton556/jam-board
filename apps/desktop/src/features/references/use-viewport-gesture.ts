@@ -3,14 +3,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** Release the compositor hint after the final zoom paint, including interrupted gestures. */
 export function useViewportGesture() {
   const [moving, setMoving] = useState(false);
+  const active = useRef(false);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const start = useCallback(() => {
     clearTimeout(settle.current);
-    setMoving(true);
+    if (!active.current) {
+      active.current = true;
+      setMoving(true);
+    }
   }, []);
   const end = useCallback(() => {
     clearTimeout(settle.current);
-    settle.current = setTimeout(() => setMoving(false), 150);
+    settle.current = setTimeout(() => {
+      if (active.current) {
+        active.current = false;
+        setMoving(false);
+      }
+    }, 150);
   }, []);
   useEffect(() => {
     window.addEventListener("blur", end);

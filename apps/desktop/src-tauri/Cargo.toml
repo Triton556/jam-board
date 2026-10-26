@@ -16,6 +16,7 @@ jam-core.workspace = true
 jam-agents = { path = "../../../crates/jam-agents" }
 jam-voice = { path = "../../../crates/jam-voice" }
 jam-mcp.workspace = true
+jam-web-mcp = { path = "../../../crates/jam-web-mcp" }
 tauri = { workspace = true, features = ["protocol-asset"] }
 percent-encoding = "2"
 tauri-specta.workspace = true

@@ -49,6 +49,11 @@ export const tauriDockApi: AgentDockApi = {
   startSession: (input) => call("start_agent_session", { input }),
   sendPrompt: (input) => call("send_agent_prompt", { input }),
   cancelTurn: (sessionId) => call("cancel_agent_turn", { sessionId }),
+  retryTurn: async (sessionId) => {
+    const result = await commands.retryAgentTurn(sessionId);
+    if (result.status === "error")
+      throw new JamError(result.error.code, result.error.message);
+  },
   resolvePermission: (input) => call("resolve_agent_permission", { input }),
   setConfigOption: (input) => call("set_agent_config_option", { input }),
   stopSession: (sessionId) => call("stop_agent_session", { sessionId }),

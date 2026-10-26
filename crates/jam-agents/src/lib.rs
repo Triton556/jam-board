@@ -3,20 +3,25 @@ mod acp;
 mod api;
 mod attachments;
 mod catalog;
+mod history;
 mod launcher;
 mod model;
 mod process;
 mod profiles;
+mod provider_errors;
 mod session;
 mod terminal;
 mod wiring;
 
 pub use api::{ApiTool, ToolSource};
 pub use attachments::AttachmentMedia;
+pub use history::{HistoryEntry, HistoryKind, HistorySettings, Resumable};
 pub use model::*;
 pub use profiles::{CredentialStore, OsCredentials, Profiles};
 pub use session::{Connector, SessionManager};
-pub use wiring::{BoardContext, McpEntry, choose_cwd, mcp_entries, terminal_command};
+pub use wiring::{
+    BoardContext, McpEntry, McpHttp, McpPreset, choose_cwd, mcp_entries, terminal_command,
+};
 
 pub type Result<T> = std::result::Result<T, AgentError>;
 
@@ -52,3 +57,6 @@ mod tests;
 
 #[cfg(test)]
 mod phase3_tests;
+
+#[cfg(test)]
+mod history_tests;

@@ -34,6 +34,9 @@ impl Connector for AcpConnector {
     fn prompt(&self, content: Vec<PromptPart>) -> BoxFuture<'_, Result<()>> {
         Box::pin(self.request(|r| Control::Prompt(content, r)))
     }
+    fn retry(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.request(Control::Retry))
+    }
     fn cancel(&self) -> BoxFuture<'_, Result<()>> {
         Box::pin(self.request(Control::Cancel))
     }
@@ -173,9 +176,9 @@ pub(crate) async fn start(
                 .iter()
                 .rev()
                 .find_map(|e| match &e.event {
-                    AgentEventKind::Error { message, detail } => {
-                        Some(detail.clone().unwrap_or_else(|| message.clone()))
-                    }
+                    AgentEventKind::Error {
+                        message, detail, ..
+                    } => Some(detail.clone().unwrap_or_else(|| message.clone())),
                     _ => None,
                 })
                 .unwrap_or_else(|| "Agent session stopped during initialization".into());
@@ -301,29 +304,32 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                 embedded_context: prompt_caps.embedded_context,
                 config_options: false,
             };
-            let servers = entries
-                .iter()
-                .map(|e| {
-                    a::McpServer::Stdio(
-                        a::McpServerStdio::new(&e.name, &e.command)
-                            .args(e.args.clone())
-                            .env(
-                                e.env
-                                    .iter()
-                                    .map(|v| a::EnvVariable::new(&v.name, &v.value))
-                                    .collect(),
-                            ),
-                    )
-                })
-                .collect();
-            let new = cx
-                .send_request(
-                    a::NewSessionRequest::new(PathBuf::from(&session.view().cwd))
-                        .mcp_servers(servers),
-                )
-                .block_task()
-                .await.inspect_err(|e| report_auth_error(&session, e))?;
-            let id = new.session_id;
+            let servers = entries.iter().map(|e| {
+                if let Some(http) = &e.http {
+                    a::McpServer::Http(a::McpServerHttp::new(&e.name, &http.url).headers(
+                        e.bearer_token.as_ref().map(|v| a::HttpHeader::new("Authorization", format!("Bearer {v}"))).into_iter().collect()
+                    ))
+                } else {
+                    a::McpServer::Stdio(a::McpServerStdio::new(&e.name, &e.command).args(e.args.clone()).env(e.env.iter().map(|v| a::EnvVariable::new(&v.name, &v.value)).collect()))
+                }
+            }).collect();
+            let native_id = session.inner.lock().expect("session lock").resume_native_id.clone();
+            let supported = init.agent_capabilities.load_session;
+            let (id, new) = if let Some(id) = native_id {
+                if !supported { return Err(sdk::Error::invalid_params().data("Agent no longer supports session/load")); }
+                let loaded = cx.send_request(a::LoadSessionRequest::new(id.clone(), PathBuf::from(&session.view().cwd)).mcp_servers(servers)).block_task().await.inspect_err(|e| report_auth_error(&session, e))?;
+                let value = serde_json::to_value(loaded).map_err(sdk::Error::into_internal_error)?;
+                let mut response = value;
+                response["sessionId"] = json!(id);
+                let new: a::NewSessionResponse = serde_json::from_value(response).map_err(sdk::Error::into_internal_error)?;
+                (new.session_id.clone(), new)
+            } else {
+                let new = cx.send_request(a::NewSessionRequest::new(PathBuf::from(&session.view().cwd)).mcp_servers(servers)).block_task().await.inspect_err(|e| report_auth_error(&session, e))?;
+                (new.session_id.clone(), new)
+            };
+            if let Some(writer) = session.history_writer.lock().expect("history writer lock").as_mut() {
+                writer.native(id.to_string(), supported).map_err(sdk::Error::into_internal_error)?;
+            }
             if let Some(options) = new.config_options {
                 emit_config(
                     &session,
@@ -361,8 +367,12 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             let _ = ready.send(Ok(()));
             while let Some(control) = controls.recv().await {
                 match control {
-                    Control::Prompt(content, reply) => {
-                        let prepared = prepare_prompt(&session, content);
+                    control @ (Control::Prompt(..) | Control::Retry(..)) => {
+                        let (prepared, reply) = match control {
+                            Control::Prompt(content, reply) => (prepare_prompt(&session, content), reply),
+                            Control::Retry(reply) => (prepare_retry_with_selection(&session).map(|(blocks, _)| blocks), reply),
+                            _ => unreachable!(),
+                        };
                         match prepared {
                             Err(e) => {
                                 let _ = reply.send(Err(e));
@@ -385,10 +395,11 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                                                 .unwrap_or_else(|| "end_turn".into()),
                                             });
                                         }
-                                        Err(e) => { report_auth_error(&completed, &e); completed.emit(AgentEventKind::Error {
-                                            message: "Agent prompt failed".into(),
-                                            detail: Some(completed.redact(&e.to_string())),
-                                        }); },
+                                        Err(e) => {
+                                            report_auth_error(&completed, &e);
+                                            crate::provider_errors::emit_failure(&completed, crate::provider_errors::acp_failure(&e));
+                                            completed.emit(AgentEventKind::TurnEnd { stop_reason: "error".into() });
+                                        },
                                     }
                                     completed.inner.lock().expect("session lock").message_id = None;
                                     completed.status(SessionStatus::Ready, None);
@@ -525,16 +536,46 @@ pub(crate) fn prepare_prompt_with_selection(
     session: &Session,
     content: Vec<PromptPart>,
 ) -> Result<(Vec<a::ContentBlock>, AgentSessionView)> {
-    if content.is_empty() {
-        return Err(err("A prompt must contain at least one content part"));
-    }
+    prepare_input(session, Some(content))
+}
+pub(crate) fn prepare_retry_with_selection(
+    session: &Session,
+) -> Result<(Vec<a::ContentBlock>, AgentSessionView)> {
+    prepare_input(session, None)
+}
+fn prepare_input(
+    session: &Session,
+    content: Option<Vec<PromptPart>>,
+) -> Result<(Vec<a::ContentBlock>, AgentSessionView)> {
+    let retry = content.is_none();
     let mut inner = session.inner.lock().expect("session lock");
     if inner.view.status != SessionStatus::Ready || session.stop.is_cancelled() {
         return Err(err("Agent is not ready for another prompt"));
     }
+    let captured = if retry {
+        if !inner.last_turn_failed {
+            return Err(err("There is no failed turn to retry"));
+        }
+        Some(
+            inner
+                .last_prompt
+                .clone()
+                .ok_or_else(|| err("There is no user message to retry"))?,
+        )
+    } else {
+        None
+    };
+    let content =
+        content.unwrap_or_else(|| captured.as_ref().expect("retry prompt").content.clone());
+    if content.is_empty() {
+        return Err(err("A prompt must contain at least one content part"));
+    }
     crate::attachments::validate(&inner, &content)?;
     let mut blocks = Vec::new();
-    let preamble = inner.first_prompt.then(|| session.board.preamble());
+    let preamble = captured
+        .as_ref()
+        .map(|p| p.preamble.clone())
+        .unwrap_or_else(|| inner.first_prompt.then(|| session.board.preamble()));
     if let Some(preamble) = &preamble {
         blocks.push(json!({"type":"text","text":preamble}));
     }
@@ -563,18 +604,41 @@ pub(crate) fn prepare_prompt_with_selection(
                 .1 = true;
         }
     }
+    inner.last_prompt = Some(crate::session::LastPrompt {
+        content: content.clone(),
+        preamble: preamble.clone(),
+    });
+    inner.last_turn_failed = false;
     inner.first_prompt = false;
     inner.message_id = None;
     inner.cancelling = false;
     inner.view.status = SessionStatus::Running;
-    session.push_locked(
-        &mut inner,
-        AgentEventKind::UserMessage {
-            message_id: ulid::Ulid::generate().to_string(),
-            content,
-            context_preamble: preamble,
-        },
-    );
+    if retry {
+        let code = inner.last_failure_code.unwrap_or(AgentErrorCode::Agent);
+        let max_attempts = if inner.view.kind == RuntimeKind::Api {
+            3
+        } else {
+            1
+        };
+        session.push_locked(
+            &mut inner,
+            AgentEventKind::Retrying {
+                attempt: 1,
+                max_attempts,
+                delay_ms: 0,
+                code,
+            },
+        );
+    } else {
+        session.push_locked(
+            &mut inner,
+            AgentEventKind::UserMessage {
+                message_id: ulid::Ulid::generate().to_string(),
+                content,
+                context_preamble: preamble,
+            },
+        );
+    }
     session.push_locked(
         &mut inner,
         AgentEventKind::Status {
@@ -750,6 +814,7 @@ pub(crate) fn map_update(session: &Session, v: Value) {
         "tool_call" => {
             session.inner.lock().expect("session lock").message_id = None;
             AgentEventKind::ToolCall {
+                tool_name: None,
                 tool_call_id: text(&v, "toolCallId").unwrap_or_default().into(),
                 title: text(&v, "title").unwrap_or("Tool call").into(),
                 tool_kind: text(&v, "kind").unwrap_or("other").into(),
@@ -809,3 +874,7 @@ pub(crate) fn map_update(session: &Session, v: Value) {
     };
     session.emit(event);
 }
+
+#[cfg(test)]
+#[path = "acp_retry_tests.rs"]
+mod retry_tests;

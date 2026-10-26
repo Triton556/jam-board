@@ -15,7 +15,7 @@ use std::{
 };
 
 fn temp() -> tempfile::TempDir {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-visuals/round5/w5");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-visuals/round6/w5");
     std::fs::create_dir_all(&root).unwrap();
     tempfile::tempdir_in(root).unwrap()
 }
@@ -75,6 +75,8 @@ fn settings_input(
     device: VoiceDevice,
 ) -> VoiceSettingsInput {
     VoiceSettingsInput {
+        engine: None,
+        cloud: None,
         enabled,
         model,
         device,
@@ -1129,4 +1131,323 @@ async fn resume_falls_back_when_server_ignores_range() {
             .iter()
             .any(|(_, r)| r.as_deref() == Some("bytes=8192-"))
     );
+}
+
+#[derive(Default)]
+struct CloudTestCredentials(Mutex<std::collections::BTreeMap<String, String>>);
+impl VoiceCredentials for CloudTestCredentials {
+    fn get(&self, provider: CloudProvider) -> Result<Option<String>> {
+        Ok(self.0.lock().unwrap().get(provider.key()).cloned())
+    }
+    fn set(&self, provider: CloudProvider, key: &str) -> Result<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .insert(provider.key().into(), key.into());
+        Ok(())
+    }
+    fn clear(&self, provider: CloudProvider) -> Result<()> {
+        self.0.lock().unwrap().remove(provider.key());
+        Ok(())
+    }
+}
+async fn cloud_stub(
+    code: StatusCode,
+) -> (
+    String,
+    tokio::sync::mpsc::Receiver<(HeaderMap, Bytes)>,
+    tokio::task::JoinHandle<()>,
+) {
+    let (send, receive) = tokio::sync::mpsc::channel(4);
+    let app = Router::new().route(
+        "/v1/audio/transcriptions",
+        axum::routing::post(move |headers: HeaderMap, body: Bytes| {
+            let send = send.clone();
+            async move {
+                send.send((headers, body)).await.unwrap();
+                (
+                    code,
+                    axum::Json(
+                        serde_json::json!({"text":" cloud words ", "error":"secret-upstream-body"}),
+                    ),
+                )
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/v1/", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    (url, receive, task)
+}
+async fn cloud_enable(engine: &LocalWhisper, url: String) -> VoiceStatus {
+    let mut settings = settings_input(true, None, VoiceDevice::Cpu);
+    settings.engine = Some(VoiceEngine::Cloud);
+    settings.cloud = Some(CloudSettings {
+        provider: CloudProvider::Custom,
+        base_url: url,
+        model: "stub-transcribe".into(),
+    });
+    engine.save_settings_input(settings).await.unwrap()
+}
+
+#[tokio::test]
+async fn cloud_request_shape_auth_language_prompt_and_auto_detection() {
+    let (url, mut requests, server) = cloud_stub(StatusCode::OK).await;
+    let dir = temp();
+    let engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+    engine
+        .set_cloud_key(CloudProvider::Custom, "cloud-test-key")
+        .unwrap();
+    cloud_enable(&engine, url).await;
+    let result = engine.transcribe(input()).await.unwrap();
+    assert_eq!(result.text, "cloud words");
+    assert_eq!(result.duration_ms, 1000);
+    let (headers, body) = requests.recv().await.unwrap();
+    assert_eq!(headers["authorization"], "Bearer cloud-test-key");
+    let content_type = headers["content-type"].to_str().unwrap();
+    assert!(content_type.starts_with("multipart/form-data; boundary="));
+    let boundary = content_type.split("boundary=").nth(1).unwrap();
+    let body_text = String::from_utf8_lossy(&body);
+    let prompt = input().initial_prompt.unwrap();
+    for (name, value) in [
+        ("model", "stub-transcribe"),
+        ("language", "ru"),
+        ("prompt", prompt.as_str()),
+        ("response_format", "json"),
+    ] {
+        assert!(
+            body_text.contains(&format!("name=\"{name}\"\r\n\r\n{value}\r\n")),
+            "{name}"
+        );
+    }
+    assert!(
+        body_text.contains(
+            "name=\"file\"; filename=\"take.wav\"\r\nContent-Type: audio/wav\r\n\r\nRIFF"
+        )
+    );
+    assert!(body.ends_with(format!("\r\n--{boundary}--\r\n").as_bytes()));
+    assert!(!body_text.contains("cloud-test-key"));
+    let mut take = input();
+    take.language = None; // saved Auto means let the provider detect it
+    take.initial_prompt = None;
+    engine.transcribe(take).await.unwrap();
+    let (_, body) = requests.recv().await.unwrap();
+    assert!(!String::from_utf8_lossy(&body).contains("name=\"language\""));
+    assert!(engine.lock().server.is_none());
+    server.abort();
+}
+
+#[tokio::test]
+async fn cloud_plain_errors_and_recovery_do_not_expose_upstream_content() {
+    for (code, message) in [
+        (StatusCode::UNAUTHORIZED, "Check the API key"),
+        (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Recording too long for this provider",
+        ),
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Cloud transcription failed",
+        ),
+    ] {
+        let (url, _requests, server) = cloud_stub(code).await;
+        let dir = temp();
+        let engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+        cloud_enable(&engine, url).await;
+        assert_eq!(
+            engine.transcribe(input()).await.unwrap_err().to_string(),
+            "Check the API key"
+        );
+        engine
+            .set_cloud_key(CloudProvider::Custom, "private-test-key")
+            .unwrap();
+        assert_eq!(
+            engine.transcribe(input()).await.unwrap_err().to_string(),
+            message
+        );
+        assert_eq!(engine.status().unwrap().error.as_deref(), Some(message));
+        server.abort();
+    }
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", listener.local_addr().unwrap());
+    drop(listener);
+    let dir = temp();
+    let engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+    cloud_enable(&engine, url).await;
+    engine
+        .set_cloud_key(CloudProvider::Custom, "private-test-key")
+        .unwrap();
+    assert_eq!(
+        engine.transcribe(input()).await.unwrap_err().to_string(),
+        "Can't reach Custom"
+    );
+    let (url, _requests, server) = cloud_stub(StatusCode::OK).await;
+    cloud_enable(&engine, url).await;
+    engine.transcribe(input()).await.unwrap();
+    assert_eq!(engine.status().unwrap().error, None);
+    server.abort();
+}
+
+#[tokio::test]
+async fn cloud_engine_switching_retains_assets_model_and_persisted_config_without_local_start() {
+    let dir = temp();
+    let mut engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+    use_fixture(&mut engine, None);
+    enable(&engine).await;
+    install_fixture(&engine);
+    engine.prepare().unwrap();
+    let port = engine.lock().server.as_ref().unwrap().port;
+    let (url, _requests, server) = cloud_stub(StatusCode::OK).await;
+    let status = cloud_enable(&engine, url.clone()).await;
+    assert_eq!(status.engine, VoiceEngine::Cloud);
+    assert!(status.runtime_installed);
+    assert_eq!(status.settings.model, VoiceModel::Balanced);
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err());
+    for _ in 0..3 {
+        engine.prepare().unwrap();
+        assert!(engine.lock().server.is_none());
+    }
+    engine
+        .set_cloud_key(CloudProvider::Custom, "private-test-key")
+        .unwrap();
+    engine.transcribe(input()).await.unwrap();
+    engine.unload().await.unwrap();
+    assert!(engine.lock().server.is_none());
+    assert!(engine.status().unwrap().runtime_installed);
+    let reopened = LocalWhisper::new(dir.path(), Arc::new(|_| {})).unwrap();
+    assert_eq!(reopened.status().unwrap().engine, VoiceEngine::Cloud);
+    assert_eq!(
+        reopened.status().unwrap().cloud.unwrap().settings.base_url,
+        url
+    );
+    assert!(reopened.lock().server.is_none());
+    let persisted = std::fs::read_to_string(dir.path().join("voice/settings.json")).unwrap();
+    assert!(!persisted.contains("private-test-key"));
+    let mut local = settings_input(true, None, VoiceDevice::Cpu);
+    local.engine = Some(VoiceEngine::LocalWhisper);
+    engine.save_settings_input(local).await.unwrap();
+    assert_eq!(
+        engine.status().unwrap().settings.model,
+        VoiceModel::Balanced
+    );
+    assert!(engine.lock().server.is_none());
+    engine.prepare().unwrap();
+    assert!(engine.lock().server.is_some());
+    engine.unload().await.unwrap();
+    server.abort();
+}
+
+#[tokio::test]
+async fn cloud_presets_key_commands_status_and_settings_validation() {
+    assert_eq!(
+        CloudProvider::Groq.preset().base_url,
+        "https://api.groq.com/openai/v1"
+    );
+    assert_eq!(CloudProvider::Groq.preset().model, "whisper-large-v3-turbo");
+    assert_eq!(
+        CloudProvider::Openai.preset().base_url,
+        "https://api.openai.com/v1"
+    );
+    assert_eq!(
+        CloudProvider::Openai.preset().model,
+        "gpt-4o-mini-transcribe"
+    );
+    let dir = temp();
+    let engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+    let mut settings = settings_input(true, None, VoiceDevice::Cpu);
+    settings.engine = Some(VoiceEngine::Cloud);
+    let status = engine.save_settings_input(settings.clone()).await.unwrap();
+    assert_eq!(status.settings.model, VoiceModel::Fast);
+    assert_eq!(status.cloud.unwrap().settings.provider, CloudProvider::Groq);
+    for provider in [
+        CloudProvider::Groq,
+        CloudProvider::Openai,
+        CloudProvider::Custom,
+    ] {
+        engine.set_cloud_key(provider, "secret-example").unwrap();
+        assert_eq!(
+            engine.inner.credentials.get(provider).unwrap().as_deref(),
+            Some("secret-example")
+        );
+        assert!(engine.set_cloud_key(provider, "\n").is_err());
+        engine.clear_cloud_key(provider).unwrap();
+        engine.clear_cloud_key(provider).unwrap();
+        assert_eq!(engine.inner.credentials.get(provider).unwrap(), None);
+    }
+    engine
+        .set_cloud_key(CloudProvider::Groq, "secret-example")
+        .unwrap();
+    let json = serde_json::to_value(engine.status().unwrap()).unwrap();
+    assert_eq!(
+        json["cloud"],
+        serde_json::json!({"provider":"groq","baseUrl":"https://api.groq.com/openai/v1","model":"whisper-large-v3-turbo","keySet":true})
+    );
+    assert!(!json.to_string().contains("secret-example"));
+    for url in [
+        "file:///tmp/voice",
+        "https://user:password@example.com",
+        "https://example.com?api_key=private",
+    ] {
+        settings.cloud = Some(CloudSettings {
+            base_url: url.into(),
+            ..CloudProvider::Openai.preset()
+        });
+        assert!(engine.save_settings_input(settings.clone()).await.is_err());
+    }
+}
+
+#[tokio::test]
+async fn cloud_disable_invalidates_inflight_transcription_and_keeps_local_unloaded() {
+    let (entered, mut started) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let release_request = release.clone();
+    let app = Router::new().route(
+        "/v1/audio/transcriptions",
+        axum::routing::post(move || {
+            let entered = entered.clone();
+            let release = release_request.clone();
+            async move {
+                entered.send(()).await.unwrap();
+                release.notified().await;
+                axum::Json(serde_json::json!({"text":"stale dictation"}))
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/v1", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let dir = temp();
+    let engine = engine(dir.path()).with_credentials(Arc::new(CloudTestCredentials::default()));
+    cloud_enable(&engine, url).await;
+    engine
+        .set_cloud_key(CloudProvider::Custom, "test-key")
+        .unwrap();
+    let transcriber = engine.clone();
+    let request = tokio::spawn(async move { transcriber.transcribe(input()).await });
+    started.recv().await.unwrap();
+    let saver = engine.clone();
+    let save = tokio::spawn(async move {
+        saver
+            .save_settings_input(settings_input(false, None, VoiceDevice::Cpu))
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while engine.lock().settings.enabled {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    release.notify_one();
+    assert_eq!(
+        request.await.unwrap().unwrap_err().to_string(),
+        "Voice operation stopped"
+    );
+    assert_eq!(save.await.unwrap().unwrap().state, VoiceState::Off);
+    assert!(engine.lock().server.is_none());
+    server.abort();
 }

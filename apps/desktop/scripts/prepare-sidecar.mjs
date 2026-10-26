@@ -9,6 +9,8 @@ execFileSync(
     "build",
     "-p",
     "jam-mcp-cli",
+    "-p",
+    "jam-web-mcp",
     ...(profile === "release" ? ["--release"] : []),
   ],
   { cwd: root, stdio: "inherit" },
@@ -20,7 +22,9 @@ if (!target) throw new Error("Cannot identify the Rust host target");
 const ext = process.platform === "win32" ? ".exe" : "";
 const binDir = new URL("../src-tauri/binaries/", import.meta.url);
 mkdirSync(binDir, { recursive: true });
-copyFileSync(
-  `${root}target/${profile}/jam-board-mcp${ext}`,
-  new URL(`jam-board-mcp-${target}${ext}`, binDir),
-);
+for (const name of ["jam-board-mcp", "jam-web-mcp"]) {
+  copyFileSync(
+    `${root}target/${profile}/${name}${ext}`,
+    new URL(`${name}-${target}${ext}`, binDir),
+  );
+}

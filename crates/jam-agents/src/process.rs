@@ -95,12 +95,39 @@ mod windows {
 }
 #[cfg(windows)]
 pub(crate) use windows::ProcessTree;
-#[cfg(not(windows))]
+#[cfg(unix)]
+pub(crate) struct ProcessTree(std::sync::atomic::AtomicU32);
+#[cfg(unix)]
+impl ProcessTree {
+    pub fn attach(pid: u32) -> Result<Self> {
+        Ok(Self(std::sync::atomic::AtomicU32::new(pid)))
+    }
+    pub fn terminate(&self) -> Result<()> {
+        let pid = self.0.swap(0, std::sync::atomic::Ordering::SeqCst);
+        if pid != 0 {
+            // Children are launched in their own process group. Keep the group owned
+            // even when an npm wrapper exits before its MCP child.
+            let _ = std::process::Command::new("kill")
+                .args(["-KILL", "--", &format!("-{pid}")])
+                .output()?;
+        }
+        Ok(())
+    }
+}
+#[cfg(unix)]
+impl Drop for ProcessTree {
+    fn drop(&mut self) {
+        let _ = self.terminate();
+    }
+}
+#[cfg(not(any(windows, unix)))]
 pub(crate) struct ProcessTree;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, unix)))]
 impl ProcessTree {
     pub fn attach(_: u32) -> Result<Self> {
-        Ok(Self)
+        Err(err(
+            "Agent process ownership is unsupported on this platform",
+        ))
     }
     pub fn terminate(&self) -> Result<()> {
         Ok(())
