@@ -1,5 +1,11 @@
 # Behavioral and visual acceptance matrix
 
+Alpha.42 H-T01 / VS02 follow-up: status filtering must retain the same filter
+geometry when bold emphasis changes. `e2e/polish.spec.ts` checks exact boxes;
+the caption reserves both font weights. Windows Chrome/mock targeted check
+passed; hosted CI and native acceptance remain separate gates. Other observed
+release browser failures stay recorded in the version verification record.
+
 [Index](README.md) · Human map IDs below use prefix **H-** (for example H-D11 refers to D11 in the human map); AG IDs refer to the agent map. Stable IDs are test contracts, not pass claims.
 
 **Initial audit status, 2026-10-22:** all execution rows below are **NOT RUN by this documentation audit**. Alpha29 implementation/test files may exist; release owner records their actual terminal results separately with exact version. Source inspection verifies inventory/causes, not native interaction quality.

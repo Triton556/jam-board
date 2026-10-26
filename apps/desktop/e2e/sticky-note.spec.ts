@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { setTheme } from "./assertions";
 
 // Synthetic, actual rendered pages only. The artifact allowlist contains these
 // PNGs, never the mock data store, application DB, clipboard or test traces.
@@ -20,9 +21,7 @@ for (const theme of ["light", "dark"] as const) {
         page.evaluate(() => Boolean(window.__jamMock && window.__jamCanvas)),
       )
       .toBe(true);
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.evaluate(() => document.fonts.ready);
     const initial = await page.evaluate(() =>

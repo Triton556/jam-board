@@ -126,6 +126,27 @@ textarea::placeholder {
   }
 }
 
+/* Reserve the selected caption's width so emphasis cannot move other filters. */
+.status-filters .chip {
+  display: inline-grid;
+}
+.status-filters .chip > span,
+.status-filters .chip::before,
+.status-filters .chip::after {
+  grid-area: 1 / 1;
+}
+.status-filters .chip::before,
+.status-filters .chip::after {
+  content: attr(data-label);
+  visibility: hidden;
+}
+.status-filters .chip::before {
+  font-weight: 400;
+}
+.status-filters .chip::after {
+  font-weight: 700;
+}
+
 .button[aria-pressed="true"],
 .button[aria-selected="true"],
 .settings-nav button[aria-current="page"],

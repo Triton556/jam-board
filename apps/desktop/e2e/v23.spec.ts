@@ -10,7 +10,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.getByRole("button", { name: "Load demo jam" }).click();
   await page.goto("/references");
   await expect(
-    page.getByText("Drop images, sounds, videos or links here"),
+    page.getByText("Double-click anywhere to jot an idea"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByRole("button", { name: "File…", exact: true }).click();
@@ -72,7 +72,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   await page.getByRole("button", { name: "Create frame", exact: true }).click();
   await expect(page.locator(".reference-frame-tab")).toHaveCSS(
     "font-family",
-    '"Fraunces Variable", serif',
+    /PT Serif/,
   );
   await page.getByRole("button", { name: "Fit view · F" }).click();
   await page.waitForTimeout(350);

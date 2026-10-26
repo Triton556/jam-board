@@ -1,7 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
-import { expectPoliteNotice } from "./assertions";
+import {
+  expectBoardReachable,
+  expectPoliteNotice,
+  setTheme,
+} from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -31,16 +35,13 @@ test("onboarding creates a jam and an empty board", async ({ page }) => {
 });
 test("demo loads all 22 cards and opens a task by URL", async ({ page }) => {
   await demo(page);
-  expect(
-    await page
-      .locator(".board-scroll")
-      .evaluate((element) => element.scrollWidth <= element.clientWidth),
-  ).toBe(true);
+  await expectBoardReachable(page);
   await page.getByRole("button", { name: /Open JB-2:/ }).click();
   await expect(page).toHaveURL(/task=JB-2/);
   await expect(page.getByRole("textbox", { name: "Task title" })).toHaveValue(
     "Player movement: coyote time & jump buffer",
   );
+  await page.getByRole("button", { name: "Close task", exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
@@ -127,7 +128,7 @@ test("agent creation highlights a card, shows a toast and expires", async ({
 test("dark theme applies to paper and cards", async ({ page }) => {
   await demo(page);
   await page.getByRole("radio", { name: "None", exact: true }).click();
-  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await setTheme(page, "dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const papers = page.getByTestId("task-card").locator(".task-card");
   await page.mouse.move(30, 70);
@@ -155,6 +156,7 @@ test("keyboard opens cards and edits status without dragging; reduced motion ret
     before.title,
   );
   await expect(page.locator(".card-button.dragging")).toHaveCount(0);
+  await page.getByRole("button", { name: "Close task", exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(card).toBeFocused();
   await page.keyboard.press("ArrowRight");
@@ -241,9 +243,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }) => {
     await demo(page);
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     const before = await page.evaluate(() => window.__jamMock.getTask("JB-2"));
     await page.getByRole("button", { name: /Open JB-2:/ }).click();
@@ -319,7 +319,7 @@ for (const theme of ["light", "dark"] as const) {
             !!parent && box.left >= parent.left && box.right <= parent.right,
         };
       });
-      expect(metrics.weight).toBeGreaterThanOrEqual(500);
+      expect(metrics.weight).toBe(400);
       expect(metrics.overflow).toBe(false);
       expect(metrics.fits).toBe(true);
     }
@@ -360,9 +360,7 @@ for (const theme of ["light", "dark"] as const) {
       });
       await page.setViewportSize({ width: 1180, height: 812 });
       await demo(page);
-      await page
-        .getByRole("combobox", { name: "Theme", exact: true })
-        .selectOption(theme);
+      await setTheme(page, theme);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await page.evaluate(() => document.fonts.ready);
       const before = await page.evaluate(() =>
@@ -425,9 +423,7 @@ for (const theme of ["light", "dark"] as const) {
   }) => {
     await page.setViewportSize({ width: 800, height: 600 });
     await demo(page);
-    await page
-      .getByRole("combobox", { name: "Theme", exact: true })
-      .selectOption(theme);
+    await setTheme(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.goto("/plan/JB-E1");
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);

@@ -1,4 +1,5 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { openExternalAgents } from "./assertions";
 
 test("Web app onboarding, milestone and project template confirmation", async ({
   page,
@@ -48,6 +49,7 @@ test("Agents reviews a bundled project skill and confirms installation without a
   });
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await openExternalAgents(page);
   const card = page.locator(".settings-card").filter({
     has: page.getByRole("heading", {
       name: "Optional · Jam Board skill",
