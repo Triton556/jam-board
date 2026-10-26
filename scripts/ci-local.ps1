@@ -31,7 +31,7 @@ function Add-Result {
 # Portable Linux browser steps are additional Windows gates; perf stays manual.
 $steps = @(
     @{ Name='actions/checkout@v4'; Skip='Use current working tree; no checkout/reset performed' }
-    @{ Name='Install Linux Tauri dependencies'; Skip='Linux only: apt/system libraries require GitHub Ubuntu' }
+    @{ Name='Install Linux Tauri dependencies'; Skip='Linux only: apt/system libraries, including libarchive-tools for voice ZIP extraction, require GitHub Ubuntu' }
     @{ Name='dtolnay/rust-toolchain@stable'; Action={
         Invoke-Checked 'rustup' @('run','stable','rustc','--version')
         Invoke-Checked 'rustup' @('run','stable','cargo','fmt','--version')
@@ -75,7 +75,7 @@ try {
     finally { $sha.Dispose() }
     # Full reviewed workflow, not just run: lines: additions, conditions, actions,
     # cwd/env changes, extra jobs and changed setup inputs all fail closed.
-    $expected = '2164475536e46421413563cec44750ace6102e808a74fb0d33c3fe88bcd68b63'
+    $expected = '6b05af33c2db9138639ba31a155090d0cfe65018c47ff7d9a71bdd7780b48696'
     if ($actual -ne $expected) {
         throw 'UNKNOWN/CHANGED CI WORKFLOW: review ci.yml against the complete step list in scripts/ci-local.ps1 and update both the mapping and fingerprint before running gates.'
     }
