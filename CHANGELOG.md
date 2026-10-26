@@ -5,6 +5,9 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Linux Clippy failure from a Windows-only voice process error-helper import.
+
 ## [0.3.0-alpha.42] - 2026-10-26
 
 Brain dock, local voice input, canvas linking and feedback, and fixes from the
