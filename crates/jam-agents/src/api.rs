@@ -382,35 +382,62 @@ impl MultiTools {
     async fn connect(session: &Session, entries: &[McpEntry], env: &[Env]) -> Arc<dyn ToolSource> {
         let mut servers = vec![];
         for entry in entries.iter().filter(|e| e.enabled) {
+            let step = format!("mcp:{}", entry.name);
+            session.launch_step(
+                &step,
+                LaunchStepState::Running,
+                format!("Connecting MCP server {}", entry.name),
+            );
             let source = McpTools::connect(session, entry, env).await;
             match source {
                 Ok(source) => {
                     match tokio::time::timeout(Duration::from_secs(30), source.list()).await {
-                        Ok(Ok(tools)) => servers.push(ServerTools {
-                            name: entry.name.clone(),
-                            trust: entry.trusts_read_only(),
-                            source,
-                            tools,
-                        }),
-                        _ => {
+                        Ok(Ok(tools)) => {
+                            session.launch_step(
+                                &step,
+                                LaunchStepState::Ok,
+                                format!(
+                                    "MCP server {} connected; {} tools",
+                                    entry.name,
+                                    tools.len()
+                                ),
+                            );
+                            servers.push(ServerTools {
+                                name: entry.name.clone(),
+                                trust: entry.trusts_read_only(),
+                                source,
+                                tools,
+                            });
+                        }
+                        result => {
                             source.shutdown().await;
-                            server_error(session, &entry.name);
+                            let reason = match result {
+                                Ok(Err(e)) => e.to_string(),
+                                _ => "MCP tool listing timed out".into(),
+                            };
+                            server_error(session, &entry.name, &reason);
                         }
                     }
                 }
-                Err(_) => server_error(session, &entry.name),
+                Err(e) => server_error(session, &entry.name, &e.to_string()),
             }
         }
         Arc::new(Self { servers })
     }
 }
-fn server_error(session: &Session, name: &str) {
+fn server_error(session: &Session, name: &str, reason: &str) {
+    session.launch_step(
+        &format!("mcp:{name}"),
+        LaunchStepState::Failed,
+        format!("MCP server {name} failed: {reason}"),
+    );
     session.emit(AgentEventKind::Error {
         code: None,
         retryable: false,
         retry_after_ms: None,
+        resets_at: None,
         message: format!("Cannot connect MCP server {name}; chat will continue without it"),
-        detail: None,
+        detail: Some(reason.into()),
     });
 }
 fn direct_tool(server: &str, read_only_hint: bool, trust: bool) -> bool {

@@ -12,7 +12,10 @@ export type WebSettings = import("../bindings").WebSearchSettings;
 export type Phase4Api = {
   history(input?: { limit?: number; query?: string }): Promise<HistoryEntry[]>;
   events(entryId: string): Promise<AgentDockEvent[]>;
-  resume(entryId: string): Promise<AgentSessionView>;
+  resume(
+    entryId: string,
+    userConfig?: import("./agent-dock-api").UserConfigChoice,
+  ): Promise<AgentSessionView>;
   rename(entryId: string, title: string): Promise<unknown>;
   delete(entryId: string): Promise<unknown>;
   historySettings(): Promise<{ keepHistory: boolean }>;
@@ -46,7 +49,8 @@ export const nativePhase4Api: Phase4Api = {
   history: (input = {}) =>
     unwrap(commands.agentHistory(input.limit ?? null, input.query ?? null)),
   events: (entryId) => unwrap(commands.agentHistoryEvents(entryId)),
-  resume: (entryId) => unwrap(commands.resumeAgentSession(entryId)),
+  resume: (entryId, userConfig) =>
+    unwrap(commands.resumeAgentSession(entryId, userConfig ?? null)),
   rename: (entryId, title) =>
     unwrap(commands.renameAgentHistory(entryId, title)),
   delete: (entryId) => unwrap(commands.deleteAgentHistory(entryId)),

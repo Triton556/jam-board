@@ -23,6 +23,7 @@ type Payload = AgentDockEvent extends infer E
 type Turn = { cancelled: boolean; resume?: () => void };
 const providerText: Record<ProviderErrorCode, string> = {
   overloaded: "503: This model is currently at capacity. Try again shortly.",
+  usage_limit: "Usage limit reached",
   rate_limited: "429: Rate limit exceeded. Retry-After: 6 seconds.",
   auth: "401: Invalid API key. Check your credentials.",
   context_too_long: "413: The request exceeds this model's context window.",

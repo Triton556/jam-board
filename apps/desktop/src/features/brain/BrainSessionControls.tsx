@@ -12,14 +12,18 @@ import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Switch } from "../../components/ui/m5";
 import { agentDockApi } from "../../lib/agent-dock";
 import type {
+  AgentDockEvent,
   AgentProfileView,
   AgentSessionView,
   ConfigOption,
   ModelInfo,
 } from "../../lib/agent-dock-api";
 import { useUiStore } from "../../lib/ui-store";
+import { BrainLaunchSteps } from "./BrainLaunchLogs";
+import { useBrainPopoverPlacement } from "./brain-popover-placement";
 import {
   accessLabel,
+  connectionAccessKind,
   connectionPreferences,
   optionCategory,
   optionLabel,
@@ -27,23 +31,30 @@ import {
   rememberModel,
 } from "./brain-settings";
 import { useBrainState } from "./brain-store";
+import { DisabledReason } from "./DisabledReason";
 
 export function ControlPopover({
   label,
   children,
   close,
   className = "brain-controls-popover",
+  role,
 }: {
   label: string;
   children: ReactNode;
   close(): void;
   className?: string;
+  role?: "menu";
 }) {
   const node = useRef<HTMLElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
+  useBrainPopoverPlacement(node);
   useEffect(() => {
-    const previous = document.activeElement;
+    const previous =
+      node.current?.parentElement?.querySelector<HTMLElement>(
+        '[aria-expanded="true"]',
+      ) ?? document.activeElement;
     node.current
       ?.querySelector<HTMLElement>("input,button:not(:disabled)")
       ?.focus();
@@ -60,7 +71,7 @@ export function ControlPopover({
         event.stopPropagation();
         closeRef.current();
       }
-      if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
         const nodes = [
           ...(node.current?.querySelectorAll<HTMLElement>(
             "input,button:not(:disabled),[tabindex='0']",
@@ -69,8 +80,12 @@ export function ControlPopover({
         const index = nodes.indexOf(document.activeElement as HTMLElement);
         event.preventDefault();
         nodes[
-          (index + (event.key === "ArrowDown" ? 1 : nodes.length - 1)) %
-            nodes.length
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? nodes.length - 1
+              : (index + (event.key === "ArrowDown" ? 1 : nodes.length - 1)) %
+                nodes.length
         ]?.focus();
       }
     };
@@ -85,7 +100,13 @@ export function ControlPopover({
     };
   }, []);
   return (
-    <section ref={node} className={className} aria-label={label}>
+    <section
+      ref={node}
+      role={role}
+      className={className}
+      aria-label={label}
+      data-brain-popover
+    >
       {children}
     </section>
   );
@@ -249,6 +270,7 @@ export function ModelPicker({
     <div className="brain-model-picker">
       <input
         aria-label="Search models"
+        disabled={disabled}
         placeholder="Search models"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -343,10 +365,14 @@ export function BrainLauncher({
   cancel,
   connections,
   initialProfileId,
+  launchEvents = [],
+  blocked = false,
 }: {
   profiles: AgentProfileView[];
   initialProfileId?: string;
+  launchEvents?: AgentDockEvent[];
   pending: boolean;
+  blocked?: boolean;
   start(id: string, choice: { model?: string; effort?: string }): Promise<void>;
   cancel(): void;
   connections(): void;
@@ -389,6 +415,20 @@ export function BrainLauncher({
       catalog.data?.models.find((m) => m.id === model),
       cached.find((o) => optionCategory(o) === "thought_level"),
     );
+  if (pending)
+    return (
+      <section ref={launcher} className="brain-launcher" aria-label="New chat">
+        <h2>New chat</h2>
+        <p>
+          {profile?.label}
+          {model ? ` · ${model}` : ""}
+        </p>
+        <Button variant="primary" disabled>
+          Starting…
+        </Button>
+        <BrainLaunchSteps events={launchEvents} />
+      </section>
+    );
   return (
     <section ref={launcher} className="brain-launcher" aria-label="New chat">
       <h2>New chat</h2>
@@ -396,6 +436,7 @@ export function BrainLauncher({
       <CustomSelect
         label="Connection"
         value={id}
+        disabled={pending || blocked}
         onChange={(value) => {
           const next = available.find((p) => p.id === value);
           setId(value);
@@ -415,6 +456,7 @@ export function BrainLauncher({
           <h3>Model</h3>
           <ModelPicker
             profile={profile}
+            disabled={pending || blocked}
             value={model}
             change={setModel}
             option={cached.find((o) => optionCategory(o) === "model")}
@@ -441,31 +483,54 @@ export function BrainLauncher({
             option={effortOption}
             value={effort}
             change={setEffort}
+            disabled={pending || blocked}
           />
         </>
       )}
       <div className="button-row">
-        <Button variant="ghost" onClick={cancel}>
+        <Button variant="ghost" disabled={pending || blocked} onClick={cancel}>
           Cancel
         </Button>
-        <Button
-          variant="primary"
-          disabled={
-            !profile?.available || pending || (profile.kind === "api" && !model)
+        <DisabledReason
+          label="Start"
+          reason={
+            !profile?.available
+              ? "No chat connection available — install Claude CLI or Codex, or configure an API connection"
+              : profile.kind === "api" && !model
+                ? "Choose a model before starting"
+                : undefined
           }
-          onClick={() => {
-            rememberConnection(id, { model, effort });
-            if (model) rememberModel(id, model);
-            void start(id, {
-              model: model || undefined,
-              effort: effortOption ? effort : undefined,
-            });
-          }}
         >
-          {pending ? "Starting…" : "Start"}
-        </Button>
+          <Button
+            variant="primary"
+            disabled={
+              !profile?.available ||
+              pending ||
+              blocked ||
+              (profile.kind === "api" && !model)
+            }
+            onClick={() => {
+              rememberConnection(id, { model, effort });
+              if (model) rememberModel(id, model);
+              void start(id, {
+                model: model || undefined,
+                effort: effortOption ? effort : undefined,
+              });
+            }}
+          >
+            {pending ? "Starting…" : "Start"}
+          </Button>
+        </DisabledReason>
       </div>
-      <button type="button" className="brain-text-action" onClick={connections}>
+      {(pending || launchEvents.length > 0) && (
+        <BrainLaunchSteps events={launchEvents} />
+      )}
+      <button
+        type="button"
+        className="brain-text-action"
+        disabled={pending || blocked}
+        onClick={connections}
+      >
         Connections…
       </button>
     </section>
@@ -540,6 +605,9 @@ export function SessionControls({
         value: access.value,
         name: access.value,
       },
+      connectionAccessKind(
+        profile ?? { id: session.profileId, preset: null, command: null },
+      ),
     );
   return (
     <div className="brain-session-controls">
@@ -611,7 +679,16 @@ export function SessionControls({
           {open === "access" && (
             <ControlPopover label="Access" close={() => setOpen(null)}>
               {access.values.map((v) => {
-                const copy = accessLabel(v);
+                const copy = accessLabel(
+                  v,
+                  connectionAccessKind(
+                    profile ?? {
+                      id: session.profileId,
+                      preset: null,
+                      command: null,
+                    },
+                  ),
+                );
                 return (
                   <button
                     type="button"

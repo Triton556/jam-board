@@ -29,9 +29,12 @@ Historical Snowball dogfood recording in the real desktop app (not current-prere
 
 - Brain dock: project-pinned ACP chat, terminal sessions and built-in API chat.
   Configure connections in Settings → Agents; sending a message does not grant Start.
-- Session history: search, rename, delete/Undo, read-only replay and supported
-  resume or transcript continuation. Tools are configured per connection, with
+- Session history: Chat and Terminal tabs, search, rename, delete/Undo, read-only
+  replay and supported resume or transcript continuation. Terminal history keeps
+  the CLI's own transcripts intact. Tools are configured per connection, with
   Web/Browser presets and multiple custom MCP servers for API chat.
+- Launch progress and readable logs, per-launch user configuration choices and
+  warnings for stale board connections.
 - Web search through the bundled `jam-web-mcp` sidecar; provider errors offer
   manual recovery and bounded automatic retry with Stop.
 - Voice input: local transcription with an on-demand whisper.cpp runtime and model

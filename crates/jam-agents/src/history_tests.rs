@@ -7,6 +7,8 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
+#[path = "terminal_history_tests.rs"]
+mod terminal_history_tests;
 
 pub(crate) fn history(s: &crate::session::Session) -> (HistoryStore, StoredHistory) {
     let store = Arc::new(jam_core::Store::open(s.board.data_dir.join("test.db")).unwrap());
@@ -20,6 +22,8 @@ pub(crate) fn history(s: &crate::session::Session) -> (HistoryStore, StoredHisto
             profile_id: profile.id.clone(),
             profile_label: profile.label.clone(),
             kind: HistoryKind::Api,
+            provider: Default::default(),
+            empty: false,
             title: "New chat".into(),
             created_at: view.created_at.clone(),
             updated_at: view.created_at,
@@ -35,6 +39,7 @@ pub(crate) fn history(s: &crate::session::Session) -> (HistoryStore, StoredHisto
         renamed: false,
         has_user_message: false,
         last_agent_message_id: None,
+        terminal: None,
     };
     let history = HistoryStore::new(
         &s.board.data_dir,
@@ -237,7 +242,9 @@ fn mcp_presets_disabled_defaults_resolution_and_secret_free_shapes() {
         let (_, args) = terminal_command(Some(preset), "fixture", &[], &entries).unwrap();
         let text = args.join(" ");
         assert!(text.contains("http://127.0.0.1:1234/mcp"));
-        assert!(text.contains("fictional-token"));
+        assert!(!text.contains("fictional-token"));
+        let env = crate::wiring::terminal_environment(Some(preset), "fixture", &entries).unwrap();
+        assert!(env.iter().any(|e| e.value == "fictional-token"));
         assert!(text.contains("jam-web-mcp"));
     }
     assert!(mcp_entries(&s.board, "Brain", &[entries[1].clone(), entries[1].clone()]).is_err());

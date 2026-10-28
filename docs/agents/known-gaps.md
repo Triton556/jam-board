@@ -257,31 +257,49 @@ source ledger are not silently promoted to full visual acceptance. See the
 
 ## Brain dock integration boundary
 
-ACP chat, terminal and built-in API chat are implemented in this increment; the
-[design contract](../brain-dock.md) and BC01-BC11 / UX01-UX09 define the current
-acceptance boundary. Fake ACP, provider fixtures, DOM and native process test
-files are available; this documentation pass does not claim new runtime passes.
+ACP chat, terminal and built-in API chat are implemented in the current source;
+the [design contract](../brain-dock.md) and BC01-BC14 / UX01-UX09 define the
+acceptance boundary. Fake ACP, scripted MCP, provider fixtures, DOM, mock browser
+and native terminal fixture evidence remain separate from live-provider or packaged
+acceptance. This documentation pass did not run runtime tests.
 
-- Real adapters/providers and real login/credential round trips are not exercised
-  in CI. Tauri/webview event delivery, rendered interactions and actual-human
-  flows still need exact-version browser/native evidence.
-- Packaged-app process cleanup is unverified: test explicit Stop, startup
+### Resolved in source
+
+- With history enabled, chat history persists separately from the board database.
+  Supported ACP session/load and API transcript resume work after restart; linked
+  Claude/Codex terminal history resumes via the CLI in a fresh dock session.
+  Terminal scrollback and live session buffers remain bounded in memory. Opening
+  history alone does not launch; deleting a terminal entry leaves CLI transcripts.
+- API chat supports its board server and enabled extra MCP servers, including Web.
+  An extra-server read-only tool also requires that server to be trusted before
+  it can run without a permission card.
+- Local and cloud voice input are implemented source paths; their own exact-version
+  browser/native/human evidence remains separate.
+
+### Remaining evidence and capability gaps
+
+- Real adapter/provider sign-in, native credential round trips, session-specific
+  board MCP selection, exclusion and terminal resume require owner-only live
+  checks under separate authorization. Workers and automated checks never start
+  real agent sessions or send provider prompts.
+- Packaged-app process cleanup remains unverified: check explicit Stop, startup
   interruption, wrapper descendants, crash and application exit in the package.
-- Transcripts and terminal scrollback are bounded in memory only. Remount replay
-  is supported during the app process; there is no resume after application
-  restart or implemented ACP session/load recovery.
-- Built-in API chat uses only the jam-board MCP server. Extra MCP servers for API
-  chat, browser/computer inputs and multi-agent views remain future work. Local
-  voice input is specified for round 5; BD17-BD20 / RR09-RR12 remain implementation
-  in progress; not yet run for browser/native/human acceptance.
-- The codex-acp adapter has never been probed on this machine. A detected command
-  or available preset does not establish adapter startup or successful Codex auth.
+  Browser/computer inputs and multi-agent views remain future work.
+- The round-7 worker's local Linux-target clippy was blocked by missing
+  `x86_64-linux-gnu-gcc`; Linux execution is not established by Windows or
+  source review. Consult the exact later CI record for any subsequent result.
+- The original owner-reported terminal corruption while scrolling and with
+  Cyrillic (B4/B5) was not reproduced by the native or replay fixtures; the
+  rendering changes have not been confirmed to fix those symptoms.
+- Packaged Tauri/webview event delivery, remaining native interactions, actual
+  provider catalogs and human acceptance require exact-version evidence. The
+  round-7 UI review is Chromium/mock evidence, not a native or provider pass.
 
 Custom terminal commands inherit the pinned board environment; only known
 Claude/Codex CLI paths have standardized MCP flags. The dock does not certify a
-custom executable's MCP support. Settings/API models and endpoints remain editable;
-no real provider availability is inferred from a stored profile or mock response.
-Tool permission and chat text never replace the board's human Start decision.
+custom executable's MCP support. Stored profiles or mock responses do not prove
+provider availability. Tool permission and chat text never replace the board's
+human Start decision.
 
 ## Round-5 Windows desktop test manifest — loader fix
 

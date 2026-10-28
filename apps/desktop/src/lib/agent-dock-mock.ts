@@ -147,6 +147,10 @@ export const mockModels = [
     tools: false,
   },
 ];
+const mockCodexModels = [
+  { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" },
+  { id: "gpt-6.1-terra", name: "GPT-6.1 Terra" },
+];
 function mockOptions(
   session: AgentSessionView,
   model: string,
@@ -159,9 +163,12 @@ function mockOptions(
       category: "model",
       name: "Model",
       value: model,
-      values: mockModels
-        .filter((m) => session.kind === "api" || m.id.startsWith("claude"))
-        .map((m) => ({ value: m.id, name: m.name })),
+      values: (session.kind !== "api" && session.profileId.startsWith("codex")
+        ? mockCodexModels
+        : mockModels.filter(
+            (m) => session.kind === "api" || m.id.startsWith("claude"),
+          )
+      ).map((m) => ({ value: m.id, name: m.name })),
     },
   ];
   if (
@@ -192,30 +199,39 @@ function mockOptions(
       id: "mode",
       category: "mode",
       name: "Access",
-      value: "default",
-      values: [
-        {
-          value: "default",
-          name: "Default",
-          description:
-            "Asks before editing files, running commands or changing the board.",
-        },
-        {
-          value: "acceptEdits",
-          name: "Accept edits",
-          description: "Edits files without asking; asks for everything else.",
-        },
-        {
-          value: "plan",
-          name: "Plan",
-          description: "Reads and proposes a plan; changes nothing.",
-        },
-        {
-          value: "bypassPermissions",
-          name: "Bypass permissions",
-          description: "Never asks. Use only in a throwaway workspace.",
-        },
-      ],
+      value: session.profileId === "codex" ? "auto" : "default",
+      values:
+        session.profileId === "codex"
+          ? [
+              { value: "read-only", name: "Read only" },
+              { value: "auto", name: "Auto" },
+              { value: "full-access", name: "Full access" },
+            ]
+          : [
+              { value: "auto", name: "Auto" },
+              {
+                value: "default",
+                name: "Default",
+                description:
+                  "Asks before editing files, running commands or changing the board.",
+              },
+              {
+                value: "acceptEdits",
+                name: "Accept edits",
+                description:
+                  "Edits files without asking; asks for everything else.",
+              },
+              {
+                value: "plan",
+                name: "Plan",
+                description: "Reads and proposes a plan; changes nothing.",
+              },
+              {
+                value: "bypassPermissions",
+                name: "Bypass permissions",
+                description: "Never asks. Use only in a throwaway workspace.",
+              },
+            ],
     });
   return options;
 }
@@ -237,6 +253,28 @@ const turns = new Map<
 const counts = new Map<string, number>();
 const signedOutProfiles = new Set<string>();
 let catalogError: string | null = null;
+let userConfigDefault: import("./agent-dock-api").UserConfigDefault = "ask";
+const warningListeners = new Set<
+  (warning: import("./agent-dock-api").LaunchWarning) => void
+>();
+export function emitMockLaunchWarning(
+  warning: import("./agent-dock-api").LaunchWarning,
+) {
+  for (const cb of warningListeners) cb(warning);
+  emit(warning.sessionId, {
+    kind: "status",
+    status: requireSession(warning.sessionId).status,
+    message: `Launch warning: ${JSON.stringify(warning)}`,
+  });
+}
+let launchDelayMs = 0;
+export function setMockLaunchDelay(delayMs: number) {
+  launchDelayMs = delayMs;
+}
+export function emitMockDockEvent(sessionId: string, payload: Payload) {
+  emit(sessionId, payload);
+}
+
 export function setMockCatalogError(error: string | null) {
   if (import.meta.env.VITE_MOCK_BRIDGE === "1") catalogError = error;
 }
@@ -275,6 +313,8 @@ export async function simulateMockCrash(sessionId: string) {
 }
 /** Reset only disposable dock fixtures; never touches the board. */
 export function resetMockDock() {
+  launchDelayMs = 0;
+  userConfigDefault = "ask";
   resetMockProviderScenarios();
   resetMockPhase4();
   for (const turn of turns.values()) {
@@ -437,6 +477,31 @@ async function stream(id: string, count: number) {
   }
 }
 export const mockDockApi: AgentDockApi = {
+  launchLogs: async (id) =>
+    structuredClone(
+      (histories.get(id) ?? []).filter(
+        (e) =>
+          e.kind === "launch_step" ||
+          e.kind === "launch_log" ||
+          (e.kind === "status" && e.message?.startsWith("Launch warning: ")),
+      ),
+    ),
+  launchOptions: async () => ({
+    userConfigDefault,
+    excludeSupported: true,
+    excludeDescription:
+      "Exclude global MCP servers and supported hooks for this launch. Global instruction files and managed policy can still apply. Native authentication is preserved.",
+  }),
+  saveUserConfigDefault: async (choice) => {
+    userConfigDefault = choice;
+    return choice;
+  },
+  onLaunchWarning: (cb) => {
+    warningListeners.add(cb);
+    return () => {
+      warningListeners.delete(cb);
+    };
+  },
   profiles: async () => structuredClone(profiles),
   saveProfile: async (input) => {
     const requestedId = input.id?.trim();
@@ -497,7 +562,7 @@ export const mockDockApi: AgentDockApi = {
         .reverse(),
     );
   },
-  startSession: async ({ profileId, cwd, model, effort }) => {
+  startSession: async ({ profileId, cwd, model, effort, userConfig }) => {
     const p = profiles.find((p) => p.id === profileId);
     if (!p?.available)
       throw new JamError(
@@ -522,8 +587,8 @@ export const mockDockApi: AgentDockApi = {
       projectId: app.jam.id,
       kind: p.kind,
       title: p.label,
-      status: "ready",
-      cwd: cwd ?? `agent-workspace/${app.jam.id}`,
+      status: launchDelayMs ? "starting" : "ready",
+      cwd: cwd ?? "C:/work/cozy-jam",
       createdAt: new Date().toISOString(),
       capabilities: {
         images: false,
@@ -533,48 +598,100 @@ export const mockDockApi: AgentDockApi = {
       },
     };
     sessions.set(s.id, s);
-    emit(s.id, { kind: "status", status: "ready" });
-    if (p.kind === "terminal")
-      output(
-        s.id,
-        `Jam Board · ${p.label} (mock terminal)\r\nConnected to ${app.jam.name}\r\n${s.cwd}\r\n> `,
-      );
-    else {
+    emit(s.id, {
+      kind: "status",
+      status: s.status,
+      message: launchDelayMs ? "Adapter starting" : "Session ready",
+    });
+    const startedAt = new Date().toISOString();
+    emit(s.id, {
+      kind: "launch_step",
+      step: "process",
+      state: "ok",
+      message: "Adapter starting",
+      startedAt,
+      endedAt: startedAt,
+    });
+    emit(s.id, {
+      kind: "launch_step",
+      step: "initialize",
+      state: launchDelayMs ? "running" : "ok",
+      message: "Initialize adapter",
+      startedAt,
+      endedAt: launchDelayMs ? null : startedAt,
+    });
+    emit(s.id, {
+      kind: "launch_step",
+      step: "mcp",
+      state: "skipped",
+      message: "MCP connection not confirmed by this adapter",
+      startedAt,
+      endedAt: startedAt,
+    });
+    if (userConfig)
       emit(s.id, {
-        kind: "auth",
-        state:
-          getMockSignedOut(p.id) ||
-          (p.id === "claude-openrouter" &&
-            p.secretKeys.some((key) => !key.isSet))
-            ? "required"
-            : "ok",
-        label: getMockSignedOut(p.id)
-          ? "Not logged in (mock)"
-          : p.id === "claude-openrouter"
-            ? "No API key"
-            : "Signed in",
+        kind: "status",
+        status: s.status,
+        message: `Global config: ${userConfig === "include" ? "on" : "off"}`,
       });
-      emit(s.id, {
-        kind: "available_commands",
-        commands: [
-          { name: "help", description: "Show agent help" },
-          { name: "compact", description: "Summarize this conversation" },
-        ],
-      });
-      const options = mockOptions(
-        s,
-        model || p.model || "claude-sonnet-4-6",
-        effort,
-      );
-      configs.set(s.id, options);
-      emit(s.id, { kind: "config_options", options: structuredClone(options) });
-      for (const server of p.extraMcpServers ?? [])
-        if (server.enabled && /fail|missing/.test(server.command))
-          emit(s.id, {
-            kind: "error",
-            message: `Could not connect to ${server.name}. Chat can continue without this tool server.`,
-          });
-    }
+    const finishLaunch = () => {
+      if (!sessions.has(s.id) || ["stopped", "failed"].includes(s.status))
+        return;
+      if (p.kind === "terminal")
+        output(
+          s.id,
+          `Jam Board · ${p.label} (mock terminal)\r\nConnected to ${app.jam?.name}\r\n${s.cwd}\r\n> `,
+        );
+      else {
+        emit(s.id, {
+          kind: "auth",
+          state:
+            getMockSignedOut(p.id) ||
+            (p.id === "claude-openrouter" &&
+              p.secretKeys.some((key) => !key.isSet))
+              ? "required"
+              : "ok",
+          label: getMockSignedOut(p.id)
+            ? "Not logged in (mock)"
+            : p.id === "claude-openrouter"
+              ? "No API key"
+              : "Signed in",
+        });
+        emit(s.id, {
+          kind: "available_commands",
+          commands: [
+            { name: "help", description: "Show agent help" },
+            { name: "compact", description: "Summarize this conversation" },
+          ],
+        });
+        const options = mockOptions(
+          s,
+          model ||
+            p.model ||
+            (p.id.startsWith("codex") ? "gpt-6.1-sol" : "claude-sonnet-4-6"),
+          effort,
+        );
+        configs.set(s.id, options);
+        emit(s.id, {
+          kind: "config_options",
+          options: structuredClone(options),
+        });
+        for (const server of p.extraMcpServers ?? [])
+          if (server.enabled && /fail|missing/.test(server.command))
+            emit(s.id, {
+              kind: "error",
+              message: `Could not connect to ${server.name}. Chat can continue without this tool server.`,
+            });
+      }
+      if (s.status === "starting")
+        emit(s.id, {
+          kind: "status",
+          status: "ready",
+          message: "Session ready",
+        });
+    };
+    if (launchDelayMs) setTimeout(finishLaunch, launchDelayMs);
+    else finishLaunch();
     return structuredClone(s);
   },
   sendPrompt: async ({ sessionId, content }) => {

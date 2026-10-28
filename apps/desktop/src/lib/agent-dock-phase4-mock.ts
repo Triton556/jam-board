@@ -46,7 +46,12 @@ function ensureFixtures(projectId: string) {
           projectId,
           profileId: index === 1 ? "api-openrouter" : "claude-code",
           profileLabel: index === 1 ? "API chat" : "Claude Code",
-          kind: index === 1 ? "api" : "acp",
+          kind: "chat",
+          provider: {
+            label: index === 1 ? "API chat" : "Claude Code",
+            agentKind: index === 1 ? "api" : "claude",
+          },
+          empty: false,
           title:
             [
               "Plan the next release",
@@ -110,7 +115,17 @@ export function recordMockHistoryEvent(
       projectId: session.projectId,
       profileId: profile.id,
       profileLabel: profile.label,
-      kind: session.kind,
+      kind: "chat",
+      provider: {
+        label: profile.label,
+        agentKind:
+          session.kind === "api"
+            ? "api"
+            : profile.id.includes("codex")
+              ? "codex"
+              : "claude",
+      },
+      empty: false,
       title: session.title,
       createdAt: session.createdAt,
       updatedAt: event.at,
@@ -161,11 +176,11 @@ export const mockPhase4Api: Phase4Api = {
       throw Error("History entry not found.");
     return structuredClone(eventFiles.get(id) ?? []);
   },
-  resume: async (id) => {
+  resume: async (id, userConfig) => {
     const entry = (await scoped()).find((e) => e.id === id);
     if (!entry || entry.resumable === "none")
       throw Error("Open this transcript and continue in a new session.");
-    if (entry.kind === "api") {
+    if (entry.provider.agentKind.startsWith("api")) {
       await mockDockApi.saveProfile({
         id: entry.profileId,
         label: entry.profileLabel,
@@ -180,12 +195,14 @@ export const mockPhase4Api: Phase4Api = {
     }
     const session = await mockDockApi.startSession({
       profileId: entry.profileId,
+      userConfig,
     });
     const temporary = sessionEntries.get(session.id);
     entries = entries?.filter((e) => e.id !== temporary || e.id === id) ?? [];
     if (temporary !== id && temporary) eventFiles.delete(temporary);
     sessionEntries.set(session.id, id);
-    restoreMockTranscript(session.id, eventFiles.get(id) ?? [], entry.title);
+    if (entry.kind !== "terminal")
+      restoreMockTranscript(session.id, eventFiles.get(id) ?? [], entry.title);
     return { ...session, title: entry.title };
   },
   rename: async (id, title) => {

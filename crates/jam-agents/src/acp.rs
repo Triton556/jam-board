@@ -77,6 +77,11 @@ pub(crate) async fn start(
     let mut child = command
         .spawn()
         .map_err(|_| err("Cannot launch ACP agent executable"))?;
+    session.launch_step(
+        "start_process",
+        LaunchStepState::Ok,
+        "ACP adapter process started",
+    );
     let pid = child
         .id()
         .ok_or_else(|| err("Agent process has no process ID"))?;
@@ -107,22 +112,7 @@ pub(crate) async fn start(
     let tail = Arc::new(std::sync::Mutex::new(String::new()));
     let stderr_tail = tail.clone();
     let stderr_task = tokio::spawn(async move {
-        use tokio::io::{AsyncBufReadExt, BufReader};
-        let mut lines = BufReader::new(stderr).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
-            let line = stderr_session.redact(&line);
-            tracing::debug!(session_id = %stderr_session.view().id, stderr = %line, "ACP stderr");
-            let mut tail = stderr_tail.lock().expect("stderr tail");
-            tail.push_str(&line);
-            tail.push('\n');
-            if tail.len() > 8192 {
-                let mut cut = tail.len() - 8192;
-                while !tail.is_char_boundary(cut) {
-                    cut += 1;
-                }
-                tail.drain(..cut);
-            }
-        }
+        read_adapter_stderr(&stderr_session, stderr, &stderr_tail).await;
     });
     let task_stop = stop.clone();
     let startup_session = session.clone();
@@ -192,6 +182,72 @@ pub(crate) async fn start(
                 "ACP agent did not initialize; check the agent installation and login",
             ))
         }
+    }
+}
+
+async fn read_adapter_stderr(
+    session: &Session,
+    mut stderr: impl tokio::io::AsyncRead + Unpin,
+    tail: &std::sync::Mutex<String>,
+) {
+    use tokio::io::AsyncReadExt;
+    let mut buffer = [0u8; 4096];
+    let mut pending = Vec::new();
+    let mut overlong = false;
+    while let Ok(n) = stderr.read(&mut buffer).await {
+        if n == 0 {
+            break;
+        }
+        for byte in &buffer[..n] {
+            if *byte == b'\n' {
+                record_stderr(
+                    session,
+                    if overlong {
+                        "[Adapter stderr line omitted: over 16 KiB]".into()
+                    } else {
+                        String::from_utf8_lossy(&pending)
+                            .trim_end_matches('\r')
+                            .to_owned()
+                    },
+                    tail,
+                );
+                pending.clear();
+                overlong = false;
+            } else if !overlong {
+                if pending.len() == 16 * 1024 {
+                    pending.clear();
+                    overlong = true;
+                } else {
+                    pending.push(*byte);
+                }
+            }
+        }
+    }
+    if overlong || !pending.is_empty() {
+        record_stderr(
+            session,
+            if overlong {
+                "[Adapter stderr line omitted: over 16 KiB]".into()
+            } else {
+                String::from_utf8_lossy(&pending).into_owned()
+            },
+            tail,
+        );
+    }
+}
+fn record_stderr(session: &Session, line: String, tail: &std::sync::Mutex<String>) {
+    let line = crate::wiring::launch_config::redact_diagnostic(&session.redact(&line));
+    session.adapter_log(&line);
+    tracing::debug!(session_id = %session.view().id, stderr = %line, "ACP stderr");
+    let mut tail = tail.lock().expect("stderr tail");
+    tail.push_str(&line);
+    tail.push('\n');
+    if tail.len() > 8192 {
+        let mut cut = tail.len() - 8192;
+        while !tail.is_char_boundary(cut) {
+            cut += 1;
+        }
+        tail.drain(..cut);
     }
 }
 
@@ -271,6 +327,7 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             Ok(())
         }, sdk::on_receive_notification!())
         .connect_with(transport, async move |cx: sdk::ConnectionTo<sdk::Agent>| {
+            session.launch_step("initialize", LaunchStepState::Running, "ACP initialize");
             let init = cx
                 .send_request(
                     a::InitializeRequest::new(ProtocolVersion::V1)
@@ -288,10 +345,14 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                         )),
                 )
                 .block_task()
-                .await?;
+                .await.inspect_err(|e| {
+                    session.launch_step("initialize", LaunchStepState::Failed, e.to_string());
+                    crate::provider_errors::emit_failure(&session, crate::provider_errors::acp_failure(e));
+                })?;
             if init.protocol_version != ProtocolVersion::V1 {
                 return Err(sdk::Error::invalid_params().data("Unsupported ACP protocol version"));
             }
+            session.launch_step("initialize", LaunchStepState::Ok, "ACP initialized");
             let prompt_caps = &init.agent_capabilities.prompt_capabilities;
             session
                 .inner
@@ -304,7 +365,7 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                 embedded_context: prompt_caps.embedded_context,
                 config_options: false,
             };
-            let servers = entries.iter().map(|e| {
+            let servers = entries.iter().filter(|e| e.enabled).map(|e| {
                 if let Some(http) = &e.http {
                     a::McpServer::Http(a::McpServerHttp::new(&e.name, &http.url).headers(
                         e.bearer_token.as_ref().map(|v| a::HttpHeader::new("Authorization", format!("Bearer {v}"))).into_iter().collect()
@@ -315,18 +376,21 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             }).collect();
             let native_id = session.inner.lock().expect("session lock").resume_native_id.clone();
             let supported = init.agent_capabilities.load_session;
+            let meta = session.inner.lock().expect("session lock").launch_meta.as_ref().and_then(|m| m.as_object().cloned());
+            session.launch_step("session", LaunchStepState::Running, if native_id.is_some() { "ACP session/load" } else { "ACP session/new" });
             let (id, new) = if let Some(id) = native_id {
                 if !supported { return Err(sdk::Error::invalid_params().data("Agent no longer supports session/load")); }
-                let loaded = cx.send_request(a::LoadSessionRequest::new(id.clone(), PathBuf::from(&session.view().cwd)).mcp_servers(servers)).block_task().await.inspect_err(|e| report_auth_error(&session, e))?;
+                let loaded = cx.send_request(a::LoadSessionRequest::new(id.clone(), PathBuf::from(&session.view().cwd)).mcp_servers(servers).meta(meta)).block_task().await.inspect_err(|e| report_setup_error(&session, e))?;
                 let value = serde_json::to_value(loaded).map_err(sdk::Error::into_internal_error)?;
                 let mut response = value;
                 response["sessionId"] = json!(id);
                 let new: a::NewSessionResponse = serde_json::from_value(response).map_err(sdk::Error::into_internal_error)?;
                 (new.session_id.clone(), new)
             } else {
-                let new = cx.send_request(a::NewSessionRequest::new(PathBuf::from(&session.view().cwd)).mcp_servers(servers)).block_task().await.inspect_err(|e| report_auth_error(&session, e))?;
+                let new = cx.send_request(a::NewSessionRequest::new(PathBuf::from(&session.view().cwd)).mcp_servers(servers).meta(meta)).block_task().await.inspect_err(|e| report_setup_error(&session, e))?;
                 (new.session_id.clone(), new)
             };
+            session.launch_step("session", LaunchStepState::Ok, "ACP session established");
             if let Some(writer) = session.history_writer.lock().expect("history writer lock").as_mut() {
                 writer.native(id.to_string(), supported).map_err(sdk::Error::into_internal_error)?;
             }
@@ -498,6 +562,12 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
         .with_subscriber(tracing::subscriber::NoSubscriber::default())
         .await
         .map_err(|e| err(e.to_string()))
+}
+
+fn report_setup_error(session: &Session, error: &sdk::Error) {
+    report_auth_error(session, error);
+    session.launch_step("session", LaunchStepState::Failed, error.to_string());
+    crate::provider_errors::emit_failure(session, crate::provider_errors::acp_failure(error));
 }
 
 pub(crate) fn report_auth_error(session: &Session, error: &sdk::Error) {
@@ -762,6 +832,12 @@ pub(crate) fn emit_config(session: &Session, value: Value) {
 }
 pub(crate) fn map_update(session: &Session, v: Value) {
     let kind = text(&v, "sessionUpdate").unwrap_or_default();
+    if matches!(kind, "tool_call" | "tool_call_update")
+        && let Some(content) = short_content(&v)
+        && content.to_ascii_lowercase().contains("mcp server ")
+    {
+        session.adapter_log(&content);
+    }
     let previous = session
         .inner
         .lock()
@@ -878,3 +954,7 @@ pub(crate) fn map_update(session: &Session, v: Value) {
 #[cfg(test)]
 #[path = "acp_retry_tests.rs"]
 mod retry_tests;
+
+#[cfg(test)]
+#[path = "launch_event_tests.rs"]
+mod launch_event_tests;

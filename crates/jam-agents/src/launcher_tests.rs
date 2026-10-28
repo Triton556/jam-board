@@ -76,6 +76,7 @@ async fn pty_batch_launch_preserves_inline_json_and_argv() {
         )
         .await
         .unwrap();
+        s.connector().unwrap().resize(80, 24).unwrap();
         let result = tokio::time::timeout(Duration::from_secs(10), s.finished.cancelled()).await;
         s.connector().unwrap().stop().await.unwrap();
         result.expect("PTY batch did not terminate");

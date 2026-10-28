@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui";
 import { agentDockApi } from "../../lib/agent-dock";
 import type { ProviderErrorEvent, RetryingEvent } from "./brain-retry";
-import { providerErrorTitle } from "./brain-retry";
+import { providerErrorTitle, usageLimit } from "./brain-retry";
 import "./brain-retry.css";
 
 export function useRetrySeconds(at: string, delayMs: number) {
@@ -64,6 +64,7 @@ export function BrainProviderError({
     };
   }, []);
   const title = providerErrorTitle(event);
+  const limit = usageLimit(event);
   if (!active)
     return (
       <details className="brain-provider-error past">
@@ -79,7 +80,7 @@ export function BrainProviderError({
         <pre>{[event.message, event.detail].filter(Boolean).join("\n\n")}</pre>
       </details>
       <div className="button-row">
-        {(event.retryable === true || failedTurn) && (
+        {!limit && (event.retryable === true || failedTurn) && (
           <Button
             variant="primary"
             disabled={!ready || !!seconds || issued}
@@ -102,27 +103,28 @@ export function BrainProviderError({
             {issued ? "Retrying…" : seconds ? `Retry in ${seconds} s` : "Retry"}
           </Button>
         )}
-        {["overloaded", "rate_limited", "context_too_long"].includes(
-          event.code ?? "",
-        ) && (
-          <Button
-            disabled={!ready || issued || !switchModel}
-            title={
-              !switchModel
-                ? "This connection has not offered model controls."
-                : undefined
-            }
-            onClick={switchModel}
-          >
-            Switch model
-          </Button>
-        )}
-        {!failedTurn && restart && (
+        {!limit &&
+          ["overloaded", "rate_limited", "context_too_long"].includes(
+            event.code ?? "",
+          ) && (
+            <Button
+              disabled={!ready || issued || !switchModel}
+              title={
+                !switchModel
+                  ? "This connection has not offered model controls."
+                  : undefined
+              }
+              onClick={switchModel}
+            >
+              Switch model
+            </Button>
+          )}
+        {!limit && !failedTurn && restart && (
           <Button onClick={() => void restart()}>Restart session</Button>
         )}
-        {!failedTurn && connections && (
+        {(limit || !failedTurn) && connections && (
           <Button variant="ghost" onClick={connections}>
-            Connections…
+            {limit ? "Switch connection" : "Connections…"}
           </Button>
         )}
       </div>

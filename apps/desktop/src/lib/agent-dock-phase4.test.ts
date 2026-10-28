@@ -13,6 +13,8 @@ it("R6-N01 generated history commands preserve exact names, nullable filters and
   await nativePhase4Api.history({ limit: 20, query: "release" });
   await nativePhase4Api.events("entry");
   await nativePhase4Api.resume("entry");
+  await nativePhase4Api.resume("entry", "include");
+  await nativePhase4Api.resume("entry", "exclude");
   await nativePhase4Api.rename("entry", "Renamed");
   await nativePhase4Api.delete("entry");
   await nativePhase4Api.historySettings();
@@ -22,7 +24,9 @@ it("R6-N01 generated history commands preserve exact names, nullable filters and
     ["agent_history", { limit: null, query: null }],
     ["agent_history", { limit: 20, query: "release" }],
     ["agent_history_events", { entryId: "entry" }],
-    ["resume_agent_session", { entryId: "entry" }],
+    ["resume_agent_session", { entryId: "entry", userConfig: null }],
+    ["resume_agent_session", { entryId: "entry", userConfig: "include" }],
+    ["resume_agent_session", { entryId: "entry", userConfig: "exclude" }],
     ["rename_agent_history", { entryId: "entry", title: "Renamed" }],
     ["delete_agent_history", { entryId: "entry" }],
     ["agent_history_settings"],

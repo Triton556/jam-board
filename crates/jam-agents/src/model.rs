@@ -230,6 +230,7 @@ pub enum AuthState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentErrorCode {
+    UsageLimit,
     RateLimited,
     Overloaded,
     Auth,
@@ -246,6 +247,16 @@ pub enum AgentErrorCode {
     rename_all_fields = "camelCase"
 )]
 pub enum AgentEventKind {
+    LaunchStep {
+        step: String,
+        state: LaunchStepState,
+        message: String,
+        started_at: String,
+        ended_at: Option<String>,
+    },
+    LaunchLog {
+        message: String,
+    },
     Status {
         status: SessionStatus,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -332,6 +343,8 @@ pub enum AgentEventKind {
         retryable: bool,
         #[serde(default)]
         retry_after_ms: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resets_at: Option<String>,
         message: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,
@@ -358,11 +371,71 @@ pub struct AgentTerminalOutput {
 pub struct StartAgentSessionInput {
     pub profile_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_config: Option<UserConfigChoice>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum UserConfigChoice {
+    Include,
+    Exclude,
+}
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum UserConfigDefault {
+    #[default]
+    Ask,
+    Include,
+    Exclude,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentLaunchOptions {
+    pub user_config_default: UserConfigDefault,
+    pub exclude_supported: bool,
+    pub exclude_description: String,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum LaunchStepState {
+    Running,
+    Ok,
+    Failed,
+    Skipped,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchStep {
+    pub step: String,
+    pub state: LaunchStepState,
+    pub message: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+}
+impl AgentEventKind {
+    pub fn launch_step(&self) -> Option<LaunchStep> {
+        match self {
+            Self::LaunchStep {
+                step,
+                state,
+                message,
+                started_at,
+                ended_at,
+            } => Some(LaunchStep {
+                step: step.clone(),
+                state: *state,
+                message: message.clone(),
+                started_at: started_at.clone(),
+                ended_at: ended_at.clone(),
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

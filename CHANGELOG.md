@@ -5,6 +5,34 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- History has its own tab with Chat and Terminal views, provider and model
+  details, resume, and a row menu for rename and delete with Undo.
+- Launch progress shows individual steps and readable logs. Choose whether to
+  include user agent configuration for each launch or set a default.
+- Warn about stale board MCP entries while using a separate session-specific
+  connection. Terminal history links supported CLI sessions for resume and keeps
+  their original transcripts when a history entry is deleted.
+
+### Changed
+
+- Session picker shows titles, start times and workspace names, groups active and
+  stopped sessions, and can clear stopped rows. Terminal titles follow the CLI.
+- Access choices use distinct Claude and Codex labels and explain Full auto.
+- Terminal startup shows progress and waits for a fitted window and printable
+  output or a timeout. Font and rendering changes address terminal display issues;
+  the original reported rendering symptoms remain unconfirmed in fixture checks.
+- Usage-limit errors show a reset time when available and offer connection
+  switching without retrying the exhausted quota.
+
+### Fixed
+
+- Board MCP discovery and calls bind the intended project and agent identity on
+  both initialized and discovery-first connections.
+- Agent and MCP credentials are passed through environment variables rather
+  than exposed in terminal command lines.
+
 ## [0.3.0-alpha.43] - 2026-10-27
 
 Session history and resume, tools per connection, web MCP, cloud speech and

@@ -5,16 +5,25 @@ import { useEffect, useRef, useState } from "react";
 import laptop from "../../assets/chibi/danil-laptop-256.webp";
 import { Button, IconButton } from "../../components/ui";
 import { agentDockApi } from "../../lib/agent-dock";
-import type { AgentProfileView, HistoryEntry } from "../../lib/agent-dock-api";
+import type {
+  AgentProfileView,
+  AgentSessionView,
+  UserConfigChoice,
+} from "../../lib/agent-dock-api";
 import { appQuery } from "../../lib/queries";
 import { useUiStore } from "../../lib/ui-store";
 import { ConnectionEditor } from "./BrainConnections";
 import { BrainHistory, HistoryTranscript } from "./BrainHistory";
+import { BrainLaunchLogs } from "./BrainLaunchLogs";
+import { BrainLaunchWarnings } from "./BrainLaunchWarnings";
 import { BrainLauncher, ControlPopover } from "./BrainSessionControls";
+import { BrainSessionPicker } from "./BrainSessionPicker";
 import {
   LazyBrainChat as BrainChat,
   LazyBrainTerminal as BrainTerminal,
 } from "./BrainSurfaces";
+import { GlobalConfigChip, useUserConfigLaunch } from "./BrainUserConfig";
+import type { DockHistoryEntry as HistoryEntry } from "./brain-history-types";
 import {
   profileGroups,
   profileStatus,
@@ -23,17 +32,22 @@ import {
 } from "./brain-profiles";
 import { pendingSessionChoices, sessionModel } from "./brain-settings";
 import { draftKey, useBrainState } from "./brain-store";
+import { DisabledReason } from "./DisabledReason";
 import "./brain-dock.css";
 import "./brain-controls.css";
 
 export function BrainDock({ overlay }: { overlay: boolean }) {
   const client = useQueryClient();
   const state = useBrainState();
+  const configLaunch = useUserConfigLaunch();
+  const [nextConfig, setNextConfig] = useState<UserConfigChoice>();
   const profiles = useQuery(profilesQuery);
   const app = useQuery(appQuery);
   const width = useUiStore((s) => s.brainDockWidth);
   const [creating, setCreating] = useState(false);
   const [launcherProfile, setLauncherProfile] = useState<string>();
+  const [logs, setLogs] = useState<string | null>(null);
+  const [launchSession, setLaunchSession] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [past, setPast] = useState<HistoryEntry | null>(null);
   useEffect(() => {
@@ -42,6 +56,63 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
   const [menu, setMenu] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const projectScope = useRef({ projectId: state.projectId });
+  const launchAttempt = useRef<{
+    scope: { projectId: string | null };
+    profileId: string;
+    existing: Set<string>;
+  } | null>(null);
+  useEffect(
+    () =>
+      agentDockApi.onEvent((event) => {
+        const attempt = launchAttempt.current;
+        if (
+          !attempt ||
+          event.kind !== "launch_step" ||
+          attempt.existing.has(event.sessionId)
+        )
+          return;
+        // The event has no project/request ID. Confirm identity with the scoped
+        // session inventory before displaying events received before start returns.
+        void agentDockApi
+          .sessions()
+          .then((sessions) => {
+            if (
+              launchAttempt.current !== attempt ||
+              projectScope.current !== attempt.scope
+            )
+              return;
+            const session = sessions.find(
+              (s) =>
+                s.id === event.sessionId &&
+                s.projectId === attempt.scope.projectId &&
+                s.profileId === attempt.profileId,
+            );
+            if (!session) return;
+            setLaunchSession(session.id);
+            useBrainState.getState().ingest(event);
+          })
+          .catch(() => {
+            /* The start command reports its own failure. */
+          });
+      }),
+    [],
+  );
+  useEffect(() => {
+    projectScope.current = { projectId: state.projectId };
+    setNextConfig(undefined);
+    setLogs(null);
+    setLaunchSession(null);
+    setCreating(false);
+    setPicker(false);
+    setMenu(false);
+    setError("");
+    setPending(false);
+    launchAttempt.current = null;
+    return () => {
+      projectScope.current = { projectId: null };
+    };
+  }, [state.projectId]);
   const [focusEpoch, setFocusEpoch] = useState(0);
   const [editingProfile, setEditingProfile] = useState<AgentProfileView | null>(
     null,
@@ -58,6 +129,20 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
   const drag = useRef<{ x: number; width: number } | null>(null);
   const navigate = useNavigate();
   const terminal = state.tab === "terminal";
+  const sessionTab = terminal ? "terminal" : "chat";
+  const launch = state.sessions.find((item) => item.id === launchSession);
+  const starting =
+    pending ||
+    configLaunch.busy ||
+    configLaunch.asking ||
+    launch?.status === "starting";
+  useEffect(() => {
+    if (launch && launch.status === "ready" && !pending) {
+      setCreating(false);
+      setLaunchSession(null);
+      setFocusEpoch((value) => value + 1);
+    }
+  }, [launch, pending]);
   const sessions = state.sessions
     .filter(
       (s) =>
@@ -65,7 +150,19 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
         (s.kind === "terminal") === terminal,
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const session = sessions.find((s) => s.id === state.selected[state.tab]);
+  const session = sessions.find((s) => s.id === state.selected[sessionTab]);
+  const sessionTitle = creating
+    ? terminal
+      ? "New terminal"
+      : "New chat"
+    : session
+      ? [
+          (terminal && state.terminalTitles?.[session.id]) || session.title,
+          sessionModel(state.events[session.id] ?? []),
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "New session";
   const close = () => useUiStore.getState().setBrainDockOpen(false);
   useEffect(() => {
     const previous = document.activeElement;
@@ -90,10 +187,13 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !event.defaultPrevented) {
-        if (picker || menu || creating) {
-          setPicker(false);
-          setMenu(false);
-          setCreating(false);
+        if (picker || menu || creating || logs) {
+          if (logs) setLogs(null);
+          else {
+            setPicker(false);
+            setMenu(false);
+            if (!starting) setCreating(false);
+          }
         } else if (overlay) useUiStore.getState().setBrainDockOpen(false);
         else return;
         event.preventDefault();
@@ -123,11 +223,16 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
     return () => {
       document.removeEventListener("keydown", key);
     };
-  }, [overlay, picker, menu, creating]);
+  }, [overlay, picker, menu, creating, logs, starting]);
   useEffect(() => {
     // An open task drawer captures keyboard events on document. The dock is a
     // separate sibling surface; keep its Tab and Escape within this surface.
     const siblingKeys = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".brain-config-question")
+      )
+        return;
       if (
         event.key === "Escape" &&
         event.target instanceof Element &&
@@ -196,63 +301,117 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
   };
   const run = async (action: () => Promise<unknown>) => {
     if (pending) return;
+    const epoch = projectScope.current;
     setPending(true);
     setError("");
     try {
       await action();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (epoch === projectScope.current)
+        setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setPending(false);
+      if (epoch === projectScope.current) setPending(false);
     }
   };
   const start = (
     profileId: string,
     choice?: { model?: string; effort?: string },
   ) =>
-    run(async () => {
-      const profile = profiles.data?.find((p) => p.id === profileId);
-      const status =
-        profile &&
-        profileStatus({ ...profile, model: choice?.model || profile.model });
-      if (profile && (status === "Add key" || status === "Choose a model")) {
-        editProfile(
-          { ...profile, model: choice?.model || profile.model },
-          status === "Choose a model" ? "model" : "key",
-        );
-        return;
-      }
-      const targetTab =
-        profiles.data?.find((p) => p.id === profileId)?.kind === "terminal"
-          ? "terminal"
-          : "chat";
-      const before = draftKey();
-      const next = await agentDockApi.startSession({ profileId, ...choice });
-      if (useBrainState.getState().projectId !== next.projectId) return;
-      if (choice) pendingSessionChoices.set(next.id, choice);
-      useBrainState.setState((s) => ({
-        sessions: [next, ...s.sessions.filter((old) => old.id !== next.id)],
-        configuring: {
-          ...s.configuring,
-          [next.id]: !!(choice?.model || choice?.effort),
-        },
-        tab: targetTab,
-        selected: { ...s.selected, [targetTab]: next.id },
-        drafts: {
-          ...s.drafts,
-          [`${s.projectId}:${next.id}`]: (before.endsWith(":new")
-            ? s.drafts[before]
-            : undefined) ?? {
-            text: "",
-            context: [],
-          },
-        },
-      }));
-      for (const event of await agentDockApi.history(next.id))
-        useBrainState.getState().ingest(event);
-      setCreating(false);
-      setFocusEpoch((value) => value + 1);
-    });
+    configLaunch.request(
+      profileId,
+      profiles.data?.find((p) => p.id === profileId)?.kind ?? "acp",
+      (userConfig) =>
+        run(async () => {
+          const clickedAt = new Date().toISOString();
+          const clicked = performance.now();
+          const epoch = projectScope.current;
+          const profile = profiles.data?.find((p) => p.id === profileId);
+          const status =
+            profile &&
+            profileStatus({
+              ...profile,
+              model: choice?.model || profile.model,
+            });
+          if (
+            profile &&
+            (status === "Add key" || status === "Choose a model")
+          ) {
+            editProfile(
+              { ...profile, model: choice?.model || profile.model },
+              status === "Choose a model" ? "model" : "key",
+            );
+            return;
+          }
+          const targetTab =
+            profiles.data?.find((p) => p.id === profileId)?.kind === "terminal"
+              ? "terminal"
+              : "chat";
+          const before = draftKey();
+          setLaunchSession(null);
+          const attempt = {
+            scope: epoch,
+            profileId,
+            existing: new Set((await agentDockApi.sessions()).map((s) => s.id)),
+          };
+          if (epoch !== projectScope.current) return;
+          launchAttempt.current = attempt;
+          let next: AgentSessionView;
+          try {
+            next = await agentDockApi.startSession({
+              profileId,
+              ...choice,
+              userConfig,
+            });
+          } finally {
+            if (launchAttempt.current === attempt) launchAttempt.current = null;
+          }
+          if (targetTab === "terminal") {
+            console.debug("[terminal-startup]", {
+              sessionId: next.id,
+              clickedAt,
+              clickToPendingMs: Math.round(performance.now() - clicked),
+            });
+          }
+          if (
+            epoch !== projectScope.current ||
+            useBrainState.getState().projectId !== next.projectId
+          )
+            return;
+          setNextConfig(undefined);
+          if (choice) pendingSessionChoices.set(next.id, choice);
+          useBrainState.setState((s) => ({
+            userConfigChoices: userConfig
+              ? { ...s.userConfigChoices, [next.id]: userConfig }
+              : s.userConfigChoices,
+            sessions: [next, ...s.sessions.filter((old) => old.id !== next.id)],
+            configuring: {
+              ...s.configuring,
+              [next.id]: !!(choice?.model || choice?.effort),
+            },
+            tab: targetTab,
+            selected: { ...s.selected, [targetTab]: next.id },
+            drafts: {
+              ...s.drafts,
+              [`${s.projectId}:${next.id}`]: (before.endsWith(":new")
+                ? s.drafts[before]
+                : undefined) ?? {
+                text: "",
+                context: [],
+              },
+            },
+          }));
+          const replay = await agentDockApi.history(next.id);
+          if (epoch !== projectScope.current) return;
+          for (const event of replay) useBrainState.getState().ingest(event);
+          if (next.status === "starting" && targetTab !== "terminal")
+            setLaunchSession(next.id);
+          else {
+            setCreating(false);
+            setFocusEpoch((value) => value + 1);
+          }
+        }),
+      nextConfig,
+    );
   return (
     <>
       {overlay && (
@@ -323,11 +482,12 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
         )}
         <header className="brain-header">
           <div className="brain-tabs" role="tablist" aria-label="Brain mode">
-            {(["chat", "terminal"] as const).map((tab) => (
+            {(["chat", "terminal", "history"] as const).map((tab) => (
               <button
                 type="button"
                 role="tab"
                 key={tab}
+                disabled={starting}
                 aria-selected={state.tab === tab}
                 tabIndex={state.tab === tab ? 0 : -1}
                 onKeyDown={(event) => {
@@ -338,18 +498,23 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                   )
                     return;
                   event.preventDefault();
+                  const tabs = ["chat", "terminal", "history"] as const;
                   const next =
-                    event.key === "Home"
-                      ? "chat"
-                      : event.key === "End"
-                        ? "terminal"
-                        : tab === "chat"
-                          ? "terminal"
-                          : "chat";
+                    tabs[
+                      event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? 2
+                          : (tabs.indexOf(tab) +
+                              (event.key === "ArrowRight" ? 1 : 2)) %
+                            3
+                    ] ?? "chat";
                   useBrainState.setState({ tab: next });
                   setCreating(false);
                   setPicker(false);
                   setMenu(false);
+                  setLogs(null);
+                  setPast(null);
                   setFocusEpoch(-1);
                   event.currentTarget.parentElement
                     ?.querySelector<HTMLElement>(`[data-brain-tab="${next}"]`)
@@ -360,17 +525,28 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                   useBrainState.setState({ tab });
                   setCreating(false);
                   setPicker(false);
+                  setMenu(false);
+                  setLogs(null);
+                  setPast(null);
                   setFocusEpoch((value) => value + 1);
                 }}
               >
-                {tab === "chat" ? "Chat" : "Terminal"}
+                {tab === "chat"
+                  ? "Chat"
+                  : tab === "terminal"
+                    ? "Terminal"
+                    : "History"}
               </button>
             ))}
           </div>
           <div className="button-row">
             <IconButton
               label={terminal ? "New terminal" : "New chat"}
+              disabled={starting}
               onClick={() => {
+                useBrainState.setState({ tab: sessionTab });
+                setLogs(null);
+                setLaunchSession(null);
                 setPast(null);
                 setLauncherProfile(session?.profileId);
                 setCreating(true);
@@ -385,142 +561,140 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             </IconButton>
           </div>
         </header>
-        <div className="brain-session-bar">
-          <div className="brain-popover-anchor">
-            <button
-              type="button"
-              className="brain-session-title"
-              aria-expanded={picker}
-              onClick={() => {
-                setPicker(!picker);
-                setMenu(false);
-              }}
-            >
-              <span>
-                {past
-                  ? past.title
-                  : session
-                    ? [
-                        session.title,
-                        sessionModel(state.events[session.id] ?? []),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : "New session"}
-              </span>
-              <ChevronDown size={14} />
-            </button>
-            {picker && (
-              <ControlPopover
-                className="brain-popover"
-                label="Sessions"
-                close={() => setPicker(false)}
+        {state.tab !== "history" && (
+          <div className="brain-session-bar">
+            <div className="brain-popover-anchor">
+              <button
+                type="button"
+                className="brain-session-title"
+                aria-expanded={picker}
+                disabled={starting}
+                aria-label={`Choose session: ${sessionTitle}`}
+                onClick={() => {
+                  setPicker(!picker);
+                  setMenu(false);
+                }}
               >
-                {sessions.length ? (
-                  sessions.map((s) => (
-                    <button
-                      type="button"
-                      key={s.id}
-                      onClick={() => {
-                        setPast(null);
-                        useBrainState.setState({
-                          selected: { ...state.selected, [state.tab]: s.id },
-                        });
-                        setCreating(false);
-                        setPicker(false);
-                        setFocusEpoch((value) => value + 1);
-                      }}
-                    >
-                      <span>
-                        {[s.title, sessionModel(state.events[s.id] ?? [])]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                      <small>{s.status.replaceAll("_", " ")}</small>
-                    </button>
-                  ))
-                ) : (
-                  <p>No sessions yet</p>
-                )}
-                {!terminal && (
-                  <BrainHistory
-                    open={(entry) => {
-                      setPast(entry);
-                      setPicker(false);
-                      setCreating(false);
-                    }}
-                    resumed={() => {
+                <span title={sessionTitle}>{sessionTitle}</span>
+                <ChevronDown size={14} />
+              </button>
+              {picker && (
+                <ControlPopover
+                  className="brain-popover"
+                  label="Sessions"
+                  close={() => setPicker(false)}
+                >
+                  <BrainSessionPicker
+                    sessions={sessions}
+                    selected={session?.id}
+                    choose={(id) => {
                       setPast(null);
-                      setPicker(false);
+                      setLogs(null);
+                      useBrainState.setState({
+                        selected: { ...state.selected, [sessionTab]: id },
+                      });
                       setCreating(false);
+                      setPicker(false);
+                      setFocusEpoch((value) => value + 1);
                     }}
                   />
-                )}
-              </ControlPopover>
-            )}
-          </div>
-          <div className="brain-popover-anchor">
-            <IconButton
-              label="Session actions"
-              onClick={() => {
-                setMenu(!menu);
-                setPicker(false);
-              }}
-            >
-              <MoreHorizontal size={18} />
-            </IconButton>
-            {menu && (
-              <ControlPopover
-                className="brain-popover right"
+                </ControlPopover>
+              )}
+            </div>
+            <div className="brain-popover-anchor">
+              <IconButton
                 label="Session actions"
-                close={() => setMenu(false)}
+                disabled={starting || creating}
+                onClick={() => {
+                  setMenu(!menu);
+                  setPicker(false);
+                }}
               >
-                <button
-                  type="button"
-                  disabled={
-                    !!past ||
-                    !session ||
-                    pending ||
-                    session.status === "stopped"
-                  }
-                  onClick={() => {
-                    if (session)
-                      void run(() => agentDockApi.stopSession(session.id));
-                    setMenu(false);
-                  }}
+                <MoreHorizontal size={18} />
+              </IconButton>
+              {menu && (
+                <ControlPopover
+                  className="brain-popover right"
+                  label="Session actions"
+                  close={() => setMenu(false)}
                 >
-                  Stop session
-                </button>
-                {import.meta.env.VITE_MOCK_BRIDGE === "1" && (
                   <button
                     type="button"
                     disabled={
-                      !session ||
-                      !!past ||
-                      pending ||
-                      ["stopped", "failed"].includes(session.status)
+                      !session || pending || session.status === "stopped"
                     }
                     onClick={() => {
                       if (session)
-                        void run(async () => {
-                          const mock = await import(
-                            "../../lib/agent-dock-mock"
-                          );
-                          await mock.simulateMockCrash(session.id);
-                        });
+                        void run(() => agentDockApi.stopSession(session.id));
                       setMenu(false);
                     }}
                   >
-                    Simulate crash
+                    Stop session
                   </button>
-                )}
-                <button type="button" onClick={connections}>
-                  Connections…
-                </button>
-              </ControlPopover>
-            )}
+                  {import.meta.env.VITE_MOCK_BRIDGE === "1" && (
+                    <button
+                      type="button"
+                      disabled={
+                        !session ||
+                        pending ||
+                        ["stopped", "failed"].includes(session.status)
+                      }
+                      onClick={() => {
+                        if (session)
+                          void run(async () => {
+                            const mock = await import(
+                              "../../lib/agent-dock-mock"
+                            );
+                            await mock.simulateMockCrash(session.id);
+                          });
+                        setMenu(false);
+                      }}
+                    >
+                      Simulate crash
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!session}
+                    onClick={() => {
+                      if (session) {
+                        setFocusEpoch(-1);
+                        setLogs(session.id);
+                      }
+                      setMenu(false);
+                    }}
+                  >
+                    Logs
+                  </button>
+                  <button type="button" onClick={connections}>
+                    Connections…
+                  </button>
+                </ControlPopover>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+        {configLaunch.view}
+        {state.tab !== "history" && session && !creating && !logs && (
+          <>
+            <GlobalConfigChip
+              key={`config-${session.id}`}
+              choice={state.userConfigChoices?.[session.id]}
+              next={nextConfig}
+              change={setNextConfig}
+            />
+            <BrainLaunchWarnings
+              key={`warning-${session.id}`}
+              sessionId={session.id}
+              events={state.events[session.id] ?? []}
+              focusComposer={() => {
+                // Keep focus meaningful while the lazy chat/terminal is mounting.
+                panel.current?.focus();
+                setFocusEpoch((value) => value + 1);
+              }}
+            />
+          </>
+        )}
         {error && (
           <div className="brain-error" role="alert">
             {error}
@@ -541,22 +715,47 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             </button>
           </div>
         )}
-        {past && !terminal ? (
-          <HistoryTranscript
-            key={past.id}
-            entry={past}
-            close={() => setPast(null)}
-            resumed={() => {
-              setPast(null);
-              setCreating(false);
-              setFocusEpoch((v) => v + 1);
-            }}
+        {state.tab === "history" ? (
+          past ? (
+            <HistoryTranscript
+              key={past.id}
+              entry={past}
+              close={() => setPast(null)}
+              resumed={() => {
+                setPast(null);
+                setCreating(false);
+                setFocusEpoch((v) => v + 1);
+              }}
+            />
+          ) : (
+            <BrainHistory
+              key={state.projectId}
+              open={setPast}
+              resumed={() => {
+                setPast(null);
+                setCreating(false);
+              }}
+            />
+          )
+        ) : logs ? (
+          <BrainLaunchLogs
+            key={logs}
+            sessionId={logs}
+            title={
+              sessions.find((item) => item.id === logs)?.title ?? "Session"
+            }
+            events={state.events[logs] ?? []}
+            close={() => setLogs(null)}
           />
         ) : creating && !terminal ? (
           <BrainLauncher
             profiles={profiles.data ?? []}
             initialProfileId={launcherProfile ?? session?.profileId}
-            pending={pending}
+            pending={pending || launch?.status === "starting"}
+            blocked={configLaunch.busy || configLaunch.asking}
+            launchEvents={
+              launchSession ? (state.events[launchSession] ?? []) : []
+            }
             start={start}
             cancel={() => setCreating(false)}
             connections={connections}
@@ -567,6 +766,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             terminal={terminal}
             profiles={profiles.data ?? []}
             pending={pending}
+            blocked={configLaunch.busy || configLaunch.asking}
             loading={profiles.isPending}
             start={
               terminal
@@ -621,7 +821,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             }}
           />
         )}
-        {session && !creating && !past && (
+        {state.tab !== "history" && session && !creating && !logs && (
           <div className="brain-cwd" title={session.cwd}>
             Project workspace · {session.cwd}
           </div>
@@ -649,6 +849,7 @@ function ProfilePicker({
   terminal,
   profiles,
   pending,
+  blocked,
   loading,
   start,
   connections,
@@ -658,6 +859,7 @@ function ProfilePicker({
   terminal: boolean;
   profiles: AgentProfileView[];
   pending: boolean;
+  blocked: boolean;
   loading: boolean;
   start(id: string): Promise<void>;
   connections(): void;
@@ -701,7 +903,7 @@ function ProfilePicker({
               key={p.id}
               className={`brain-profile ${chosen?.id === p.id ? "selected" : ""}`}
               aria-pressed={chosen?.id === p.id}
-              disabled={!p.available || pending}
+              disabled={!p.available || pending || blocked}
               onClick={() => {
                 setSelected(p.id);
                 const status = profileStatus(p);
@@ -732,22 +934,38 @@ function ProfilePicker({
             : "Choose a model"}
         </Button>
       ) : (
-        <Button
-          variant="primary"
-          disabled={!chosen || pending}
-          onClick={() => {
-            if (chosen) void start(chosen.id);
-          }}
+        <DisabledReason
+          label={terminal ? "Open terminal" : "Start chat"}
+          reason={
+            !chosen
+              ? terminal
+                ? "No terminal connection available — install Claude CLI or Codex"
+                : "No chat connection available — install Claude CLI or Codex, or configure an API connection"
+              : undefined
+          }
         >
-          {pending ? "Starting…" : terminal ? "Open terminal" : "Start chat"}
-        </Button>
+          <Button
+            variant="primary"
+            disabled={!chosen || pending || blocked}
+            onClick={() => {
+              if (chosen) void start(chosen.id);
+            }}
+          >
+            {pending ? "Starting…" : terminal ? "Open terminal" : "Start chat"}
+          </Button>
+        </DisabledReason>
       )}
       {cancel && (
-        <Button variant="ghost" onClick={cancel}>
+        <Button variant="ghost" disabled={pending || blocked} onClick={cancel}>
           Back to session
         </Button>
       )}
-      <button type="button" className="brain-text-action" onClick={connections}>
+      <button
+        type="button"
+        className="brain-text-action"
+        disabled={pending || blocked}
+        onClick={connections}
+      >
         Connections…
       </button>
     </div>

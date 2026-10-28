@@ -931,6 +931,8 @@ async fn api_resume_command_restores_transcript_truncates_results_and_continues_
     let record = crate::history::StoredHistory {
         entry: HistoryEntry {
             id: "saved-entry".into(),
+            provider: Default::default(),
+            empty: false,
             project_id: s.board.project_id.clone(),
             profile_id: profile.id.clone(),
             profile_label: profile.label,
@@ -950,6 +952,7 @@ async fn api_resume_command_restores_transcript_truncates_results_and_continues_
         renamed: false,
         has_user_message: false,
         last_agent_message_id: None,
+        terminal: None,
     };
     let mut writer = history.create(record).unwrap().unwrap();
     for (i, event) in [
@@ -1190,6 +1193,17 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
 });
 "#).unwrap();
     let command = which::which("node").unwrap().to_string_lossy().into_owned();
+    // This fixture must never resolve an installed agent or a real MCP server.
+    assert_eq!(
+        std::path::Path::new(&command)
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_lowercase(),
+        "node"
+    );
+    assert!(fixture.is_file());
+    assert!(std::path::Path::new(&command).is_absolute());
     let make = |name: &str, trust| McpEntry {
         enabled: true,
         name: name.into(),
@@ -1226,6 +1240,10 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     assert_eq!(tools.len(), 2);
     assert_eq!(tools[0].name, "jam-board__read");
     assert_eq!(tools[1].name, "web__read");
+    for name in ["jam-board", "web"] {
+        assert!(events(&s).iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == format!("mcp:{name}") && launch.state == LaunchStepState::Ok)));
+    }
+    assert!(events(&s).iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "mcp:broken" && launch.state == LaunchStepState::Failed && launch.message.contains("MCP executable not found"))));
     assert_eq!(
         source.call("web__read".into(), json!({})).await.unwrap()["content"][0]["text"],
         "web:absent"

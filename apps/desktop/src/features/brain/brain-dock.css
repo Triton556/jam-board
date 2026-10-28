@@ -56,6 +56,7 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
   background: var(--danger-ink);
 }
 .brain-dock {
+  animation: brain-dock-enter var(--motion-slow) var(--ease-out);
   position: relative;
   flex: 0 0 auto;
   min-height: 0;
@@ -84,16 +85,21 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
 }
 .brain-resize {
   position: absolute;
-  width: 8px;
-  left: -5px;
+  width: 28px;
+  left: -14px;
   top: 0;
   bottom: 0;
   cursor: col-resize;
   touch-action: none;
   z-index: 2;
 }
-.brain-resize:hover,
-.brain-resize:focus-visible {
+.brain-resize::after {
+  content: "";
+  position: absolute;
+  inset: 0 13px;
+}
+.brain-resize:hover::after,
+.brain-resize:focus-visible::after {
   background: var(--coral);
   opacity: 0.5;
   outline: 2px solid var(--coral);
@@ -157,11 +163,12 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
   position: relative;
 }
 .brain-popover {
+  animation: brain-control-enter var(--motion-base) var(--ease-out);
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 210px;
-  max-width: 310px;
+  min-width: min(210px, calc(100vw - 16px));
+  max-width: min(310px, calc(100vw - 16px));
   max-height: 330px;
   overflow: auto;
   background: var(--card);
@@ -700,6 +707,31 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
   padding: 5px;
   font-size: 11px;
 }
+.brain-terminal-area {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.brain-terminal-starting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--ink-2);
+  background: var(--paper);
+  text-align: center;
+  pointer-events: none;
+}
+.brain-terminal-starting-hint {
+  max-width: 36ch;
+  font-size: 11px;
+}
 .brain-terminal-host {
   min-height: 0;
   min-width: 0;
@@ -708,6 +740,8 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
 }
 .brain-terminal-host .xterm {
   height: 100%;
+  font-kerning: none;
+  font-variant-ligatures: none;
 }
 .brain-connections {
   border: 1.5px solid var(--line-soft);
@@ -839,7 +873,19 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
     transform: rotate(360deg);
   }
 }
+@keyframes brain-dock-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .brain-dock,
+  .brain-popover,
   .brain-dot.working,
   .brain-caret,
   .brain-spinner svg {
