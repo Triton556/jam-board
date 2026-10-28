@@ -46,6 +46,7 @@ import { profilesQuery } from "./brain-profiles";
 import { activeRetry, latestTurnError } from "./brain-retry";
 import {
   configDivider,
+  connectionAccessKind,
   optionCategory,
   sessionOptions,
 } from "./brain-settings";
@@ -416,7 +417,16 @@ export function BrainChat({
       return (
         !!event.message && /^(Resumed |History truncated)/.test(event.message)
       );
-    if (event.kind === "config_options") return !!configDivider(events, index);
+    if (event.kind === "config_options")
+      return !!configDivider(
+        events,
+        index,
+        connectionAccessKind({
+          id: session.profileId,
+          preset: null,
+          command: null,
+        }),
+      );
     if (
       event.kind === "agent_message_delta" ||
       event.kind === "agent_thought_delta"
@@ -537,7 +547,15 @@ export function BrainChat({
             if (event.kind === "config_options")
               return (
                 <div key={key} className="brain-config-divider">
-                  {configDivider(events, events.indexOf(event))}
+                  {configDivider(
+                    events,
+                    events.indexOf(event),
+                    connectionAccessKind({
+                      id: session.profileId,
+                      preset: null,
+                      command: null,
+                    }),
+                  )}
                 </div>
               );
             if (event.kind === "user_message")
@@ -809,7 +827,14 @@ export function BrainComposer({
     };
   }, []);
   useLayoutEffect(() => {
-    if (focusEpoch >= 0) textarea.current?.focus();
+    // A lazy chat mount must not take focus from an already opened dock menu.
+    if (
+      focusEpoch >= 0 &&
+      !textarea.current
+        ?.closest(".brain-dock")
+        ?.querySelector("[data-brain-popover]")
+    )
+      textarea.current?.focus();
   }, [focusEpoch]);
   useEffect(() => {
     const dismiss = () => setPicker(null);

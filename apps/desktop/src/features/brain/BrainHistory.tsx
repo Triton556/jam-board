@@ -3,18 +3,29 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { Button, Tooltip } from "../../components/ui";
 import { agentDockApi } from "../../lib/agent-dock";
-import type { AgentDockEvent, HistoryEntry } from "../../lib/agent-dock-api";
+import type { AgentDockEvent } from "../../lib/agent-dock-api";
 import { phase4Api } from "../../lib/agent-dock-phase4";
 import { useUiStore } from "../../lib/ui-store";
 import { useBrainState } from "./brain-store";
 import "./brain-phase4.css";
+import type { UserConfigChoice } from "../../lib/agent-dock-api";
+import { BrainProgress } from "./BrainProgress";
 import { BrainProviderError } from "./BrainProviderError";
+import { ControlPopover } from "./BrainSessionControls";
+import { useUserConfigLaunch } from "./BrainUserConfig";
+import type { DockHistoryEntry as HistoryEntry } from "./brain-history-types";
 import { type ProviderErrorEvent, providerErrorTitle } from "./brain-retry";
+import { DisabledReason } from "./DisabledReason";
 
 const useDeletes = create<{
   pending: Record<
     string,
-    { title: string; timer: ReturnType<typeof setTimeout>; expired?: boolean }
+    {
+      title: string;
+      timer: ReturnType<typeof setTimeout>;
+      expired?: boolean;
+      height?: number;
+    }
   >;
 }>(() => ({ pending: {} }));
 let scopeEpoch = 0;
@@ -124,6 +135,7 @@ export function historyTranscriptRows(events: AgentDockEvent[]) {
 export async function activateHistory(
   entry: HistoryEntry,
   continueNew = false,
+  userConfig?: UserConfigChoice,
 ) {
   const projectId = useBrainState.getState().projectId;
   const epoch = scopeEpoch;
@@ -133,17 +145,24 @@ export async function activateHistory(
   const session = continueNew
     ? await agentDockApi.startSession({
         profileId: entry.profileId,
+        userConfig,
         ...(entry.model ? { model: entry.model } : {}),
         ...(entry.effort ? { effort: entry.effort } : {}),
       })
-    : await phase4Api.resume(entry.id);
+    : await phase4Api.resume(entry.id, userConfig);
   if (epoch !== scopeEpoch || session.projectId !== projectId) return;
   const replay = await agentDockApi.history(session.id);
   if (epoch !== scopeEpoch) return;
   useBrainState.setState((state) => ({
+    userConfigChoices: userConfig
+      ? { ...state.userConfigChoices, [session.id]: userConfig }
+      : state.userConfigChoices,
     sessions: [session, ...state.sessions.filter((s) => s.id !== session.id)],
-    selected: { ...state.selected, chat: session.id },
-    tab: "chat",
+    selected: {
+      ...state.selected,
+      [session.kind === "terminal" ? "terminal" : "chat"]: session.id,
+    },
+    tab: session.kind === "terminal" ? "terminal" : "chat",
     events: { ...state.events, [session.id]: replay },
     drafts: continueNew
       ? {
@@ -164,13 +183,16 @@ export function BrainHistory({
   resumed(): void;
 }) {
   const projectId = useBrainState((s) => s.projectId);
+  const configLaunch = useUserConfigLaunch();
+  const terminalStatus = useBrainState((s) =>
+    s.sessions
+      .filter((v) => v.kind === "terminal")
+      .map((v) => `${v.id}:${v.status}`)
+      .join("|"),
+  );
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
-  const menuButton = useRef<HTMLFieldSetElement>(null);
-  useEffect(() => {
-    if (menu)
-      menuButton.current?.querySelector<HTMLButtonElement>("button")?.focus();
-  }, [menu]);
+  const [kind, setKind] = useState<"chat" | "terminal">("chat");
   const [rename, setRename] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const renameInput = useRef<HTMLInputElement>(null);
@@ -178,9 +200,21 @@ export function BrainHistory({
     if (rename) renameInput.current?.focus();
   }, [rename]);
   const [busy, setBusy] = useState(false);
+  const [resuming, setResuming] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [error, setError] = useState("");
   const pending = useDeletes((s) => s.pending);
   const list = useRef<HTMLElement>(null);
+  const focusAction = (id: string) =>
+    requestAnimationFrame(() => {
+      Array.from(
+        list.current?.querySelectorAll<HTMLButtonElement>(
+          "[data-history-action]",
+        ) ?? [],
+      )
+        .find((button) => button.dataset.historyAction === id)
+        ?.focus();
+    });
   useEffect(() => {
     if (Object.keys(pending).length)
       list.current
@@ -189,13 +223,14 @@ export function BrainHistory({
   }, [pending]);
   const client = useQueryClient();
   const history = useQuery({
-    queryKey: ["agent-history", projectId, query],
+    queryKey: ["agent-history", projectId, query, terminalStatus],
     staleTime: 0,
     refetchOnMount: "always",
     queryFn: () => phase4Api.history({ query, limit: 100 }),
   });
   const run = async (action: () => Promise<unknown>) => {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -203,14 +238,63 @@ export function BrainHistory({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      actionLock.current = false;
       setBusy(false);
     }
   };
+  const entriesForKind = history.data?.filter(
+    (entry) =>
+      entry.projectId === projectId &&
+      !(entry.kind === "terminal" && entry.empty) &&
+      (entry.kind === "terminal") === (kind === "terminal"),
+  );
   return (
     <section className="brain-history" aria-label="History" ref={list}>
       <h3>History</h3>
+      {configLaunch.view}
+      <div className="brain-tabs" role="tablist" aria-label="History kind">
+        {(["chat", "terminal"] as const).map((value) => (
+          <button
+            type="button"
+            key={value}
+            role="tab"
+            disabled={configLaunch.asking || configLaunch.busy}
+            aria-selected={kind === value}
+            tabIndex={kind === value ? 0 : -1}
+            onClick={() => {
+              setKind(value);
+              setMenu(null);
+              setRename(null);
+            }}
+            onKeyDown={(event) => {
+              if (
+                ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+              ) {
+                event.preventDefault();
+                const next =
+                  event.key === "Home"
+                    ? "chat"
+                    : event.key === "End"
+                      ? "terminal"
+                      : kind === "chat"
+                        ? "terminal"
+                        : "chat";
+                setKind(next);
+                setMenu(null);
+                setRename(null);
+                event.currentTarget.parentElement
+                  ?.querySelectorAll<HTMLButtonElement>("button")
+                  [next === "chat" ? 0 : 1]?.focus();
+              }
+            }}
+          >
+            {value === "chat" ? "Chat" : "Terminal"}
+          </button>
+        ))}
+      </div>
       <input
         aria-label="Search history"
+        disabled={configLaunch.asking || configLaunch.busy}
         placeholder="Search history"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -224,12 +308,16 @@ export function BrainHistory({
       )}
       {error && <p role="alert">{error}</p>}
       {history.data &&
-        !history.data.some((entry) => !pending[entry.id]?.expired) && (
-          <p>No history found</p>
+        !entriesForKind?.some((entry) => !pending[entry.id]?.expired) && (
+          <p>
+            {kind === "terminal"
+              ? "No terminal history yet. CLI transcripts will appear here when available."
+              : "No chat history found"}
+          </p>
         )}
       {["Today", "This week", "Older"].map((group) => {
         const entries =
-          history.data?.filter(
+          entriesForKind?.filter(
             (entry) =>
               !pending[entry.id]?.expired &&
               historyGroup(entry.updatedAt) === group,
@@ -241,10 +329,7 @@ export function BrainHistory({
               <article
                 key={entry.id}
                 className="brain-history-row"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget))
-                    setMenu(null);
-                }}
+                style={{ height: pending[entry.id]?.height }}
               >
                 {pending[entry.id] ? (
                   <div
@@ -261,6 +346,7 @@ export function BrainHistory({
                           delete pending[entry.id];
                           return { pending };
                         });
+                        focusAction(entry.id);
                       }}
                     >
                       Undo
@@ -279,6 +365,7 @@ export function BrainHistory({
                               await client.invalidateQueries({
                                 queryKey: ["agent-history", projectId],
                               });
+                              focusAction(entry.id);
                             });
                         }}
                       >
@@ -287,13 +374,41 @@ export function BrainHistory({
                           ref={renameInput}
                           value={title}
                           maxLength={60}
-                          disabled={busy}
+                          disabled={
+                            busy || configLaunch.busy || configLaunch.asking
+                          }
                           onChange={(e) => setTitle(e.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape" && !busy) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setRename(null);
+                              focusAction(entry.id);
+                            }
+                          }}
                         />
-                        <Button type="submit" disabled={busy || !title.trim()}>
-                          Save title
-                        </Button>
-                        <Button disabled={busy} onClick={() => setRename(null)}>
+                        <DisabledReason
+                          label="Save title"
+                          reason={
+                            !title.trim() ? "Title can't be empty" : undefined
+                          }
+                        >
+                          <Button
+                            type="submit"
+                            disabled={busy || !title.trim()}
+                          >
+                            Save title
+                          </Button>
+                        </DisabledReason>
+                        <Button
+                          disabled={
+                            busy || configLaunch.busy || configLaunch.asking
+                          }
+                          onClick={() => {
+                            setRename(null);
+                            focusAction(entry.id);
+                          }}
+                        >
                           Cancel rename
                         </Button>
                       </form>
@@ -302,13 +417,17 @@ export function BrainHistory({
                         type="button"
                         className="brain-history-open"
                         aria-label={`Open ${entry.title}`}
-                        disabled={busy}
+                        disabled={
+                          busy || configLaunch.busy || configLaunch.asking
+                        }
                         onClick={() => open(entry)}
                       >
                         <strong>{entry.title}</strong>
                         <small>
-                          {entry.profileLabel}
-                          {entry.model ? ` · ${entry.model}` : ""}
+                          <span title={entry.provider.agentKind}>
+                            {entry.provider.label || entry.profileLabel}
+                          </span>
+                          {` · ${entry.model || "Model unavailable"}`}
                         </small>
                         <small
                           title={new Date(entry.updatedAt).toLocaleString()}
@@ -328,15 +447,36 @@ export function BrainHistory({
                       {entry.resumable !== "none" && (
                         <Button
                           variant="ghost"
-                          disabled={busy}
+                          aria-busy={resuming === entry.id}
+                          aria-label={
+                            resuming === entry.id ? "Resuming…" : undefined
+                          }
+                          disabled={
+                            busy || configLaunch.busy || configLaunch.asking
+                          }
                           onClick={() =>
-                            void run(async () => {
-                              await activateHistory(entry);
-                              resumed();
-                            })
+                            void configLaunch.request(
+                              entry.profileId,
+                              entry.kind === "terminal"
+                                ? "terminal"
+                                : entry.provider.agentKind.startsWith("api")
+                                  ? "api"
+                                  : "acp",
+                              (choice) => {
+                                setResuming(entry.id);
+                                return run(async () => {
+                                  await activateHistory(entry, false, choice);
+                                  resumed();
+                                }).finally(() => setResuming(null));
+                              },
+                            )
                           }
                         >
-                          Resume
+                          {resuming === entry.id ? (
+                            <BrainProgress>Resuming…</BrainProgress>
+                          ) : (
+                            "Resume"
+                          )}
                         </Button>
                       )}
                       <Tooltip text={`History actions for ${entry.title}`}>
@@ -344,7 +484,11 @@ export function BrainHistory({
                           variant="ghost"
                           aria-label={`History actions for ${entry.title}`}
                           aria-expanded={menu === entry.id}
-                          disabled={busy}
+                          aria-haspopup="menu"
+                          data-history-action={entry.id}
+                          disabled={
+                            busy || configLaunch.busy || configLaunch.asking
+                          }
                           onClick={() =>
                             setMenu(menu === entry.id ? null : entry.id)
                           }
@@ -352,100 +496,104 @@ export function BrainHistory({
                           ⋯
                         </Button>
                       </Tooltip>
-                    </div>
-                    {menu === entry.id && (
-                      <fieldset
-                        className="brain-history-menu"
-                        ref={menuButton}
-                        aria-label="History actions"
-                        onKeyDownCapture={(event) => {
-                          if (event.key === "Escape") {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            setMenu(null);
-                            event.currentTarget.parentElement
-                              ?.querySelector<HTMLButtonElement>(
-                                "[aria-expanded]",
-                              )
-                              ?.focus();
-                          }
-                        }}
-                      >
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setMenu(null);
-                            setRename(entry.id);
-                            setTitle(entry.title);
-                          }}
+                      {menu === entry.id && (
+                        <ControlPopover
+                          className="brain-popover brain-history-menu right"
+                          label="History actions"
+                          role="menu"
+                          close={() => setMenu(null)}
                         >
-                          Rename
-                        </Button>
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setMenu(null);
-                            const epoch = scopeEpoch;
-                            const timer = setTimeout(() => {
-                              if (epoch !== scopeEpoch) {
-                                useDeletes.setState((state) => {
-                                  const pending = { ...state.pending };
-                                  delete pending[entry.id];
-                                  return { pending };
-                                });
-                                return;
-                              }
-                              useDeletes.setState((state) => ({
-                                pending: {
-                                  ...state.pending,
-                                  [entry.id]: {
-                                    title: entry.title,
-                                    timer,
-                                    expired: true,
-                                  },
-                                },
-                              }));
-                              void phase4Api
-                                .delete(entry.id)
-                                .then(() => {
-                                  client.setQueriesData<HistoryEntry[]>(
-                                    { queryKey: ["agent-history", projectId] },
-                                    (entries) =>
-                                      entries?.filter(
-                                        (item) => item.id !== entry.id,
-                                      ),
-                                  );
-                                })
-                                .catch(() =>
-                                  useUiStore
-                                    .getState()
-                                    .error(
-                                      "Could not delete history. Open History to try again.",
-                                    ),
-                                )
-                                .finally(() => {
+                          <Button
+                            role="menuitem"
+                            disabled={
+                              busy || configLaunch.busy || configLaunch.asking
+                            }
+                            onClick={() => {
+                              setMenu(null);
+                              setRename(entry.id);
+                              setTitle(entry.title);
+                            }}
+                          >
+                            Rename
+                          </Button>
+                          <Button
+                            role="menuitem"
+                            disabled={
+                              busy || configLaunch.busy || configLaunch.asking
+                            }
+                            onClick={(event) => {
+                              const height = event.currentTarget
+                                .closest(".brain-history-row")
+                                ?.getBoundingClientRect().height;
+                              setMenu(null);
+                              const epoch = scopeEpoch;
+                              const timer = setTimeout(() => {
+                                if (epoch !== scopeEpoch) {
                                   useDeletes.setState((state) => {
                                     const pending = { ...state.pending };
                                     delete pending[entry.id];
                                     return { pending };
                                   });
-                                  void client.invalidateQueries({
-                                    queryKey: ["agent-history", projectId],
+                                  return;
+                                }
+                                useDeletes.setState((state) => ({
+                                  pending: {
+                                    ...state.pending,
+                                    [entry.id]: {
+                                      title: entry.title,
+                                      timer,
+                                      expired: true,
+                                    },
+                                  },
+                                }));
+                                void phase4Api
+                                  .delete(entry.id)
+                                  .then(() => {
+                                    client.setQueriesData<HistoryEntry[]>(
+                                      {
+                                        queryKey: ["agent-history", projectId],
+                                      },
+                                      (entries) =>
+                                        entries?.filter(
+                                          (item) => item.id !== entry.id,
+                                        ),
+                                    );
+                                  })
+                                  .catch(() =>
+                                    useUiStore
+                                      .getState()
+                                      .error(
+                                        "Could not delete history. Open History to try again.",
+                                      ),
+                                  )
+                                  .finally(() => {
+                                    useDeletes.setState((state) => {
+                                      const pending = { ...state.pending };
+                                      delete pending[entry.id];
+                                      return { pending };
+                                    });
+                                    void client.invalidateQueries({
+                                      queryKey: ["agent-history", projectId],
+                                    });
                                   });
-                                });
-                            }, 8000);
-                            useDeletes.setState((s) => ({
-                              pending: {
-                                ...s.pending,
-                                [entry.id]: { title: entry.title, timer },
-                              },
-                            }));
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </fieldset>
-                    )}
+                              }, 8000);
+                              useDeletes.setState((s) => ({
+                                pending: {
+                                  ...s.pending,
+                                  [entry.id]: {
+                                    title: entry.title,
+                                    timer,
+                                    height,
+                                  },
+                                },
+                              }));
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </ControlPopover>
+                      )}
+                    </div>
                   </>
                 )}
               </article>
@@ -465,8 +613,10 @@ export function HistoryTranscript({
   close(): void;
   resumed(): void;
 }) {
+  const configLaunch = useUserConfigLaunch();
   const events = useQuery({
     queryKey: ["agent-history-events", entry.projectId, entry.id],
+    enabled: entry.kind !== "terminal",
     queryFn: () => phase4Api.events(entry.id),
   });
   const [busy, setBusy] = useState(false);
@@ -478,10 +628,25 @@ export function HistoryTranscript({
     >
       <header>
         <h3>{entry.title}</h3>
-        <p>Read-only transcript · {entry.profileLabel}</p>
-        <Button onClick={close}>Back to chat</Button>
+        <p>
+          {entry.kind === "terminal"
+            ? "Terminal history"
+            : "Read-only transcript"}{" "}
+          · {entry.provider.label} · {entry.model || "Model unavailable"}
+        </p>
+        <Button onClick={close}>Back to history</Button>
       </header>
-      {events.isPending && <p role="status">Loading transcript…</p>}
+      {configLaunch.view}
+      {entry.kind === "terminal" && (
+        <p>
+          Resume this saved CLI conversation in a new terminal tab.{" "}
+          {entry.messageCount} messages /{" "}
+          {new Date(entry.updatedAt).toLocaleString()}
+        </p>
+      )}
+      {entry.kind !== "terminal" && events.isPending && (
+        <p role="status">Loading transcript…</p>
+      )}
       {events.error && (
         <p role="alert">
           Could not load transcript.{" "}
@@ -514,20 +679,39 @@ export function HistoryTranscript({
       {error && <p role="alert">{error}</p>}
       <Button
         variant="primary"
-        disabled={busy || !events.data}
-        onClick={async () => {
-          if (busy) return;
-          setBusy(true);
-          setError("");
-          try {
-            await activateHistory(entry, entry.resumable === "none");
-            resumed();
-          } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-          } finally {
-            setBusy(false);
-          }
-        }}
+        disabled={
+          busy ||
+          configLaunch.busy ||
+          configLaunch.asking ||
+          (entry.kind !== "terminal" && !events.data) ||
+          (entry.kind === "terminal" && entry.resumable === "none")
+        }
+        onClick={() =>
+          void configLaunch.request(
+            entry.profileId,
+            entry.kind === "terminal"
+              ? "terminal"
+              : entry.provider.agentKind.startsWith("api")
+                ? "api"
+                : "acp",
+            async (choice) => {
+              setBusy(true);
+              setError("");
+              try {
+                await activateHistory(
+                  entry,
+                  entry.resumable === "none",
+                  choice,
+                );
+                resumed();
+              } catch (e) {
+                setError(String(e));
+              } finally {
+                setBusy(false);
+              }
+            },
+          )
+        }
       >
         {busy
           ? "Starting…"

@@ -35,7 +35,17 @@ type BrainState = {
   sessions: AgentSessionView[];
   events: Record<string, AgentDockEvent[]>;
   selected: { chat: string | null; terminal: string | null };
-  tab: "chat" | "terminal";
+  tab: "chat" | "terminal" | "history";
+  userConfigChoices?: Record<
+    string,
+    import("../../lib/agent-dock-api").UserConfigChoice
+  >;
+  launchWarnings?: Record<
+    string,
+    import("../../lib/agent-dock-api").LaunchWarning[]
+  >;
+  terminalTitles?: Record<string, string>;
+  hiddenSessions?: Record<string, boolean>;
   drafts: Record<string, Draft>;
   attachments: Record<string, AttachmentView>;
   configuring?: Record<string, boolean>;
@@ -66,23 +76,64 @@ export const useBrainState = create<BrainState>((set) => ({
             .slice(-4000),
         },
         sessions:
-          event.kind === "status" || event.kind === "retrying"
+          event.kind === "user_message" &&
+          !existing.some((item) => item.kind === "user_message")
             ? s.sessions.map((session) =>
-                session.id === event.sessionId
+                session.id === event.sessionId &&
+                /^(Claude Code|Codex|Claude via z\.ai|Claude via OpenRouter|OpenRouter|z\.ai|Custom API)$/.test(
+                  session.title,
+                )
                   ? {
                       ...session,
-                      status:
-                        event.kind === "retrying" ? "running" : event.status,
+                      title:
+                        event.content
+                          .flatMap((part) =>
+                            part.type === "text" ? [part.text] : [],
+                          )
+                          .join(" ")
+                          .trim()
+                          .slice(0, 60) || session.title,
                     }
                   : session,
               )
-            : s.sessions,
+            : event.kind === "status" || event.kind === "retrying"
+              ? s.sessions.map((session) =>
+                  session.id === event.sessionId
+                    ? {
+                        ...session,
+                        status:
+                          event.kind === "retrying" ? "running" : event.status,
+                      }
+                    : session,
+                )
+              : s.sessions,
       };
     }),
 }));
 export function draftKey() {
   const s = useBrainState.getState();
   return `${s.projectId}:${s.selected.chat ?? "new"}`;
+}
+/** A3: call from xterm onTitleChange, including snapshot replay. */
+export function setTerminalTitle(sessionId: string, title: string) {
+  const clean = title
+    .split("")
+    .filter((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127)
+    .join("")
+    .trim()
+    .slice(0, 240);
+  if (!clean) return;
+  useBrainState.setState((state) => ({
+    terminalTitles: { ...state.terminalTitles, [sessionId]: clean },
+  }));
+}
+export function clearStoppedSessions(ids: string[]) {
+  useBrainState.setState((state) => ({
+    hiddenSessions: {
+      ...state.hiddenSessions,
+      ...Object.fromEntries(ids.map((id) => [id, true])),
+    },
+  }));
 }
 export function updateDraft(draft: Partial<Draft>) {
   const key = draftKey();

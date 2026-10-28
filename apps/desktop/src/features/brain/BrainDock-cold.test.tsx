@@ -106,6 +106,7 @@ async function mount() {
 }
 beforeEach(async () => {
   resetMockDock();
+  await mockDockApi.saveUserConfigDefault("include");
   await mockApi.resetDemo();
   useUiStore.setState({ brainDockOpen: false, brainDockWidth: 480 });
   useBrainState.setState({

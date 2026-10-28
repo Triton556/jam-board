@@ -52,7 +52,9 @@ const entry = (
   projectId,
   profileId: "claude-code",
   profileLabel: "Claude Code",
-  kind: "acp",
+  kind: "chat",
+  provider: { label: "Claude Code", agentKind: "claude" },
+  empty: false,
   title: `${resumable} conversation`,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -112,6 +114,7 @@ beforeEach(async () => {
   vi.restoreAllMocks();
   vi.stubEnv("VITE_MOCK_BRIDGE", "1");
   resetMockDock();
+  await mockDockApi.saveUserConfigDefault("include");
   resetMockPhase4();
   await mockApi.resetDemo();
   projectId = (await mockApi.appState()).jam?.id ?? "";
@@ -153,13 +156,13 @@ it("R6-H02 searches, renames inline and opens a transcript without launching", a
   fireEvent.change(screen.getByRole("textbox", { name: "Search history" }), {
     target: { value: "no match" },
   });
-  expect(await screen.findByText("No history found")).toBeVisible();
+  expect(await screen.findByText("No chat history found")).toBeVisible();
   fireEvent.change(screen.getByRole("textbox", { name: "Search history" }), {
     target: { value: "" },
   });
   await screen.findByText("native conversation");
   historyMenu();
-  fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
   fireEvent.change(screen.getByRole("textbox", { name: "History title" }), {
     target: { value: "Renamed conversation" },
   });
@@ -178,7 +181,7 @@ it("R6-H03 Delete offers undo before dispatch and survives picker unmount", asyn
   const view = mount(<BrainHistory open={vi.fn()} resumed={vi.fn()} />);
   await screen.findByText(selected.title);
   historyMenu();
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
   expect(remove).not.toHaveBeenCalled();
   const deleted = screen.getByRole("status", {
     name: `Deleted ${selected.title}`,
@@ -267,7 +270,7 @@ it("R6-H08 pending deletion survives picker unmount, commits once, and cancels o
   await screen.findByText(first.title);
   vi.useFakeTimers();
   historyMenu();
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
   view.unmount();
   await act(() => vi.advanceTimersByTimeAsync(8000));
   expect(remove).toHaveBeenCalledTimes(1);
@@ -277,7 +280,7 @@ it("R6-H08 pending deletion survives picker unmount, commits once, and cancels o
   await screen.findByRole("button", { name: /^History actions for / });
   vi.useFakeTimers();
   historyMenu();
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
   act(() => {
     useBrainState.setState({ projectId: "other" });
     useBrainState.setState({ projectId });
@@ -394,7 +397,7 @@ function ToolsHarness({
 it("R6-T01 tools lock jam-board, default presets off, Web trust on and desktop notice", async () => {
   render(<ToolsHarness />);
   expect(
-    screen.getByRole("switch", { name: "jam-board · Always on" }),
+    screen.getByRole("switch", { name: "Jam Board · Always on" }),
   ).toBeDisabled();
   expect(
     screen.getByRole("switch", { name: "Web (Jam Board)" }),
@@ -605,8 +608,8 @@ it("R6-H11 rows open read-only, show resumable pills, and reveal Rename/Delete t
   await screen.findByText("Native resume");
   expect(screen.getByText("From transcript")).toBeVisible();
   expect(screen.getByText("Read only")).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
   fireEvent.click(
     screen.getAllByRole("button", { name: /^Open / })[2] as HTMLElement,
   );
@@ -616,12 +619,12 @@ it("R6-H11 rows open read-only, show resumable pills, and reveal Rename/Delete t
     name: /^History actions for /,
   })[0] as HTMLElement;
   fireEvent.click(trigger);
-  expect(screen.getByRole("button", { name: "Rename" })).toHaveFocus();
-  expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
-  fireEvent.keyDown(screen.getByRole("button", { name: "Rename" }), {
+  expect(screen.getByRole("menuitem", { name: "Rename" })).toHaveFocus();
+  expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "Rename" }), {
     key: "Escape",
   });
-  expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
   expect(trigger).toHaveFocus();
 });
 it("R6-W02 disabled Test explains missing provider and key to pointer and keyboard users", async () => {
@@ -653,7 +656,7 @@ it("R6-H13 a deleted row stays available for Undo then disappears when its windo
   vi.useFakeTimers();
   try {
     historyMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(
       screen.getByRole("status", { name: `Deleted ${selected.title}` }),
     ).toBeVisible();
@@ -664,7 +667,7 @@ it("R6-H13 a deleted row stays available for Undo then disappears when its windo
     expect(remove).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Open / })).toBeNull();
-    expect(screen.getByText("No history found")).toBeVisible();
+    expect(screen.getByText("No chat history found")).toBeVisible();
   } finally {
     vi.useRealTimers();
   }
@@ -684,7 +687,7 @@ it("R6-H14 Undo expires before a slow delete dispatch completes; failure restore
   vi.useFakeTimers();
   try {
     historyMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     await act(() => vi.advanceTimersByTimeAsync(8000));
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Open / })).toBeNull();
@@ -697,4 +700,35 @@ it("R6-H14 Undo expires before a slow delete dispatch completes; failure restore
   } finally {
     vi.useRealTimers();
   }
+});
+it("R7-W2/W3 History filters the same list by kind, keeps provider/model and handles no terminal entries", async () => {
+  const chat = entry();
+  const terminal = {
+    ...entry("none"),
+    id: "terminal-entry",
+    kind: "terminal",
+    profileId: "codex-cli",
+    profileLabel: "My connection",
+    provider: { label: "Codex", agentKind: "codex" },
+    model: "gpt-6.1-sol",
+    title: "Terminal review",
+  };
+  vi.spyOn(mockPhase4Api, "history").mockResolvedValue([
+    chat,
+    terminal,
+  ] as HistoryEntry[]);
+  mount(<BrainHistory open={vi.fn()} resumed={vi.fn()} />);
+  expect(await screen.findByText(chat.title)).toBeVisible();
+  expect(screen.queryByText(terminal.title)).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "Terminal" }));
+  expect(
+    screen.getByRole("button", { name: "Open Terminal review" }),
+  ).toHaveTextContent("Codex \u00b7 gpt-6.1-sol");
+  expect(screen.queryByText(chat.title)).toBeNull();
+  const tabs = screen.getByRole("tablist", { name: "History kind" });
+  fireEvent.keyDown(within(tabs).getByRole("tab", { name: "Terminal" }), {
+    key: "Home",
+  });
+  expect(within(tabs).getByRole("tab", { name: "Chat" })).toHaveFocus();
+  expect(screen.getByText(chat.title)).toBeVisible();
 });

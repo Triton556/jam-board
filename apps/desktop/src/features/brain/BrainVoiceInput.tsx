@@ -12,6 +12,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, IconButton } from "../../components/ui";
 import { Switch } from "../../components/ui/m5";
+import { useBrainPopoverPlacement } from "./brain-popover-placement";
 import { draftKey, useBrainState } from "./brain-store";
 import {
   cancelVoiceInstall,
@@ -39,6 +40,8 @@ export function BrainVoiceInput({
   const { status, progress, error, busy } = useVoiceStatus();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const popover = useRef<HTMLElement>(null);
+  useBrainPopoverPlacement(popover, open);
   const [take, setTake] = useState<TakeState>({
     phase: "idle",
     seconds: 0,
@@ -279,6 +282,8 @@ export function BrainVoiceInput({
         </span>
         {open && (
           <section
+            ref={popover}
+            data-brain-popover
             className="brain-controls-popover brain-voice-popover"
             aria-label="Voice input controls"
           >

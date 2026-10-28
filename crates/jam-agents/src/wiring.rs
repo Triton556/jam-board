@@ -2,6 +2,9 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+#[path = "launch_config.rs"]
+pub(crate) mod launch_config;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardContext {
     pub project_id: String,
@@ -10,6 +13,8 @@ pub struct BoardContext {
     pub project_folder: Option<String>,
     pub data_dir: PathBuf,
     pub sidecar_path: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_server_name: Option<String>,
 }
 impl BoardContext {
     pub fn from_store(
@@ -27,13 +32,29 @@ impl BoardContext {
             project_folder,
             data_dir: std::path::absolute(data_dir)?,
             sidecar_path: std::path::absolute(sidecar_path)?,
+            mcp_server_name: None,
         })
     }
     pub fn preamble(&self) -> String {
         format!(
-            "Board session context\nProject: {}\nKey prefix: {}\nProject ID: {}\nUse the jam-board MCP server for this board; read jam://guide first. A chat message is not Start approval.",
-            self.project_name, self.key_prefix, self.project_id
+            "Board session context\nProject: {}\nKey prefix: {}\nProject ID: {}\nUse the {} MCP server for this board; read jam://guide first from that server. Ignore other Jam Board MCP connections. A chat message is not Start approval.",
+            self.project_name,
+            self.key_prefix,
+            self.project_id,
+            self.server_name()
         )
+    }
+    pub fn server_name(&self) -> &str {
+        self.mcp_server_name.as_deref().unwrap_or("jam-board")
+    }
+    pub(crate) fn name_for_launch(&mut self) {
+        let prefix: String = self
+            .key_prefix
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .take(20)
+            .collect();
+        self.mcp_server_name = Some(format!("jam-board-{prefix}-{}", ulid::Ulid::generate()));
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -107,7 +128,10 @@ pub fn mcp_entries(
     if !board.sidecar_path.is_absolute() {
         return Err(err("The MCP sidecar path must be absolute"));
     }
-    if extra.iter().any(|e| e.name == "jam-board") {
+    if extra
+        .iter()
+        .any(|e| e.name == "jam-board" || e.name == board.server_name())
+    {
         return Err(err("The jam-board MCP entry cannot be overridden"));
     }
     let mut entries = vec![McpEntry {
@@ -116,7 +140,7 @@ pub fn mcp_entries(
         trust_read_only: Some(true),
         http: None,
         bearer_token: None,
-        name: "jam-board".into(),
+        name: board.server_name().into(),
         command: board.sidecar_path.to_string_lossy().into_owned(),
         args: vec![],
         env: vec![
@@ -134,7 +158,7 @@ pub fn mcp_entries(
             },
         ],
     }];
-    let mut names = std::collections::BTreeSet::from(["jam-board".to_string()]);
+    let mut names = std::collections::BTreeSet::from([board.server_name().to_string()]);
     for entry in extra.iter().filter(|e| e.enabled) {
         if entry.name.is_empty()
             || !entry
@@ -254,42 +278,37 @@ pub fn terminal_command(
     entries: &[McpEntry],
 ) -> Result<(String, Vec<String>)> {
     let mut args = args.to_vec();
-    let executable_name = std::path::Path::new(command)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(command);
-    if preset == Some("claude-cli")
-        || (preset.is_none() && executable_name.eq_ignore_ascii_case("claude"))
-    {
-        let servers: serde_json::Map<String, serde_json::Value> = entries.iter().map(|e| {
+    let family = terminal_family(preset, command);
+    // Validate forwarding conflicts before producing any launch specification.
+    terminal_environment(preset, command, entries)?;
+    if family == Some("claude") {
+        let servers: serde_json::Map<String, serde_json::Value> = entries.iter().enumerate().map(|(i, e)| {
             let spec = if let Some(http) = &e.http {
-                let headers: std::collections::BTreeMap<_, _> = e.bearer_token.as_ref().map(|v| ("Authorization", format!("Bearer {v}"))).into_iter().collect();
+                let headers: std::collections::BTreeMap<_, _> = e.bearer_token.as_ref().map(|_| ("Authorization", format!("Bearer ${{{}}}", bearer_env(i)))).into_iter().collect();
                 serde_json::json!({"type":"http","url":http.url,"headers":headers})
-            } else { serde_json::json!({"command":e.command,"args":e.args,"env":e.env.iter().map(|v|(v.name.clone(),v.value.clone())).collect::<std::collections::BTreeMap<_,_>>()}) };
+            } else { serde_json::json!({"command":e.command,"args":e.args,"env":e.env.iter().enumerate().map(|(j,v)|(v.name.clone(),format!("${{{}}}", entry_env(i,j)))).collect::<std::collections::BTreeMap<_,_>>()}) };
             (e.name.clone(), spec)
         }).collect();
         args.extend([
             "--mcp-config".into(),
             serde_json::json!({"mcpServers":servers}).to_string(),
         ]);
-    } else if preset == Some("codex-cli")
-        || (preset.is_none() && executable_name.eq_ignore_ascii_case("codex"))
-    {
+    } else if family == Some("codex") {
         // codex --help: dotted keys; values parsed as TOML. JSON string escaping
         // is compatible with TOML basic strings for paths and these env values.
-        for entry in entries {
+        for (i, entry) in entries.iter().enumerate() {
             let key = format!("mcp_servers.{}", toml_string(&entry.name)?);
             if let Some(http) = &entry.http {
                 args.extend([
                     "-c".into(),
                     format!("{key}.url={}", toml_string(&http.url)?),
                 ]);
-                if let Some(token) = &entry.bearer_token {
+                if entry.bearer_token.is_some() {
                     args.extend([
                         "-c".into(),
                         format!(
-                            "{key}.http_headers.Authorization={}",
-                            toml_string(&format!("Bearer {token}"))?
+                            "{key}.bearer_token_env_var={}",
+                            toml_string(&bearer_env(i))?
                         ),
                     ]);
                 }
@@ -311,20 +330,122 @@ pub fn terminal_command(
                         .join(",")
                 ),
             ]);
-            for env in &entry.env {
-                args.extend([
-                    "-c".into(),
-                    format!(
-                        "{key}.env.{}={}",
-                        toml_string(&env.name)?,
-                        toml_string(&env.value)?
-                    ),
-                ]);
-            }
+            args.extend([
+                "-c".into(),
+                format!(
+                    "{key}.env_vars={}",
+                    serde_json::to_string(&entry.env.iter().map(|e| &e.name).collect::<Vec<_>>())?
+                ),
+            ]);
         }
     }
     Ok((command.into(), args))
 }
+pub(crate) fn terminal_family(preset: Option<&str>, command: &str) -> Option<&'static str> {
+    let name = Path::new(command)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(command);
+    match preset {
+        Some("claude-cli") => Some("claude"),
+        Some("codex-cli") => Some("codex"),
+        None if name.eq_ignore_ascii_case("claude") => Some("claude"),
+        None if name.eq_ignore_ascii_case("codex") => Some("codex"),
+        _ => None,
+    }
+}
+pub(crate) fn terminal_session_id(
+    preset: Option<&str>,
+    command: &str,
+    args: &mut Vec<String>,
+) -> Result<Option<String>> {
+    if terminal_family(preset, command) != Some("claude") {
+        return Ok(None);
+    }
+    if args
+        .iter()
+        .any(|s| s == "--session-id" || s.starts_with("--session-id="))
+    {
+        return Err(err(
+            "Jam Board assigns the Claude terminal session ID; remove --session-id from the profile",
+        ));
+    }
+    // The low 80 bits of each ULID are random. Use two independent draws for
+    // 128 random bits, then set the RFC 9562 UUIDv4 version and variant bits.
+    let mut bytes = [0u8; 16];
+    bytes[..8].copy_from_slice(&ulid::Ulid::generate().to_bytes()[8..]);
+    bytes[8..].copy_from_slice(&ulid::Ulid::generate().to_bytes()[8..]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex = format!("{:032x}", u128::from_be_bytes(bytes));
+    let id = format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    );
+    args.extend(["--session-id".into(), id.clone()]);
+    Ok(Some(id))
+}
+fn bearer_env(server: usize) -> String {
+    format!("JAM_MCP_{server}_BEARER_TOKEN")
+}
+fn entry_env(server: usize, variable: usize) -> String {
+    format!("JAM_MCP_{server}_ENV_{variable}")
+}
+/// Values travel only in the child's environment. Never mutate the app environment.
+pub(crate) fn terminal_environment(
+    preset: Option<&str>,
+    command: &str,
+    entries: &[McpEntry],
+) -> Result<Vec<Env>> {
+    let Some(family) = terminal_family(preset, command) else {
+        return Ok(vec![]);
+    };
+    let mut env = std::collections::BTreeMap::new();
+    for (i, entry) in entries.iter().enumerate() {
+        if let Some(token) = &entry.bearer_token {
+            env.insert(bearer_env(i), token.clone());
+        }
+        if entry.http.is_some() {
+            continue;
+        }
+        for (j, variable) in entry.env.iter().enumerate() {
+            if variable.name.is_empty() || variable.name.contains(['=', '\0']) {
+                return Err(err("Invalid MCP environment variable name"));
+            }
+            if variable.name.to_ascii_uppercase().starts_with("JAM_MCP_") {
+                return Err(err(
+                    "MCP environment names beginning JAM_MCP_ are reserved for launch credentials",
+                ));
+            }
+            let name = if family == "claude" {
+                entry_env(i, j)
+            } else {
+                variable.name.clone()
+            };
+            // Codex's env_vars cannot map distinct values to the same name.
+            // Reject ambiguity rather than silently authenticating the wrong server.
+            if let Some(previous) = env.insert(name, variable.value.clone())
+                && previous != variable.value
+            {
+                return Err(err(
+                    "MCP servers have conflicting environment values; use separate profiles",
+                ));
+            }
+        }
+    }
+    Ok(env
+        .into_iter()
+        .map(|(name, value)| Env { name, value })
+        .collect())
+}
 fn toml_string(value: &str) -> Result<String> {
     Ok(serde_json::to_string(value)?)
 }
+
+#[cfg(test)]
+#[path = "launch_wiring_tests.rs"]
+mod launch_wiring_tests;

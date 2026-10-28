@@ -30,9 +30,11 @@ impl CredentialStore for MemoryCredentials {
     }
 }
 pub(crate) fn directory() -> PathBuf {
-    let path = std::env::temp_dir().join(format!("jam-agents-test-{}", ulid::Ulid::generate()));
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-visuals/round7/b2-launch-events/fixtures")
+        .join(ulid::Ulid::generate().to_string());
     std::fs::create_dir_all(&path).unwrap();
-    path
+    std::path::absolute(path).unwrap()
 }
 fn board() -> BoardContext {
     let dir = directory();
@@ -48,6 +50,7 @@ fn board() -> BoardContext {
         project_folder: None,
         sidecar_path: dir.join("jam-board-mcp.exe"),
         data_dir: dir,
+        mcp_server_name: None,
     }
 }
 pub(crate) fn session(status: SessionStatus) -> Arc<Session> {
@@ -75,6 +78,9 @@ pub(crate) fn session_with_media(
                 effort: None,
             },
             events: VecDeque::new(),
+            launch_log: VecDeque::new(),
+            launch_steps: BTreeMap::new(),
+            launch_meta: None,
             seq: 0,
             permissions: BTreeMap::new(),
             first_prompt: true,
@@ -343,7 +349,7 @@ fn bd_mcp_and_cwd_are_project_pinned() {
     let value: serde_json::Value = serde_json::from_str(&args[1]).unwrap();
     assert_eq!(
         value["mcpServers"]["jam-board"]["env"]["JAM_BOARD_PROJECT"],
-        "project-a"
+        "${JAM_MCP_0_ENV_0}"
     );
     let (_, args) = terminal_command(Some("codex-cli"), "codex", &[], &entries).unwrap();
     assert!(
@@ -352,7 +358,7 @@ fn bd_mcp_and_cwd_are_project_pinned() {
     );
     assert!(
         args.iter()
-            .any(|s| s == "mcp_servers.\"jam-board\".env.\"JAM_BOARD_PROJECT\"=\"project-a\"")
+            .any(|s| s == "mcp_servers.\"jam-board\".env_vars=[\"JAM_BOARD_PROJECT\",\"JAM_BOARD_DATA_DIR\",\"JAM_AGENT_NAME\"]")
     );
 }
 
@@ -442,6 +448,7 @@ async fn bd_crashed_acp_keeps_redacted_stderr_and_failed_history() {
         .start(
             b.clone(),
             StartAgentSessionInput {
+                user_config: Some(UserConfigChoice::Include),
                 model: None,
                 effort: None,
                 profile_id: profile.id,
@@ -489,6 +496,7 @@ async fn bd_stop_all_terminates_terminal_wrapper_and_descendant() {
         .start(
             b,
             StartAgentSessionInput {
+                user_config: Some(UserConfigChoice::Include),
                 model: None,
                 effort: None,
                 profile_id: profile.id,
@@ -822,7 +830,12 @@ async fn fake_acp_flow(cancel: bool) {
         })
         .collect::<Vec<_>>();
     let mut expected = vec![
+        "launch_step",
+        "launch_step",
+        "launch_step",
+        "launch_step",
         "config_options",
+        "launch_step",
         "status",
         "config_options",
         "user_message",
@@ -837,7 +850,7 @@ async fn fake_acp_flow(cancel: bool) {
         "status",
     ];
     if !cancel {
-        expected.insert(11, "status");
+        expected.insert(16, "status");
     }
     assert_eq!(kinds, expected);
     assert_eq!(cancelled.load(std::sync::atomic::Ordering::SeqCst), cancel);
@@ -867,6 +880,7 @@ async fn bd_pty_echo_and_scrollback() {
     )
     .await
     .unwrap();
+    s.connector().unwrap().resize(80, 24).unwrap();
     let observed = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let hello = s.inner.lock().unwrap().scrollback.contains("hello");

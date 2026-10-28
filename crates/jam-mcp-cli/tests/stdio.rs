@@ -124,7 +124,7 @@ async fn client(db: &Path, name: &str) -> RunningService<RoleClient, ClientConfi
     let transport = TokioChildProcess::new(cmd).unwrap();
     ClientConfig::new(
         ClientCapabilities::default(),
-        Implementation::new("codex-integration-test", "1"),
+        Implementation::new(name, "1"),
     )
     .with_protocol_version(ProtocolVersion::V_2025_06_18)
     .serve(transport)

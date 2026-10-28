@@ -23,7 +23,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { Drawer } from "../../components/ui";
 import type { AgentDockEvent } from "../../lib/agent-dock-api";
-import { mockDockApi, resetMockDock } from "../../lib/agent-dock-mock";
+import {
+  emitMockDockEvent,
+  mockDockApi,
+  resetMockDock,
+  setMockLaunchDelay,
+} from "../../lib/agent-dock-mock";
 import {
   resetMockPhase4,
   seedMockHistory,
@@ -108,13 +113,44 @@ async function openChat() {
   );
   return user;
 }
+
+it("BC03 New terminal closes the picker for a pending session so its size handshake can mount", async () => {
+  mount();
+  const user = userEvent.setup();
+  const original = mockDockApi.startSession;
+  vi.spyOn(mockDockApi, "startSession").mockImplementation(async (input) => ({
+    ...(await original(input)),
+    status: "starting",
+  }));
+  vi.spyOn(mockDockApi, "history").mockResolvedValue([]);
+  const log = vi.spyOn(console, "debug").mockImplementation(() => {});
+  await user.click(
+    await screen.findByRole("button", { name: "Brain chat · Ctrl+J" }),
+  );
+  await user.click(screen.getByRole("tab", { name: "Terminal" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Open terminal" }),
+  );
+  await screen.findByText("Terminal fixture");
+  await user.click(screen.getByRole("button", { name: "New terminal" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Open terminal" }),
+  );
+  await screen.findByText("Terminal fixture");
+  expect(
+    screen.queryByRole("button", { name: "Open terminal" }),
+  ).not.toBeInTheDocument();
+  expect(log).toHaveBeenLastCalledWith("[terminal-startup]", {
+    sessionId: useBrainState.getState().selected.terminal,
+    clickedAt: expect.any(String),
+    clickToPendingMs: expect.any(Number),
+  });
+});
 it("R6-H10 opening a past transcript starts nothing; New leaves read-only mode and cannot stop an unrelated chat", async () => {
   mount();
   const user = await openChat();
   const start = vi.spyOn(mockDockApi, "startSession");
-  await user.click(
-    document.querySelector(".brain-session-title") as HTMLElement,
-  );
+  await user.click(screen.getByRole("tab", { name: "History" }));
   const history = await screen.findByRole("region", { name: "History" });
   await user.click(
     await within(history).findByRole("button", { name: /^Open / }),
@@ -124,9 +160,7 @@ it("R6-H10 opening a past transcript starts nothing; New leaves read-only mode a
   expect(
     screen.queryByRole("textbox", { name: "Message the brain" }),
   ).toBeNull();
-  await user.click(screen.getByRole("button", { name: "Session actions" }));
-  expect(screen.getByRole("button", { name: "Stop session" })).toBeDisabled();
-  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("button", { name: "Session actions" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "New chat" }));
   expect(
     screen.queryByRole("region", { name: "Read-only transcript" }),
@@ -138,6 +172,7 @@ it("R6-H10 opening a past transcript starts nothing; New leaves read-only mode a
 beforeEach(async () => {
   vi.unstubAllEnvs();
   resetMockDock();
+  await mockDockApi.saveUserConfigDefault("include");
   resetMockPhase4();
   seedMockHistory([]);
   await mockApi.resetDemo();
@@ -526,7 +561,8 @@ it("BDW-03 tabs rove focus, activate with arrows and retain chat drafts", async 
   ).toHaveValue("Keep this draft");
   expect(chat).toHaveFocus();
   await user.keyboard("{ArrowLeft}");
-  expect(terminal).toHaveFocus();
+  expect(screen.getByRole("tab", { name: "History" })).toHaveFocus();
+  expect(screen.getByRole("region", { name: "History" })).toBeVisible();
   await user.keyboard("{Home}");
   expect(chat).toHaveFocus();
 });
@@ -561,7 +597,7 @@ it("BDW-04 session menus enter their items, traverse with arrows and return focu
   await user.click(actions);
   expect(screen.getByRole("button", { name: "Stop session" })).toHaveFocus();
   await user.keyboard("{ArrowDown}");
-  expect(screen.getByRole("button", { name: "Connections…" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Logs" })).toHaveFocus();
   await user.keyboard("{ArrowUp}");
   expect(screen.getByRole("button", { name: "Stop session" })).toHaveFocus();
   await user.keyboard("{Escape}");
@@ -947,6 +983,7 @@ it.each(["claude-code", "codex"])(
     await waitFor(() => expect(useBrainState.getState().tab).toBe("terminal"));
     expect(start).toHaveBeenCalledWith({
       profileId: profileId === "codex" ? "codex-cli" : "claude-cli",
+      userConfig: "include",
     });
   },
 );
@@ -1146,6 +1183,7 @@ it("BC12 launcher remembers model and effort per connection and requires explici
   await screen.findByRole("textbox", { name: "Message the brain" });
   expect(start).toHaveBeenLastCalledWith({
     profileId: "claude-code",
+    userConfig: "include",
     model: "claude-opus-4-6",
     effort: "high",
   });
@@ -1164,11 +1202,11 @@ it("BC13 category chips hide independently and Access explains known and agent-d
     "Asks before editing files, running commands or changing the board.",
     "Edits files without asking; asks for everything else.",
     "Reads and proposes a plan; changes nothing.",
-    "Never asks. Use only in a throwaway workspace.",
+    "Runs commands and edits files without asking. Use only in a folder you can afford to lose.",
   ])
     expect(screen.getByText(text)).toBeVisible();
   expect(
-    screen.getByRole("button", { name: /Full auto Never asks/ }),
+    screen.getByRole("button", { name: /Full auto Runs commands/ }),
   ).toHaveClass("brain-access-danger");
   await user.keyboard("{Escape}");
   act(() =>
@@ -1726,12 +1764,10 @@ it("BC12 a failed startup clears pending choices and keeps Restart actionable", 
   expect(screen.getByRole("button", { name: "Restart session" })).toBeEnabled();
   expect(apply).not.toHaveBeenCalled();
 });
-it("R6-H12 pointer Undo stays inside the open history picker; Escape closes only its action menu", async () => {
+it("R7-W4 pointer Undo stays inside the History tab; Escape closes only its action menu", async () => {
   mount();
   const user = await openChat();
-  await user.click(
-    document.querySelector(".brain-session-title") as HTMLElement,
-  );
+  await user.click(screen.getByRole("tab", { name: "History" }));
   const history = await screen.findByRole("region", { name: "History" });
   const open = await within(history).findByRole("button", { name: /^Open / });
   const title = open.textContent;
@@ -1743,7 +1779,7 @@ it("R6-H12 pointer Undo stays inside the open history picker; Escape closes only
   expect(history).toBeVisible();
   expect(actions).toHaveFocus();
   await user.click(actions);
-  await user.click(within(history).getByRole("button", { name: "Delete" }));
+  await user.click(within(history).getByRole("menuitem", { name: "Delete" }));
   const undo = within(history).getByRole("button", { name: "Undo" });
   expect(undo).toHaveFocus();
   expect(within(history).queryByRole("button", { name: /^Open / })).toBeNull();
@@ -1752,4 +1788,70 @@ it("R6-H12 pointer Undo stays inside the open history picker; Escape closes only
   expect(
     within(history).getByRole("button", { name: /^Open / }),
   ).toHaveTextContent(title ?? "");
+});
+it("R7-B7 Starting streams launch steps, shows the new header and exposes read-only Logs", async () => {
+  mount();
+  const user = await openChat();
+  setMockLaunchDelay(800);
+  await user.click(screen.getByRole("button", { name: "New chat" }));
+  expect(document.querySelector(".brain-session-title")).toHaveTextContent(
+    "New chat",
+  );
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(screen.getByRole("button", { name: "Starting\u2026" })).toBeDisabled();
+  expect(screen.getByRole("log", { name: "Launch steps" })).toHaveTextContent(
+    "OKAdapter starting",
+  );
+  act(() =>
+    emitMockDockEvent(useBrainState.getState().selected.chat ?? "", {
+      kind: "launch_step",
+      step: "mcp-board",
+      state: "failed",
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      message: "mcp__jam-board__startup failed",
+    }),
+  );
+  expect(screen.getByRole("log", { name: "Launch steps" })).toHaveTextContent(
+    "Failedmcp__jam-board__startup failed",
+  );
+  await screen.findByRole("textbox", { name: "Message the brain" });
+  await user.click(screen.getByRole("button", { name: "Session actions" }));
+  await user.click(screen.getByRole("button", { name: "Logs" }));
+  const logs = await screen.findByRole("log", { name: "Launch timeline" });
+  await waitFor(() =>
+    expect(logs).toHaveTextContent("mcp__jam-board__startup failed"),
+  );
+  expect(screen.getByRole("button", { name: "Copy raw" })).toBeEnabled();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("region", { name: "Session logs" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Session actions" })).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: "Session actions" }));
+  await user.click(screen.getByRole("button", { name: "Logs" }));
+  act(() => useBrainState.setState({ projectId: "other-project" }));
+  expect(screen.queryByRole("region", { name: "Session logs" })).toBeNull();
+});
+it("R7-B7 launch steps remain live before the start command returns, with confirmed project identity", async () => {
+  mount();
+  const user = await openChat();
+  const original = mockDockApi.startSession;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.spyOn(mockDockApi, "startSession").mockImplementation(async (input) => {
+    const session = await original(input);
+    await held;
+    return session;
+  });
+  await user.click(screen.getByRole("button", { name: "New chat" }));
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  await waitFor(() =>
+    expect(screen.getByRole("log", { name: "Launch steps" })).toHaveTextContent(
+      "OKAdapter starting",
+    ),
+  );
+  expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+  await act(async () => release());
+  await screen.findByRole("textbox", { name: "Message the brain" });
 });

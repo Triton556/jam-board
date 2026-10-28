@@ -38,6 +38,11 @@ function subscribe<T>(name: string, cb: (payload: T) => void) {
   };
 }
 export const tauriDockApi: AgentDockApi = {
+  launchLogs: (sessionId) => call("agent_launch_logs", { sessionId }),
+  launchOptions: (profileId) => call("agent_launch_options", { profileId }),
+  saveUserConfigDefault: (choice) =>
+    call("save_agent_user_config_default", { choice }),
+  onLaunchWarning: (cb) => subscribe("agent-launch-warning", cb),
   profiles: () => call("agent_profiles"),
   saveProfile: (input) => call("save_agent_profile", { input }),
   deleteProfile: (profileId) => call("delete_agent_profile", { profileId }),

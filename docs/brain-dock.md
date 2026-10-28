@@ -20,7 +20,7 @@ permission requests in place.
 | Connection profile | A saved way to reach an agent: a preset (Claude Code, Codex, OpenCode, Claude Code via z.ai / OpenRouter) or a custom command / API endpoint. Non-secret settings only. |
 | Runtime kind | `acp` (structured chat over the Agent Client Protocol), `terminal` (the agent's own CLI in a pseudo-terminal) or `api` (built-in chat against an OpenAI-compatible endpoint). |
 | Dock session | One running conversation or terminal started from a profile, bound to exactly one board project for its lifetime. |
-| Board wiring | ACP/API sessions and known Claude/Codex terminal CLIs receive project-pinned `jam-board` MCP wiring with a stable profile agent name. Custom terminal commands inherit board environment but require compatible MCP support. |
+| Board wiring | ACP/API sessions and known Claude/Codex terminal CLIs receive project-pinned board MCP wiring with a stable profile agent name. Custom terminal commands inherit board environment but require compatible MCP support. |
 
 ### Why ACP
 
@@ -65,8 +65,9 @@ React dock UI ──invoke/listen──▶ Tauri commands (agent_commands.rs)
   New runtimes and input sources (voice → audio content or speech-to-text,
   browser or computer-use MCP servers per profile) plug in without changing the
   dock protocol.
-- ACP/known-terminal MCP list = `[jam-board (always), ...profile.extraMcpServers]`.
-  Built-in API chat currently uses only jam-board; extra API-chat servers are later work.
+- ACP/known-terminal MCP list includes the always-on session-specific board
+  server plus enabled profile servers. API chat also supports enabled extra MCP
+  servers; its private board connection retains the `jam-board` name.
 
 ## Board wiring
 
@@ -74,6 +75,17 @@ React dock UI ──invoke/listen──▶ Tauri commands (agent_commands.rs)
   env `JAM_BOARD_PROJECT=<project id>`, `JAM_BOARD_DATA_DIR=<data dir>`,
   `JAM_AGENT_NAME=<profile agent name>` (default `"<Label> · dock"`, editable,
   stable per profile).
+- ACP and known terminal launches inject a session-specific server named
+  `jam-board-<sanitized project prefix>-<ULID>`; API uses its private
+  `jam-board` connection. The context names the injected server. Stale global
+  or project entries trigger `agent-launch-warning` with `sessionId`,
+  `configPath`, `serverName`, `injectedServerName` and `suggestedFix`;
+  the warning is also retained as a status message. The file is not modified.
+- MCP project binding occurs once on either initialized or discovery-first
+  lifecycles, including first calls without discovery; an HTTP session cannot
+  retarget its captured project. Identity precedence is `X-Jam-Agent`,
+  `JAM_AGENT_NAME`, initialized client default, request `_meta` client default,
+  then `Agent`; identity remains fixed for the session.
 - Working directory: the board's saved project folder hint when set; otherwise a
   per-project scratch folder `<data dir>/agent-workspace/<project id>`. The dock
   shows which one is used.
@@ -105,7 +117,7 @@ All commands return the existing `Result<T, ApiError>` shape. Names are the exac
 | `set_agent_secret` | `profileId, key, value` | `()` |
 | `clear_agent_secret` | `profileId, key` | `()` |
 | `agent_sessions` | – | `AgentSessionView[]` (current project) |
-| `start_agent_session` | `input: { profileId, cwd?: string, model?: string, effort?: string }` | `AgentSessionView` |
+| `start_agent_session` | `input: { profileId, cwd?: string, model?: string, effort?: string, userConfig?: "include" \| "exclude" }` | `AgentSessionView` |
 | `agent_model_catalog` | `input: { profileId, refresh?: boolean }` | `ModelCatalog` (phase 3) |
 | `add_agent_attachment` | `input: { sessionId, source: AttachmentSource }` | `AttachmentView` (phase 3) |
 | `remove_agent_attachment` | `input: { sessionId, attachmentId }` | `()` (phase 3, unsent only) |
@@ -115,13 +127,17 @@ All commands return the existing `Result<T, ApiError>` shape. Names are the exac
 | `resolve_agent_permission` | `input: { sessionId, requestId, optionId: string \| null }` | `()` |
 | `set_agent_config_option` | `input: { sessionId, optionId, value }` | `()` |
 | `stop_agent_session` | `sessionId` | `()` |
+| `agent_launch_options` | `profileId` | saved default, exclusion support and description |
+| `save_agent_user_config_default` | `choice: "ask" \| "include" \| "exclude"` | saved choice |
+| `agent_launch_logs` | `sessionId` | bounded launch events |
 | `agent_session_history` | `sessionId` | `AgentDockEvent[]` |
 | `terminal_write` | `input: { sessionId, data }` | `()` |
 | `terminal_resize` | `input: { sessionId, cols, rows }` | `()` |
 | `terminal_snapshot` | `sessionId` | `string` (recent scrollback) |
 
-Events: `agent-dock-event` (payload `AgentDockEvent`) and
-`agent-terminal-output` (payload `{ sessionId, data }`).
+Events: `agent-dock-event` (payload `AgentDockEvent`),
+`agent-terminal-output` (payload `{ sessionId, data }`), and
+`agent-launch-warning` (payload described under Board wiring).
 
 ### Types (TypeScript view)
 
@@ -145,6 +161,7 @@ type AgentSessionView = {
   title: string; status: SessionStatus; cwd: string; createdAt: string;
   capabilities: { images: boolean; audio: boolean; embeddedContext: boolean; configOptions: boolean };
   model: string | null; effort: string | null; // phase 3: current values, null = agent/provider default
+  agentSessionId?: string | null; // native ID when known
 };
 type PromptPart =
   | { type: "text"; text: string }
@@ -152,6 +169,9 @@ type PromptPart =
   | { type: "image"; mimeType: string; data: string }               // base64 (legacy inline image)
   | { type: "attachment"; attachmentId: string };                   // phase 3, see "Attachments"
 type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
+  | { kind: "launch_step"; step: string; state: "running" | "ok" | "failed" | "skipped";
+      message: string; startedAt: string; endedAt: string | null }
+  | { kind: "launch_log"; message: string }
   | { kind: "status"; status: SessionStatus; message?: string }
   | { kind: "user_message"; messageId: string; content: PromptPart[]; contextPreamble?: string }
   | { kind: "agent_message_delta"; messageId: string; text: string }
@@ -171,7 +191,7 @@ type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
       values: { value: string; name: string; description?: string }[] }[] }
   | { kind: "auth"; state: "ok" | "required" | "unknown"; label: string }
   | { kind: "turn_end"; stopReason: string }
-  | { kind: "error"; message: string; detail?: string }
+  | { kind: "error"; message: string; detail?: string; code?: string | null; retryable?: boolean; retryAfterMs?: number | null; resetsAt?: string | null }
 );
 ```
 
@@ -184,8 +204,8 @@ type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
 `board_ref` is sent as an ACP embedded `resource` when the agent advertises
 `embeddedContext`, otherwise as a text block. `seq` is per session and strictly
 increasing; `agent_session_history` returns the in-memory buffer so a remounted
-dock re-renders the same transcript. Transcripts are not written to the board
-database (agents keep their own session storage).
+dock re-renders the same transcript. Chat transcripts are persisted separately from the board database when history
+is enabled; terminal agents keep their own session storage.
 
 ## Presets (phase 1)
 
@@ -197,7 +217,7 @@ database (agents keep their own session storage).
 | `claude-zai` | acp | as `claude-code` | Env `ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic`; secret `ANTHROPIC_AUTH_TOKEN`. |
 | `claude-openrouter` | acp | as `claude-code` | Env `ANTHROPIC_BASE_URL=https://openrouter.ai/api`, `ANTHROPIC_API_KEY=""`; secret `ANTHROPIC_AUTH_TOKEN`. |
 | `claude-cli` | terminal | `claude --mcp-config <inline json>` | Falls back to `npx -y @anthropic-ai/claude-code` when `claude` is not on PATH. Also the sign-in path (`/login`). |
-| `codex-cli` | terminal | `codex -c mcp_servers.jam-board.command=… -c mcp_servers.jam-board.env=…` | Needs `codex` on PATH. |
+| `codex-cli` | terminal | `codex -c mcp_servers.<session-name>.command=...` | Needs `codex` on PATH; the board server name is session-specific. |
 
 ### Presets (phase 2 — built-in API chat)
 
@@ -250,7 +270,34 @@ editable because providers change them.
   composer through `useBrainDock().compose`. They never send automatically or
   start a session/turn. Refine and continuation keep copy as the secondary path.
 - **Terminal:** xterm.js themed with paper tokens and JetBrains Mono; fit on
-  resize; Restart/Stop in the header.
+  resize; Restart/Stop in the header. Start returns a pending session; the first
+  fitted size starts the child. A startup overlay remains until the first
+  printable output or the 15-second fallback; control sequences alone do not
+  imply readiness. OSC titles update the session picker.
+- **Launcher and logs:** Starting displays running, OK, failed and skipped
+  steps distinctly. Session actions open a readable timestamped launch timeline,
+  including adapter stderr and retained warnings, with a secondary raw JSON copy.
+  `agent_launch_logs` retains up to 500 bounded, redacted events per session;
+  an unconfirmed ACP/terminal MCP connection is skipped, not reported connected.
+- **User configuration:** Settings offers Ask every time (default), Always and
+  Never. Ask prompts on each ACP/terminal start or resume; Always includes and
+  Never excludes without a question, with a chip for a one-launch override.
+  Cancel dispatches no launch. API sessions do not load agent user configuration.
+  Unsupported custom agents reject exclusion before launch. The backend receives
+  an explicit `userConfig` choice for ACP/terminal launches.
+
+### User configuration exclusion boundaries
+
+Exclusion is partial and preserves native authentication; it is not a clean home
+or full isolation. The launcher displays the backend's exclusion description.
+
+| Runtime | Mechanism | Configuration that may still apply |
+|---|---|---|
+| Claude CLI | `--setting-sources project,local`, `--strict-mcp-config`, and `--settings` disabling hooks | Global CLAUDE.md, skills/plugins/memory, managed policy and project/local settings. User setting sources remain when auth helpers or env are present, or inspection is unsafe. |
+| Claude ACP | `session/new` / `session/load` metadata supplies `settingSources`, `strictMcpConfig` and `disableAllHooks` | Same authentication exception and remaining customizations; the adapter separately resolves global settings for model, permission and auth metadata. |
+| Codex CLI | Per-launch `-c` disables MCP entries found in global config, `features.hooks`, `features.codex_hooks` and `notify` | Global AGENTS.md, skills/plugins, model/provider/permission settings, project config, explicit profile/environment overrides and managed policy remain. |
+| Codex ACP | Merged `CODEX_CONFIG` JSON session overrides | Same remaining configuration; app-server startup hooks can run before session overrides. |
+| API / unknown custom | API has no agent configuration to exclude; unknown custom exclusion is rejected | API profile credentials and board MCP connections remain available. |
 
 ## Phase 3 — session controls
 
@@ -478,22 +525,29 @@ and can be resumed.
 - Every ACP and API session gets a local history entry:
   `<data dir>/agent-history/<projectId>/<entryId>.json` (metadata) and
   `<entryId>.events.jsonl` (the same `AgentDockEvent`s the dock rendered). Not in
-  the board database, not in exports. Terminal sessions are not kept. Events
+  the board database, not in exports. Terminal launches also create local history
+  records; native CLI transcripts remain in CLI storage. Events
   never contain secrets by construction; what people type is theirs.
 - Settings → Agents: "Keep chat history" (on by default) and "Clear history for
   this project".
-- `HistoryEntry = { id, projectId, profileId, profileLabel, kind: "acp" | "api",
-  title, createdAt, updatedAt, model, effort, agentSessionId: string | null,
+- `HistoryEntry = { id, projectId, profileId, profileLabel, kind: "chat" | "terminal",
+  provider, empty, title, createdAt, updatedAt, model, effort, agentSessionId: string | null,
   resumable: "native" | "transcript" | "none", messageCount }`.
 - Commands: `agent_history({ limit?, query? })` → `HistoryEntry[]` (current
   project, newest first); `agent_history_events({ entryId })` →
-  `AgentDockEvent[]`; `resume_agent_session({ entryId })` → `AgentSessionView`;
+  `AgentDockEvent[]`; `resume_agent_session({ entryId, userConfig? })` → `AgentSessionView`;
   `rename_agent_history({ entryId, title })`; `delete_agent_history({ entryId })`.
 - Resume:
   - ACP agent advertising `loadSession`: start the agent with the same cwd and
     MCP wiring and call `session/load` with `agentSessionId`; the agent replays
     its history; the dock shows the replay plus a divider "Resumed <date>" and
     keeps appending to the same entry (`resumable: "native"`).
+  - Terminal: Claude links by its assigned native UUID (`--session-id` on a
+    new launch); Codex links by cwd and nearest launch time within 120 seconds,
+    rejecting ties. Resume creates a new dock session via `claude --resume` or
+    `codex resume` using the saved native ID and cwd; Claude resume does not
+    assign a new native ID. Missing transcripts and duplicate active resumes
+    fail clearly. Deleting a history entry leaves CLI transcripts untouched.
   - API chat: rebuild the message list from the stored transcript (user text,
     assistant text, tool calls and results; results over 8 KB truncated with a
     note) and continue (`resumable: "transcript"`).
@@ -502,16 +556,18 @@ and can be resumed.
     sends) an editable summary prompt: the last user messages and the final agent
     answer.
 - Title: first line of the first user message (≤ 60 characters), renameable.
-- UI: the session picker gains a **History** section (search; Today / This week /
-  Older), rows show title, connection · model, relative time and a resumable
-  badge, with Resume / Open / Rename / Delete. Opening a past entry never starts
-  a process until Resume.
+- UI: **History** is a top-level tab with Chat / Terminal filters, search and
+  rows showing provider, model, relative time and resume capability. Row menus
+  offer Rename and Delete with Undo; empty terminal entries are filtered. Terminal
+  detail is a summary, not an imported chat transcript. Opening a past entry
+  never starts a process until Resume. The session picker groups Active / Stopped,
+  shows title, status, start time and workspace, and can clear stopped rows.
 
 ## Phase 4 — tools per connection (MCP servers)
 
 - The connection editor gets a **Tools** section: the MCP servers attached to
-  this connection, each with a switch. `jam-board` is always on and not
-  removable.
+  this connection, each with a switch. Jam Board is always on and not
+  removable; ACP and CLI server names vary per session.
 - Presets, all off by default:
   - **Web (Jam Board)** — the bundled `jam-web-mcp` sidecar (below).
   - **Browser** — Playwright MCP (`npx -y @playwright/mcp@latest`): the agent
@@ -583,9 +639,9 @@ z.ai — can search the web and collect images, e.g. for the moodboard loop in
 Providers fail transiently (rate limits, "model at capacity", dropped streams).
 The dock says what happened in plain words and offers the next step.
 
-- `error` events gain `code: "rate_limited" | "overloaded" | "auth" |
+- `error` events gain `code: "usage_limit" | "rate_limited" | "overloaded" | "auth" |
   "context_too_long" | "network" | "provider" | "agent" | null`,
-  `retryable: boolean` and `retryAfterMs: number | null`. Classification uses
+  `retryable: boolean`, `retryAfterMs: number | null` and optional `resetsAt`. Classification uses
   HTTP status (429, 503, 529, 401/403, 413), provider error bodies (e.g. "at
   capacity", "overloaded", "rate limit", context length) and ACP error data.
 - **API chat auto-retry**: a model request that fails before any output with a
@@ -594,7 +650,12 @@ The dock says what happened in plain words and offers the next step.
   `{ kind: "retrying", attempt, maxAttempts, delayMs, code }`. Tool calls that
   already ran in the turn are never re-executed; only the model request repeats.
   A stream that fails after output started is not retried automatically.
-- **ACP agents** retry inside the agent; the dock shows their final error.
+- **Usage limits** are non-retryable, including structured Codex and quota
+  responses. No automatic retry or Retry action is offered; show the localized
+  reset time when known and offer Switch connection. Ordinary throttling remains
+  distinct and may be retryable.
+- **ACP agents** handle their own transient retry behavior; the dock does not
+  automatically retry a usage-limit failure and shows the final error.
 - **Error card** in the transcript: plain title by code ("The model is busy right
   now", "Rate limit reached", "Check the API key or sign in", "The conversation is
   too long for this model", "Can't reach the provider"), the provider's own text
@@ -607,6 +668,15 @@ The dock says what happened in plain words and offers the next step.
   - **Sign in / Add key** for `auth` (existing auth card).
 - While an auto-retry waits, the composer shows "Retrying in 6 s (2/3)…" with
   Stop, and the Brain button state stays "working".
+
+## Testing
+
+Workers and automated checks never start real agent sessions or send provider
+prompts. Use guarded fake executables, scripted MCP clients and recorded terminal
+streams. Live installed-agent checks are owner-only under separate authorization.
+Record source, DOM/mock, browser, native package and human observations separately.
+The round-7 terminal rendering changes have not reproduced the owner's original
+Cyrillic/scroll symptoms; a fix is not established by those fixture checks.
 
 ## Later (kept in mind, not built)
 

@@ -81,14 +81,17 @@ export function BrainTools({
       <div className="brain-tool-row">
         <div className="brain-tool-heading">
           <div className="brain-tool-copy">
-            <strong>jam-board</strong>
-            <small>Read and update this project’s board.</small>
+            <strong>Jam Board</strong>
+            <small>
+              Read and update this project’s board. ACP and CLI server names
+              vary per session.
+            </small>
           </div>
           <Tooltip text="Always on for this project">
             {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Disabled switch needs a focusable explanation. */}
             <span tabIndex={0} className="brain-tool-toggle">
               <Switch
-                label="jam-board · Always on"
+                label="Jam Board · Always on"
                 checked
                 disabled
                 onChange={() => {}}

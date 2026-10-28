@@ -22,7 +22,7 @@ release or native-acceptance exception.
 
 | ID | Actor / entry → depth and actions | Result / authority boundary | Failure/recovery and human counterpart |
 |---|---|---|---|
-| AG01 | New client → initialize exact project → get_session_context → scoped baseline | Connection stays pinned; current desktop project is not retargeting | Wrong/archived project fails closed. Verify immutable ID before reads; H-G04/S01 |
+| AG01 | New client → initialized or discovery-first binding → get_session_context → scoped baseline | Connection captures project and identity once; current desktop project is not retargeting | Wrong/archived project fails closed. Identity precedence: X-Jam-Agent, JAM_AGENT_NAME, initialized client, request metadata, Agent. Verify immutable ID before reads; H-G04/S01 |
 | AG02 | Human Refine heading action -> scoped prompt -> stage in dock composer or secondary copy -> inspect scope/sources -> refine | Compose/copy is guidance, not Send, execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
 | AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04 |
 | AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06 |
@@ -31,15 +31,15 @@ release or native-acceptance exception.
 | AG07 | Worker reads running scope + Ready task → get_task → claim_task → implementation | Accepted claim sets holder and ordinarily In progress atomically; claim response supplies new generation | Conflicting claim, stale token or paused scope stops new work. A board claim never launches a filesystem/process action; explicit dock startup is separate (AG15); H-B02/D08 |
 | AG08 | Holder submits report → Review → human/brain reviews captured report/context → accept or changes requested | Accept → Done; changes requested → Ready, same worker retained; next round needs current permission | Evidence names test setup/command/expected/actual/PASS/FAIL/NOT_RUN; stale context reread/reconcile, not token substitution; H-D09 |
 | AG09 | Human Pause / holder or human release → tracking recovery | Pause blocks new rounds/claims, existing holder may report; release clears holder, returns Backlog/Ready | Neither kills process; no Done via release. Archive retains evidence/flags; project archive refuses In-progress work; H-D08/S03 |
-| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate in-memory state (AG15); H-M02/H01 |
+| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate from board activity; bounded replay and optional persisted history are described in AG15; H-M02/H01 |
 | AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent | Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 |
 | AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets | File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 |
 | AG13 | Agent searches/reads tasks/assets/members; comments or allowed task edits | Reads do not authorize mutations; comments append, update fields use current contract | Foreign-project addresses rejected; pages/tails are not complete history; capture validators before overwrites; H-D03/A01/M01 |
 | AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch | Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 |
-| AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start | First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay, no app-restart resume; H-BD01/BD02/BD05/BD06 |
+| AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start | First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay and, when enabled, persisted history with supported resume after restart; H-BD01/BD02/BD05/BD06 |
 | AG16 | Dock session startup -> project-pinned jam-board MCP and cwd -> ordinary agent calls | In-app agent is an ordinary MCP client with stable profile JAM_AGENT_NAME; exact project/data dir/cwd captured before dispatch | Navigation cannot retarget; same normalized name shares a member, not independent worker identity; custom terminal needs compatible CLI wiring; H-BD01/BD03 |
-| AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims | Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; failed in-memory history retained until app exit; H-BD03/BD08 |
-| AG18 | Built-in API chat -> MCP tool metadata -> automatic read or explicit write permission | Only tools explicitly annotated read-only auto-run; writes ask Allow once / Always allow this tool for this session / Reject; only jam-board MCP is available | Rejection/cancel does not execute; session allow is not a board Start grant and does not bypass project/claim/review validators; H-BD02/BD07/BD08; BC10 |
+| AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims | Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; retained launch logs are bounded in memory, while enabled history is stored separately; H-BD03/BD08 |
+| AG18 | Built-in API chat -> MCP tool metadata -> automatic read or explicit write permission | Board and enabled per-connection MCP servers, including Web, are available. Board read-only tools auto-run; extra-server tools also require that server to be trusted. Writes and other calls ask Allow once / Always allow this tool for this session / Reject | Rejection/cancel does not execute; session allow is not a board Start grant and does not bypass project/claim/review validators; H-BD02/BD07/BD08; BC10 |
 
 ## State meanings: never collapse these into “agent working”
 
@@ -282,9 +282,11 @@ A chat message, session ready/running state, plan, model reply, config selection
 PTY output or tool permission decision is never Start approval. Human direct
 Start or a fresh typed Inbox approval remains the only execution grant path.
 
-Built-in API chat discovers tools from its per-session jam-board sidecar. Only
-`readOnlyHint:true` tools auto-run; writes and absent/unknown read-only annotations
-ask through a permission card. Choices are Allow once, Always allow this tool for
+Built-in API chat discovers tools from its per-session jam-board sidecar and
+enabled extra per-connection servers, including Web. A board tool with
+`readOnlyHint:true` runs directly; an extra-server tool also requires that server
+to be trusted. Writes and absent/unknown read-only annotations ask through a
+permission card. Choices are Allow once, Always allow this tool for
 this session, or Reject. A session allow is scoped to that tool and runtime
 session, not future sessions or arbitrary filesystem/process work. ACP runtimes
 provide their own offered options. Reject/cancel does not dispatch a rejected
@@ -295,14 +297,17 @@ core Start, project isolation, claim generation or review checks.
 editable prompt with scope/context chips; they do not send it or start a turn.
 Explicit session launch and explicit Send are separate actions. Navigation
 changes the displayed project, never an existing runtime's captured project/cwd.
-API chat currently has only jam-board MCP; custom terminal commands inherit board
-environment, while standardized CLI MCP flags apply to known Claude/Codex paths.
+Custom terminal commands inherit board environment, while standardized CLI MCP
+flags apply to known Claude/Codex paths.
 
-Session events and terminal scrollback are bounded in memory. Remount can replay
-them during this app process; application restart cannot resume the conversation.
-Stored board reports/questions/activity remain separate durable records. Required
+Session events and terminal scrollback have bounded in-memory replay. When history
+is enabled, chat history is stored separately and supports API transcript or
+ACP native resume where available. Linked Claude/Codex terminal history can
+resume in a fresh dock session using its native CLI transcript; deleting the
+board history entry does not delete that transcript. Opening history alone does
+not launch. Stored board reports/questions/activity remain separate durable records. Required
 process cleanup, live providers, credentials and rendered interaction evidence are
-tracked in [BC01-BC11](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
+tracked in [BC01-BC14](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
 and [remaining gaps](known-gaps.md#brain-dock-integration-boundary).
 
 

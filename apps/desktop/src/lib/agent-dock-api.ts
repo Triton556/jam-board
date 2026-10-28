@@ -1,7 +1,17 @@
 ﻿export type RuntimeKind = "acp" | "terminal" | "api";
 export type ProviderErrorCode = import("../bindings").AgentErrorCode;
 export type McpServer = import("../bindings").McpEntry_Serialize;
-export type HistoryEntry = import("../bindings").HistoryEntry;
+export type HistoryEntry = import("../bindings").HistoryEntry_Serialize;
+export type UserConfigChoice = import("../bindings").UserConfigChoice;
+export type UserConfigDefault = import("../bindings").UserConfigDefault;
+export type AgentLaunchOptions = import("../bindings").AgentLaunchOptions;
+export type LaunchWarning = {
+  sessionId: string;
+  configPath: string;
+  serverName: string;
+  injectedServerName: string;
+  suggestedFix: string;
+};
 export type AgentProfileView = {
   id: string;
   label: string;
@@ -69,6 +79,15 @@ export type ModelCatalog = import("../bindings").ModelCatalog_Serialize;
 export type AttachmentSource = import("../bindings").AttachmentSource;
 export type AttachmentView = import("../bindings").AttachmentView;
 export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
+  | {
+      kind: "launch_step";
+      step: string;
+      state: import("../bindings").LaunchStepState;
+      message: string;
+      startedAt: string;
+      endedAt: string | null;
+    }
+  | { kind: "launch_log"; message: string }
   | { kind: "status"; status: SessionStatus; message?: string | null }
   | { kind: "auth"; state: "ok" | "required" | "unknown"; label: string }
   | {
@@ -140,10 +159,15 @@ export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
       code?: ProviderErrorCode | null;
       retryable?: boolean;
       retryAfterMs?: number | null;
+      resetsAt?: string | null;
     }
 );
 
 export interface AgentDockApi {
+  launchLogs(sessionId: string): Promise<AgentDockEvent[]>;
+  launchOptions(profileId: string): Promise<AgentLaunchOptions>;
+  saveUserConfigDefault(choice: UserConfigDefault): Promise<UserConfigDefault>;
+  onLaunchWarning(cb: (warning: LaunchWarning) => void): () => void;
   profiles(): Promise<AgentProfileView[]>;
   saveProfile(input: AgentProfileInput): Promise<AgentProfileView>;
   deleteProfile(profileId: string): Promise<void>;
@@ -155,6 +179,7 @@ export interface AgentDockApi {
     cwd?: string;
     model?: string;
     effort?: string;
+    userConfig?: UserConfigChoice;
   }): Promise<AgentSessionView>;
   sendPrompt(input: {
     sessionId: string;

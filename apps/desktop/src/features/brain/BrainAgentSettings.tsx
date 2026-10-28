@@ -1,16 +1,24 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Dialog, Tooltip } from "../../components/ui";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Switch } from "../../components/ui/m5";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
+import { agentDockApi } from "../../lib/agent-dock";
+import type { UserConfigDefault } from "../../lib/agent-dock-api";
 import { phase4Api, type WebProvider } from "../../lib/agent-dock-phase4";
+import { BrainProgress } from "./BrainProgress";
 import { BrainProviderKey } from "./BrainProviderKey";
+import { globalConfigLabel } from "./BrainUserConfig";
 import { useBrainState } from "./brain-store";
 import "./brain-phase4.css";
 
 export function BrainAgentSettings() {
   const client = useQueryClient();
+  const config = useQuery({
+    queryKey: ["agent-user-config-default"],
+    queryFn: () => agentDockApi.launchOptions("claude-code"),
+  });
   const projectId = useBrainState((s) => s.projectId);
   const history = useQuery({
     queryKey: ["agent-history-settings"],
@@ -22,11 +30,14 @@ export function BrainAgentSettings() {
   });
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const actionLock = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
   const [testResult, setTestResult] = useState("");
   const run = async (action: () => Promise<unknown>) => {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -34,14 +45,55 @@ export function BrainAgentSettings() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      actionLock.current = false;
       setBusy(false);
     }
   };
   return (
     <>
       <SettingsSection
+        className="brain-agent-config"
+        title="Global agent config"
+        description="Choose whether new agent sessions use your personal configuration."
+      >
+        <SettingsRow label={globalConfigLabel}>
+          <div aria-busy={savingConfig}>
+            <CustomSelect
+              label={globalConfigLabel}
+              value={config.data?.userConfigDefault ?? "ask"}
+              disabled={busy || !config.data}
+              options={[
+                { value: "ask", label: "Ask every time" },
+                { value: "include", label: "Always" },
+                { value: "exclude", label: "Never" },
+              ]}
+              onChange={(value) =>
+                void run(async () => {
+                  setSavingConfig(true);
+                  try {
+                    await agentDockApi.saveUserConfigDefault(
+                      value as UserConfigDefault,
+                    );
+                    await config.refetch();
+                  } finally {
+                    setSavingConfig(false);
+                  }
+                })
+              }
+            />
+            {savingConfig && <BrainProgress>Saving…</BrainProgress>}
+          </div>
+          {config.error && (
+            <p role="alert">
+              Could not read global config preference.{" "}
+              <Button onClick={() => void config.refetch()}>Retry</Button>
+            </p>
+          )}
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection
         title="Chat history"
-        description="Save conversations on this computer. Terminal sessions are not kept."
+        description="Save conversations and available terminal history on this computer."
       >
         {history.data ? (
           <>

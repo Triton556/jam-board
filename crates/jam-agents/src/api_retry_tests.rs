@@ -1,5 +1,22 @@
 use super::*;
 
+#[tokio::test]
+async fn b9_api_quota_429_never_auto_retries_even_with_retry_after_zero() {
+    let mut server = FakeHttp::new(vec![immediate_error(
+        429,
+        "insufficient_quota: You've hit your usage limit; try again at Nov 2nd, 2026 4:27 PM.",
+    )])
+    .await;
+    let s = session(SessionStatus::Starting);
+    prompt_fixture(&s, &server, Arc::new(FakeTools::default())).await;
+    wait_retry(&s, ended).await;
+    assert!(retry_events(&s).is_empty());
+    server.requests.recv().await.unwrap();
+    assert!(server.requests.try_recv().is_err());
+    assert!(events(&s).iter().any(|e| matches!(&e.event, AgentEventKind::Error { code: Some(AgentErrorCode::UsageLimit), retryable: false, resets_at: Some(date), .. } if date == "2026-11-02T16:27:00")));
+    s.connector().unwrap().stop().await.unwrap();
+}
+
 async fn wait_retry(s: &Session, predicate: impl Fn(&[AgentDockEvent]) -> bool) {
     tokio::time::timeout(Duration::from_secs(16), async {
         loop {
@@ -270,6 +287,7 @@ async fn api_manual_retry_command_preserves_parts_context_tools_and_records_hist
         .start(
             fixture.board.clone(),
             StartAgentSessionInput {
+                user_config: None,
                 profile_id: p.id,
                 cwd: None,
                 model: None,

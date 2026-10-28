@@ -132,6 +132,50 @@ pub struct Profiles {
     lock: Mutex<()>,
 }
 impl Profiles {
+    pub fn user_config_default(&self) -> Result<UserConfigDefault> {
+        Ok(
+            match self.store.setting("agent_user_config_default")?.as_deref() {
+                Some("include") => UserConfigDefault::Include,
+                Some("exclude") => UserConfigDefault::Exclude,
+                _ => UserConfigDefault::Ask,
+            },
+        )
+    }
+    pub fn save_user_config_default(&self, choice: UserConfigDefault) -> Result<UserConfigDefault> {
+        self.store.set_setting(
+            "agent_user_config_default",
+            match choice {
+                UserConfigDefault::Ask => "ask",
+                UserConfigDefault::Include => "include",
+                UserConfigDefault::Exclude => "exclude",
+            },
+        )?;
+        Ok(choice)
+    }
+    pub fn launch_options(&self, id: &str) -> Result<AgentLaunchOptions> {
+        let profile = self.get(id)?;
+        let (exclude_supported, exclude_description) =
+            crate::wiring::launch_config::exclude_description(&profile);
+        Ok(AgentLaunchOptions {
+            user_config_default: self.user_config_default()?,
+            exclude_supported,
+            exclude_description,
+        })
+    }
+    pub(crate) fn user_config_choice(
+        &self,
+        choice: Option<UserConfigChoice>,
+        kind: RuntimeKind,
+    ) -> Result<UserConfigChoice> {
+        if kind == RuntimeKind::Api {
+            return Ok(choice.unwrap_or(UserConfigChoice::Exclude));
+        }
+        // The Settings value preselects the launch question; it never replaces
+        // the owner's explicit choice for this new or resumed process.
+        choice.ok_or_else(|| {
+            err("Choose whether to include user configuration before launching this agent")
+        })
+    }
     pub fn new(store: Arc<Store>, credentials: Arc<dyn CredentialStore>) -> Self {
         Self {
             store,

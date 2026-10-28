@@ -45,6 +45,9 @@ pub(crate) struct LastPrompt {
 pub(crate) struct SessionInner {
     pub view: AgentSessionView,
     pub events: VecDeque<AgentDockEvent>,
+    pub launch_log: VecDeque<AgentDockEvent>,
+    pub launch_steps: BTreeMap<String, LaunchStep>,
+    pub launch_meta: Option<serde_json::Value>,
     pub seq: u64,
     pub permissions: BTreeMap<String, PendingPermission>,
     pub first_prompt: bool,
@@ -81,6 +84,103 @@ pub(crate) fn now() -> String {
         .unwrap_or_default()
 }
 impl Session {
+    pub fn launch_step(&self, step: &str, state: LaunchStepState, message: impl Into<String>) {
+        let mut inner = self.inner.lock().expect("session lock");
+        self.launch_step_locked(&mut inner, step, state, message.into());
+    }
+    fn launch_step_locked(
+        &self,
+        inner: &mut SessionInner,
+        step: &str,
+        state: LaunchStepState,
+        message: String,
+    ) {
+        let started_at = inner
+            .launch_steps
+            .get(step)
+            .filter(|s| state != LaunchStepState::Running || s.state == LaunchStepState::Running)
+            .map(|s| s.started_at.clone())
+            .unwrap_or_else(now);
+        let launch = LaunchStep {
+            step: step.into(),
+            state,
+            message: crate::wiring::launch_config::redact_diagnostic(&self.redact(&message))
+                .chars()
+                .take(4096)
+                .collect(),
+            started_at,
+            ended_at: (state != LaunchStepState::Running).then(now),
+        };
+        if inner.launch_steps.len() >= 500
+            && !inner.launch_steps.contains_key(step)
+            && let Some(old) = inner
+                .launch_steps
+                .keys()
+                .find(|key| key.starts_with("mcp:"))
+                .cloned()
+        {
+            inner.launch_steps.remove(&old);
+        }
+        inner.launch_steps.insert(step.into(), launch.clone());
+        self.push_locked(
+            inner,
+            AgentEventKind::LaunchStep {
+                step: launch.step,
+                state: launch.state,
+                message: launch.message,
+                started_at: launch.started_at,
+                ended_at: launch.ended_at,
+            },
+        );
+    }
+    pub fn adapter_log(&self, message: &str) {
+        let message = crate::wiring::launch_config::redact_diagnostic(&self.redact(message));
+        let message: String = message.chars().take(4096).collect();
+        self.emit(AgentEventKind::LaunchLog {
+            message: message.clone(),
+        });
+        // Preserve the adapter's actual reason; forwarding a server in an ACP
+        // request is not evidence that the server connected.
+        let lower = message.to_ascii_lowercase();
+        if let Some(at) = lower.find("mcp server ") {
+            let rest = &message[at + 11..];
+            let name = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or_default()
+                .trim_matches(['`', '\'', '"', ':']);
+            if !name.is_empty() {
+                let state = if lower.contains("not started")
+                    || lower.contains("failed")
+                    || lower.contains("cancelled")
+                    || lower.contains("error")
+                {
+                    Some(LaunchStepState::Failed)
+                } else if lower.contains("connected") || lower.contains("started successfully") {
+                    Some(LaunchStepState::Ok)
+                } else {
+                    None
+                };
+                if let Some(state) = state {
+                    self.launch_step(&format!("mcp:{name}"), state, message);
+                }
+            }
+        }
+    }
+    fn end_launch(&self, state: LaunchStepState, message: &str) {
+        let pending = self
+            .inner
+            .lock()
+            .expect("session lock")
+            .launch_steps
+            .values()
+            .filter(|s| s.state == LaunchStepState::Running)
+            .map(|s| s.step.clone())
+            .collect::<Vec<_>>();
+        for step in pending {
+            self.launch_step(&step, state, message);
+        }
+    }
     pub fn stream_text(&self, message_id: &str, text: &str) {
         if text.is_empty() {
             return;
@@ -175,6 +275,54 @@ impl Session {
         }
     }
     pub fn push_locked(&self, inner: &mut SessionInner, event: AgentEventKind) {
+        if let AgentEventKind::Status { status, message } = &event {
+            if *status == SessionStatus::Starting
+                && message
+                    .as_deref()
+                    .is_some_and(|s| s.starts_with("Terminal startup: spawned;"))
+            {
+                self.launch_step_locked(
+                    inner,
+                    "start_process",
+                    LaunchStepState::Ok,
+                    "Terminal process spawned".into(),
+                );
+            }
+            if *status == SessionStatus::Ready && !inner.launch_steps.contains_key("ready") {
+                if inner
+                    .launch_steps
+                    .get("start_process")
+                    .is_some_and(|s| s.state == LaunchStepState::Running)
+                {
+                    self.launch_step_locked(
+                        inner,
+                        "start_process",
+                        LaunchStepState::Ok,
+                        "Runtime started".into(),
+                    );
+                }
+                let pending = inner
+                    .launch_steps
+                    .values()
+                    .filter(|s| s.state == LaunchStepState::Running)
+                    .map(|s| s.step.clone())
+                    .collect::<Vec<_>>();
+                for step in pending {
+                    self.launch_step_locked(
+                        inner,
+                        &step,
+                        LaunchStepState::Skipped,
+                        "Adapter does not report connection confirmation; see adapter logs".into(),
+                    );
+                }
+                self.launch_step_locked(
+                    inner,
+                    "ready",
+                    LaunchStepState::Ok,
+                    "Session ready".into(),
+                );
+            }
+        }
         let mut json = serde_json::to_value(&event).expect("serialize dock event");
         self.redact_json(&mut json, false);
         let event = serde_json::from_value(json).expect("redacted dock event");
@@ -185,6 +333,15 @@ impl Session {
             at: now(),
             event,
         };
+        if matches!(
+            event.event,
+            AgentEventKind::LaunchStep { .. } | AgentEventKind::LaunchLog { .. }
+        ) {
+            if inner.launch_log.len() == 500 {
+                inner.launch_log.pop_front();
+            }
+            inner.launch_log.push_back(event.clone());
+        }
         if inner.events.len() == 5_000 {
             inner.events.pop_front();
         }
@@ -203,6 +360,7 @@ impl Session {
                         code: None,
                         retryable: false,
                         retry_after_ms: None,
+                        resets_at: None,
                         message: "Cannot save chat history".into(),
                         detail: Some(self.redact(&e.to_string())),
                     },
@@ -230,6 +388,9 @@ impl Session {
         self.push_locked(&mut self.inner.lock().expect("session lock"), event);
     }
     pub fn status(&self, status: SessionStatus, message: Option<String>) {
+        if status == SessionStatus::Stopped {
+            self.end_launch(LaunchStepState::Skipped, "Session stopped during launch");
+        }
         let mut inner = self.inner.lock().expect("session lock");
         if matches!(
             inner.view.status,
@@ -248,11 +409,16 @@ impl Session {
         ) {
             return;
         }
+        self.end_launch(
+            LaunchStepState::Failed,
+            detail.as_deref().unwrap_or(message),
+        );
         self.status(SessionStatus::Failed, Some(message.into()));
         self.emit(AgentEventKind::Error {
             code: None,
             retryable: false,
             retry_after_ms: None,
+            resets_at: None,
             message: message.into(),
             detail,
         });
@@ -411,7 +577,7 @@ impl SessionManager {
             .flatten()
             .as_deref()
             != Some("false");
-        Self {
+        let manager = Self {
             profiles: Profiles::new(store.clone(), credentials),
             store,
             history_enabled: Arc::new(std::sync::atomic::AtomicBool::new(keep)),
@@ -422,7 +588,15 @@ impl SessionManager {
             dock_sink: Arc::new(dock_sink),
             terminal_sink: Arc::new(terminal_sink),
             shutting_down: std::sync::atomic::AtomicBool::new(false),
+        };
+        if let Some(dir) = manager.store.path.parent() {
+            crate::history::HistoryStore::recover_all(
+                dir,
+                manager.history_enabled.clone(),
+                manager.history_lock.clone(),
+            );
         }
+        manager
     }
     pub fn with_attachment_media(mut self, media: Arc<dyn AttachmentMedia>) -> Self {
         self.attachment_media = Some(media);
@@ -454,7 +628,7 @@ impl SessionManager {
     }
     async fn start_saved(
         &self,
-        board: BoardContext,
+        mut board: BoardContext,
         input: StartAgentSessionInput,
         saved: Option<crate::history::StoredHistory>,
     ) -> Result<AgentSessionView> {
@@ -465,6 +639,9 @@ impl SessionManager {
             Some(record) => record.profile.clone(),
             None => self.profiles.get(&input.profile_id)?,
         };
+        let user_config = self
+            .profiles
+            .user_config_choice(input.user_config, profile.kind)?;
         if let Some(model) = input.model {
             profile.model = Some(model);
         }
@@ -481,11 +658,12 @@ impl SessionManager {
                 "Jam Board MCP sidecar not found; build or reinstall the app before starting an agent",
             ));
         }
-        let (executable, args) = if profile.kind == RuntimeKind::Api {
-            (std::path::PathBuf::new(), vec![])
+        let launch_resolution = if profile.kind == RuntimeKind::Api {
+            Ok((std::path::PathBuf::new(), vec![]))
         } else {
-            profile.launch_command()?
+            profile.launch_command()
         };
+        let (executable, mut args) = launch_resolution.as_ref().ok().cloned().unwrap_or_default();
         let api_key = if profile.kind == RuntimeKind::Api {
             self.profiles.api_key(&profile.id)?
         } else {
@@ -507,6 +685,27 @@ impl SessionManager {
             None
         };
         let cwd = choose_cwd(&board, input.cwd.as_deref())?;
+        let previous_server_name = board.server_name().to_string();
+        let terminal_session_id =
+            if profile.kind == RuntimeKind::Terminal && launch_resolution.is_ok() {
+                if let Some(record) = &saved {
+                    Some(record.terminal_resume_args(&mut args)?)
+                } else {
+                    crate::wiring::terminal_session_id(
+                        profile.preset.as_deref(),
+                        &executable.to_string_lossy(),
+                        &mut args,
+                    )?
+                }
+            } else {
+                None
+            };
+        // API runtimes own their MCP connections and do not merge user config.
+        // ACP/CLI adapters do, so each process gets a fresh collision-proof name.
+        if profile.kind != RuntimeKind::Api && (saved.is_none() || board.mcp_server_name.is_none())
+        {
+            board.name_for_launch();
+        }
         let mut entries = mcp_entries(&board, &profile.agent_name, &profile.extra_mcp_servers)?;
         for entry in &mut entries {
             if let Some(key) = entry
@@ -518,6 +717,12 @@ impl SessionManager {
             }
         }
         let mut env = self.profiles.child_env(&profile)?;
+        let launch_meta = crate::wiring::launch_config::apply_user_config(
+            &profile,
+            user_config,
+            &mut args,
+            &mut env,
+        )?;
         env.extend(entries[0].env.clone());
         // A custom terminal wrapper has no universal CLI flags. Give it the
         // same non-secret stdio spec as ACP, without touching global config.
@@ -555,17 +760,59 @@ impl SessionManager {
                 .map(|(_, v)| v)
                 .filter(|v| !v.is_empty()),
         );
+        // Adapter stderr may quote credential values as JSON. Redact the
+        // escaped spelling too, before it can reach tracing or retained errors.
+        let escaped = secrets
+            .iter()
+            .filter_map(|s| serde_json::to_string(s).ok())
+            .map(|s| s[1..s.len() - 1].to_string())
+            .collect::<Vec<_>>();
+        secrets.extend(escaped);
         secrets.sort_by_key(|v| std::cmp::Reverse(v.len()));
         secrets.dedup();
+        // Reject credentials copied into custom argv or downstream MCP argv,
+        // including the ACP path. Diagnostics deliberately omit the value.
+        let contains_secret =
+            |value: &str| secrets.iter().any(|s| !s.is_empty() && value.contains(s));
+        if contains_secret(&executable.to_string_lossy())
+            || args.iter().any(|a| contains_secret(a))
+            || entries.iter().any(|e| {
+                contains_secret(&e.command)
+                    || e.args.iter().any(|a| contains_secret(a))
+                    || e.http.as_ref().is_some_and(|h| contains_secret(&h.url))
+            })
+        {
+            return Err(err(
+                "Credentials cannot be passed in process arguments; use environment variables",
+            ));
+        }
+        if profile.kind == RuntimeKind::Terminal && launch_resolution.is_ok() {
+            env.extend(crate::wiring::terminal_environment(
+                profile.preset.as_deref(),
+                &executable.to_string_lossy(),
+                &entries,
+            )?);
+        }
+        let launch_warnings = crate::wiring::launch_config::launch_warnings(
+            &profile,
+            &cwd,
+            &env,
+            board.server_name(),
+        );
         let history_store = self.history_store(&board.data_dir, &board.project_id)?;
         let resume_events = if let Some(record) = &saved {
-            history_store.events_for_resume(&record.entry.id)?
+            if profile.kind == RuntimeKind::Terminal {
+                vec![]
+            } else {
+                history_store.events_for_resume(&record.entry.id)?
+            }
         } else {
             vec![]
         };
         let view = AgentSessionView {
             id: saved
                 .as_ref()
+                .filter(|_| profile.kind != RuntimeKind::Terminal)
                 .map(|r| r.entry.id.clone())
                 .unwrap_or_else(|| ulid::Ulid::generate().to_string()),
             profile_id: profile.id.clone(),
@@ -582,7 +829,7 @@ impl SessionManager {
             model: profile.model.clone(),
             effort: profile.effort.clone(),
         };
-        let record = saved
+        let mut record = saved
             .clone()
             .unwrap_or_else(|| crate::history::StoredHistory {
                 entry: HistoryEntry {
@@ -590,6 +837,8 @@ impl SessionManager {
                     project_id: board.project_id.clone(),
                     profile_id: profile.id.clone(),
                     profile_label: profile.label.clone(),
+                    provider: Default::default(),
+                    empty: true,
                     kind: if profile.kind == RuntimeKind::Api {
                         HistoryKind::Api
                     } else {
@@ -614,12 +863,18 @@ impl SessionManager {
                 renamed: false,
                 has_user_message: false,
                 last_agent_message_id: None,
+                terminal: None,
             });
-        let writer = if profile.kind == RuntimeKind::Terminal {
-            None
-        } else {
-            history_store.create(record)?
-        };
+        record.board = board.clone();
+        if profile.kind == RuntimeKind::Terminal {
+            record.entry.id = view.id.clone();
+            record.entry.created_at = view.created_at.clone();
+            record.entry.updated_at = view.created_at.clone();
+            if saved.is_none() {
+                record.prepare_terminal(terminal_session_id.clone());
+            }
+        }
+        let writer = history_store.create(record)?;
         let mut last_prompt = None;
         let mut last_turn_failed = false;
         let mut last_failure_code = None;
@@ -632,7 +887,12 @@ impl SessionManager {
                 } => {
                     last_prompt = Some(LastPrompt {
                         content: content.clone(),
-                        preamble: context_preamble.clone(),
+                        preamble: context_preamble.as_ref().map(|text| {
+                            text.replace(
+                                &format!("Use the {previous_server_name} MCP server"),
+                                &format!("Use the {} MCP server", board.server_name()),
+                            )
+                        }),
                     });
                     last_turn_failed = false;
                 }
@@ -653,6 +913,9 @@ impl SessionManager {
             inner: Mutex::new(SessionInner {
                 view,
                 events: VecDeque::new(),
+                launch_log: VecDeque::new(),
+                launch_steps: BTreeMap::new(),
+                launch_meta,
                 seq: resume_events.last().map_or(0, |e| e.seq),
                 permissions: BTreeMap::new(),
                 first_prompt: saved.is_none(),
@@ -668,9 +931,11 @@ impl SessionManager {
                 text_pending: String::new(),
                 attachments: BTreeMap::new(),
                 resume_events,
-                resume_native_id: saved
-                    .as_ref()
-                    .and_then(|r| r.entry.agent_session_id.clone()),
+                resume_native_id: terminal_session_id.or_else(|| {
+                    saved
+                        .as_ref()
+                        .and_then(|r| r.entry.agent_session_id.clone())
+                }),
                 replaying: saved.is_some() && profile.kind == RuntimeKind::Acp,
             }),
             board,
@@ -696,6 +961,91 @@ impl SessionManager {
             status: SessionStatus::Starting,
             message: None,
         });
+        session.launch_step(
+            "user_config",
+            LaunchStepState::Ok,
+            if user_config == UserConfigChoice::Include {
+                "User global configuration included".into()
+            } else {
+                crate::wiring::launch_config::exclude_description(&profile).1
+            },
+        );
+        if let Err(error) = launch_resolution {
+            session.launch_step(
+                "resolve_executable",
+                LaunchStepState::Failed,
+                error.to_string(),
+            );
+            session.fail("Cannot resolve agent executable", Some(error.to_string()));
+            session.finished.cancel();
+            return Err(err(session.redact(&error.to_string())));
+        }
+        session.launch_step(
+            "resolve_executable",
+            if profile.kind == RuntimeKind::Api {
+                LaunchStepState::Skipped
+            } else {
+                LaunchStepState::Ok
+            },
+            if profile.kind == RuntimeKind::Api {
+                "API connection; no agent executable".into()
+            } else {
+                format!(
+                    "Resolved {} (version not cached; no version probe was run)",
+                    executable.display()
+                )
+            },
+        );
+        session.launch_step(
+            "start_process",
+            LaunchStepState::Running,
+            if profile.kind == RuntimeKind::Api {
+                "Initialize API connector"
+            } else {
+                "Start adapter/process"
+            },
+        );
+        if profile.kind != RuntimeKind::Acp {
+            session.launch_step(
+                "initialize",
+                LaunchStepState::Skipped,
+                "ACP initialize does not apply to this runtime",
+            );
+            session.launch_step(
+                "session",
+                LaunchStepState::Skipped,
+                "ACP session/new or session/load does not apply to this runtime",
+            );
+        }
+        for entry in &entries {
+            session.launch_step(
+                &format!("mcp:{}", entry.name),
+                if entry.enabled {
+                    LaunchStepState::Running
+                } else {
+                    LaunchStepState::Skipped
+                },
+                if entry.enabled {
+                    format!(
+                        "MCP server {}: awaiting runtime connection result",
+                        entry.name
+                    )
+                } else {
+                    format!("MCP server {} is disabled", entry.name)
+                },
+            );
+        }
+        for warning in launch_warnings {
+            // The existing status channel also retains startup diagnostics for
+            // replay after a session picker remount.
+            session.emit(AgentEventKind::Status {
+                status: SessionStatus::Starting,
+                message: Some(format!(
+                    "Launch warning: {}",
+                    serde_json::to_string(&warning)?
+                )),
+            });
+        }
         let started = match profile.kind {
             RuntimeKind::Acp => {
                 crate::acp::start(session.clone(), executable, args, env, entries).await
@@ -746,6 +1096,28 @@ impl SessionManager {
                 .history_enabled
                 .load(std::sync::atomic::Ordering::SeqCst),
         }
+    }
+    pub fn launch_logs(&self, id: &str) -> Result<Vec<AgentDockEvent>> {
+        Ok(self
+            .get(id)?
+            .inner
+            .lock()
+            .map_err(|_| err("Session lock unavailable"))?
+            .launch_log
+            .iter()
+            .cloned()
+            .collect())
+    }
+    /// CLI identity is runtime metadata, separate from Jam Board's session ID.
+    pub fn agent_session_id(&self, id: &str) -> Result<Option<String>> {
+        let session = self.get(id)?;
+        let inner = session
+            .inner
+            .lock()
+            .map_err(|_| err("Session lock unavailable"))?;
+        Ok((inner.view.kind == RuntimeKind::Terminal)
+            .then(|| inner.resume_native_id.clone())
+            .flatten())
     }
     pub fn save_history_settings(&self, settings: HistorySettings) -> Result<HistorySettings> {
         let _guard = self
@@ -819,6 +1191,16 @@ impl SessionManager {
         project_id: &str,
         entry_id: &str,
     ) -> Result<AgentSessionView> {
+        self.resume_with_user_config(dir, project_id, entry_id, None)
+            .await
+    }
+    pub async fn resume_with_user_config(
+        &self,
+        dir: &std::path::Path,
+        project_id: &str,
+        entry_id: &str,
+        user_config: Option<UserConfigChoice>,
+    ) -> Result<AgentSessionView> {
         {
             let mut entries = self
                 .resuming
@@ -832,9 +1214,22 @@ impl SessionManager {
             entries: &self.resuming,
             id: entry_id,
         };
-        let record = self.history_store(dir, project_id)?.load(entry_id)?;
+        let mut record = self.history_store(dir, project_id)?.load(entry_id)?;
         if record.entry.project_id != project_id || record.board.project_id != project_id {
             return Err(err("History belongs to another project"));
+        }
+        if record.entry.kind == HistoryKind::Terminal {
+            record.refresh_terminal()?;
+            record.terminal_resume_args(&mut vec![])?;
+            if self.sessions(&record.entry.project_id).iter().any(|view| {
+                view.kind == RuntimeKind::Terminal
+                    && view.profile_id == record.entry.profile_id
+                    && !matches!(view.status, SessionStatus::Stopped | SessionStatus::Failed)
+                    && self.agent_session_id(&view.id).ok().flatten()
+                        == record.entry.agent_session_id
+            }) {
+                return Err(err("This terminal session is already open"));
+            }
         }
         if record.entry.resumable == Resumable::None {
             return Err(err(
@@ -851,6 +1246,7 @@ impl SessionManager {
         }
         let input = StartAgentSessionInput {
             profile_id: record.profile.id.clone(),
+            user_config,
             cwd: Some(record.cwd.clone()),
             model: record.entry.model.clone(),
             effort: record.entry.effort.clone(),

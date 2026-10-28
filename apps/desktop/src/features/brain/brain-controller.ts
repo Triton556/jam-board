@@ -44,6 +44,18 @@ export function connectBrain(projectId: string) {
   const off = agentDockApi.onEvent((event) => {
     if (!disposed) useBrainState.getState().ingest(event);
   });
+  const offWarning = agentDockApi.onLaunchWarning((warning) => {
+    if (disposed) return;
+    useBrainState.setState((state) => ({
+      launchWarnings: {
+        ...state.launchWarnings,
+        [warning.sessionId]: [
+          ...(state.launchWarnings?.[warning.sessionId] ?? []),
+          warning,
+        ],
+      },
+    }));
+  });
   void (async () => {
     try {
       const sessions = (await agentDockApi.sessions()).filter(
@@ -76,6 +88,7 @@ export function connectBrain(projectId: string) {
   return () => {
     disposed = true;
     off();
+    offWarning();
     offActivity();
   };
 }

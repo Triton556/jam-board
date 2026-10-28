@@ -1,0 +1,571 @@
+import { expect, type Page, test } from "@playwright/test";
+
+async function openDock(page: Page) {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Load demo jam", exact: true })
+    .click();
+  await page.evaluate(async () => {
+    const uiPath = "/src/lib/ui-store.ts";
+    const { useUiStore } = await import(uiPath);
+    useUiStore.getState().setBrainDockOpen(true);
+  });
+  await expect(page.getByRole("tablist", { name: "Brain mode" })).toBeVisible();
+}
+async function startChat(page: Page, profileId = "claude-code") {
+  await page.evaluate(async (id) => {
+    const apiPath = "/src/lib/agent-dock-mock.ts";
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { mockDockApi } = await import(apiPath);
+    const { useBrainState } = await import(storePath);
+    const session = await mockDockApi.startSession({ profileId: id });
+    useBrainState.setState(
+      (state: { sessions: { id: string }[]; selected: object }) => ({
+        sessions: [
+          session,
+          ...state.sessions.filter((item) => item.id !== session.id),
+        ],
+        selected: { ...state.selected, chat: session.id },
+        tab: "chat",
+      }),
+    );
+    for (const event of await mockDockApi.history(session.id))
+      useBrainState.getState().ingest(event);
+  }, profileId);
+}
+
+test("Q1 BD21/BC13 delete keeps the exact row height, including a wrapped title", async ({
+  page,
+}) => {
+  await openDock(page);
+  await page.getByRole("tab", { name: "History", exact: true }).click();
+  const title = "A long history title which wraps at narrow widths 1234567890";
+  await page
+    .getByRole("button", { name: "History actions for Plan the next release" })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  await page.getByRole("textbox", { name: "History title" }).fill(title);
+  await page.getByRole("button", { name: "Save title" }).click();
+  for (const width of [1440, 1000, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    const next = page.getByRole("button", {
+      name: "Open Review the board layout",
+    });
+    const row = page.locator(".brain-history-row").first();
+    const before = await row.boundingBox();
+    const nextBefore = await next.boundingBox();
+    await page
+      .getByRole("button", { name: `History actions for ${title}` })
+      .click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await expect(
+      page.getByRole("button", { name: "Undo", exact: true }),
+    ).toBeFocused();
+    expect((await row.boundingBox())?.height).toBe(before?.height);
+    expect((await next.boundingBox())?.y).toBe(nextBefore?.y);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+  }
+});
+
+test("Q1 H-BD01/BC01 a picker opened before the chat chunk mounts retains focus and arrows", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/features/brain/BrainChat.tsx*", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await openDock(page);
+  await startChat(page);
+  await page.getByRole("button", { name: /^Choose session:/ }).click();
+  const picker = page.getByRole("region", { name: "Sessions", exact: true });
+  await expect(picker.getByRole("button").first()).toBeFocused();
+  release();
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeVisible();
+  await expect(picker.getByRole("button").first()).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(picker.getByRole("button").last()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: /^Choose session:/ }),
+  ).toBeFocused();
+});
+
+test("Q1 BD23/BC12 global config chip closes at the correct Escape depth and outside", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await page.evaluate(async () => {
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { useBrainState } = await import(storePath);
+    const id = useBrainState.getState().selected.chat;
+    useBrainState.setState({ userConfigChoices: { [id]: "include" } });
+  });
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeVisible();
+  const chip = page.getByRole("button", { name: "Global config: on" });
+  const select = page.getByRole("combobox", {
+    name: "Global config for next launch",
+  });
+  await chip.click();
+  await select.focus();
+  await page.keyboard.press("Escape");
+  await expect(select).toBeHidden();
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute("aria-expanded", "false");
+  await chip.click();
+  await select.click();
+  await page.keyboard.press("Escape");
+  await expect(select).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(select).toBeHidden();
+  await chip.click();
+  await page.getByRole("textbox", { name: "Message the brain" }).click();
+  await expect(select).toBeHidden();
+  await expect(chip).toHaveAttribute("aria-expanded", "false");
+});
+
+test("Q1 BD23/BC12 a config selector opened before chat mount retains its options", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/features/brain/BrainChat.tsx*", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await openDock(page);
+  await page.getByRole("button", { name: "Start chat", exact: true }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Don't use", exact: true }).click();
+  await page.getByRole("button", { name: "Global config: off" }).click();
+  const select = page.getByRole("combobox", {
+    name: "Global config for next launch",
+  });
+  await select.click();
+  release();
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeVisible();
+  await expect(select).toBeFocused();
+  await page.getByRole("option", { name: "On", exact: true }).click();
+  await expect(
+    page.getByText("Next launch: on", { exact: true }),
+  ).toBeVisible();
+});
+
+test("Q1 BD22/BC12 dismissing the last warning during cold mount hands focus to the composer", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/features/brain/BrainChat.tsx*", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await openDock(page);
+  await startChat(page);
+  await page.evaluate(async () => {
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { useBrainState } = await import(storePath);
+    const sessionId = useBrainState.getState().selected.chat;
+    useBrainState.getState().ingest({
+      kind: "status",
+      status: "ready",
+      sessionId,
+      seq: 9000,
+      at: new Date().toISOString(),
+      message: `Launch warning: ${JSON.stringify({ configPath: "C:/fixture/config.toml", suggestedFix: "Review this entry." })}`,
+    });
+  });
+  await page.getByRole("button", { name: "Dismiss", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".brain-dock")).toBeFocused();
+  release();
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeFocused();
+});
+
+test("Q1 BD01/BD11/BC01/ RR03 all dock popovers stay bounded across viewport changes", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeVisible();
+  for (const width of [1440, 1000, 375, 280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const [trigger, label] of [
+      ["Access: Ask first", "Access"],
+      ["Session actions", "Session actions"],
+    ]) {
+      await page.getByRole("button", { name: trigger, exact: true }).click();
+      const menu = page.getByRole("region", { name: label, exact: true });
+      const box = await menu.boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(8);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width - 8);
+      await page.keyboard.press("Escape");
+    }
+    await page.getByRole("button", { name: /^Choose session:/ }).click();
+    const box = await page
+      .getByRole("region", { name: "Sessions", exact: true })
+      .boundingBox();
+    expect(box?.x).toBeGreaterThanOrEqual(8);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width - 8);
+    await page.keyboard.press("Escape");
+  }
+});
+
+test("Q1 H-BD01/BC01 Clear stopped focuses a remaining row or the trigger", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await expect(
+    page.getByRole("textbox", { name: "Message the brain" }),
+  ).toBeVisible();
+  await page.evaluate(async () => {
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { useBrainState } = await import(storePath);
+    const s = useBrainState.getState().sessions[0];
+    useBrainState.setState({
+      sessions: [
+        s,
+        {
+          ...s,
+          id: "stopped-fixture",
+          title: "Stopped fixture",
+          status: "stopped",
+        },
+      ],
+    });
+  });
+  const trigger = page.getByRole("button", { name: /^Choose session:/ });
+  await trigger.click();
+  const picker = page.getByRole("region", { name: "Sessions", exact: true });
+  await picker
+    .getByRole("button", { name: "Clear stopped", exact: true })
+    .focus();
+  await page.keyboard.press("Space");
+  await expect(picker.getByRole("button").first()).toBeFocused();
+  await page.evaluate(async () => {
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { useBrainState } = await import(storePath);
+    useBrainState.setState({
+      sessions: useBrainState
+        .getState()
+        .sessions.map((s: { status: string }) => ({ ...s, status: "stopped" })),
+    });
+  });
+  await picker
+    .getByRole("button", { name: "Clear stopped", exact: true })
+    .focus();
+  await page.keyboard.press("Space");
+  await expect(trigger).toBeFocused();
+  await expect(picker.getByRole("button")).toHaveCount(0);
+});
+test("W1/W2/W3 History is a keyboard-accessible top tab with kind filters, metadata and a terminal empty state", async ({
+  page,
+}) => {
+  await openDock(page);
+  const tabs = page.getByRole("tablist", { name: "Brain mode" });
+  await tabs.getByRole("tab", { name: "Chat", exact: true }).focus();
+  await page.keyboard.press("End");
+  await expect(tabs.getByRole("tab", { name: "History" })).toBeFocused();
+  const history = page.getByRole("region", { name: "History", exact: true });
+  await expect(
+    history.getByRole("button", { name: "Open Plan the next release" }),
+  ).toContainText("Claude Code · claude-sonnet-4-6");
+  await expect(history).toContainText("Native resume");
+  await expect(history).toContainText(/\dm ago/);
+  await history.getByRole("tab", { name: "Terminal", exact: true }).click();
+  await expect(history).toContainText("No terminal history yet");
+  await history.getByRole("tab", { name: "Chat", exact: true }).click();
+  await expect(
+    history.getByRole("button", { name: "Open Plan the next release" }),
+  ).toBeVisible();
+  await tabs.getByRole("tab", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: /^Choose session:/ }).click();
+  await expect(
+    page.getByRole("region", { name: "Sessions", exact: true }),
+  ).not.toContainText("History");
+});
+test("W4 History popover supports arrows, Escape, outside close, inline rename, delete and undo", async ({
+  page,
+}) => {
+  await openDock(page);
+  await page.getByRole("tab", { name: "History", exact: true }).click();
+  const trigger = page.getByRole("button", {
+    name: "History actions for Plan the next release",
+  });
+  await trigger.click();
+  const menu = page.getByRole("menu", { name: "History actions" });
+  await expect(menu.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Delete" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.getByRole("textbox", { name: "Search history" }).click();
+  await expect(menu).toBeHidden();
+  await trigger.click();
+  await menu.getByRole("menuitem", { name: "Rename" }).click();
+  await page
+    .getByRole("textbox", { name: "History title" })
+    .fill("Review dock UX");
+  await page.getByRole("button", { name: "Save title" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Review dock UX" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "History actions for Review dock UX" })
+    .click();
+  await menu.getByRole("menuitem", { name: "Delete" }).click();
+  await expect(
+    page.getByRole("status", { name: "Deleted Review dock UX" }),
+  ).toContainText("Deleted · Undo");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Review dock UX" }),
+  ).toBeVisible();
+});
+test("B1 session picker groups titled sessions, indicates current, and clears stopped without deleting history", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await page.evaluate(async () => {
+    const path = "/src/features/brain/brain-store.ts";
+    const { useBrainState } = await import(path);
+    const state = useBrainState.getState();
+    const current = state.sessions.find(
+      (session: { id: string }) => session.id === state.selected.chat,
+    );
+    useBrainState.setState({
+      sessions: [
+        {
+          ...current,
+          title: "Review the dock",
+          cwd: "C:/work/fictional-project",
+        },
+        {
+          ...current,
+          id: "stopped-fixture",
+          title: "Earlier review",
+          status: "stopped",
+        },
+      ],
+    });
+  });
+  await page.getByRole("button", { name: /^Choose session:/ }).click();
+  const picker = page.getByRole("region", { name: "Sessions", exact: true });
+  await expect(
+    picker.getByRole("region", { name: "Active", exact: true }),
+  ).toContainText("Review the dock");
+  await expect(
+    picker.getByRole("region", { name: "Stopped", exact: true }),
+  ).toContainText("Earlier review");
+  await expect(picker.locator('[aria-current="true"]')).toContainText(
+    /ready · started \d\d:\d\d · fictional-project/,
+  );
+  await picker.getByRole("button", { name: "Clear stopped" }).click();
+  await expect(
+    picker.getByRole("region", { name: "Stopped", exact: true }),
+  ).toBeHidden();
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "History", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Plan the next release" }),
+  ).toBeVisible();
+});
+test("B10/W5 access menus distinguish Claude auto from Codex project access and preserve the chosen mode", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await page
+    .getByRole("button", { name: "Access: Ask first", exact: true })
+    .click();
+  const access = page.getByRole("region", { name: "Access", exact: true });
+  await expect(
+    access.locator("strong", { hasText: /^Ask first$/ }),
+  ).toHaveCount(1);
+  await access.getByRole("button", { name: /Auto \(Claude decides\)/ }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "Access: Auto (Claude decides)",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Access: Auto (Claude decides)", exact: true })
+    .click();
+  await expect(access).toContainText(
+    "Runs commands and edits files without asking. Use only in a folder you can afford to lose.",
+  );
+  await page.keyboard.press("Escape");
+  await startChat(page, "codex");
+  await page
+    .getByRole("button", { name: "Access: Work in project", exact: true })
+    .click();
+  await expect(access).toContainText(
+    "Edits and runs commands inside the project folder; asks for network and anything outside.",
+  );
+  await expect(access.getByRole("button")).toHaveCount(3);
+});
+test("B7/minor Starting shows live launch failures, clears the previous title, and Logs opens read-only events", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  await page.evaluate(async () => {
+    const path = "/src/lib/agent-dock-mock.ts";
+    const { setMockLaunchDelay } = await import(path);
+    setMockLaunchDelay(1500);
+  });
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: /^Choose session:/ }),
+  ).toHaveText("New chat");
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Use global config", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Starting…", exact: true }),
+  ).toBeDisabled();
+  const steps = page.getByRole("log", { name: "Launch steps" });
+  await expect(steps).toContainText("Adapter starting");
+  await page.evaluate(async () => {
+    const path = "/src/lib/agent-dock-mock.ts";
+    const storePath = "/src/features/brain/brain-store.ts";
+    const { emitMockDockEvent } = await import(path);
+    const { useBrainState } = await import(storePath);
+    emitMockDockEvent(useBrainState.getState().selected.chat, {
+      kind: "launch_step",
+      step: "mcp-board",
+      state: "failed",
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      message: "mcp__jam-board__startup failed",
+    });
+  });
+  await expect(steps).toContainText("Failedmcp__jam-board__startup failed");
+  await expect(
+    page.getByRole("button", { name: "Starting…", exact: true }),
+  ).toBeHidden();
+  await page
+    .getByRole("button", { name: "Session actions", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Logs", exact: true }).click();
+  await expect(
+    page.getByRole("log", { name: "Launch timeline" }),
+  ).toContainText("mcp__jam-board__startup failed");
+  await expect(
+    page.getByRole("button", { name: "Copy raw", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "Session logs" })).toBeHidden();
+});
+
+test("I1-R1 Logs follows new events until the reader scrolls up and Copy raw includes displayed events", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openDock(page);
+  await startChat(page);
+  const append = async (count: number, label: string) =>
+    page.evaluate(
+      async ({ count, label }) => {
+        const mockPath = "/src/lib/agent-dock-mock.ts";
+        const storePath = "/src/features/brain/brain-store.ts";
+        const { emitMockDockEvent } = await import(mockPath);
+        const { useBrainState } = await import(storePath);
+        for (let i = 0; i < count; i++)
+          emitMockDockEvent(useBrainState.getState().selected.chat, {
+            kind: "launch_log",
+            message: `${label} ${i}`,
+          });
+      },
+      { count, label },
+    );
+  await append(60, "Fixture adapter line");
+  await page
+    .getByRole("button", { name: "Session actions", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Logs", exact: true }).click();
+  const timeline = page.getByRole("log", { name: "Launch timeline" });
+  await expect(timeline).toContainText("Fixture adapter line 59");
+  const distance = () =>
+    timeline.evaluate(
+      (node) => node.scrollHeight - node.scrollTop - node.clientHeight,
+    );
+  await expect.poll(distance).toBeLessThan(24);
+  await append(1, "Newest adapter line");
+  await expect(timeline).toContainText("Newest adapter line 0");
+  await expect.poll(distance).toBeLessThan(24);
+  await timeline.evaluate((node) => {
+    node.scrollTop = 0;
+    node.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await append(1, "While reading earlier lines");
+  await expect(timeline).toContainText("While reading earlier lines 0");
+  expect(await timeline.evaluate((node) => node.scrollTop)).toBe(0);
+  await page.getByRole("button", { name: "Copy raw", exact: true }).click();
+  await expect(
+    page.getByText("Raw events copied", { exact: true }),
+  ).toBeVisible();
+  const copied = await page.evaluate(async () =>
+    JSON.parse(await navigator.clipboard.readText()),
+  );
+  expect(copied.at(-1).message).toBe("While reading earlier lines 0");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Session actions", exact: true }),
+  ).toBeFocused();
+});
+
+test("I1-R4 Claude and Codex model options stay scoped to the selected connection", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page, "claude-code");
+  await startChat(page, "codex");
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  const launcher = page.getByRole("region", { name: "New chat", exact: true });
+  await expect(
+    launcher.getByRole("button", { name: "GPT-6.1 Sol", exact: true }),
+  ).toBeVisible();
+  await expect(launcher).not.toContainText("Claude Sonnet");
+  await launcher
+    .getByRole("combobox", { name: "Connection", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Claude Code", exact: true }).click();
+  await expect(
+    launcher.getByRole("button", { name: "Claude Sonnet 4.6", exact: true }),
+  ).toBeVisible();
+  await expect(launcher).not.toContainText("GPT-6.1");
+  await launcher
+    .getByRole("combobox", { name: "Connection", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Codex", exact: true }).click();
+  await expect(
+    launcher.getByRole("button", { name: "GPT-6.1 Terra", exact: true }),
+  ).toBeVisible();
+  await expect(launcher).not.toContainText("Claude Opus");
+});

@@ -4,7 +4,7 @@ This is the maintained map of **what people and agents can do**, how nested inte
 
 ## Read in this order
 
-1. [Human interaction tree](human-interactions.md): 82 stable route/action-family IDs (46 original plus BD01-BD20 and R09-R24, including 28 pending round-5 paths) and nested surfaces.
+1. [Human interaction tree](human-interactions.md): 86 stable route/action-family IDs (46 original plus BD01-BD24 and R09-R24, including the round-5 inventory and round-7 additions) and nested surfaces.
 2. [Agent action/state map](agent-actions.md): all 52 current MCP tools, human-only decisions, lifecycle, recovery and handover.
 3. [Behavioral and visual acceptance](acceptance-matrix.md): scenario IDs, functional assertions, visual states and honest result recording.
 4. [Known gaps / next work](known-gaps.md): observed source causes, planned changes and open choices.
@@ -15,7 +15,7 @@ This is the maintained map of **what people and agents can do**, how nested inte
 
 - Baseline inspected: alpha28, source `2b263795b31767da29db0b62dc81f4da19dfc4d1`, 2026-10-22. Canonical transport and permissions: [MCP contract](../mcp.md). Architecture: [architecture](../architecture.md); decision history: [workflow UX](../workflow-ux.md).
 - Alpha29 source candidate: Task Description and true Comments primary; Story Description maps `outcomeMd`; collapsed Agent plan retains mounted editors; scoped in-session drafts. Implementation is present; see the [alpha29 verification record](../verification/0.3.0-alpha.29.md) for actual behavioral checks and pending browser/native evidence.
-- Alpha30 source adds inline reference notes, visible frame controls and image pixel-resolution selection; see its verification. Alpha31 integrates notification history, explicit Refine modes, presence freshness and nested select placement as a separate candidate. Alpha32 adds concise empty-column text and a calmer single frame representation; its visual acceptance remains separate. Alpha33 repairs independently reproduced hidden pending/menu/loading interactions. Session streaming is not implemented.
+- Alpha30 source adds inline reference notes, visible frame controls and image pixel-resolution selection; see its verification. Alpha31 integrates notification history, explicit Refine modes, presence freshness and nested select placement as a separate candidate. Alpha32 adds concise empty-column text and a calmer single frame representation; its visual acceptance remains separate. Alpha33 repairs independently reproduced hidden pending/menu/loading interactions. At that alpha33 checkpoint session streaming was not implemented; the later brain dock includes streaming.
 - This documentation audit ran **source inspection and web research**, not new application acceptance tests. Prior exact-version results remain in [verification](../verification/0.3.0-alpha.28.md); do not transfer their pass status to another version/platform.
 - Build/type/lint/hash checks establish engineering integrity or artifact identity, not ease of use. A quality claim needs observed behavior and an inspected open-state layout. Browser/mock, DOM, native package and actual-human observations are different evidence classes.
 
@@ -135,12 +135,12 @@ ACP chat, terminal and built-in API runtimes. The UI reaches the Tauri adapter a
 Board Refine/Continue/Ask brain actions stage composer drafts, never automatic
 Send or Start. Settings groups dock profiles before the external MCP disclosure.
 
-The human map extends BD01-BD03 through BD08; the agent map extends AG15-AG18.
-[UX01-UX09 and BC01-BC11](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
+The human map includes BD01-BD24; the agent map includes AG15-AG18.
+[UX01-UX09 and BC01-BC14](acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending)
 cover board entry points, canvas/Inbox/task layout and every nested dock surface.
-Their functional and visual requirements remain not yet run for this increment;
-source/DOM/fake-agent evidence cannot substitute for pending browser/native QA.
+Round-7 fake, DOM and Chromium/mock results are recorded in worker handoffs;
+they do not substitute for exact-version packaged/native or live-provider QA.
 [Known gaps](known-gaps.md#brain-dock-integration-boundary) records live-provider,
-packaged cleanup, memory-only history and adapter limits. Historical 46-family
+packaged cleanup, terminal rendering confirmation and live-adapter limits. Historical 46-family
 and alpha40/41 results retain their exact source boundary, not this increment's
 acceptance. The seven canvas organization tools plus unlink_reference bring the current MCP inventory to 52.

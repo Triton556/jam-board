@@ -133,6 +133,8 @@ export function sessionModel(events: AgentDockEvent[]) {
     sessionOptions(events).find((o) => optionCategory(o) === "model"),
   );
 }
+const fullAutoCopy =
+  "Runs commands and edits files without asking. Use only in a folder you can afford to lose.";
 const accessCopy: Record<string, [string, string]> = {
   default: [
     "Ask first",
@@ -143,27 +145,52 @@ const accessCopy: Record<string, [string, string]> = {
     "Edits files without asking; asks for everything else.",
   ],
   plan: ["Plan only", "Reads and proposes a plan; changes nothing."],
-  bypassPermissions: [
-    "Full auto",
-    "Never asks. Use only in a throwaway workspace.",
-  ],
+  bypassPermissions: ["Full auto", fullAutoCopy],
+  "full-access": ["Full auto", fullAutoCopy],
+  "read-only": ["Read only", "Reads files without changing them."],
 };
-export function accessLabel(value: ConfigOption["values"][number]) {
-  const copy = accessCopy[value.value];
+export type AccessKind = "claude" | "codex" | "other";
+export function connectionAccessKind(profile?: {
+  preset: string | null;
+  command: string | null;
+  id: string;
+}): AccessKind {
+  const identity = [profile?.preset, profile?.command, profile?.id].join(" ");
+  return /claude/i.test(identity)
+    ? "claude"
+    : /codex/i.test(identity)
+      ? "codex"
+      : "other";
+}
+export function accessLabel(
+  value: ConfigOption["values"][number],
+  kind: AccessKind = "other",
+) {
+  const copy =
+    value.value === "auto"
+      ? kind === "claude"
+        ? [
+            "Auto (Claude decides)",
+            "Runs safe actions itself; asks or blocks risky ones.",
+          ]
+        : kind === "codex"
+          ? [
+              "Work in project",
+              "Edits and runs commands inside the project folder; asks for network and anything outside.",
+            ]
+          : undefined
+      : accessCopy[value.value];
   return {
-    label:
-      copy?.[0] ??
-      {
-        "read-only": "Read only",
-        auto: "Ask first",
-        "full-access": "Full auto",
-      }[value.value] ??
-      value.name,
+    label: copy?.[0] ?? value.name,
     description: copy?.[1] ?? value.description ?? "",
     danger: ["bypassPermissions", "full-access"].includes(value.value),
   };
 }
-export function configDivider(events: AgentDockEvent[], index: number) {
+export function configDivider(
+  events: AgentDockEvent[],
+  index: number,
+  kind: AccessKind = "other",
+) {
   const event = events[index];
   if (
     event?.kind !== "config_options" ||
@@ -185,7 +212,7 @@ export function configDivider(events: AgentDockEvent[], index: number) {
   const access = changed.find((o) => optionCategory(o) === "mode");
   if (access)
     labels.push(
-      `Access → ${accessLabel(access.values.find((v) => v.value === access.value) ?? { value: access.value, name: access.value }).label}`,
+      `Access → ${accessLabel(access.values.find((v) => v.value === access.value) ?? { value: access.value, name: access.value }, kind).label}`,
     );
   return labels.join(" · ");
 }

@@ -13,6 +13,9 @@ use std::{
 };
 
 pub const MAX_HISTORY_RESPONSE: usize = 20 * 1024 * 1024;
+#[path = "terminal_history.rs"]
+mod terminal_history;
+pub(crate) use terminal_history::TerminalHistory;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Resumable {
@@ -20,11 +23,25 @@ pub enum Resumable {
     Transcript,
     None,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum HistoryKind {
-    Acp,
-    Api,
+    #[default]
+    #[serde(alias = "acp", alias = "api")]
+    Chat,
+    Terminal,
+}
+// Source compatibility for existing chat callers; persisted/API kinds are chat/terminal.
+#[allow(non_upper_case_globals)]
+impl HistoryKind {
+    pub const Acp: Self = Self::Chat;
+    pub const Api: Self = Self::Chat;
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryProvider {
+    pub label: String,
+    pub agent_kind: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -33,10 +50,16 @@ pub struct HistoryEntry {
     pub project_id: String,
     pub profile_id: String,
     pub profile_label: String,
+    #[serde(default)]
     pub kind: HistoryKind,
+    #[serde(default)]
+    pub provider: HistoryProvider,
+    #[serde(default)]
+    pub empty: bool,
     pub title: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
     pub model: Option<String>,
     pub effort: Option<String>,
     pub agent_session_id: Option<String>,
@@ -62,6 +85,8 @@ pub(crate) struct StoredHistory {
     pub has_user_message: bool,
     #[serde(default)]
     pub last_agent_message_id: Option<String>,
+    #[serde(default)]
+    pub terminal: Option<TerminalHistory>,
 }
 #[derive(Clone)]
 pub(crate) struct HistoryStore {
@@ -80,6 +105,30 @@ fn safe_id(value: &str) -> Result<()> {
     Ok(())
 }
 impl HistoryStore {
+    pub(crate) fn recover_all(data_dir: &Path, enabled: Arc<AtomicBool>, lock: Arc<Mutex<()>>) {
+        if !enabled.load(Ordering::SeqCst) {
+            return;
+        }
+        let Ok(projects) = fs::read_dir(data_dir.join("agent-history")) else {
+            return;
+        };
+        for project in projects.flatten() {
+            if !project.file_type().is_ok_and(|kind| kind.is_dir()) {
+                continue;
+            }
+            let Some(id) = project.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if Self::new(data_dir, &id, enabled.clone(), lock.clone())
+                .and_then(|store| store.list(None, None))
+                .is_err()
+            {
+                // A damaged history must not prevent the application opening.
+                // Never log transcript contents or connection configuration.
+                tracing::warn!("Cannot reconcile a project's terminal history at startup");
+            }
+        }
+    }
     pub fn new(
         data_dir: &Path,
         project_id: &str,
@@ -101,7 +150,10 @@ impl HistoryStore {
         )))
     }
     pub fn load(&self, id: &str) -> Result<StoredHistory> {
-        Ok(serde_json::from_reader(File::open(self.path(id, false)?)?)?)
+        let mut record: StoredHistory =
+            serde_json::from_reader(File::open(self.path(id, false)?)?)?;
+        record.fill_provider();
+        Ok(record)
     }
     fn save(&self, record: &StoredHistory) -> Result<()> {
         let path = self.path(&record.entry.id, false)?;
@@ -115,7 +167,7 @@ impl HistoryStore {
         fs::rename(temporary, path)?;
         Ok(())
     }
-    pub fn create(&self, record: StoredHistory) -> Result<Option<HistoryWriter>> {
+    pub fn create(&self, mut record: StoredHistory) -> Result<Option<HistoryWriter>> {
         if !self.enabled.load(Ordering::SeqCst) {
             return Ok(None);
         }
@@ -124,6 +176,10 @@ impl HistoryStore {
             .lock()
             .map_err(|_| err("History lock unavailable"))?;
         fs::create_dir_all(&self.dir)?;
+        record.fill_provider();
+        if record.entry.kind == HistoryKind::Chat {
+            record.entry.empty = false;
+        }
         self.save(&record)?;
         let path = self.path(&record.entry.id, true)?;
         let repair = OpenOptions::new()
@@ -154,7 +210,15 @@ impl HistoryStore {
         for item in fs::read_dir(&self.dir)? {
             let path = item?.path();
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                let record: StoredHistory = serde_json::from_reader(File::open(path)?)?;
+                let mut record: StoredHistory = serde_json::from_reader(File::open(path)?)?;
+                record.fill_provider();
+                // Reconcile interrupted sessions on the first history read after restart.
+                // Transcript files are only read; deletion remains project-local.
+                if record.entry.kind == HistoryKind::Terminal && self.enabled.load(Ordering::SeqCst)
+                {
+                    record.refresh_terminal()?;
+                    self.save(&record)?;
+                }
                 if record.entry.title.to_lowercase().contains(&query) {
                     entries.push(record.entry);
                 }
@@ -277,6 +341,28 @@ impl HistoryWriter {
             return Ok(());
         }
         let current = self.store.load(&self.record.entry.id)?;
+        if self.record.entry.kind == HistoryKind::Terminal {
+            // A history read may already have linked this transcript or renamed
+            // its row. Keep that identity and summary across later lifecycle events.
+            self.record = current;
+            if matches!(
+                event.event,
+                AgentEventKind::Status {
+                    status: SessionStatus::Stopped | SessionStatus::Failed,
+                    ..
+                }
+            ) {
+                self.record.refresh_terminal()?;
+                self.store.save(&self.record)?;
+            }
+            // Retain launch/status diagnostics, never raw PTY output.
+            serde_json::to_writer(&mut self.file, event)?;
+            self.file.write_all(b"\n")?;
+            if matches!(event.event, AgentEventKind::Status { .. }) {
+                self.file.sync_data()?;
+            }
+            return Ok(());
+        }
         if current.renamed {
             self.record.entry.title = current.entry.title;
             self.record.renamed = true;
@@ -308,7 +394,16 @@ impl HistoryWriter {
             self.record.entry.message_count += 1;
         }
         self.record.entry.updated_at = event.at.clone();
-        self.record.entry.model = view.model.clone();
+        if let AgentEventKind::ConfigOptions { options } = &event.event {
+            if let Some(option) = options
+                .iter()
+                .find(|o| o.category.as_deref() == Some("model") || o.id == "model")
+            {
+                self.record.entry.model = Some(option.value.clone());
+            }
+        } else if self.record.entry.model.is_none() {
+            self.record.entry.model = view.model.clone();
+        }
         self.record.entry.effort = view.effort.clone();
         serde_json::to_writer(&mut self.file, event)?;
         self.file.write_all(b"\n")?;

@@ -4,6 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex, OnceLock};
+use tokio::sync::OnceCell;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -36,18 +37,22 @@ struct SessionContext {
 #[derive(Clone)]
 pub struct JamServer {
     store: Arc<Store>,
-    session_store: Arc<OnceLock<Arc<Store>>>,
+    session_store: Arc<OnceCell<ProjectBinding>>,
     session_identity: Arc<OnceLock<(String, String)>>,
     project_hint: Option<String>,
     agent_name: Option<String>,
     recent: RecentCalls,
     report_stdio: bool,
 }
+struct ProjectBinding {
+    store: Arc<Store>,
+    selector: Option<String>,
+}
 impl JamServer {
     pub fn new(store: Arc<Store>, agent_name: Option<String>, recent: RecentCalls) -> Self {
         Self {
             store,
-            session_store: Arc::new(OnceLock::new()),
+            session_store: Arc::new(OnceCell::new()),
             session_identity: Arc::new(OnceLock::new()),
             project_hint: None,
             agent_name,
@@ -60,11 +65,12 @@ impl JamServer {
         self
     }
     fn session_store(&self) -> jam_core::Result<Arc<Store>> {
-        self.session_store.get().cloned().ok_or_else(|| {
-            jam_core::Error::Forbidden(
-                "Initialize this session with a project before making calls".into(),
-            )
-        })
+        self.session_store
+            .get()
+            .map(|b| b.store.clone())
+            .ok_or_else(|| {
+                jam_core::Error::Forbidden("This session has not bound a project".into())
+            })
     }
     async fn bind_project(&self, ctx: &RequestContext<RoleServer>) -> Result<(), ErrorData> {
         let header = ctx
@@ -73,32 +79,60 @@ impl JamServer {
             .and_then(|parts| parts.headers.get("X-Jam-Project"))
             .and_then(|v| v.to_str().ok())
             .map(str::to_owned);
-        let requested = header.or_else(|| self.project_hint.clone());
-        let base = self.store.clone();
-        let scoped = tokio::task::spawn_blocking(move || {
-            let selected = requested
-                .map(Ok)
-                .unwrap_or_else(|| base.active_jam().map(|j| j.id))?;
-            base.for_project(&selected).map(Arc::new)
-        })
-        .await
-        .map_err(internal)?
-        .map_err(|e| {
-            ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
-        })?;
-        if let Some(existing) = self.session_store.get() {
-            if existing.bound_project_id().map_err(internal)?
-                != scoped.bound_project_id().map_err(internal)?
+        let requested = header.clone().or_else(|| self.project_hint.clone());
+        // Inline clients may begin with any request and send concurrent lists.
+        // Resolve the active project only once, even if the desktop later switches.
+        let binding = self
+            .session_store
+            .get_or_try_init(|| async {
+                let base = self.store.clone();
+                let selector = requested.clone();
+                let scoped = tokio::task::spawn_blocking(move || {
+                    let selected = selector
+                        .map(Ok)
+                        .unwrap_or_else(|| base.active_jam().map(|j| j.id))?;
+                    base.for_project(&selected).map(Arc::new)
+                })
+                .await
+                .map_err(internal)?
+                .map_err(|e| {
+                    ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
+                })?;
+                let _ = self.session_identity.set(self.identity(ctx));
+                Ok::<_, ErrorData>(ProjectBinding {
+                    store: scoped,
+                    selector: requested.clone(),
+                })
+            })
+            .await?;
+        // An explicit subsequent selector must still address the captured project.
+        if let Some(requested) = header {
+            let bound = binding.store.bound_project_id().map_err(internal)?;
+            if bound.as_deref() == Some(requested.as_str())
+                || binding.selector.as_deref() == Some(requested.as_str())
             {
+                return Ok(());
+            }
+            let base = self.store.clone();
+            let selected = tokio::task::spawn_blocking(move || {
+                base.list_projects(true).map(|projects| {
+                    projects
+                        .into_iter()
+                        .find(|p| p.jam.id == requested || p.jam.key_prefix == requested)
+                        .map(|p| p.jam.id)
+                })
+            })
+            .await
+            .map_err(internal)?
+            .map_err(|e| {
+                ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
+            })?;
+            if selected != bound {
                 return Err(ErrorData::invalid_params(
                     "This session is already bound. Reconnect to change projects.",
                     None,
                 ));
             }
-        } else {
-            self.session_store
-                .set(scoped)
-                .map_err(|_| ErrorData::internal_error("Session binding raced", None))?;
         }
         Ok(())
     }
@@ -111,16 +145,17 @@ impl JamServer {
             return identity.clone();
         }
         let info = ctx
-            .client_info()
-            .map(|i| i.name)
-            .unwrap_or_else(|| "Agent".into());
-        let lower = info.to_lowercase();
+            .peer
+            .peer_info()
+            .map(|i| i.client_info.name.clone())
+            .or_else(|| ctx.meta.client_info().map(|i| i.name));
+        let lower = info.as_deref().unwrap_or_default().to_lowercase();
         let (client, default) = if lower.contains("codex") {
             ("codex", "Codex")
         } else if lower.contains("claude") {
             ("claude-code", "Claude")
         } else {
-            ("other", info.as_str())
+            ("other", info.as_deref().unwrap_or("Agent"))
         };
         let header = ctx
             .extensions
@@ -131,11 +166,13 @@ impl JamServer {
         (
             header
                 .or_else(|| self.agent_name.clone())
-                .unwrap_or_else(|| default.into()),
+                .or_else(|| info.as_ref().map(|_| default.into()))
+                .unwrap_or_else(|| "Agent".into()),
             client.into(),
         )
     }
     async fn heartbeat(&self, ctx: &RequestContext<RoleServer>) -> Result<Member, ErrorData> {
+        self.bind_project(ctx).await?;
         let (name, client) = self.identity(ctx);
         let store = self.session_store().map_err(internal)?;
         tokio::task::spawn_blocking(move || store.identify_agent(&name, &client))
@@ -448,13 +485,26 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, ErrorData> {
         ctx.peer.set_peer_info(request.clone());
-        self.bind_project(&ctx).await?;
-        let _ = self.session_identity.set(self.identity(&ctx));
         self.heartbeat(&ctx).await?;
         self.negotiate_initialize(&request)
     }
+    async fn discover(&self, ctx: RequestContext<RoleServer>) -> Result<DiscoverResult, ErrorData> {
+        self.heartbeat(&ctx).await?;
+        Ok(DiscoverResult::from_server_info(
+            self.supported_protocol_versions().into_owned(),
+            self.get_info(),
+        ))
+    }
+    async fn complete(
+        &self,
+        _: CompleteRequestParams,
+        ctx: RequestContext<RoleServer>,
+    ) -> Result<CompleteResult, ErrorData> {
+        self.heartbeat(&ctx).await?;
+        Ok(CompleteResult::default())
+    }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project at initialization; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project on its first request; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -472,6 +522,7 @@ impl ServerHandler for JamServer {
         request: CallToolRequestParams,
         ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
+        self.bind_project(&ctx).await?;
         let (name, client) = self.identity(&ctx);
         let this = self.clone();
         let tool_name = request.name.to_string();
