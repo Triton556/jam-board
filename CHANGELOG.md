@@ -5,6 +5,12 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.44] - 2026-10-28
+
+Board tools bind the intended project for agents; terminal startup, session history
+and launch logs make connection state and recovery clearer. Live-provider checks
+and confirmation of the original terminal rendering symptoms remain owner-only.
+
 ### Added
 
 - History has its own tab with Chat and Terminal views, provider and model
@@ -28,6 +34,8 @@ All notable changes to Jam Board are documented here. The format follows
 
 ### Fixed
 
+- Polish viewport-safe menus, keyboard focus, reasons on disabled actions, progress
+  states and motion, including reduced-motion behavior.
 - Board MCP discovery and calls bind the intended project and agent identity on
   both initialized and discovery-first connections.
 - Agent and MCP credentials are passed through environment variables rather
