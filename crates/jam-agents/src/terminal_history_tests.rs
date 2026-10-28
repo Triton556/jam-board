@@ -7,13 +7,17 @@ mod integration;
 
 fn fixture_session(status: SessionStatus) -> Arc<crate::session::Session> {
     let mut s = session(status);
-    let root = std::path::absolute(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-visuals/round7/b1-terminal-history/fixtures")
-            .join(ulid::Ulid::generate().to_string()),
-    )
-    .unwrap();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-visuals/round7/b1-terminal-history/fixtures")
+        .join(ulid::Ulid::generate().to_string());
     fs::create_dir_all(&root).unwrap();
+    // The fake CLI encodes process.cwd() in the transcript path. Keep the
+    // fixture's stored cwd identical rather than retaining Unix `..` segments.
+    let root = if cfg!(windows) {
+        std::path::absolute(root).unwrap()
+    } else {
+        root.canonicalize().unwrap()
+    };
     let mutable = Arc::get_mut(&mut s).unwrap();
     mutable.board.data_dir = root.clone();
     mutable.board.sidecar_path = root.join("fake-sidecar");

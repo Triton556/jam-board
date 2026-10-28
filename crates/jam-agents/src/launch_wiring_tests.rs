@@ -6,7 +6,13 @@ pub(super) fn scratch() -> PathBuf {
         .join("../../test-visuals/round7/a2-launch-wiring")
         .join(ulid::Ulid::generate().to_string());
     std::fs::create_dir_all(&dir).unwrap();
-    std::path::absolute(dir).unwrap()
+    // Match the OS/Node child cwd: Unix absolute() retains `..`, while Windows
+    // canonicalize() adds a verbatim prefix that the CLI does not retain.
+    if cfg!(windows) {
+        std::path::absolute(dir).unwrap()
+    } else {
+        dir.canonicalize().unwrap()
+    }
 }
 
 /// A process test may invoke only the explicitly resolved Node interpreter and

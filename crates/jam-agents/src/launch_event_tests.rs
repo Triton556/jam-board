@@ -606,9 +606,9 @@ fn fake_profile(
     );
     let fake = root.join("scripted-adapter.cjs");
     std::fs::write(&fake, script).unwrap();
-    let fake = fake.canonicalize().unwrap();
+    let canonical_fake = fake.canonicalize().unwrap();
     assert!(
-        fake.starts_with(
+        canonical_fake.starts_with(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../test-visuals/round7/b2-launch-events")
                 .canonicalize()
@@ -618,7 +618,14 @@ fn fake_profile(
     let mut profile = manager.profiles.get(family).unwrap();
     profile.id = format!("b2-fixture-{family}");
     profile.command = node.to_string_lossy().into_owned();
-    profile.args = vec![fake.to_string_lossy().into_owned()];
+    // Node's Windows module loader rejects verbatim-prefixed script paths on
+    // hosted runners. Launch the ordinary absolute path, still checked below.
+    profile.args = vec![
+        std::path::absolute(&fake)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+    ];
     profile.env = vec![
         Env {
             name: "PATH".into(),
@@ -639,7 +646,10 @@ fn fake_profile(
     ];
     let (resolved, args) = profile.launch_command().unwrap();
     assert_eq!(resolved.canonicalize().unwrap(), node);
-    assert_eq!(std::path::Path::new(&args[0]).canonicalize().unwrap(), fake);
+    assert_eq!(
+        std::path::Path::new(&args[0]).canonicalize().unwrap(),
+        canonical_fake
+    );
     profile
 }
 
