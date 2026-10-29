@@ -40,6 +40,7 @@ export function BrainProviderError({
   switchModel,
   restart,
   connections,
+  showLogs,
 }: {
   event: ProviderErrorEvent;
   active?: boolean;
@@ -48,6 +49,7 @@ export function BrainProviderError({
   switchModel?: () => void;
   restart?: () => Promise<void>;
   connections?: () => void;
+  showLogs?: () => void;
 }) {
   const seconds = useRetrySeconds(
     event.at,
@@ -63,7 +65,8 @@ export function BrainProviderError({
       mounted.current = false;
     };
   }, []);
-  const title = providerErrorTitle(event);
+  const startupTimeout = event.message.includes("chat didn't start in time");
+  const title = startupTimeout ? event.message : providerErrorTitle(event);
   const limit = usageLimit(event);
   if (!active)
     return (
@@ -80,6 +83,30 @@ export function BrainProviderError({
         <pre>{[event.message, event.detail].filter(Boolean).join("\n\n")}</pre>
       </details>
       <div className="button-row">
+        {startupTimeout && (
+          <>
+            <Button
+              variant="primary"
+              disabled={issued || !restart}
+              onClick={async () => {
+                if (lock.current || !restart) return;
+                lock.current = true;
+                setIssued(true);
+                try {
+                  await restart();
+                } catch (e) {
+                  if (mounted.current) setError(String(e));
+                } finally {
+                  lock.current = false;
+                  if (mounted.current) setIssued(false);
+                }
+              }}
+            >
+              Retry
+            </Button>
+            {showLogs && <Button onClick={showLogs}>Show logs</Button>}
+          </>
+        )}
         {!limit && (event.retryable === true || failedTurn) && (
           <Button
             variant="primary"
@@ -119,7 +146,7 @@ export function BrainProviderError({
               Switch model
             </Button>
           )}
-        {!limit && !failedTurn && restart && (
+        {!limit && !startupTimeout && !failedTurn && restart && (
           <Button onClick={() => void restart()}>Restart session</Button>
         )}
         {(limit || !failedTurn) && connections && (

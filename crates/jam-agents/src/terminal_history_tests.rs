@@ -8,7 +8,7 @@ mod integration;
 fn fixture_session(status: SessionStatus) -> Arc<crate::session::Session> {
     let mut s = session(status);
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-visuals/round7/b1-terminal-history/fixtures")
+        .join("../../test-visuals/round8/r8h-terminal-history/fixtures")
         .join(ulid::Ulid::generate().to_string());
     fs::create_dir_all(&root).unwrap();
     // The fake CLI encodes process.cwd() in the transcript path. Keep the
@@ -73,13 +73,7 @@ fn claude_path(record: &StoredHistory, root: &std::path::Path) -> PathBuf {
     let project: String = record
         .cwd
         .chars()
-        .map(|c| {
-            if matches!(c, ':' | '\\' | '/') {
-                '-'
-            } else {
-                c
-            }
-        })
+        .map(|c| if !c.is_ascii_alphanumeric() { '-' } else { c })
         .collect();
     root.join("projects")
         .join(project)
@@ -103,6 +97,111 @@ fn codex_rows(id: &str, cwd: &str, at: &str) -> Vec<Value> {
         json!({"type":"response_item","timestamp":"2026-10-28T02:00:05Z","payload":{"type":"message","id":"a1","role":"assistant","content":[{"type":"output_text","text":"Fixture reply"}]}}),
         json!({"type":"turn_context","timestamp":"2026-10-28T02:00:06Z","payload":{"model":"codex-fixture-last"}}),
     ]
+}
+
+#[test]
+fn r8h_claude_windows_slugs_relink_alpha44_empty_history_on_load_and_recovery() {
+    for cwd in [
+        r"C:\work\dotted.project\under_score",
+        r"C:\Users\Example\AppData\Roaming\dev.triton556.jamboard\agent-workspace\01M62WYWJVWKHMPN28EVCH660A",
+    ] {
+        let (_s, store, mut record, root) = fixture("claude");
+        record.cwd = cwd.into();
+        let path = claude_path(&record, &root);
+        drop(store.create(record).unwrap());
+        assert!(store.load("session-a").unwrap().entry.empty);
+        write_jsonl(&path, claude_rows());
+        let bytes = fs::read(&path).unwrap();
+        let entries = store.list(None, None).unwrap();
+        assert!(!entries[0].empty);
+        assert_eq!(entries[0].resumable, Resumable::Native);
+        let mut old = store.load("session-a").unwrap();
+        old.entry.empty = true;
+        old.entry.resumable = Resumable::None;
+        old.terminal.as_mut().unwrap().transcript_path = None;
+        drop(store.create(old).unwrap());
+        HistoryStore::recover_all(
+            store.dir.parent().unwrap().parent().unwrap(),
+            store.enabled.clone(),
+            store.lock.clone(),
+        );
+        assert!(!store.load("session-a").unwrap().entry.empty);
+        assert_eq!(fs::read(path).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn r8h_claude_fallback_matches_only_exact_session_filename() {
+    let (_s, store, mut record, root) = fixture("claude");
+    record.cwd = r"C:\different.cwd\under_score".into();
+    // A stale cached path must also fall back after a CLI transcript move.
+    record.terminal.as_mut().unwrap().transcript_path = Some(root.join("missing.jsonl"));
+    write_jsonl(
+        &root.join("projects/wrong/another-session.jsonl"),
+        claude_rows(),
+    );
+    write_jsonl(
+        &root.join("projects/wrong/fixture-claude-id.jsonl.bak"),
+        claude_rows(),
+    );
+    drop(store.create(record).unwrap());
+    assert!(store.list(None, None).unwrap()[0].empty);
+    let expected = root.join("projects/canonical-cwd/fixture-claude-id.jsonl");
+    write_jsonl(&expected, claude_rows());
+    assert!(!store.list(None, None).unwrap()[0].empty);
+    assert_eq!(
+        store
+            .load("session-a")
+            .unwrap()
+            .terminal
+            .unwrap()
+            .transcript_path,
+        Some(expected)
+    );
+}
+
+#[test]
+fn r8h_claude_long_path_uses_installed_cli_hash() {
+    let (_s, store, mut record, root) = fixture("claude");
+    record.cwd = format!("C:\\{}", "a".repeat(210));
+    // Independently evaluated from installed vpe / bD, not the Rust slug helper.
+    let slug = format!("C--{}-6d38w5", "a".repeat(197));
+    let expected = root
+        .join("projects")
+        .join(slug)
+        .join("fixture-claude-id.jsonl");
+    write_jsonl(&expected, claude_rows());
+    drop(store.create(record).unwrap());
+    assert!(!store.list(None, None).unwrap()[0].empty);
+    assert_eq!(
+        store
+            .load("session-a")
+            .unwrap()
+            .terminal
+            .unwrap()
+            .transcript_path,
+        Some(expected)
+    );
+}
+
+#[test]
+fn r8h_codex_rollout_cwd_handles_case_verbatim_slashes_and_trailing_separators() {
+    for cwd in [
+        r"\\?\f:\WORK\sample-project\",
+        "f:/work/SAMPLE-project/",
+        r"F:\work\sample-project",
+    ] {
+        let (_s, store, mut record, root) = fixture("codex");
+        record.cwd = r"F:\work\sample-project".into();
+        write_jsonl(
+            &root.join("sessions/2026/10/28/rollout-variant.jsonl"),
+            codex_rows("variant-id", cwd, "2026-10-28T02:00:01Z"),
+        );
+        drop(store.create(record).unwrap());
+        let entry = store.list(None, None).unwrap().remove(0);
+        assert_eq!(entry.agent_session_id.as_deref(), Some("variant-id"));
+        assert_eq!(entry.resumable, Resumable::Native);
+    }
 }
 
 #[test]

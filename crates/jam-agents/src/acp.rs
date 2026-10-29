@@ -16,6 +16,95 @@ use tokio_util::{
 };
 use tracing::instrument::WithSubscriber;
 
+// Observe a complete JSON-RPC message without delaying or changing the wire stream.
+struct StartupReader<R> {
+    reader: R,
+    traffic: Option<tokio::sync::watch::Sender<bool>>,
+    session: Arc<Session>,
+    pending: Vec<u8>,
+}
+impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for StartupReader<R> {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let before = buf.filled().len();
+        let result = std::pin::Pin::new(&mut self.reader).poll_read(cx, buf);
+        let mut protocol_message = false;
+        if self.traffic.is_some() {
+            for byte in &buf.filled()[before..] {
+                if *byte == b'\n' {
+                    protocol_message |= serde_json::from_slice::<Value>(&self.pending)
+                        .ok()
+                        .is_some_and(|v| {
+                            v["jsonrpc"] == "2.0"
+                                && (v.get("method").is_some() || v.get("id").is_some())
+                        });
+                    self.pending.clear();
+                } else if self.pending.len() < 1024 * 1024 {
+                    self.pending.push(*byte);
+                }
+            }
+        }
+        if protocol_message && let Some(tx) = self.traffic.take() {
+            self.pending.clear();
+            self.session
+                .launch_step("adapter", LaunchStepState::Ok, "Chat adapter responded");
+            self.session.launch_step(
+                "initialize",
+                LaunchStepState::Running,
+                "Connecting to chat adapter",
+            );
+            let _ = tx.send(true);
+        }
+        result
+    }
+}
+fn package_launcher(executable: &std::path::Path, args: &[String]) -> bool {
+    let name = executable
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    matches!(name.as_str(), "npx" | "pnpx" | "bunx")
+        || (matches!(name.as_str(), "npm" | "pnpm" | "yarn" | "bun")
+            && args
+                .iter()
+                .any(|a| matches!(a.as_str(), "exec" | "dlx" | "x")))
+}
+fn startup_timeout_message(connection: &str, download: bool) -> String {
+    if download {
+        format!(
+            "{connection} chat didn't start in time. The first launch downloads its chat adapter, which can take a few minutes. Try again; if it keeps failing, open Logs."
+        )
+    } else {
+        format!(
+            "{connection} chat didn't start in time. Try again; if it keeps failing, open Logs."
+        )
+    }
+}
+async fn wait_for_startup<T>(
+    ready: oneshot::Receiver<T>,
+    mut traffic: tokio::sync::watch::Receiver<bool>,
+    preparing: bool,
+    adapter_budget: Duration,
+    initialize_budget: Duration,
+) -> std::result::Result<std::result::Result<T, oneshot::error::RecvError>, ()> {
+    let deadline = tokio::time::sleep(if preparing {
+        adapter_budget
+    } else {
+        initialize_budget
+    });
+    tokio::pin!(deadline);
+    tokio::pin!(ready);
+    tokio::select! {
+        result = &mut ready => Ok(result),
+        _ = &mut deadline => Err(()),
+        _ = async { let _ = traffic.wait_for(|seen| *seen).await; } => tokio::time::timeout(initialize_budget, ready).await.map_err(|_| ()),
+    }
+}
+
 struct AcpConnector {
     tx: mpsc::UnboundedSender<Control>,
     stop: CancellationToken,
@@ -60,7 +149,18 @@ pub(crate) async fn start(
     args: Vec<String>,
     env: Vec<Env>,
     entries: Vec<McpEntry>,
+    connection: String,
 ) -> Result<()> {
+    let preparing = package_launcher(&executable, &args);
+    session.launch_step(
+        "adapter",
+        LaunchStepState::Running,
+        if preparing {
+            format!("Preparing {connection} chat adapter (first launch may download it)…")
+        } else {
+            format!("Starting {connection} chat adapter…")
+        },
+    );
     let mut command = tokio::process::Command::new(&executable);
     command
         .args(args)
@@ -76,11 +176,11 @@ pub(crate) async fn start(
     command.process_group(0);
     let mut child = command
         .spawn()
-        .map_err(|_| err("Cannot launch ACP agent executable"))?;
+        .map_err(|_| err(format!("Cannot launch {connection} chat adapter")))?;
     session.launch_step(
         "start_process",
         LaunchStepState::Ok,
-        "ACP adapter process started",
+        "Chat adapter process started",
     );
     let pid = child
         .id()
@@ -93,9 +193,16 @@ pub(crate) async fn start(
             return Err(e);
         }
     };
+    let (traffic_tx, traffic_rx) = tokio::sync::watch::channel(false);
     let transport = sdk::ByteStreams::new(
         child.stdin.take().expect("stdin").compat_write(),
-        child.stdout.take().expect("stdout").compat(),
+        StartupReader {
+            reader: child.stdout.take().expect("stdout"),
+            traffic: Some(traffic_tx),
+            session: session.clone(),
+            pending: Vec::new(),
+        }
+        .compat(),
     );
     let stderr = child.stderr.take().expect("stderr");
     let (tx, rx) = mpsc::unbounded_channel();
@@ -143,7 +250,7 @@ pub(crate) async fn start(
             None => session.status(SessionStatus::Stopped, None),
             Some(Ok(())) => session.status(SessionStatus::Stopped, None),
             Some(Err(e)) => session.fail(
-                "ACP agent disconnected",
+                "Chat connection disconnected",
                 Some(format!(
                     "{}\n{}",
                     session.redact(&e.to_string()),
@@ -154,7 +261,15 @@ pub(crate) async fn start(
         let _ = done_tx.send(true);
         session.finished.cancel();
     });
-    match tokio::time::timeout(Duration::from_secs(60), ready_rx).await {
+    match wait_for_startup(
+        ready_rx,
+        traffic_rx,
+        preparing,
+        Duration::from_secs(180),
+        Duration::from_secs(60),
+    )
+    .await
+    {
         Ok(Ok(r)) => r,
         Ok(Err(_)) => {
             let _ = startup_done.wait_for(|v| *v).await;
@@ -175,12 +290,14 @@ pub(crate) async fn start(
             Err(err(detail))
         }
         Err(_) => {
-            startup_session.fail("ACP agent initialization timed out", None);
+            let message = startup_timeout_message(&connection, preparing);
+            startup_session.fail(
+                &message,
+                Some("ACP initialize/session readiness deadline exceeded".into()),
+            );
             stop.cancel();
             let _ = startup_done.wait_for(|v| *v).await;
-            Err(err(
-                "ACP agent did not initialize; check the agent installation and login",
-            ))
+            Err(err(message))
         }
     }
 }
@@ -238,6 +355,32 @@ async fn read_adapter_stderr(
 fn record_stderr(session: &Session, line: String, tail: &std::sync::Mutex<String>) {
     let line = crate::wiring::launch_config::redact_diagnostic(&session.redact(&line));
     session.adapter_log(&line);
+    let lower = line.to_ascii_lowercase();
+    let downloading = [
+        "npm http fetch",
+        "npm warn exec",
+        "npm info",
+        "npm notice",
+        "downloading",
+        "fetch manifest",
+    ]
+    .iter()
+    .any(|s| lower.contains(s));
+    if downloading
+        && session
+            .inner
+            .lock()
+            .expect("session lock")
+            .launch_steps
+            .get("adapter")
+            .is_some_and(|s| s.state == LaunchStepState::Running)
+    {
+        session.launch_step(
+            "adapter",
+            LaunchStepState::Running,
+            "Downloading chat adapter packages; first launch may take a few minutes…",
+        );
+    }
     tracing::debug!(session_id = %session.view().id, stderr = %line, "ACP stderr");
     let mut tail = tail.lock().expect("stderr tail");
     tail.push_str(&line);
@@ -327,7 +470,9 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             Ok(())
         }, sdk::on_receive_notification!())
         .connect_with(transport, async move |cx: sdk::ConnectionTo<sdk::Agent>| {
-            session.launch_step("initialize", LaunchStepState::Running, "ACP initialize");
+            if !session.inner.lock().expect("session lock").launch_steps.contains_key("adapter") {
+                session.launch_step("initialize", LaunchStepState::Running, "Connecting to chat adapter");
+            }
             let init = cx
                 .send_request(
                     a::InitializeRequest::new(ProtocolVersion::V1)
@@ -346,13 +491,13 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                 )
                 .block_task()
                 .await.inspect_err(|e| {
-                    session.launch_step("initialize", LaunchStepState::Failed, e.to_string());
+                    session.launch_step("initialize", LaunchStepState::Failed, "Chat adapter initialization failed; see Logs");
                     crate::provider_errors::emit_failure(&session, crate::provider_errors::acp_failure(e));
                 })?;
             if init.protocol_version != ProtocolVersion::V1 {
                 return Err(sdk::Error::invalid_params().data("Unsupported ACP protocol version"));
             }
-            session.launch_step("initialize", LaunchStepState::Ok, "ACP initialized");
+            session.launch_step("initialize", LaunchStepState::Ok, "Chat adapter initialized");
             let prompt_caps = &init.agent_capabilities.prompt_capabilities;
             session
                 .inner
@@ -377,7 +522,7 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             let native_id = session.inner.lock().expect("session lock").resume_native_id.clone();
             let supported = init.agent_capabilities.load_session;
             let meta = session.inner.lock().expect("session lock").launch_meta.as_ref().and_then(|m| m.as_object().cloned());
-            session.launch_step("session", LaunchStepState::Running, if native_id.is_some() { "ACP session/load" } else { "ACP session/new" });
+            session.launch_step("session", LaunchStepState::Running, if native_id.is_some() { "Restoring chat session" } else { "Creating chat session" });
             let (id, new) = if let Some(id) = native_id {
                 if !supported { return Err(sdk::Error::invalid_params().data("Agent no longer supports session/load")); }
                 let loaded = cx.send_request(a::LoadSessionRequest::new(id.clone(), PathBuf::from(&session.view().cwd)).mcp_servers(servers).meta(meta)).block_task().await.inspect_err(|e| report_setup_error(&session, e))?;
@@ -390,7 +535,8 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
                 let new = cx.send_request(a::NewSessionRequest::new(PathBuf::from(&session.view().cwd)).mcp_servers(servers).meta(meta)).block_task().await.inspect_err(|e| report_setup_error(&session, e))?;
                 (new.session_id.clone(), new)
             };
-            session.launch_step("session", LaunchStepState::Ok, "ACP session established");
+            session.launch_step("session", LaunchStepState::Ok, "Chat session established");
+            session.inner.lock().expect("session lock").resume_native_id = Some(id.to_string());
             if let Some(writer) = session.history_writer.lock().expect("history writer lock").as_mut() {
                 writer.native(id.to_string(), supported).map_err(sdk::Error::into_internal_error)?;
             }
@@ -641,11 +787,29 @@ fn prepare_input(
         return Err(err("A prompt must contain at least one content part"));
     }
     crate::attachments::validate(&inner, &content)?;
+    // Adapters recognize /usage only as one text block. A board preamble would
+    // turn this local command into ordinary model input. Keep first-prompt
+    // context pending for the next real prompt, including after command retry.
+    let usage_command = inner.view.kind == RuntimeKind::Acp
+        && matches!(content.as_slice(), [PromptPart::Text { text }] if text == "/usage")
+        && inner
+            .events
+            .iter()
+            .rev()
+            .find_map(|e| match &e.event {
+                AgentEventKind::AvailableCommands { commands } => {
+                    Some(commands.iter().any(|c| c.name == "usage"))
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
     let mut blocks = Vec::new();
     let preamble = captured
         .as_ref()
         .map(|p| p.preamble.clone())
-        .unwrap_or_else(|| inner.first_prompt.then(|| session.board.preamble()));
+        .unwrap_or_else(|| {
+            (inner.first_prompt && !usage_command).then(|| session.board.preamble())
+        });
     if let Some(preamble) = &preamble {
         blocks.push(json!({"type":"text","text":preamble}));
     }
@@ -679,7 +843,9 @@ fn prepare_input(
         preamble: preamble.clone(),
     });
     inner.last_turn_failed = false;
-    inner.first_prompt = false;
+    if !usage_command {
+        inner.first_prompt = false;
+    }
     inner.message_id = None;
     inner.cancelling = false;
     inner.view.status = SessionStatus::Running;
@@ -944,7 +1110,18 @@ pub(crate) fn map_update(session: &Session, v: Value) {
             }
             return;
         }
-        "usage_update" => return,
+        "usage_update" => {
+            let (Some(used), Some(size)) = (v["used"].as_u64(), v["size"].as_u64()) else {
+                return;
+            };
+            AgentEventKind::Usage {
+                used,
+                size,
+                cost: serde_json::from_value::<UsageCost>(v["cost"].clone())
+                    .ok()
+                    .filter(|c| c.amount.is_finite() && c.amount >= 0.0),
+            }
+        }
         // Unadvertised extension updates have no matching dock surface.
         _ => return,
     };

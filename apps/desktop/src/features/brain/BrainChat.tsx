@@ -39,8 +39,14 @@ import {
   attachmentRefusal,
   TranscriptAttachment,
 } from "./BrainAttachments";
+import { BrainLaunchLogs } from "./BrainLaunchLogs";
 import { BrainProviderError, BrainRetryStatus } from "./BrainProviderError";
-import { SessionControls, useModelCatalog } from "./BrainSessionControls";
+import {
+  BrainSessionStatus,
+  BrainStatusChip,
+  SessionControls,
+  useModelCatalog,
+} from "./BrainSessionControls";
 import { BrainVoiceInput } from "./BrainVoiceInput";
 import { profilesQuery } from "./brain-profiles";
 import { activeRetry, latestTurnError } from "./brain-retry";
@@ -391,6 +397,8 @@ export function BrainChat({
   const [limit, setLimit] = useState(350);
   const [streamingSeq, setStreamingSeq] = useState<number | null>(null);
   const [modelRequest, setModelRequest] = useState(0);
+  const [status, setStatus] = useState<"status" | "usage" | null>(null);
+  const [logs, setLogs] = useState(false);
   const failed = latestTurnError(events);
   const modelOffered = sessionOptions(events).some(
     (option) => optionCategory(option) === "model",
@@ -447,9 +455,12 @@ export function BrainChat({
       "config_options",
       "auth",
       "retrying",
+      "usage",
+      "plan_usage",
     ].includes(event.kind);
   });
   useLayoutEffect(() => {
+    if (logs) return;
     const user = events.filter((event) => event.kind === "user_message").at(-1);
     if (user && lastUser.current !== user.seq) {
       lastUser.current = user.seq;
@@ -459,9 +470,9 @@ export function BrainChat({
       scroller.current.scrollTop = scroller.current.scrollHeight;
       setJump(false);
     } else setJump(true);
-  }, [events]);
+  }, [events, logs]);
   useEffect(() => {
-    if (!content.current || !scroller.current) return;
+    if (logs || !content.current || !scroller.current) return;
     const observer = new ResizeObserver(() => {
       if (pinned.current && scroller.current)
         scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -470,9 +481,34 @@ export function BrainChat({
     observer.observe(content.current);
     observer.observe(scroller.current);
     return () => observer.disconnect();
-  }, []);
+  }, [logs]);
+  if (logs)
+    return (
+      <BrainLaunchLogs
+        sessionId={session.id}
+        title={session.title}
+        events={events}
+        close={() => setLogs(false)}
+      />
+    );
   return (
     <>
+      <header className="brain-session-controls brain-chat-status-header">
+        <div className="brain-control-anchor">
+          <BrainStatusChip
+            events={events}
+            open={() => setStatus(status ? null : "status")}
+          />
+          {status && (
+            <BrainSessionStatus
+              session={session}
+              events={events}
+              usageFocus={status === "usage"}
+              close={() => setStatus(null)}
+            />
+          )}
+        </div>
+      </header>
       <div
         className="brain-transcript"
         ref={scroller}
@@ -709,6 +745,7 @@ export function BrainChat({
                   }
                   restart={restart}
                   connections={connections}
+                  showLogs={() => setLogs(true)}
                 />
               );
             return null;
@@ -735,6 +772,7 @@ export function BrainChat({
         restart={restart}
         focusEpoch={focusEpoch}
         modelRequest={modelRequest}
+        showSessionStatus={(usage) => setStatus(usage ? "usage" : "status")}
       />
     </>
   );
@@ -745,12 +783,14 @@ export function BrainComposer({
   restart,
   focusEpoch = 0,
   modelRequest = 0,
+  showSessionStatus,
 }: {
   session: AgentSessionView;
   events: AgentDockEvent[];
   restart(): Promise<void>;
   focusEpoch?: number;
   modelRequest?: number;
+  showSessionStatus?(usage: boolean): void;
 }) {
   const tasks = useQuery(tasksQuery);
   const epics = useQuery(epicsQuery);
@@ -902,6 +942,10 @@ export function BrainComposer({
         e.kind === "available_commands",
     )
     .at(-1);
+  const advertisedUsage =
+    session.kind === "acp" &&
+    draft.text.trim() === "/usage" &&
+    commandEvent?.commands.some((c) => c.name === "usage");
   const options = sessionOptions(events);
   const matchingCommands = commandEvent?.commands.filter((command) =>
     command.name.includes(draft.text.slice(1)),
@@ -942,28 +986,50 @@ export function BrainComposer({
     }
   }, [draft.text]);
   const send = async () => {
+    const command = /^\/(\S+)/.exec(draft.text.trim())?.[1];
+    if (command && session.kind === "acp") {
+      if (
+        (command === "status" || (command === "usage" && !advertisedUsage)) &&
+        showSessionStatus
+      ) {
+        showSessionStatus(command === "usage");
+        updateDraft({ text: "" });
+        setPicker(null);
+        setError("");
+        return;
+      }
+      if (!commandEvent?.commands.some((c) => c.name === command)) {
+        setError(
+          `/${command} isn't available in chat — use Session status, or open a Terminal for ${connectionAccessKind(profile) === "codex" ? "Codex" : connectionAccessKind(profile) === "claude" ? "Claude Code" : "the agent"}'s built-in commands.`,
+        );
+        setPicker(null);
+        return;
+      }
+    }
     if (
       lock.current ||
       voiceActive ||
       running ||
       session.status !== "ready" ||
       (!draft.text.trim() && !attachments.length && !context.length) ||
-      blockedAttachments
+      (blockedAttachments && !advertisedUsage)
     )
       return;
     lock.current = true;
     setPending(true);
     setError("");
     const text = draft.text;
-    const content: PromptPart[] = [
-      ...context,
-      ...attachments.flatMap((a) =>
-        a.view
-          ? [{ type: "attachment" as const, attachmentId: a.view.id }]
-          : [],
-      ),
-      ...(text.trim() ? [{ type: "text" as const, text }] : []),
-    ];
+    const content: PromptPart[] = advertisedUsage
+      ? [{ type: "text", text: "/usage" }]
+      : [
+          ...context,
+          ...attachments.flatMap((a) =>
+            a.view
+              ? [{ type: "attachment" as const, attachmentId: a.view.id }]
+              : [],
+          ),
+          ...(text.trim() ? [{ type: "text" as const, text }] : []),
+        ];
     try {
       await agentDockApi.sendPrompt({ sessionId: session.id, content });
       // Do not erase text typed while the send was in flight.
@@ -973,13 +1039,16 @@ export function BrainComposer({
           [key]: {
             text:
               s.drafts[key]?.text === text ? "" : (s.drafts[key]?.text ?? ""),
-            context:
-              s.drafts[key]?.context.filter(
-                (item) => !context.some((sent) => sent.uri === item.uri),
-              ) ?? [],
-            attachments: s.drafts[key]?.attachments?.filter(
-              (a) => !attachments.some((sent) => sent.id === a.id),
-            ),
+            context: advertisedUsage
+              ? (s.drafts[key]?.context ?? [])
+              : (s.drafts[key]?.context.filter(
+                  (item) => !context.some((sent) => sent.uri === item.uri),
+                ) ?? []),
+            attachments: advertisedUsage
+              ? s.drafts[key]?.attachments
+              : s.drafts[key]?.attachments?.filter(
+                  (a) => !attachments.some((sent) => sent.id === a.id),
+                ),
           },
         },
       }));
@@ -1091,6 +1160,7 @@ export function BrainComposer({
         value={draft.text}
         rows={2}
         onChange={(e) => {
+          setError("");
           updateDraft({ text: e.target.value });
           setPicker(
             /@[^@\n]*$/.test(e.target.value)
@@ -1113,7 +1183,7 @@ export function BrainComposer({
             e.nativeEvent.keyCode !== 229
           ) {
             e.preventDefault();
-            if (!picker) void send();
+            if (!picker || draft.text.startsWith("/")) void send();
           }
         }}
       />
@@ -1182,7 +1252,7 @@ export function BrainComposer({
               pending ||
               voiceActive ||
               (!draft.text.trim() && !attachments.length && !context.length) ||
-              blockedAttachments ||
+              (blockedAttachments && !advertisedUsage) ||
               session.status !== "ready"
             }
             onClick={() => void send()}

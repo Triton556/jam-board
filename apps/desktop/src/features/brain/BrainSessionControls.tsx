@@ -19,8 +19,10 @@ import type {
   ModelInfo,
 } from "../../lib/agent-dock-api";
 import { useUiStore } from "../../lib/ui-store";
-import { BrainLaunchSteps } from "./BrainLaunchLogs";
+import { BrainLaunchLogs, BrainLaunchSteps } from "./BrainLaunchLogs";
+import { BrainProviderError } from "./BrainProviderError";
 import { useBrainPopoverPlacement } from "./brain-popover-placement";
+import { profilesQuery } from "./brain-profiles";
 import {
   accessLabel,
   connectionAccessKind,
@@ -29,9 +31,179 @@ import {
   optionLabel,
   rememberConnection,
   rememberModel,
+  sessionOptions,
 } from "./brain-settings";
 import { useBrainState } from "./brain-store";
 import { DisabledReason } from "./DisabledReason";
+import "./BrainSessionControls.css";
+
+type UsageEvent = Extract<AgentDockEvent, { kind: "usage" }>;
+export function usageText(usage?: UsageEvent) {
+  return usage
+    ? `${usage.used.toLocaleString("en-US")} / ${usage.size.toLocaleString("en-US")} tokens${usage.cost?.amount != null ? ` · ${usage.cost.amount.toLocaleString("en-US", { maximumFractionDigits: 6 })} ${usage.cost.currency}` : ""}`
+    : "Context usage not reported yet";
+}
+export function BrainStatusChip({
+  events,
+  open,
+}: {
+  events: AgentDockEvent[];
+  open(): void;
+}) {
+  const usage = events.filter((e) => e.kind === "usage").at(-1);
+  return (
+    <button
+      type="button"
+      className="brain-control-chip"
+      title={usageText(usage)}
+      aria-label={`Session status: ${usage && usage.size > 0 ? `${Math.round((usage.used / usage.size) * 100)}% context` : "context unavailable"}`}
+      onClick={open}
+    >
+      {usage && usage.size > 0
+        ? `${Math.round((usage.used / usage.size) * 100)}% context`
+        : "Context —"}
+    </button>
+  );
+}
+export function BrainSessionStatus({
+  session,
+  events,
+  usageFocus = false,
+  close,
+}: {
+  session: AgentSessionView;
+  events: AgentDockEvent[];
+  usageFocus?: boolean;
+  close(): void;
+}) {
+  const profiles = useQuery(profilesQuery);
+  const logs = useQuery({
+    queryKey: ["brain", "status", session.id],
+    queryFn: () => agentDockApi.launchLogs(session.id),
+    refetchInterval: 15000,
+  });
+  const usageNode = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (usageFocus) {
+      usageNode.current?.scrollIntoView?.({ block: "nearest" });
+      usageNode.current?.focus();
+    }
+  }, [usageFocus]);
+  const profile = profiles.data?.find((p) => p.id === session.profileId);
+  const options = sessionOptions(events);
+  const access = options.find((o) =>
+    ["mode", "access", "permissions"].includes(optionCategory(o) ?? ""),
+  );
+  const all = [...(logs.data ?? []), ...events];
+  const board = all
+    .filter(
+      (e) => e.kind === "launch_step" && e.step.startsWith("mcp:jam-board"),
+    )
+    .at(-1);
+  const global = all
+    .filter((e) => e.kind === "launch_step" && e.step === "user_config")
+    .at(-1);
+  const usage = events.filter((e) => e.kind === "usage").at(-1);
+  const plan = logs.data?.filter((e) => e.kind === "plan_usage").at(-1);
+  return (
+    <ControlPopover
+      label="Session status"
+      className="brain-controls-popover brain-session-status"
+      close={close}
+    >
+      <div>
+        <div className="button-row">
+          <strong>Session status</strong>
+          <Button variant="ghost" onClick={close}>
+            Close
+          </Button>
+        </div>
+        <dl>
+          <dt>Connection</dt>
+          <dd>{profile?.label ?? session.title}</dd>
+          <dt>Model</dt>
+          <dd>
+            {options.find((o) => optionCategory(o) === "model")?.value ??
+              session.model ??
+              profile?.model ??
+              "Agent default"}
+          </dd>
+          <dt>Access mode</dt>
+          <dd>
+            {access
+              ? accessLabel(
+                  access.values.find((v) => v.value === access.value) ?? {
+                    value: access.value,
+                    name: access.value,
+                  },
+                  connectionAccessKind(
+                    profile ?? {
+                      id: session.profileId,
+                      preset: null,
+                      command: null,
+                    },
+                  ),
+                ).label
+              : "Not reported"}
+          </dd>
+          <dt>Board MCP connected</dt>
+          <dd>
+            {board?.kind === "launch_step"
+              ? `${board.state === "ok" ? "Yes" : board.state === "failed" ? "No" : "Not confirmed"} · ${board.step.slice(4)}`
+              : "Not confirmed"}
+          </dd>
+          <dt>Global config</dt>
+          <dd>
+            {global?.kind === "launch_step"
+              ? global.message === "User global configuration included"
+                ? "On"
+                : "Off"
+              : "Not reported"}
+          </dd>
+        </dl>
+        <section ref={usageNode} tabIndex={-1} aria-label="Session usage">
+          <strong>Context usage</strong>
+          <p>{usageText(usage)}</p>
+          {connectionAccessKind(
+            profile ?? { id: session.profileId, preset: null, command: null },
+          ) === "claude" && <p>Plan limits: type /usage</p>}
+          {connectionAccessKind(
+            profile ?? { id: session.profileId, preset: null, command: null },
+          ) === "codex" && (
+            <>
+              <strong>Plan usage</strong>
+              {plan ? (
+                (
+                  [
+                    ["Primary", plan.primary],
+                    ["Secondary", plan.secondary],
+                  ] as const
+                ).map(([label, window]) => (
+                  <p key={label}>
+                    {label}:{" "}
+                    {window?.used_percent != null
+                      ? `${window.used_percent}% used${window.resets_at ? ` · resets ${new Date(window.resets_at * 1000).toLocaleString()}` : ""}`
+                      : "Not reported"}
+                  </p>
+                ))
+              ) : (
+                <p>
+                  {logs.isError
+                    ? "Could not read local plan usage"
+                    : "No plan usage reported for this session"}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+        <dl>
+          <dt>Session started</dt>
+          <dd>{new Date(session.createdAt).toLocaleString()}</dd>
+        </dl>
+      </div>
+    </ControlPopover>
+  );
+}
 
 export function ControlPopover({
   label,
@@ -378,6 +550,7 @@ export function BrainLauncher({
   connections(): void;
 }) {
   const launcher = useRef<HTMLElement>(null);
+  const [showLogs, setShowLogs] = useState(false);
   useLayoutEffect(() => {
     const previous = document.activeElement;
     launcher.current?.querySelector<HTMLElement>("button,input")?.focus();
@@ -415,6 +588,16 @@ export function BrainLauncher({
       catalog.data?.models.find((m) => m.id === model),
       cached.find((o) => optionCategory(o) === "thought_level"),
     );
+  const startupError = launchEvents.filter((e) => e.kind === "error").at(-1);
+  if (showLogs)
+    return (
+      <BrainLaunchLogs
+        sessionId={launchEvents.at(-1)?.sessionId}
+        title={profile?.label ?? "Session"}
+        events={launchEvents}
+        close={() => setShowLogs(false)}
+      />
+    );
   if (pending)
     return (
       <section ref={launcher} className="brain-launcher" aria-label="New chat">
@@ -432,6 +615,19 @@ export function BrainLauncher({
   return (
     <section ref={launcher} className="brain-launcher" aria-label="New chat">
       <h2>New chat</h2>
+      {startupError?.message.includes("chat didn't start in time") && (
+        <BrainProviderError
+          active
+          event={startupError}
+          restart={() =>
+            start(id, {
+              model: model || undefined,
+              effort: effortOption ? effort : undefined,
+            })
+          }
+          showLogs={() => setShowLogs(true)}
+        />
+      )}
       <h3>Connection</h3>
       <CustomSelect
         label="Connection"

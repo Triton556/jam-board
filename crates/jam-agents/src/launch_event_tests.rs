@@ -3,6 +3,161 @@ use super::*;
 use crate::tests::{MemoryCredentials, directory, events, session};
 
 #[test]
+fn r8c_advertised_usage_is_one_command_without_consuming_first_prompt_context() {
+    let s = session(SessionStatus::Ready);
+    map_update(
+        &s,
+        json!({"sessionUpdate":"available_commands_update", "availableCommands":[{"name":"usage","description":"Plan usage"}]}),
+    );
+    let blocks = prepare_prompt(
+        &s,
+        vec![PromptPart::Text {
+            text: "/usage".into(),
+        }],
+    )
+    .unwrap();
+    let wire = serde_json::to_value(blocks).unwrap();
+    assert_eq!(wire, json!([{"type":"text","text":"/usage"}]));
+    assert!(s.inner.lock().unwrap().first_prompt);
+    s.status(SessionStatus::Ready, None);
+    let blocks = prepare_prompt(
+        &s,
+        vec![PromptPart::Text {
+            text: "Synthetic next prompt".into(),
+        }],
+    )
+    .unwrap();
+    let wire = serde_json::to_value(blocks).unwrap();
+    assert!(
+        wire[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("Board session context")
+    );
+    assert!(!s.inner.lock().unwrap().first_prompt);
+}
+
+#[test]
+fn r8c_usage_mapping_and_startup_copy() {
+    let s = session(SessionStatus::Ready);
+    map_update(
+        &s,
+        json!({"sessionUpdate":"usage_update","used":42000,"size":200000,"cost":{"amount":0.42,"currency":"USD"}}),
+    );
+    let wire = serde_json::to_value(events(&s).last().unwrap()).unwrap();
+    assert_eq!(wire["kind"], "usage");
+    assert_eq!(wire["used"], 42000);
+    assert_eq!(wire["size"], 200000);
+    assert_eq!(wire["cost"]["amount"], 0.42);
+    map_update(
+        &s,
+        json!({"sessionUpdate":"usage_update","used":0,"size":0}),
+    );
+    assert!(matches!(
+        events(&s).last().unwrap().event,
+        AgentEventKind::Usage { cost: None, .. }
+    ));
+    let count = events(&s).len();
+    map_update(
+        &s,
+        json!({"sessionUpdate":"usage_update","used":-1,"size":200000}),
+    );
+    assert_eq!(events(&s).len(), count);
+    for name in ["Claude Code", "Codex", "My custom connection"] {
+        let message = startup_timeout_message(name, true);
+        assert!(message.starts_with(name));
+        assert!(!message.contains("ACP"));
+        assert!(message.contains("first launch downloads"));
+        assert!(message.contains("open Logs"));
+    }
+    assert!(package_launcher(std::path::Path::new("npx.cmd"), &[]));
+    assert!(package_launcher(
+        std::path::Path::new("npm"),
+        &["exec".into()]
+    ));
+    assert!(!package_launcher(std::path::Path::new("node.exe"), &[]));
+}
+
+#[tokio::test]
+async fn r8c_scripted_slow_adapter_gets_preparation_budget_then_short_traffic_budget() {
+    use tokio::io::AsyncReadExt;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-visuals/round8/r8c-chat-launch-status/fixtures");
+    std::fs::create_dir_all(&root).unwrap();
+    let script = root.join("slow-initialize.cjs");
+    std::fs::write(&script, "setTimeout(()=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:1,result:{protocolVersion:1}})+'\\n'),1000);").unwrap();
+    let s = session(SessionStatus::Starting);
+    s.launch_step("adapter", LaunchStepState::Running, "Preparing fixture");
+    let mut command = tokio::process::Command::new(which::which("node").unwrap());
+    command
+        .arg(std::path::absolute(&script).unwrap())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    command.creation_flags(0x08000000);
+    let mut child = command.spawn().unwrap();
+    let (traffic, rx) = tokio::sync::watch::channel(false);
+    let mut reader = StartupReader {
+        reader: child.stdout.take().unwrap(),
+        traffic: Some(traffic),
+        session: s.clone(),
+        pending: Vec::new(),
+    };
+    let (ready, result) = oneshot::channel();
+    let read = tokio::spawn(async move {
+        let mut text = String::new();
+        reader.read_to_string(&mut text).await.unwrap();
+        assert!(text.contains("protocolVersion"));
+        let _ = ready.send(());
+    });
+    // Scale 180/60 seconds down to 1800/600 ms; the scripted 1 s delay
+    // must outlive the old budget without timing out during preparation.
+    assert!(
+        wait_for_startup(
+            result,
+            rx,
+            true,
+            Duration::from_millis(1800),
+            Duration::from_millis(600)
+        )
+        .await
+        .is_ok()
+    );
+    child.wait().await.unwrap();
+    read.await.unwrap();
+    assert_eq!(
+        s.inner.lock().unwrap().launch_steps["adapter"].state,
+        LaunchStepState::Ok
+    );
+    let (traffic, rx) = tokio::sync::watch::channel(false);
+    let (_ready, result) = oneshot::channel::<()>();
+    traffic.send(true).unwrap();
+    let started = tokio::time::Instant::now();
+    assert!(
+        wait_for_startup(
+            result,
+            rx,
+            true,
+            Duration::from_secs(3),
+            Duration::from_millis(60)
+        )
+        .await
+        .is_err()
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+    let tail = std::sync::Mutex::new(String::new());
+    let downloading = session(SessionStatus::Starting);
+    downloading.launch_step("adapter", LaunchStepState::Running, "Preparing fixture");
+    record_stderr(&downloading, "npm http fetch GET 200 fixture".into(), &tail);
+    assert!(
+        downloading.inner.lock().unwrap().launch_steps["adapter"]
+            .message
+            .contains("Downloading")
+    );
+}
+
+#[test]
 fn b7_launch_steps_have_stable_start_end_and_bounded_redacted_logs() {
     let s = session(SessionStatus::Starting);
     s.launch_step("initialize", LaunchStepState::Running, "Initializing");
@@ -575,7 +730,7 @@ async fn b7_stop_during_scripted_initialize_closes_running_steps_without_ready()
     let pending = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             if let Some(view) = manager.sessions(&s.board.project_id).first()
-                && manager.launch_logs(&view.id).unwrap().iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "initialize" && launch.state == LaunchStepState::Running)) { break view.id.clone(); }
+                && manager.launch_logs(&view.id).unwrap().iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "adapter" && launch.state == LaunchStepState::Running)) { break view.id.clone(); }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     }).await;
@@ -583,7 +738,7 @@ async fn b7_stop_during_scripted_initialize_closes_running_steps_without_ready()
     let id = pending.expect("Fake initialize was not reached");
     assert!(startup.await.unwrap().is_err());
     let log = manager.launch_logs(&id).unwrap();
-    assert!(log.iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "initialize" && launch.state == LaunchStepState::Skipped)));
+    assert!(log.iter().any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "adapter" && launch.state == LaunchStepState::Skipped)));
     assert!(
         !log.iter()
             .any(|e| matches!(e.event.launch_step(), Some(launch) if launch.step == "ready"))

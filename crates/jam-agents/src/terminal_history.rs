@@ -90,8 +90,9 @@ impl StoredHistory {
             .terminal
             .as_ref()
             .and_then(|t| t.transcript_path.as_ref())
+            && path.is_file()
         {
-            return Ok(path.is_file().then(|| path.clone()));
+            return Ok(Some(path.clone()));
         }
         match self.family() {
             Some("claude") => {
@@ -102,22 +103,31 @@ impl StoredHistory {
                 let Some(root) = self.config_dir("CLAUDE_CONFIG_DIR", ".claude") else {
                     return Ok(None);
                 };
-                let project: String = self
-                    .cwd
-                    .chars()
-                    .map(|c| {
-                        if matches!(c, ':' | '\\' | '/') {
-                            '-'
-                        } else {
-                            c
+                let projects = root.join("projects");
+                let filename = format!("{id}.jsonl");
+                let path = projects
+                    .join(claude_project_slug(&self.cwd))
+                    .join(&filename);
+                if path.is_file() {
+                    return Ok(Some(path));
+                }
+                // CLI versions / canonical cwd spellings can use a different slug.
+                // Our generated session UUID identifies exactly one transcript.
+                let folders = match fs::read_dir(projects) {
+                    Ok(folders) => folders,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                    Err(e) => return Err(e.into()),
+                };
+                for folder in folders {
+                    let folder = folder?;
+                    if folder.file_type()?.is_dir() {
+                        let path = folder.path().join(&filename);
+                        if path.is_file() {
+                            return Ok(Some(path));
                         }
-                    })
-                    .collect();
-                let path = root
-                    .join("projects")
-                    .join(project)
-                    .join(format!("{id}.jsonl"));
-                Ok(path.is_file().then_some(path))
+                    }
+                }
+                Ok(None)
             }
             Some("codex") => {
                 let Some(root) = self.config_dir("CODEX_HOME", ".codex") else {
@@ -253,13 +263,93 @@ impl StoredHistory {
 fn timestamp(s: &str) -> Option<OffsetDateTime> {
     OffsetDateTime::parse(s, &Rfc3339).ok()
 }
+// Claude Code 2.1.309: bD / k / Le, with vpe's signed JS UTF-16 hash.
+fn claude_project_slug(cwd: &str) -> String {
+    let mut slug: String = cwd
+        .encode_utf16()
+        .map(|c| {
+            if c <= 127 && (c as u8).is_ascii_alphanumeric() {
+                c as u8 as char
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    if slug.len() > 200 {
+        let hash = cwd.encode_utf16().fold(0i32, |hash, c| {
+            hash.wrapping_mul(31).wrapping_add(i32::from(c))
+        });
+        let mut magnitude = hash.unsigned_abs();
+        let mut digits = Vec::new();
+        loop {
+            digits.push(char::from_digit(magnitude % 36, 36).expect("base36 digit"));
+            magnitude /= 36;
+            if magnitude == 0 {
+                break;
+            }
+        }
+        slug.truncate(200);
+        slug.push('-');
+        slug.extend(digits.into_iter().rev());
+    }
+    slug
+}
 fn same_cwd(a: &str, b: &str) -> bool {
-    if cfg!(windows) {
-        a.replace('\\', "/")
-            .trim_end_matches('/')
-            .eq_ignore_ascii_case(b.replace('\\', "/").trim_end_matches('/'))
+    fn normalize(cwd: &str) -> String {
+        let cwd = cwd.replace('\\', "/");
+        let cwd = cwd.strip_prefix("//?/").unwrap_or(&cwd);
+        let cwd = if cwd.get(..4).is_some_and(|s| s.eq_ignore_ascii_case("UNC/")) {
+            format!("//{}", &cwd[4..])
+        } else {
+            cwd.to_owned()
+        };
+        cwd.trim_end_matches('/').to_owned()
+    }
+    let (a, b) = (normalize(a), normalize(b));
+    let windows_path = |s: &str| s.as_bytes().get(1) == Some(&b':') || s.starts_with("//");
+    if cfg!(windows) || (windows_path(&a) && windows_path(&b)) {
+        a.eq_ignore_ascii_case(&b)
     } else {
-        a.trim_end_matches('/') == b.trim_end_matches('/')
+        a == b
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn r8h_slug_matches_cli_ascii_utf16_and_long_path_rules() {
+        assert_eq!(
+            claude_project_slug(r"C:\work\dot.dir\under_score"),
+            "C--work-dot-dir-under-score"
+        );
+        assert_eq!(
+            claude_project_slug(
+                r"C:\Users\Example\AppData\Roaming\dev.triton556.jamboard\agent-workspace\01M62WYWJVWKHMPN28EVCH660A"
+            ),
+            "C--Users-Example-AppData-Roaming-dev-triton556-jamboard-agent-workspace-01M62WYWJVWKHMPN28EVCH660A"
+        );
+        assert_eq!(
+            claude_project_slug(&format!("C:\\{}", "a".repeat(210))),
+            format!("C--{}-6d38w5", "a".repeat(197))
+        );
+        assert_eq!(
+            claude_project_slug(&format!("C:\\{}", "é😀".repeat(80))),
+            format!("C{}-tkfxt1", "-".repeat(199))
+        );
+    }
+
+    #[test]
+    fn r8h_cwd_does_not_merge_different_projects() {
+        assert!(same_cwd(
+            r"\\?\UNC\Server\Share\Project\",
+            "//server/share/project/"
+        ));
+        assert!(!same_cwd(r"F:\work\sample-project", r"F:\work\other"));
+        if !cfg!(windows) {
+            assert!(!same_cwd("/work/Project", "/work/project"));
+        }
     }
 }
 
