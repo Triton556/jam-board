@@ -52,12 +52,11 @@ directed connections, and `arrange_references` for explicit world positions or
 the whole batch if it cannot fit. A write response is not a concurrency token:
 reread and reconcile uncertain results before an intentional retry.
 
-
 ## Building and refining a moodboard
 
 When the user requests a web moodboard for selected work:
 
-1. Read get_canvas and create_frame with title "Moodboard ? <topic>" beside the
+1. Read get_canvas and create_frame with title "Moodboard — <topic>" beside the
    related work. Use link_reference { frameId, targetKey } to link it to its
    story or epic; current and future children become references of that target.
 2. Find candidates using your client's own authorized web tools and download
