@@ -34,6 +34,83 @@ async function startChat(page: Page, profileId = "claude-code") {
   }, profileId);
 }
 
+test("R9-A/BD02 composer keeps equal icon boxes, keyboard sending and narrow recovery alignment", async ({
+  page,
+}) => {
+  await openDock(page);
+  await startChat(page);
+  const input = page.getByRole("textbox", { name: "Message the brain" });
+  for (const width of [1440, 1000, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await input.fill("Keep the draft after interruption");
+    const send = page.getByRole("button", { name: "Send", exact: true });
+    const before = await send.boundingBox();
+    expect(before?.width).toBe(32);
+    expect(before?.height).toBe(32);
+    await page.evaluate(async () => {
+      const apiPath = "/src/lib/agent-dock-mock.ts";
+      const storePath = "/src/features/brain/brain-store.ts";
+      const { emitMockDockEvent } = await import(apiPath);
+      const { useBrainState } = await import(storePath);
+      emitMockDockEvent(useBrainState.getState().selected.chat, {
+        kind: "status",
+        status: "running",
+      });
+    });
+    const stop = page.getByRole("button", { name: "Stop", exact: true });
+    await expect(stop).toBeVisible();
+    expect(await stop.boundingBox()).toEqual(before);
+    expect(await stop.textContent()).toBe("");
+    await page.evaluate(async () => {
+      const apiPath = "/src/lib/agent-dock-mock.ts";
+      const storePath = "/src/features/brain/brain-store.ts";
+      const { emitMockDockEvent } = await import(apiPath);
+      const { useBrainState } = await import(storePath);
+      emitMockDockEvent(useBrainState.getState().selected.chat, {
+        kind: "status",
+        status: "stopped",
+      });
+    });
+    await expect(
+      page.getByRole("button", { name: "Restart session" }),
+    ).toBeVisible();
+    const controls = await page
+      .locator(".brain-composer-actions")
+      .evaluate((row) => {
+        const box = row.getBoundingClientRect();
+        return [...row.querySelectorAll("button")].map((button) => {
+          const rect = button.getBoundingClientRect();
+          return {
+            height: rect.height,
+            inside: rect.left >= box.left && rect.right <= box.right,
+          };
+        });
+      });
+    expect(
+      controls.every((control) => control.height === 32 && control.inside),
+    ).toBe(true);
+    await expect(input).toHaveValue("Keep the draft after interruption");
+    await page.evaluate(async () => {
+      const apiPath = "/src/lib/agent-dock-mock.ts";
+      const storePath = "/src/features/brain/brain-store.ts";
+      const { emitMockDockEvent } = await import(apiPath);
+      const { useBrainState } = await import(storePath);
+      emitMockDockEvent(useBrainState.getState().selected.chat, {
+        kind: "status",
+        status: "ready",
+      });
+    });
+  }
+  await input.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Stop", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Send", exact: true }),
+  ).toBeDisabled();
+});
+
 test("Q1 BD21/BC13 delete keeps the exact row height, including a wrapped title", async ({
   page,
 }) => {

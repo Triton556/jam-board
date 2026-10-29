@@ -152,3 +152,11 @@ and RR01 rows now cover terminal recovery, launch phases, status and commands.
 [Brain dock](../brain-dock.md) owns the detailed history and status contracts;
 [alpha45 verification](../verification/0.3.0-alpha.45.md) separates reported
 fixture/mock evidence from packaged/native/live checks.
+
+## Round 9 composer contracts
+
+BD02/BD06/BD17/BD18/BD20, BC02/BC07 and RR09/RR10/RR12 describe the
+icon-only actions, shared control sizing, disabled reasons and voice-strip
+placement. AG15 session, dispatch and cancellation semantics are unchanged.
+R9-A evidence is scoped DOM/Chromium/mock; see alpha46 verification for release
+gates and remaining native/live boundaries.

@@ -572,7 +572,7 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
 }
 .brain-composer {
   margin: 8px 12px 10px;
-  padding: 11px;
+  padding: 12px;
   background: var(--card);
   border: 1.5px solid var(--line-soft);
   border-radius: var(--r-card);
@@ -600,18 +600,6 @@ body:has(.brain-trigger:focus, .brain-trigger:hover) .tooltip {
 }
 .brain-composer:focus-within {
   border-color: var(--ink-2);
-}
-.brain-composer-actions {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 5px;
-}
-.brain-composer-actions > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 .brain-context-chips {
   display: flex;

@@ -1,5 +1,14 @@
 # Known gaps and next work
 
+## Round 9 composer evidence boundary
+
+R9-A reports DOM and Chromium/mock checks for icon-only actions, 32 px controls,
+busy/disabled explanations, the voice strip above the textarea and narrow Restart.
+See `test-visuals/round9/r9-composer-buttons/report.md` for its inspected matrix.
+These checks do not establish exact-package native tooltips, OS scaling, live
+voice or provider behavior. AG15 dispatch/cancellation and execution grants are
+unchanged; the existing live-provider and performance gaps remain open.
+
 ## Round 6 W1: selected rendering evidence boundary
 
 RF02 found the bounded header's 320px/40% controls at 20.48 screen pixels. The

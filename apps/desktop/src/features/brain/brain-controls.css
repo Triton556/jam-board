@@ -146,8 +146,9 @@
   gap: 4px;
 }
 .brain-composer-actions > .brain-session-controls {
+  flex: 0 1 auto;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: var(--composer-gap);
 }
 .brain-control-anchor {
   min-width: 0;
@@ -227,14 +228,60 @@
 }
 .brain-toolbar-gap {
   flex: 1;
-  min-width: 4px;
+  min-width: 0;
 }
 .brain-composer-actions {
-  gap: 4px;
+  --composer-gap: 4px;
+  --composer-control-size: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--composer-gap);
+  padding-top: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.brain-composer-actions > .tooltip-wrap,
+.brain-composer-actions > .brain-voice-anchor {
+  flex: 0 0 auto;
+}
+.brain-composer-actions .brain-disabled-reason {
+  border-radius: 8px;
+}
+.brain-composer-actions .icon-button {
+  width: var(--composer-control-size);
+  height: var(--composer-control-size);
+  min-height: var(--composer-control-size);
+  flex-shrink: 0;
+}
+.brain-composer-actions .brain-control-chip,
+.brain-composer-actions > .button {
+  height: var(--composer-control-size);
+}
+.brain-composer-action {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.brain-composer-send,
+.brain-composer-send:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.brain-composer-send:enabled:hover {
+  background: var(--primary-hover);
+}
+.brain-composer-send:disabled {
+  opacity: 1;
+  background: var(--paper-2);
+  color: var(--ink-2);
 }
 .brain-composer-actions > .button {
   flex-shrink: 0;
   padding-inline: 8px;
+}
+.brain-composer > .brain-voice-take {
+  order: -1;
+  flex-shrink: 0;
+  padding: 0 0 8px;
 }
 .brain-composer {
   display: flex;
@@ -304,9 +351,6 @@
 .brain-composer > textarea {
   flex-shrink: 1;
   overflow-y: auto;
-}
-.brain-composer-actions {
-  flex-shrink: 0;
 }
 .brain-composer > .brain-context-chips {
   max-height: 80px;
