@@ -102,10 +102,10 @@ To connect another project, repeat steps 1–3 with that project's configuration
 After a version upgrade, refresh cached tools and reread task/report evidence before
 new actions. Never repair a rejected stale payload by silently filling new tokens.
 
-The [optional playbook compatibility note](agent-playbook-compatibility.md) separates
-workflow instructions from this version's calling contract. Installing that skill
-is not required for MCP, does not configure the connection, and cannot certify that
-older examples match the live tool schemas.
+The [standalone skill note](agent-playbook-compatibility.md) separates the optional
+board skill from this version's calling contract. Installing that skill is not
+required for MCP, does not configure the connection, and cannot certify that older
+examples match the live tool schemas.
 
 ## Transports and authentication
 

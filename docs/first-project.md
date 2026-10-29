@@ -32,9 +32,9 @@ Open **Settings → Agents** and follow the three steps:
    **Plan → Epic → Brain**, or explicitly appoint it in chat for an unassigned epic.
    This role is not an execution grant and does not launch a model.
 
-The optional playbook is separate from this connection. Its older examples may
-not contain current required fields; use live MCP schemas and the current in-app
-prompts. See [the compatibility note](agent-playbook-compatibility.md).
+The optional Jam Board skill only adds board guidance; this connection works
+without it. Use live MCP schemas and the current in-app prompts rather than
+examples written for other versions. See [the standalone skill note](agent-playbook-compatibility.md).
 
 **Important:** a connected session stays pinned to its project. Switching boards
 in Jam Board does not redirect it. To use another project, create or replace that
