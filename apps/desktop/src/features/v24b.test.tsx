@@ -115,7 +115,7 @@ it("destination preview is project-scoped and client-specific", () => {
   expect(skillDestination({ target: "", client: "codex" })).toBeNull();
 });
 const validCheck = {
-  version: "0.3.0-alpha.45",
+  version: "0.3.0-alpha.46",
   destination: "C:/project/.agents/skills/jam-board",
   status: "new",
   errors: [],
