@@ -5,6 +5,25 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.46] - 2026-10-30
+
+Standalone board guidance is easier to maintain and migrate; the chat composer
+uses compact, consistent controls with clear tooltips.
+
+### Changed
+
+- Remove duplicated canvas rules from the bundled skill's operations.md.
+- Explain how to migrate Jam Board skill copies installed by agent-playbook 2.0
+  or earlier, in the Settings hint, installer error and documentation.
+- Clarify the planning prompt wording.
+- Use icon-only Send/Stop with accessible names, busy state, tooltips and disabled
+  reasons; align the composer row with 32 px controls and keep the voice strip
+  above the textarea, including narrow Restart layouts.
+
+### Fixed
+
+- Correct the moodboard frame title in the bundled skill.
+
 ## [0.3.0-alpha.45] - 2026-10-29
 
 Terminal conversations appear in History; chat launch recovery and Session status
