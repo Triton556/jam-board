@@ -161,7 +161,7 @@ fn inspect(
         return Err("The skill destination is not a directory; nothing was changed".into());
     }
     validate_tree(&destination)?;
-    let receipt:Receipt=serde_json::from_slice(&fs::read(destination.join(RECEIPT)).map_err(|_| "An existing Jam Board skill has no app ownership receipt. If installed by agent-playbook, use its original installer and receipts to remove or migrate unchanged files first. Preserve edits; nothing was overwritten".to_string())?).map_err(|_|"Invalid skill ownership receipt; nothing was changed".to_string())?;
+    let receipt:Receipt=serde_json::from_slice(&fs::read(destination.join(RECEIPT)).map_err(|_| "An existing Jam Board skill has no app ownership receipt; nothing was overwritten. If agent-playbook 2.0 or older installed it, remove it with that playbook version, or save your edits and move the folder aside, then install again".to_string())?).map_err(|_|"Invalid skill ownership receipt; nothing was changed".to_string())?;
     if receipt.format != 1 || receipt.owner != "jam-board" || receipt.files.keys().ne(files.keys())
     {
         return Err("Unsupported skill ownership receipt; preserve this installation for explicit migration".into());
