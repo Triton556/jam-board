@@ -54,6 +54,8 @@ export type AgentSessionView = {
   status: SessionStatus;
   cwd: string;
   createdAt: string;
+  model?: string | null;
+  effort?: string | null;
   capabilities: {
     images: boolean;
     audio: boolean;
@@ -90,6 +92,17 @@ export type AgentDockEvent = { sessionId: string; seq: number; at: string } & (
   | { kind: "launch_log"; message: string }
   | { kind: "status"; status: SessionStatus; message?: string | null }
   | { kind: "auth"; state: "ok" | "required" | "unknown"; label: string }
+  | {
+      kind: "usage";
+      used: number;
+      size: number;
+      cost: import("../bindings").UsageCost | null;
+    }
+  | {
+      kind: "plan_usage";
+      primary: import("../bindings").PlanUsageWindow | null;
+      secondary: import("../bindings").PlanUsageWindow | null;
+    }
   | {
       kind: "user_message";
       messageId: string;

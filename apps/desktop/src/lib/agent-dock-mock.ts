@@ -606,20 +606,42 @@ export const mockDockApi: AgentDockApi = {
     const startedAt = new Date().toISOString();
     emit(s.id, {
       kind: "launch_step",
+      step: "user_config",
+      state: "ok",
+      message:
+        userConfig === "exclude"
+          ? "User global configuration excluded"
+          : "User global configuration included",
+      startedAt,
+      endedAt: startedAt,
+    });
+    emit(s.id, {
+      kind: "launch_step",
+      step: "adapter",
+      state: launchDelayMs ? "running" : "ok",
+      message: launchDelayMs
+        ? `Preparing ${p.label} chat adapter (first launch may download it)…`
+        : "Chat adapter responded",
+      startedAt,
+      endedAt: launchDelayMs ? null : startedAt,
+    });
+    emit(s.id, {
+      kind: "launch_step",
       step: "process",
       state: "ok",
       message: "Adapter starting",
       startedAt,
       endedAt: startedAt,
     });
-    emit(s.id, {
-      kind: "launch_step",
-      step: "initialize",
-      state: launchDelayMs ? "running" : "ok",
-      message: "Initialize adapter",
-      startedAt,
-      endedAt: launchDelayMs ? null : startedAt,
-    });
+    if (!launchDelayMs)
+      emit(s.id, {
+        kind: "launch_step",
+        step: "initialize",
+        state: "ok",
+        message: "Initialize adapter",
+        startedAt,
+        endedAt: startedAt,
+      });
     emit(s.id, {
       kind: "launch_step",
       step: "mcp",
@@ -643,6 +665,24 @@ export const mockDockApi: AgentDockApi = {
           `Jam Board · ${p.label} (mock terminal)\r\nConnected to ${app.jam?.name}\r\n${s.cwd}\r\n> `,
         );
       else {
+        emit(s.id, { kind: "usage", used: 0, size: 200000, cost: null });
+        emit(s.id, {
+          kind: "launch_step",
+          step: "adapter",
+          state: "ok",
+          message: "Chat adapter responded",
+          startedAt,
+          endedAt: new Date().toISOString(),
+        });
+        if (launchDelayMs)
+          emit(s.id, {
+            kind: "launch_step",
+            step: "initialize",
+            state: "ok",
+            message: "Chat adapter initialized",
+            startedAt: new Date().toISOString(),
+            endedAt: new Date().toISOString(),
+          });
         emit(s.id, {
           kind: "auth",
           state:

@@ -99,6 +99,23 @@ function mount(path = "/board") {
   );
   return router;
 }
+it("R8-C Session status menu opens the popover and Escape returns focus to session actions", async () => {
+  mount();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "Brain chat · Ctrl+J" }),
+  );
+  await user.click(await screen.findByRole("button", { name: "Start chat" }));
+  await user.click(await screen.findByRole("button", { name: "Start" }));
+  const actions = screen.getByRole("button", { name: "Session actions" });
+  await waitFor(() => expect(actions).toBeEnabled());
+  await user.click(actions);
+  await user.click(screen.getByRole("button", { name: "Session status" }));
+  expect(screen.getByRole("region", { name: "Session status" })).toBeVisible();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("region", { name: "Session status" })).toBeNull();
+  expect(actions).toHaveFocus();
+});
 async function openChat() {
   const user = userEvent.setup();
   await user.click(

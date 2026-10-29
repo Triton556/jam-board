@@ -1,0 +1,28 @@
+.brain-controls-popover.brain-session-status {
+  overflow-wrap: anywhere;
+  top: calc(100% + 8px);
+  bottom: auto;
+  max-height: min(560px, calc(100dvh - 200px));
+}
+.brain-chat-status-header .brain-session-status {
+  left: 0;
+  right: auto;
+}
+.brain-session-status dl {
+  display: grid;
+  gap: 4px;
+  margin-block: 12px;
+}
+.brain-session-status dt {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.brain-session-status dd {
+  margin: 0 0 8px;
+}
+.brain-session-status p {
+  margin-block: 8px 12px;
+}
+.brain-chat-status-header {
+  padding: 4px 12px;
+}

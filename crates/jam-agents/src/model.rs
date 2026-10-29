@@ -320,6 +320,15 @@ pub enum AgentEventKind {
     AvailableCommands {
         commands: Vec<AvailableCommand>,
     },
+    Usage {
+        used: u64,
+        size: u64,
+        cost: Option<UsageCost>,
+    },
+    PlanUsage {
+        primary: Option<PlanUsageWindow>,
+        secondary: Option<PlanUsageWindow>,
+    },
     ConfigOptions {
         options: Vec<ConfigOption>,
     },
@@ -349,6 +358,16 @@ pub enum AgentEventKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,
     },
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct UsageCost {
+    pub amount: f64,
+    pub currency: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct PlanUsageWindow {
+    pub used_percent: f64,
+    pub resets_at: Option<i64>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

@@ -16,7 +16,11 @@ import { ConnectionEditor } from "./BrainConnections";
 import { BrainHistory, HistoryTranscript } from "./BrainHistory";
 import { BrainLaunchLogs } from "./BrainLaunchLogs";
 import { BrainLaunchWarnings } from "./BrainLaunchWarnings";
-import { BrainLauncher, ControlPopover } from "./BrainSessionControls";
+import {
+  BrainLauncher,
+  BrainSessionStatus,
+  ControlPopover,
+} from "./BrainSessionControls";
 import { BrainSessionPicker } from "./BrainSessionPicker";
 import {
   LazyBrainChat as BrainChat,
@@ -54,6 +58,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
     if (past && past.projectId !== state.projectId) setPast(null);
   }, [state.projectId, past]);
   const [menu, setMenu] = useState(false);
+  const [statusSession, setStatusSession] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const projectScope = useRef({ projectId: state.projectId });
@@ -106,6 +111,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
     setCreating(false);
     setPicker(false);
     setMenu(false);
+    setStatusSession(null);
     setError("");
     setPending(false);
     launchAttempt.current = null;
@@ -151,6 +157,11 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const session = sessions.find((s) => s.id === state.selected[sessionTab]);
+  useEffect(() => {
+    setStatusSession((current) =>
+      current === session?.id && state.tab !== "history" ? current : null,
+    );
+  }, [session?.id, state.tab]);
   const sessionTitle = creating
     ? terminal
       ? "New terminal"
@@ -236,7 +247,7 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
       if (
         event.key === "Escape" &&
         event.target instanceof Element &&
-        event.target.closest(".brain-history-menu")
+        event.target.closest(".brain-history-menu, .brain-session-status")
       )
         return;
       if (
@@ -604,9 +615,11 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
             <div className="brain-popover-anchor">
               <IconButton
                 label="Session actions"
+                aria-expanded={menu || !!statusSession}
                 disabled={starting || creating}
                 onClick={() => {
                   setMenu(!menu);
+                  setStatusSession(null);
                   setPicker(false);
                 }}
               >
@@ -669,7 +682,24 @@ export function BrainDock({ overlay }: { overlay: boolean }) {
                   <button type="button" onClick={connections}>
                     Connections…
                   </button>
+                  <button
+                    type="button"
+                    disabled={!session}
+                    onClick={() => {
+                      setMenu(false);
+                      if (session) setStatusSession(session.id);
+                    }}
+                  >
+                    Session status
+                  </button>
                 </ControlPopover>
+              )}
+              {statusSession === session?.id && session && (
+                <BrainSessionStatus
+                  session={session}
+                  events={state.events[session.id] ?? []}
+                  close={() => setStatusSession(null)}
+                />
               )}
             </div>
           </div>

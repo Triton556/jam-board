@@ -83,6 +83,104 @@ pub(crate) fn now() -> String {
         .format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_default()
 }
+// A deliberately narrow projection: no conversation text, credentials or unrelated
+// rollout fields escape this reader. Never borrow usage from another session.
+fn read_plan_usage(root: &std::path::Path, native: &str) -> Option<AgentEventKind> {
+    use std::io::BufRead;
+    if native.is_empty()
+        || !native
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
+        return None;
+    }
+    fn find(root: &std::path::Path, suffix: &str, depth: u8, found: &mut Vec<std::path::PathBuf>) {
+        if depth == 0 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            if kind.is_dir() {
+                find(&entry.path(), suffix, depth - 1, found);
+            } else if kind.is_file()
+                && entry.file_name().to_string_lossy().starts_with("rollout-")
+                && entry.file_name().to_string_lossy().ends_with(suffix)
+            {
+                found.push(entry.path());
+            }
+        }
+    }
+    #[derive(serde::Deserialize)]
+    struct Row {
+        r#type: Option<String>,
+        payload: Option<Payload>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Payload {
+        r#type: Option<String>,
+        rate_limits: Option<Limits>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Limits {
+        primary: Option<PlanUsageWindow>,
+        secondary: Option<PlanUsageWindow>,
+    }
+    let mut files = vec![];
+    find(root, &format!("-{native}.jsonl"), 5, &mut files);
+    let file = files
+        .into_iter()
+        .max_by_key(|p| p.metadata().and_then(|m| m.modified()).ok())?;
+    let mut latest = None;
+    for line in std::io::BufReader::new(std::fs::File::open(file).ok()?)
+        .lines()
+        .map_while(std::result::Result::ok)
+    {
+        let Ok(row) = serde_json::from_str::<Row>(&line) else {
+            continue;
+        };
+        if row.r#type.as_deref() != Some("event_msg") {
+            continue;
+        }
+        if let Some(payload) = row.payload
+            && payload.r#type.as_deref() == Some("token_count")
+            && let Some(limits) = payload.rate_limits
+        {
+            let valid = |w: &PlanUsageWindow| {
+                w.used_percent.is_finite() && (0.0..=100.0).contains(&w.used_percent)
+            };
+            let primary = limits.primary.filter(valid);
+            let secondary = limits.secondary.filter(valid);
+            latest = Some(AgentEventKind::PlanUsage { primary, secondary });
+        }
+    }
+    latest
+}
+#[cfg(test)]
+#[test]
+fn r8c_rollout_limits_are_session_scoped_and_only_latest_valid_fields_are_returned() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-visuals/round8/r8c-chat-launch-status/fixtures")
+        .join(ulid::Ulid::generate().to_string());
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("rollout-2026-other.jsonl"), r#"{"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":99,"resets_at":123}}}}"#).unwrap();
+    assert!(read_plan_usage(&root, "wanted").is_none());
+    std::fs::write(root.join("rollout-2026-wanted.jsonl"), concat!(
+        "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"rate_limits\":{\"primary\":{\"used_percent\":20,\"resets_at\":123}}}}\n",
+        "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"content\":\"ignored fixture\"}}\n",
+        "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"rate_limits\":{\"primary\":{\"used_percent\":30,\"resets_at\":456},\"secondary\":{\"used_percent\":40,\"resets_at\":789}}}}\n",
+        "{incomplete"
+    )).unwrap();
+    let wire = serde_json::to_value(read_plan_usage(&root, "wanted").unwrap()).unwrap();
+    assert_eq!(wire["primary"]["used_percent"].as_f64(), Some(30.0));
+    assert_eq!(wire["secondary"]["resets_at"], 789);
+    assert!(read_plan_usage(&root, "../wanted").is_none());
+    assert!(!wire.to_string().contains("ignored fixture"));
+}
 impl Session {
     pub fn launch_step(&self, step: &str, state: LaunchStepState, message: impl Into<String>) {
         let mut inner = self.inner.lock().expect("session lock");
@@ -409,10 +507,7 @@ impl Session {
         ) {
             return;
         }
-        self.end_launch(
-            LaunchStepState::Failed,
-            detail.as_deref().unwrap_or(message),
-        );
+        self.end_launch(LaunchStepState::Failed, message);
         self.status(SessionStatus::Failed, Some(message.into()));
         self.emit(AgentEventKind::Error {
             code: None,
@@ -1048,7 +1143,15 @@ impl SessionManager {
         }
         let started = match profile.kind {
             RuntimeKind::Acp => {
-                crate::acp::start(session.clone(), executable, args, env, entries).await
+                crate::acp::start(
+                    session.clone(),
+                    executable,
+                    args,
+                    env,
+                    entries,
+                    profile.label.clone(),
+                )
+                .await
             }
             RuntimeKind::Terminal => {
                 crate::terminal::start(
@@ -1098,15 +1201,49 @@ impl SessionManager {
         }
     }
     pub fn launch_logs(&self, id: &str) -> Result<Vec<AgentDockEvent>> {
-        Ok(self
-            .get(id)?
-            .inner
-            .lock()
-            .map_err(|_| err("Session lock unavailable"))?
-            .launch_log
-            .iter()
-            .cloned()
-            .collect())
+        let session = self.get(id)?;
+        let (mut logs, native, profile_id) = {
+            let inner = session
+                .inner
+                .lock()
+                .map_err(|_| err("Session lock unavailable"))?;
+            (
+                inner.launch_log.iter().cloned().collect::<Vec<_>>(),
+                inner.resume_native_id.clone(),
+                inner.view.profile_id.clone(),
+            )
+        };
+        if let Ok(profile) = self.profiles.get(&profile_id)
+            && (profile
+                .preset
+                .as_deref()
+                .is_some_and(|p| matches!(p, "codex" | "codex-cli"))
+                || profile.command.contains("codex-acp")
+                || profile.args.iter().any(|arg| arg.contains("codex-acp")))
+            && let Some(native) = native
+        {
+            let home = profile
+                .env
+                .iter()
+                .find(|e| e.name == "CODEX_HOME")
+                .map(|e| std::path::PathBuf::from(&e.value))
+                .or_else(|| std::env::var_os("CODEX_HOME").map(std::path::PathBuf::from))
+                .or_else(|| {
+                    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                        .map(|p| std::path::PathBuf::from(p).join(".codex"))
+                });
+            if let Some(home) = home
+                && let Some(event) = read_plan_usage(&home.join("sessions"), &native)
+            {
+                logs.push(AgentDockEvent {
+                    session_id: id.into(),
+                    seq: 0,
+                    at: now(),
+                    event,
+                });
+            }
+        }
+        Ok(logs)
     }
     /// CLI identity is runtime metadata, separate from Jam Board's session ID.
     pub fn agent_session_id(&self, id: &str) -> Result<Option<String>> {

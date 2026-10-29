@@ -138,6 +138,22 @@ export async function activateHistory(
   userConfig?: UserConfigChoice,
 ) {
   const projectId = useBrainState.getState().projectId;
+  const live = useBrainState
+    .getState()
+    .sessions.find(
+      (session) =>
+        session.id === entry.id &&
+        session.projectId === projectId &&
+        session.kind === "terminal" &&
+        !["stopped", "failed"].includes(session.status),
+    );
+  if (entry.projectId === projectId && live) {
+    useBrainState.setState((state) => ({
+      selected: { ...state.selected, terminal: live.id },
+      tab: "terminal",
+    }));
+    return;
+  }
   const epoch = scopeEpoch;
   if (entry.projectId !== projectId) return;
   const events = continueNew ? await phase4Api.events(entry.id) : [];
@@ -183,6 +199,7 @@ export function BrainHistory({
   resumed(): void;
 }) {
   const projectId = useBrainState((s) => s.projectId);
+  const sessions = useBrainState((s) => s.sessions);
   const configLaunch = useUserConfigLaunch();
   const terminalStatus = useBrainState((s) =>
     s.sessions
@@ -242,10 +259,42 @@ export function BrainHistory({
       setBusy(false);
     }
   };
-  const entriesForKind = history.data?.filter(
+  const liveTerminals = sessions.filter(
+    (session) =>
+      session.projectId === projectId &&
+      session.kind === "terminal" &&
+      !["stopped", "failed"].includes(session.status),
+  );
+  const isLive = (entry: HistoryEntry) =>
+    liveTerminals.some((session) => session.id === entry.id);
+  // Include starting terminals before the persisted history query completes.
+  const combined = [...(history.data ?? [])];
+  for (const session of liveTerminals) {
+    if (combined.some((entry) => entry.id === session.id)) continue;
+    combined.unshift({
+      id: session.id,
+      projectId: session.projectId,
+      profileId: session.profileId,
+      profileLabel: session.profileId,
+      kind: "terminal",
+      provider: { label: session.profileId, agentKind: "terminal" },
+      empty: true,
+      title: session.title,
+      createdAt: session.createdAt,
+      updatedAt: session.createdAt,
+      model: session.model ?? null,
+      effort: session.effort ?? null,
+      agentSessionId: null,
+      resumable: "none",
+      messageCount: 0,
+    });
+  }
+  const entriesForKind = combined.filter(
     (entry) =>
       entry.projectId === projectId &&
-      !(entry.kind === "terminal" && entry.empty) &&
+      // Hide only ended terminals with no user-message transcript to resume.
+      !(entry.kind === "terminal" && entry.empty && !isLive(entry)) &&
+      entry.title.toLowerCase().includes(query.toLowerCase()) &&
       (entry.kind === "terminal") === (kind === "terminal"),
   );
   return (
@@ -420,7 +469,11 @@ export function BrainHistory({
                         disabled={
                           busy || configLaunch.busy || configLaunch.asking
                         }
-                        onClick={() => open(entry)}
+                        onClick={() => {
+                          if (isLive(entry)) {
+                            void activateHistory(entry).then(resumed);
+                          } else open(entry);
+                        }}
                       >
                         <strong>{entry.title}</strong>
                         <small>
@@ -434,17 +487,19 @@ export function BrainHistory({
                         >
                           {historyTime(entry.updatedAt)} ·{" "}
                           <span className="brain-history-badge">
-                            {entry.resumable === "native"
-                              ? "Native resume"
-                              : entry.resumable === "transcript"
-                                ? "From transcript"
-                                : "Read only"}
+                            {isLive(entry)
+                              ? "Running"
+                              : entry.resumable === "native"
+                                ? "Native resume"
+                                : entry.resumable === "transcript"
+                                  ? "From transcript"
+                                  : "Read only"}
                           </span>
                         </small>
                       </button>
                     )}
                     <div className="brain-history-actions">
-                      {entry.resumable !== "none" && (
+                      {!isLive(entry) && entry.resumable !== "none" && (
                         <Button
                           variant="ghost"
                           aria-busy={resuming === entry.id}
