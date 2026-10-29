@@ -276,6 +276,22 @@ acceptance. This documentation pass did not run runtime tests.
 - Local and cloud voice input are implemented source paths; their own exact-version
   browser/native/human evidence remains separate.
 
+### Round-8 source and evidence boundary
+
+Terminal history now includes live Running rows and alpha.44 recovery relinking;
+Claude folder/hash/fallback and Codex cwd normalization follow the history
+contract. Chat separates adapter preparation from initialize, adds explicit
+timeout recovery, reported context and Session status, local /status and
+advertised /usage routing. See [alpha45 verification](../verification/0.3.0-alpha.45.md)
+for the scripted/mock Windows results and inspected layouts.
+
+R8-B1's cold-adapter cause remains a hypothesis: a longer preparation budget and
+clear recovery mitigate it without confirming the owner's failure. No stable
+Claude plan-limit API is integrated; /usage output belongs to the adapter.
+Codex limits are exact-session rollout snapshots, not live account polling.
+Packaged, cold-download and live-provider checks remain unrun. Linux requires
+exact-SHA hosted CI; alpha.44 manual perf case B remains open.
+
 ### Remaining evidence and capability gaps
 
 - Real adapter/provider sign-in, native credential round trips, session-specific

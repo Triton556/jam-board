@@ -286,6 +286,39 @@ editable because providers change them.
   Unsupported custom agents reject exclusion before launch. The backend receives
   an explicit `userConfig` choice for ACP/terminal launches.
 
+### Chat launch, session status and commands (Round 8)
+
+- Package launchers such as npx have a 180-second preparation budget until the
+  first complete JSON-RPC message, then a 60-second initialization budget. Other
+  executables retain 60 seconds. Preparation and initialize are separate launch
+  steps; recognized npm activity updates the preparation text. A timeout names
+  the Settings connection: "<Connection> chat didn't start in time"; package
+  launchers explain that the first launch downloads the adapter. Retry is explicit,
+  Show logs opens retained logs, and technical details stay collapsed initially.
+- The context chip shows reported context percentage, or "Context —" when absent.
+  Its tooltip gives exact used/capacity tokens and optional cumulative session
+  cost; these values are not remaining plan allowance. The chip, Session actions
+  → Session status and local /status open the same status surface. It shows
+  connection, model, access mode, evidence-based board MCP state/server name,
+  global configuration, context/cost and session start time. Unconfirmed fields
+  remain unconfirmed. Escape closes it and restores the triggering focus.
+- The slash picker contains only adapter-advertised commands. /status always
+  opens local status. Exact /usage is sent to the adapter only when advertised,
+  as one text block without board preamble, selected context or attachments;
+  those staged items and the first normal-message preamble remain available.
+  Otherwise /usage opens local usage status. Adapter Markdown renders as an
+  ordinary reply. Unknown commands retain the draft and show provider-specific
+  guidance without a provider turn.
+- Claude status says "Plan limits: type /usage". There is no stable Claude plan
+  limit API integrated here; Jam Board displays the adapter's command reply
+  without parsing its experimental SDK fields. Codex Plan usage reads only the
+  newest rollout for the exact native session under CODEX_HOME/sessions (default
+  .codex/sessions), projecting primary/secondary utilization and reset timestamps.
+  Missing/incomplete data is unavailable, never borrowed from another session.
+  This is a recorded snapshot refreshed on status/log queries (every 15 seconds
+  while status is open), not a live quota poll; windows are not assumed to be
+  five-hour/weekly.
+
 ### User configuration exclusion boundaries
 
 Exclusion is partial and preserves native authentication; it is not a clean home
@@ -544,7 +577,16 @@ and can be resumed.
     keeps appending to the same entry (`resumable: "native"`).
   - Terminal: Claude links by its assigned native UUID (`--session-id` on a
     new launch); Codex links by cwd and nearest launch time within 120 seconds,
-    rejecting ties. Resume creates a new dock session via `claude --resume` or
+    rejecting ties. Claude's project folder rule replaces each non-ASCII-
+    alphanumeric UTF-16 unit with a hyphen; slugs longer than 200 characters use
+    the first 200 plus a hyphen and the absolute signed 32-bit UTF-16 hash in
+    base36. If the expected path is missing (including a stale cached path), scan
+    immediate project folders only for the exact assigned session UUID filename.
+    Codex reads the rollout's first session_meta line and normalizes Windows case,
+    verbatim prefixes, UNC, slashes and trailing separators while preserving Unix
+    case sensitivity. Existing history load and startup reconciliation relink
+    alpha.44 empty entries when transcripts become discoverable, without changing
+    transcript bytes. Resume creates a new dock session via `claude --resume` or
     `codex resume` using the saved native ID and cwd; Claude resume does not
     assign a new native ID. Missing transcripts and duplicate active resumes
     fail clearly. Deleting a history entry leaves CLI transcripts untouched.
@@ -558,9 +600,13 @@ and can be resumed.
 - Title: first line of the first user message (≤ 60 characters), renameable.
 - UI: **History** is a top-level tab with Chat / Terminal filters, search and
   rows showing provider, model, relative time and resume capability. Row menus
-  offer Rename and Delete with Undo; empty terminal entries are filtered. Terminal
-  detail is a summary, not an imported chat transcript. Opening a past entry
-  never starts a process until Resume. The session picker groups Active / Stopped,
+  offer Rename and Delete with Undo. Starting/running project terminals appear
+  immediately with a Running badge, even before the history query completes;
+  opening one focuses its existing tab without Resume or a duplicate launch.
+  Only ended terminals without a user transcript are hidden, because an unused
+  shell is not a conversation to resume. Stopped linked conversations offer
+  Resume. Terminal detail is a summary, not an imported chat transcript. Opening
+  a past entry never starts a process until explicit Resume. The session picker groups Active / Stopped,
   shows title, status, start time and workspace, and can clear stopped rows.
 
 ## Phase 4 — tools per connection (MCP servers)

@@ -144,3 +144,11 @@ they do not substitute for exact-version packaged/native or live-provider QA.
 packaged cleanup, terminal rendering confirmation and live-adapter limits. Historical 46-family
 and alpha40/41 results retain their exact source boundary, not this increment's
 acceptance. The seven canvas organization tools plus unlink_reference bring the current MCP inventory to 52.
+
+## Round 8 contracts
+
+The existing BD01/BD02/BD06/BD08/BD21/BD22, AG15/AG17, BC01/BC02/BC07/BC09/BC11-BC13
+and RR01 rows now cover terminal recovery, launch phases, status and commands.
+[Brain dock](../brain-dock.md) owns the detailed history and status contracts;
+[alpha45 verification](../verification/0.3.0-alpha.45.md) separates reported
+fixture/mock evidence from packaged/native/live checks.
