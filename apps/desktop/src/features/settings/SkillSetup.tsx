@@ -163,8 +163,9 @@ export function SkillSetup({ disabled = false }: { disabled?: boolean }) {
         hint="Review the destination before any files are written."
       >
         <p>
-          Existing unowned or edited files are preserved. An older playbook copy
-          needs a separate migration; this installer will not overwrite it.
+          Existing unowned or edited files are preserved. A copy installed by
+          agent-playbook 2.0 or older is never overwritten: remove it with that
+          playbook version, or move it aside after saving your edits.
         </p>
         <div className="button-row">
           <Button
