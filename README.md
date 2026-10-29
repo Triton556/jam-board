@@ -136,9 +136,9 @@ or full-playbook option. Review the destination, then confirm install and verify
 
 Upgrade preserves a backup outside the skill catalog and checks a matching private
 app ownership receipt. Modified files, an existing foreign skill or missing
-ownership proof stop before overwrite. For a skill installed by an older playbook,
-use that original installer's migration/removal procedure first; this application
-never adopts or removes another installer's files silently. Global client settings
+ownership proof stop before overwrite. A copy installed by agent-playbook 2.0 or
+older must be removed with that playbook version, or moved aside after saving your
+edits; this application never adopts or removes another installer's files silently. Global client settings
 and other skills remain unchanged. File verification is not a live-model or MCP
 compatibility test. See [standalone skill and migration](docs/agent-playbook-compatibility.md).
 
