@@ -801,13 +801,29 @@ it("announces pending move without a speculative jump and exposes read-only reco
     persistent: true,
     text: expect.stringContaining("Move result unconfirmed for JB-7"),
   });
+  const readsBeforeRetry = read.mock.calls.length;
   read.mockResolvedValue(before as BoardTasks);
-  await user.click(screen.getByRole("button", { name: "Try again" }));
+  const retry = screen.getByRole("button", { name: "Try again" });
+  await waitFor(() => expect(retry).toBeEnabled());
+  // The drag sensor briefly suppresses clicks after pointerUp. Wait for actual
+  // click delivery before the single recovery action, without a timed sleep.
+  const clickDelivered = vi.fn();
+  document.body.addEventListener("click", clickDelivered);
+  try {
+    await waitFor(() => {
+      fireEvent.click(document.body);
+      expect(clickDelivered).toHaveBeenCalledTimes(1);
+    });
+  } finally {
+    document.body.removeEventListener("click", clickDelivered);
+  }
+  await user.click(retry);
   await waitFor(() =>
     expect(
       screen.queryByText(/Could not refresh board or team/),
     ).not.toBeInTheDocument(),
   );
+  expect(read).toHaveBeenCalledTimes(readsBeforeRetry + 1);
   expect(move).toHaveBeenCalledTimes(1);
   expect(client.getQueryData(["boardTasks"])).toEqual(before);
   move.mockRestore();
