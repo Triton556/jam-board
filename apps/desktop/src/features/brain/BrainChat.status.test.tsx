@@ -71,6 +71,63 @@ function mount(
     </QueryClientProvider>,
   );
 }
+it.each(["ready", "running"] as const)(
+  "R9-A/BD02 composer %s action has a shared square size class and accessible name",
+  async (status) => {
+    session = { ...session, status };
+    mount();
+    const action = await screen.findByRole("button", {
+      name: status === "ready" ? "Send" : "Stop",
+    });
+    expect(action).toHaveClass("icon-button", "brain-composer-action");
+    expect(action).toHaveTextContent(/^$/);
+    if (status === "ready") {
+      expect(action).toBeDisabled();
+      const reason = screen.getByRole("group", { name: "Send unavailable" });
+      expect(reason).toHaveAccessibleDescription(
+        "Write a message or add context to send",
+      );
+    } else {
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "fill",
+        "currentColor",
+      );
+      await userEvent.setup().hover(action);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        "Stop response",
+      );
+    }
+  },
+);
+it("R9-A/BD02 sending keeps the square box busy and retains the draft after failure", async () => {
+  let reject!: (reason: Error) => void;
+  vi.spyOn(mockDockApi, "sendPrompt").mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+  );
+  mount();
+  const user = userEvent.setup();
+  const input = await screen.findByRole("textbox", {
+    name: "Message the brain",
+  });
+  await user.type(input, "Retain this draft");
+  const send = screen.getByRole("button", { name: "Send" });
+  await user.hover(send);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Send (Enter)");
+  await user.click(send);
+  const busy = screen.getByRole("button", { name: "Sending…" });
+  expect(busy).toHaveClass("icon-button", "brain-composer-action");
+  expect(busy).toHaveAttribute("aria-busy", "true");
+  expect(busy).toBeDisabled();
+  reject(new Error("Synthetic send failure"));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Synthetic send failure",
+  );
+  expect(input).toHaveValue("Retain this draft");
+  expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+});
 it("R8-C/BD02-BD06 chip shows context percentage with exact tokens and cumulative cost", async () => {
   mount(<BrainStatusChip events={events} open={vi.fn()} />);
   expect(

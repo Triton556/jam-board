@@ -25,7 +25,7 @@ import {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Button, IconButton } from "../../components/ui";
+import { Button, IconButton, Tooltip } from "../../components/ui";
 import { agentDockApi } from "../../lib/agent-dock";
 import type {
   AgentDockEvent,
@@ -64,6 +64,7 @@ import {
   useBrainContext,
   useBrainState,
 } from "./brain-store";
+import { DisabledReason } from "./DisabledReason";
 import { voicePrompt } from "./voice-take";
 
 type EventOf<K extends AgentDockEvent["kind"]> = Extract<
@@ -1060,6 +1061,35 @@ export function BrainComposer({
       setPending(false);
     }
   };
+  const sendReason = pending
+    ? "Sending…"
+    : voiceActive
+      ? "Finish voice input before sending"
+      : session.status !== "ready"
+        ? "This session is not ready for a prompt."
+        : !draft.text.trim() && !attachments.length && !context.length
+          ? "Write a message or add context to send"
+          : blockedAttachments && !advertisedUsage
+            ? configuring
+              ? "Wait for session choices to finish applying"
+              : "Resolve pending or unsupported attachments before sending"
+            : undefined;
+  const sendButton = (
+    <button
+      type="button"
+      className="icon-button brain-composer-action brain-composer-send"
+      aria-label={pending ? "Sending…" : "Send"}
+      aria-busy={pending}
+      disabled={!!sendReason}
+      onClick={() => void send()}
+    >
+      {pending ? (
+        <LoaderCircle size={16} className="brain-spinner" aria-hidden="true" />
+      ) : (
+        <Send size={16} aria-hidden="true" />
+      )}
+    </button>
+  );
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Composer is a drop region containing independently focusable controls. */
     <div
@@ -1227,8 +1257,10 @@ export function BrainComposer({
           openModelEpoch={modelRequest}
         />
         {running ? (
-          <Button
-            variant="secondary"
+          <IconButton
+            label="Stop response"
+            aria-label="Stop"
+            className="icon-button brain-composer-action"
             disabled={pending}
             onClick={async () => {
               setPending(true);
@@ -1241,25 +1273,18 @@ export function BrainComposer({
               }
             }}
           >
-            <Square size={14} />
-            Stop
-          </Button>
+            <Square size={14} fill="currentColor" aria-hidden="true" />
+          </IconButton>
         ) : ["stopped", "failed"].includes(session.status) ? (
           <Button onClick={() => void restart()}>Restart session</Button>
         ) : (
-          <Button
-            disabled={
-              pending ||
-              voiceActive ||
-              (!draft.text.trim() && !attachments.length && !context.length) ||
-              (blockedAttachments && !advertisedUsage) ||
-              session.status !== "ready"
-            }
-            onClick={() => void send()}
-          >
-            <Send size={14} />
-            {pending ? "Sending…" : "Send"}
-          </Button>
+          <DisabledReason reason={sendReason} label="Send unavailable">
+            {sendReason ? (
+              sendButton
+            ) : (
+              <Tooltip text="Send (Enter)">{sendButton}</Tooltip>
+            )}
+          </DisabledReason>
         )}
       </div>
       {configuring && <small role="status">Applying session choices…</small>}

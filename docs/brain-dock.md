@@ -265,6 +265,10 @@ editable because providers change them.
   epic, selected canvas notes) as a removable chip; `@` mentions board items; `/`
   lists the agent's commands. Model, effort, access, attachments and voice
   controls follow "Phase 3" below.
+- **Composer actions (Round 9):** Send/Stop are icon-only 32 px squares with accessible names Send and Stop; pending Send shows a spinner, aria-busy=true and name Sending…. Enabled tooltips are Send (Enter) / Stop response; disabled Send keeps focusable reasons for empty, voice, readiness, configuration and attachment guards. The row centers 32 px attachment/voice/actions and 32 px-high model/access chips, with 4 px minimum gaps and 12 px composer padding. Restart session remains text at 32 px height and fits at 375 px; model/access labels truncate without wrapping.
+  The recording/transcription strip sits above the textarea, keeping the action row anchored; voice-active Send is disabled with a reason. The mic uses the same 32 px square. Sending, cancellation, restart, scoped drafts and execution
+  grants retain their existing semantics (AG15 unchanged). R9-A reports scoped
+  DOM/Chromium/mock evidence; exact-package native/live checks remain unrun.
 - **Board entry points:** "Refine with brain", "Continue in brain chat" and canvas
   "Ask brain" stage an editable prompt and scope/context chips in the dock
   composer through `useBrainDock().compose`. They never send automatically or
