@@ -5,6 +5,33 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.45] - 2026-10-29
+
+Terminal conversations appear in History; chat launch recovery and Session status
+make connection state, context and recorded plan usage easier to inspect.
+
+### Added
+
+- Context chip with exact-token/cost tooltip and Session status through the chip,
+  session actions or local /status.
+- Codex Plan usage from the newest rollout for the exact session, with recorded
+  primary/secondary utilization and reset times when available.
+
+### Changed
+
+- Claude chat first launch has a 180-second adapter preparation budget followed
+  by initialization, with a clear connection-specific error, Retry and Show logs.
+- /status is handled locally. Exact /usage goes to the adapter when advertised,
+  preserving staged context/files; otherwise it opens local status. Unknown
+  commands retain the draft and show a provider-specific hint.
+
+### Fixed
+
+- Terminal sessions appear in History with a Running badge and focus their
+  existing tab. Recovery relinks alpha.44 entries using Claude's folder rule and
+  exact-session fallback scan, plus normalized Codex cwd matching. Ended shells
+  without a user transcript are excluded; native transcripts remain intact.
+
 ## [0.3.0-alpha.44] - 2026-10-28
 
 Board tools bind the intended project for agents; terminal startup, session history

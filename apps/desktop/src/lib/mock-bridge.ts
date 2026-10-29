@@ -687,7 +687,7 @@ export class MockBridge implements JamApi {
     this.skillPath = input.target;
     this.checkpoint();
     return {
-      version: "0.3.0-alpha.44",
+      version: "0.3.0-alpha.45",
       destination: input.target
         ? `${input.target.replace(/[\\/]$/, "")}/${input.client === "claude" ? ".claude" : ".agents"}/skills/jam-board`
         : null,
