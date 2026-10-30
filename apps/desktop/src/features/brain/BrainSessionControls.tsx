@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Shield } from "lucide-react";
+import { RefreshCw, Shield, SlidersHorizontal } from "lucide-react";
 import {
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -733,6 +734,72 @@ export function BrainLauncher({
   );
 }
 
+function booleanValues(option: ConfigOption) {
+  if (option.values.length !== 2) return;
+  for (const [on, off] of [
+    ["on", "off"],
+    ["true", "false"],
+  ]) {
+    const enabled = option.values.find((v) => v.value.toLowerCase() === on);
+    const disabled = option.values.find((v) => v.value.toLowerCase() === off);
+    if (enabled && disabled) return { on: enabled.value, off: disabled.value };
+  }
+}
+
+function MoreOption({
+  option,
+  disabled,
+  change,
+}: {
+  option: ConfigOption;
+  disabled: boolean;
+  change(value: string): void;
+}) {
+  const id = useId();
+  const pair = booleanValues(option);
+  return (
+    <div className={`brain-more-option ${pair ? "brain-more-switch" : ""}`}>
+      <div className="brain-more-copy">
+        <label id={`${id}-label`} htmlFor={id}>
+          {option.name}
+        </label>
+        {option.description && (
+          <small id={`${id}-description`}>{option.description}</small>
+        )}
+      </div>
+      {pair ? (
+        <button
+          id={id}
+          type="button"
+          role="switch"
+          className="switch"
+          aria-labelledby={`${id}-label`}
+          aria-describedby={
+            option.description ? `${id}-description` : undefined
+          }
+          aria-checked={option.value === pair.on}
+          disabled={disabled}
+          onClick={() => change(option.value === pair.on ? pair.off : pair.on)}
+        >
+          <span />
+        </button>
+      ) : (
+        <CustomSelect
+          id={id}
+          label={option.name}
+          value={option.value}
+          disabled={disabled}
+          options={option.values.map((v) => ({
+            value: v.value,
+            label: v.name,
+          }))}
+          onChange={change}
+        />
+      )}
+    </div>
+  );
+}
+
 export function SessionControls({
   session,
   options,
@@ -767,6 +834,24 @@ export function SessionControls({
   const other = options.filter(
     (o) => !["model", "thought_level", "mode"].includes(optionCategory(o)),
   );
+  // ACP does not advertise defaults: use Off for boolean pairs, otherwise the
+  // first value advertised in this session (not the first selectable item).
+  const defaults = useRef({
+    sessionId: session.id,
+    values: new Map<string, string>(),
+  });
+  if (defaults.current.sessionId !== session.id)
+    defaults.current = { sessionId: session.id, values: new Map() };
+  for (const option of other) {
+    if (!defaults.current.values.has(option.id))
+      defaults.current.values.set(
+        option.id,
+        booleanValues(option)?.off ?? option.value,
+      );
+  }
+  const activeMore = other.filter(
+    (o) => o.value !== defaults.current.values.get(o.id),
+  ).length;
   const change = async (option: ConfigOption, value: string) => {
     if (busy || disabled) return;
     setBusy(true);
@@ -907,26 +992,34 @@ export function SessionControls({
         </div>
       )}
       {!!other.length && (
-        <div className="brain-control-anchor">
-          <Button
-            variant="ghost"
-            onClick={() => setOpen(open === "more" ? null : "more")}
-          >
-            More
-          </Button>
+        <div className="brain-control-anchor brain-more-anchor">
+          <Tooltip text="More session options">
+            <button
+              type="button"
+              className="brain-control-chip brain-more-chip"
+              aria-label="More options"
+              aria-expanded={open === "more"}
+              onClick={() => setOpen(open === "more" ? null : "more")}
+            >
+              <SlidersHorizontal size={14} aria-hidden="true" />
+              {activeMore > 0 && (
+                <span
+                  className="brain-more-active"
+                  role="status"
+                  aria-label={`${activeMore} active session options`}
+                />
+              )}
+            </button>
+          </Tooltip>
           {open === "more" && (
             <ControlPopover label="More options" close={() => setOpen(null)}>
+              <strong>More options</strong>
               {other.map((o) => (
-                <CustomSelect
+                <MoreOption
                   key={o.id}
-                  label={o.name}
-                  value={o.value}
+                  option={o}
                   disabled={disabled || busy}
-                  options={o.values.map((v) => ({
-                    value: v.value,
-                    label: v.name,
-                  }))}
-                  onChange={(value) => void change(o, value)}
+                  change={(value) => void change(o, value)}
                 />
               ))}
             </ControlPopover>
