@@ -1,5 +1,23 @@
 # Known gaps and next work
 
+## Round 10 More options evidence boundary
+
+R10-A on the alpha46 baseline adds labels, descriptions, boolean switches and a
+32 px icon-only More chip with an active dot. Final standard checks passed:
+254/254 brain DOM tests, both typechecks, Biome, and 23/23 headless Chromium/mock
+dock scenarios. All 12 requested PNGs were inspected: full model/effort label at
+1440 and 1000, visible dot/focus ring in Light/Dark, 36 px row, bounded 375 popover.
+More-switch Off boundaries use --ink-2: 5.94:1 Light / 6.29:1 Dark against the
+popover; thumb, On and keyboard outline pass 3:1 in both themes. Four focused
+3x crops and computed-color records supplement the 12-PNG matrix.
+When More is present in a dock up to 479 px wide, Access uses its icon form to
+preserve model-label space. Native/package/live-provider checks remain unrun.
+See `test-visuals/round10/r10-more-options/report.md`.
+ConfigOption has no default field: boolean pairs use Off; other options compare
+against their first advertised value in the mounted session controls. Reopening
+a session cannot reconstruct a provider default that was never advertised.
+No release version bump or native package was prepared.
+
 ## Round 9 composer evidence boundary
 
 R9-A reports DOM and Chromium/mock checks for icon-only actions, 32 px controls,

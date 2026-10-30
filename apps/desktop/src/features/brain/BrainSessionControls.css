@@ -26,3 +26,80 @@
 .brain-chat-status-header {
   padding: 4px 12px;
 }
+
+.brain-more-option {
+  margin-top: 16px;
+  min-width: 0;
+}
+.brain-more-copy {
+  min-width: 0;
+}
+.brain-more-copy label {
+  font-weight: 600;
+}
+.brain-more-copy small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.brain-more-option > .custom-select {
+  margin-top: 8px;
+}
+.brain-more-switch {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+.brain-more-switch > .switch {
+  flex-shrink: 0;
+}
+/* A visible boundary and thumb identify Off even on the dark card surface. */
+.brain-more-switch > .switch::before {
+  border-color: var(--ink-2);
+}
+.brain-more-switch > .switch[aria-checked="false"] > span {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+}
+.brain-more-switch > .switch[aria-checked="true"] > span {
+  border-color: var(--card);
+}
+.brain-more-switch > .switch:focus-visible {
+  outline-color: var(--ink);
+}
+.brain-more-chip {
+  flex-shrink: 0;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding-inline: 0;
+  justify-content: center;
+}
+.brain-more-chip > .brain-more-active {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  flex-shrink: 0;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+/* Preserve the model label when the extra chip shares a compact dock row. */
+@container brain-dock (max-width: 479px) {
+  .brain-session-controls:has(.brain-more-anchor) .brain-access-chip > span {
+    display: none;
+  }
+  .brain-session-controls:has(.brain-more-anchor) .brain-access-chip {
+    width: 32px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+}
+
+.brain-more-anchor {
+  flex: 0 0 auto;
+}

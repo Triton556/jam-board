@@ -1261,7 +1261,7 @@ it("BC13 category chips hide independently and Access explains known and agent-d
   expect(
     screen.queryByRole("button", { name: /Model and effort:/ }),
   ).toBeNull();
-  expect(screen.getByRole("button", { name: "More" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "More options" })).toBeVisible();
   act(() =>
     inject({
       kind: "config_options",
@@ -1736,6 +1736,132 @@ it("BC12 cached ACP choices apply only after ready even when the dock has closed
     value: "high",
   });
 });
+
+it("R10-A/BC07 More visibly names and describes both paths and returns focus", async () => {
+  mount();
+  const user = await openChat();
+  const trigger = screen.getByRole("button", { name: "More options" });
+  expect(trigger).toHaveTextContent("");
+  expect(trigger.querySelector("svg")).not.toBeNull();
+  await user.click(trigger);
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("Fast mode", { selector: "label" })).toBeVisible();
+  expect(
+    screen.getByText("Faster responses on supported models"),
+  ).toBeVisible();
+  expect(screen.getByRole("switch", { name: "Fast mode" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect(screen.getByLabelText("Response style")).toBe(
+    screen.getByRole("combobox", { name: "Response style" }),
+  );
+  expect(screen.getByText("Mock fixture for session choices.")).toBeVisible();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
+  expect(trigger).toHaveFocus();
+});
+
+it("R10-A/BC07 switch guards pending changes and updates the indicator", async () => {
+  mount();
+  const user = await openChat();
+  let release: () => void = () => {};
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const original = mockDockApi.setConfigOption;
+  const apply = vi
+    .spyOn(mockDockApi, "setConfigOption")
+    .mockImplementation(async (value) => {
+      await waiting;
+      await original(value);
+    });
+  await user.click(screen.getByRole("button", { name: "More options" }));
+  expect(screen.queryByLabelText("1 active session options")).toBeNull();
+  await user.click(screen.getByRole("switch", { name: "Fast mode" }));
+  expect(apply).toHaveBeenCalledExactlyOnceWith({
+    sessionId: useBrainState.getState().selected.chat,
+    optionId: "fast",
+    value: "on",
+  });
+  expect(screen.getByText("Applying session choices…")).toBeVisible();
+  expect(screen.getByRole("switch", { name: "Fast mode" })).toBeDisabled();
+  expect(
+    screen.getByRole("combobox", { name: "Response style" }),
+  ).toBeDisabled();
+  await act(async () => release());
+  await waitFor(() =>
+    expect(screen.getByRole("switch", { name: "Fast mode" })).toBeEnabled(),
+  );
+  expect(screen.getByRole("switch", { name: "Fast mode" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  expect(screen.getByLabelText("1 active session options")).toBeVisible();
+  await user.click(screen.getByRole("switch", { name: "Fast mode" }));
+  await waitFor(() =>
+    expect(screen.queryByLabelText("1 active session options")).toBeNull(),
+  );
+});
+
+it("R10-A/BC07 dropdown changes and restores its baseline; running disables both paths", async () => {
+  mount();
+  const user = await openChat();
+  const apply = vi.spyOn(mockDockApi, "setConfigOption");
+  await user.click(screen.getByRole("button", { name: "More options" }));
+  await user.click(screen.getByRole("combobox", { name: "Response style" }));
+  await user.click(screen.getByRole("option", { name: "Concise" }));
+  expect(apply).toHaveBeenCalledWith({
+    sessionId: useBrainState.getState().selected.chat,
+    optionId: "mock-response-style",
+    value: "concise",
+  });
+  expect(screen.getByLabelText("1 active session options")).toBeVisible();
+  await user.click(screen.getByRole("combobox", { name: "Response style" }));
+  await user.click(screen.getByRole("option", { name: "Balanced" }));
+  expect(screen.queryByLabelText("1 active session options")).toBeNull();
+  act(() => inject({ kind: "status", status: "running" }));
+  expect(screen.getByRole("switch", { name: "Fast mode" })).toBeDisabled();
+  expect(
+    screen.getByRole("combobox", { name: "Response style" }),
+  ).toBeDisabled();
+});
+
+it.each([
+  ["ON", "OFF"],
+  ["True", "False"],
+])(
+  "R10-A/BC07 %s/%s is case insensitive; initial On is active",
+  async (on, off) => {
+    mount();
+    const user = await openChat();
+    act(() =>
+      inject({
+        kind: "config_options",
+        options: [
+          {
+            id: "toggle",
+            name: "Fixture toggle",
+            value: on,
+            values: [
+              { value: on, name: "Enabled" },
+              { value: off, name: "Disabled" },
+            ],
+          },
+        ],
+      }),
+    );
+    const apply = vi.spyOn(mockDockApi, "setConfigOption").mockResolvedValue();
+    expect(screen.getByLabelText("1 active session options")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("switch", { name: "Fixture toggle" }));
+    expect(apply).toHaveBeenCalledWith({
+      sessionId: useBrainState.getState().selected.chat,
+      optionId: "toggle",
+      value: off,
+    });
+  },
+);
 
 it("BC13 Send waits for an in-flight model change and retains the message", async () => {
   mount();

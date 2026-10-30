@@ -611,7 +611,7 @@ it("R6-H11 rows open read-only, show resumable pills, and reveal Rename/Delete t
   expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
   expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
   fireEvent.click(
-    screen.getAllByRole("button", { name: /^Open / })[2] as HTMLElement,
+    screen.getByRole("button", { name: "Open none conversation" }),
   );
   expect(open).toHaveBeenCalledWith(entries[2]);
   expect(resume).not.toHaveBeenCalled();

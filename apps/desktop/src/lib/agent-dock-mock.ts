@@ -233,6 +233,32 @@ function mockOptions(
               },
             ],
     });
+  if (session.kind === "acp" && session.profileId.startsWith("claude"))
+    options.push(
+      {
+        id: "fast",
+        name: "Fast mode",
+        description: "Faster responses on supported models",
+        category: "model_config",
+        value: "off",
+        values: [
+          { value: "on", name: "On" },
+          { value: "off", name: "Off" },
+        ],
+      },
+      {
+        id: "mock-response-style",
+        name: "Response style",
+        description: "Mock fixture for session choices.",
+        category: "model_config",
+        value: "balanced",
+        values: [
+          { value: "balanced", name: "Balanced" },
+          { value: "concise", name: "Concise" },
+          { value: "detailed", name: "Detailed" },
+        ],
+      },
+    );
   return options;
 }
 const histories = new Map<string, AgentDockEvent[]>();

@@ -1,4 +1,6 @@
+import { writeFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
+import sharp from "sharp";
 
 async function openDock(page: Page) {
   await page.goto("/");
@@ -646,3 +648,192 @@ test("I1-R4 Claude and Codex model options stay scoped to the selected connectio
   ).toBeVisible();
   await expect(launcher).not.toContainText("Claude Opus");
 });
+
+for (const variant of [
+  { name: "1440-light", width: 1440, theme: "light" },
+  { name: "1440-dark", width: 1440, theme: "dark" },
+  { name: "1000-light", width: 1000, theme: "light" },
+  { name: "375-light", width: 375, theme: "light" },
+]) {
+  test(`R10-A/BC07 More options ${variant.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: variant.width, height: 900 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openDock(page);
+    await startChat(page);
+    await page.evaluate((theme) => {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+    }, variant.theme);
+    await page.evaluate(() => document.fonts.ready);
+    const trigger = page.getByRole("button", {
+      name: "More options",
+      exact: true,
+    });
+    const indicator = trigger.getByRole("status");
+    const row = page.locator(".brain-composer-actions");
+    const checkRow = async () => {
+      expect((await row.boundingBox())?.height).toBe(36);
+      expect((await trigger.boundingBox())?.height).toBe(32);
+      expect((await trigger.boundingBox())?.width).toBe(32);
+      expect(await trigger.textContent()).toBe("");
+      if (variant.width >= 1000) {
+        const modelLabel = page.locator(
+          ".brain-model-anchor .brain-control-chip > span",
+        );
+        await expect(modelLabel).toHaveText("Claude Sonnet 4.6 · Auto");
+        expect(
+          await modelLabel.evaluate(
+            (label) => label.scrollWidth <= label.clientWidth,
+          ),
+        ).toBe(true);
+      }
+      const inside = await row.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return [...element.querySelectorAll("button")]
+          .filter((button) => !button.closest("[data-brain-popover]"))
+          .every((button) => {
+            const rect = button.getBoundingClientRect();
+            return rect.left >= box.left && rect.right <= box.right;
+          });
+      });
+      expect(inside).toBe(true);
+    };
+    const shot = async (state: string) => {
+      await page.screenshot({
+        path: `../../test-visuals/round10/r10-more-options/${variant.name}-${state}.png`,
+      });
+    };
+    await expect(trigger).toBeVisible();
+    await expect(indicator).toHaveCount(0);
+    await checkRow();
+    await shot("off");
+    await trigger.click();
+    const popover = page
+      .locator("[data-brain-popover]")
+      .filter({ has: page.getByRole("switch", { name: "Fast mode" }) });
+    await expect(
+      popover.getByText("Faster responses on supported models"),
+    ).toBeVisible();
+    await expect(
+      popover.getByRole("combobox", { name: "Response style" }),
+    ).toBeVisible();
+    const bounds = await popover.boundingBox();
+    expect(bounds?.x).toBeGreaterThanOrEqual(8);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(
+      variant.width - 8,
+    );
+    await checkRow();
+    await shot("open");
+    const toggle = popover.getByRole("switch", { name: "Fast mode" });
+    const measurements: Record<string, unknown> = {};
+    const inspectSwitch = async (state: "off" | "on") => {
+      // Enter keyboard modality and return to the switch from its neighbour.
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+      await expect(toggle).toBeFocused();
+      const measured = await toggle.evaluate((button) => {
+        const surface = getComputedStyle(
+          button.closest("[data-brain-popover]") as HTMLElement,
+        ).backgroundColor;
+        const track = getComputedStyle(button, "::before");
+        const thumb = getComputedStyle(
+          button.querySelector("span") as HTMLElement,
+        );
+        const control = getComputedStyle(button);
+        const luminance = (color: string) => {
+          const rgb = color.match(/[\d.]+/g)?.map(Number) ?? [];
+          if (rgb.length !== 3)
+            throw new Error(`Expected opaque RGB color: ${color}`);
+          const [red = 0, green = 0, blue = 0] = rgb.map((value) => {
+            const channel = value / 255;
+            return channel <= 0.04045
+              ? channel / 12.92
+              : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+        };
+        const contrast = (first: string, second: string) => {
+          const a = luminance(first),
+            b = luminance(second);
+          return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        };
+        return {
+          colors: {
+            surface,
+            track: track.backgroundColor,
+            border: track.borderTopColor,
+            thumb: thumb.backgroundColor,
+            focus: control.outlineColor,
+          },
+          ratios: {
+            boundaryToSurface: contrast(track.borderTopColor, surface),
+            trackToSurface: contrast(track.backgroundColor, surface),
+            thumbToTrack: contrast(
+              thumb.backgroundColor,
+              track.backgroundColor,
+            ),
+            focusToSurface: contrast(control.outlineColor, surface),
+          },
+          focusVisible: button.matches(":focus-visible"),
+          outlineWidth: control.outlineWidth,
+          outlineStyle: control.outlineStyle,
+          outlineOffset: control.outlineOffset,
+        };
+      });
+      expect(measured.ratios.boundaryToSurface).toBeGreaterThanOrEqual(3);
+      expect(measured.ratios.thumbToTrack).toBeGreaterThanOrEqual(3);
+      expect(measured.ratios.focusToSurface).toBeGreaterThanOrEqual(3);
+      if (state === "on")
+        expect(measured.ratios.trackToSurface).toBeGreaterThanOrEqual(3);
+      expect(measured.focusVisible).toBe(true);
+      expect(measured.outlineWidth).toBe("2px");
+      expect(measured.outlineStyle).toBe("solid");
+      expect(measured.outlineOffset).toBe("2px");
+      measurements[state] = measured;
+      if (variant.width === 1440) {
+        const box = await toggle.boundingBox();
+        if (!box) throw new Error("Switch has no bounds");
+        const width = Math.ceil(box.width + 16),
+          height = Math.ceil(box.height + 16);
+        const crop = await page.screenshot({
+          clip: { x: box.x - 8, y: box.y - 8, width, height },
+        });
+        await sharp(crop)
+          .resize(width * 3, height * 3, { kernel: "nearest" })
+          .toFile(
+            `../../test-visuals/round10/r10-more-options/switch-${variant.theme}-${state}-3x.png`,
+          );
+      }
+    };
+    await inspectSwitch("off");
+    await toggle.press("Space");
+    await expect(
+      popover.getByRole("switch", { name: "Fast mode" }),
+    ).toBeChecked();
+    await inspectSwitch("on");
+    await writeFile(
+      `../../test-visuals/round10/r10-more-options/contrast-${variant.name}.json`,
+      JSON.stringify(measurements, null, 2),
+    );
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    await expect(indicator).toBeVisible();
+    await checkRow();
+    await shot("on");
+    await trigger.click();
+    await popover.getByRole("combobox", { name: "Response style" }).click();
+    await page.getByRole("option", { name: "Concise", exact: true }).click();
+    await expect(
+      popover.getByRole("combobox", { name: "Response style" }),
+    ).toContainText("Concise");
+    await expect(
+      popover.getByRole("switch", { name: "Fast mode" }),
+    ).toBeChecked();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    await expect(indicator).toHaveAttribute(
+      "aria-label",
+      "2 active session options",
+    );
+  });
+}
