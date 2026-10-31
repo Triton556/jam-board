@@ -5,6 +5,50 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0-alpha.47] - 2026-10-31
+
+Project folders make boards portable, and task files keep the material for each
+task close to the work. Existing app-data projects keep working.
+
+### Added
+
+- **Project folders.** Create or open a board in its own folder with jamboard.json,
+  a readable board.json snapshot that is safe for git, and a local .state/.
+  Locate a moved folder or remove a project from the list. Old projects keep
+  working from app data.
+- **Move to folder.** Preview what moves, follow step-by-step progress, and
+  resume or roll back an interrupted move. Moving is refused while agents are
+  connected.
+- **Backups and recovery.** Automatic backups keep 10 recent plus 7 daily copies;
+  Save now writes a snapshot on demand. If board.json changes outside the app or
+  .state is missing, compare, keep or restore through the recovery dialog.
+- **Task files.** Attach a copy in the board, a link into your game repo, or a URL.
+  Give each file a role: to edit, reference, or result. Open, reveal, reorder or
+  unlink files; missing and unreadable files are flagged.
+- **Large task view.** Open tasks in a large modal with ?taskView=modal as well as
+  the side drawer, keeping edits and pending work when switching views.
+- **Assets filters.** Filter assets by storage and by used by tasks.
+
+### Changed
+
+- **Agents and project folders.** Agents started from chat reach the right board
+  from any working directory or worktree and run in the project's working
+  directory. New MCP tools: register_file, link_task_file, set_task_file_role,
+  unlink_task_file and resolve_file; get_task lists files. The bundled guide
+  explains copy versus link and file roles.
+- **Narrow window.** Top-bar actions move into a labeled More menu at narrow widths.
+- **Composer options (Round 10).** More options show names and descriptions;
+  On/Off options such as Fast mode use switches. More is an icon chip with an
+  active dot.
+
+### Fixed
+
+- **Focus.** Clicking inside the task modal no longer leaves a focus ring around
+  the modal itself. Keyboard focus remains visible on controls.
+- Keep the background inactive until a closing task drawer or modal has fully
+  left its route, preventing background actions from reopening it.
+
+
 ## [0.3.0-alpha.46] - 2026-10-30
 
 Standalone board guidance is easier to maintain and migrate; the chat composer
