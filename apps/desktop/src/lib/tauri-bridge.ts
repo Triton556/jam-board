@@ -20,6 +20,62 @@ async function unwrap<T>(
   return result.data;
 }
 export const tauriApi: JamApi = {
+  fileOperationStatus: (context, id) =>
+    unwrap(commands.fileOperationStatus(context, id)),
+  cancelFileOperation: (context, id) =>
+    unwrap(commands.cancelFileOperation(context, id)),
+  resolveFile: async (context, assetId) => {
+    const settings = await tauriApi.getSettings();
+    return unwrap(
+      commands.resolveFile(context, {
+        assetId,
+        workingDirectory: settings.workingDirectory ?? null,
+      }),
+    );
+  },
+  openFile: async (context, id, reveal) => {
+    await unwrap(
+      reveal
+        ? commands.revealFileAsset(context, id)
+        : commands.openFileAsset(context, id),
+    );
+  },
+  projectSelectionContext: async () => {
+    try {
+      return await unwrap(commands.projectSelectionContext());
+    } catch (error) {
+      if (error instanceof JamError && error.code === "not_found") return null;
+      throw error;
+    }
+  },
+  projectFolderInfo: () => unwrap(commands.projectFolderInfo()),
+  listProjectFolders: () => unwrap(commands.listProjectFolders()),
+  createProjectFolder: (folder, name, ack, initialization = null) =>
+    unwrap(commands.createProjectFolder(folder, name, ack, initialization)),
+  openProjectFolder: (folder, ack, separate = false) =>
+    unwrap(commands.openProjectFolder(folder, ack, separate)),
+  registerFile: (context, input) =>
+    unwrap(commands.registerFile(context, input)),
+  linkTaskFile: (context, input) =>
+    unwrap(commands.linkTaskFile(context, input)),
+  setTaskFileRole: (context, input) =>
+    unwrap(commands.setTaskFileRole(context, input)),
+  unlinkTaskFile: (context, input) =>
+    unwrap(commands.unlinkTaskFile(context, input)),
+  listFileAssets: (context, query) =>
+    unwrap(
+      commands.listFileAssets(context, {
+        kind: null,
+        query: null,
+        storageType: null,
+        taskKey: null,
+        role: null,
+        limit: null,
+        cursor: null,
+        workingDirectory: null,
+        ...query,
+      }),
+    ),
   releaseTask: (input) => unwrap(commands.releaseTask(input)),
   getExecution: (scope) => unwrap(commands.getExecution(scope)),
   listExecution: () => unwrap(commands.listExecution()),
@@ -252,21 +308,26 @@ export const tauriApi: JamApi = {
       }),
     ),
   getSettings: () => unwrap(commands.getSettings()),
-  setSettings: (input) =>
-    unwrap(
-      commands.setSettings({
-        projectFolder: null,
-        expectedProjectId: null,
-        theme: null,
-        soundEnabled: null,
-        colorBy: null,
-        estimatesEnabled: null,
-        wipLimit: null,
-        assetsView: null,
-        collapsedAssetKinds: null,
-        ...input,
-      }),
-    ),
+  setSettings: async (input, captured) => {
+    const context = captured ?? (await tauriApi.projectSelectionContext());
+    return unwrap(
+      commands.setSettings(
+        {
+          projectFolder: null,
+          expectedProjectId: null,
+          theme: null,
+          soundEnabled: null,
+          colorBy: null,
+          estimatesEnabled: null,
+          wipLimit: null,
+          assetsView: null,
+          collapsedAssetKinds: null,
+          ...input,
+        },
+        context,
+      ),
+    );
+  },
   resetJam: (input) => unwrap(commands.resetJam(input)),
   exportJamJson: () => unwrap(commands.exportJamJson()),
   importJamJson: (path) => unwrap(commands.importJamJson(path)),
@@ -376,7 +437,7 @@ export const tauriApi: JamApi = {
     let disposed = false;
     let stop: (() => void) | undefined;
     void events.boardChanged
-      .listen((event) => cb(event.payload.events))
+      .listen((event) => cb(event.payload.events, event.payload.projectContext))
       .then((unsubscribe) => {
         if (disposed) unsubscribe();
         else stop = unsubscribe;

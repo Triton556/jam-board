@@ -33,7 +33,7 @@ it.each([
   "config.json",
   "C:\\config\\CONFIG.JSON",
   "https://example.invalid/settings.json?download=1#file",
-])("generic JSON %s is not inferred as a game level", (location) => {
+])("generic JSON %s retains Other instead of Document or Level", (location) => {
   expect(assetKind(location)).toBe("other");
 });
 it.each(["map.tmx", "WORLD.LDTK?download=1"])(
@@ -146,7 +146,15 @@ it("editing a persisted JSON level preserves its explicit classification", async
   );
 });
 it("the empty Assets page describes a general project, without creating or reclassifying anything", async () => {
-  vi.spyOn(api, "listAssets").mockResolvedValue([]);
+  await api.createJam({
+    name: "Empty project",
+    template: "custom",
+    theme: null,
+    startsAt: "2026-10-30T00:00:00Z",
+    endsAt: "2026-11-30T00:00:00Z",
+    timezone: "UTC",
+    yourName: "Fixture",
+  });
   const create = vi.spyOn(api, "createAsset"),
     edit = vi.spyOn(api, "updateAsset");
   await mount(<AssetsPage openTask={vi.fn()} />);

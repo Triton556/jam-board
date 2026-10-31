@@ -2,8 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AudioLines,
+  Box,
   ChevronDown,
   ChevronRight,
+  FileText,
   Image,
   LayoutGrid,
   List,
@@ -15,6 +17,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
+import type { FileAsset } from "../../bindings";
 import {
   Button,
   Dialog,
@@ -32,12 +35,21 @@ import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
-import { useBoardSettings } from "../../lib/queries";
+import { appQuery, useBoardSettings } from "../../lib/queries";
+import {
+  type FileRole,
+  fileRoleLabels,
+  fileStatus,
+  fileUnavailable,
+  storageLabel,
+  taskFilesApi,
+} from "../../lib/task-files-api";
 import type { Asset, AssetWithTasks } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { useExplicitRead } from "../../lib/use-explicit-read";
 import { useProjectWrite } from "../../lib/use-project-write";
 import { useTableVirtualizer } from "../table/use-table-virtualizer";
+import { FileAvailability } from "../task/TaskFiles";
 import { AssetLinkDialog } from "./AssetLinkDialog";
 import { assetKind, assetKinds, assetName, assetSchema } from "./model";
 
@@ -46,6 +58,8 @@ const icons = {
   audio: AudioLines,
   level: MapIcon,
   font: Type,
+  model: Box,
+  document: FileText,
   other: Package,
 };
 export const assetColors = {
@@ -53,6 +67,8 @@ export const assetColors = {
   audio: "sky",
   level: "mint",
   font: "lilac",
+  model: "mint",
+  document: "butter",
   other: "butter",
 };
 export function AssetDialog({
@@ -230,11 +246,13 @@ export function AssetDialog({
 }
 function AssetCard({
   asset,
+  file,
   openTask,
   edit,
   link,
 }: {
   asset: AssetWithTasks;
+  file?: FileAsset;
   openTask(key: string): void;
   edit(): void;
   link(): void;
@@ -313,6 +331,10 @@ function AssetCard({
                 Link to task…
               </Button>
               <Button
+                disabled={!!file && fileUnavailable(file)}
+                title={
+                  file && fileUnavailable(file) ? fileStatus(file) : undefined
+                }
                 onClick={() => {
                   setMenu(false);
                   void (
@@ -334,6 +356,7 @@ function AssetCard({
           ? `…${asset.location.slice(-31)}`
           : asset.location}
       </p>
+      <FileAvailability asset={file} />
       <p className="asset-notes">{asset.notes || " "}</p>
       <div className="asset-tasks">
         {asset.tasks.slice(0, 3).map((t) => (
@@ -355,27 +378,64 @@ function AssetCard({
 }
 export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const { settings, update } = useBoardSettings();
+  const app = useQuery(appQuery);
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: () => api.listAssets(),
   });
+  const files = useQuery({
+    queryKey: ["file-assets", app.data?.jam?.id],
+    enabled: !!app.data?.jam,
+    queryFn: async () => {
+      const context = await taskFilesApi.capture(app.data?.jam?.id ?? "");
+      const [catalog, usages] = await Promise.all([
+        taskFilesApi.list(context),
+        taskFilesApi.usages(context),
+      ]);
+      return { catalog, usages };
+    },
+  });
+  const combined: AssetWithTasks[] = [...(assets.data ?? [])];
+  for (const file of files.data?.catalog ?? []) {
+    const index = combined.findIndex((a) => a.id === file.id);
+    const old = combined[index];
+    const tasks =
+      files.data?.usages[file.id]?.map((usage) => ({
+        key: usage.key,
+        title: `${usage.title} · ${fileRoleLabels[usage.role as FileRole] ?? usage.role}`,
+        status: usage.status,
+        fileRole: usage.role,
+      })) ??
+      old?.tasks ??
+      [];
+    const entry = { ...file, tasks };
+    if (index >= 0) combined[index] = entry;
+    else combined.push(entry);
+  }
   const batch = useFileDropBatch("assets");
   const [kind, setKind] = useState("all");
   const [dragActive, setDragActive] = useState(false);
   const [text, setText] = useState("");
   const [linked, setLinked] = useState("all");
+  const [storage, setStorage] = useState("all");
+  const storageId = useId(),
+    usedById = useId();
   const [sort, setSort] = useState("createdAt:desc");
   const [edit, setEdit] = useState<Asset | true | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const read = useExplicitRead(
-    JSON.stringify(["assets", kind, text, linked, sort]),
+    JSON.stringify(["assets", kind, text, linked, storage, sort]),
   );
   const refresh = () =>
-    void read.run(() => assets.refetch({ cancelRefetch: false }));
+    void read.run(async () => {
+      const result = await assets.refetch({ cancelRefetch: false });
+      if (result.isError) return result;
+      return files.refetch({ cancelRefetch: false });
+    });
   useEffect(
     () =>
       api.onFileDrop((paths, point) => {
-        if (document.querySelector(".drawer")) return;
+        if (document.querySelector(".drawer, [data-task-files]")) return;
         // onFileDrop has already converted physical pixels to CSS pixels.
         if (
           point &&
@@ -411,7 +471,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
     [batch.run],
   );
   const filtered =
-    assets.data
+    combined
       ?.slice()
       .sort((a, b) => {
         const [field, dir] = sort.split(":");
@@ -425,10 +485,14 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
       .filter(
         (a) =>
           (kind === "all" || a.kind === kind) &&
+          (storage === "all" ||
+            ("storageType" in a
+              ? a.storageType
+              : /^https?:\/\//i.test(a.location)
+                ? "url"
+                : "linked_file") === storage) &&
           (linked === "all" ||
-            (linked === "linked"
-              ? a.tasks.length > 0
-              : a.tasks.length === 0)) &&
+            files.data?.usages[a.id]?.some((usage) => usage.role === linked)) &&
           (!text ||
             `${a.name} ${a.location} ${a.notes}`
               .toLowerCase()
@@ -463,7 +527,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           </Button>
         </div>
       </PageHeading>
-      <div className="filter-bar">
+      <div className="filter-bar assets-file-filters">
         <div className="kind-filters">
           {["all", ...assetKinds].map((k) => (
             <Button
@@ -473,21 +537,41 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
             >
               <span className="capitalize">{k}</span>{" "}
               <small>
-                {assets.data?.filter((a) => k === "all" || a.kind === k)
-                  .length ?? "—"}
+                {combined.filter((a) => k === "all" || a.kind === k).length}
               </small>
             </Button>
           ))}
         </div>
-        <Select
-          aria-label="Asset links filter"
-          value={linked}
-          onChange={(e) => setLinked(e.target.value)}
-        >
-          <option value="all">All links</option>
-          <option value="linked">Linked</option>
-          <option value="unlinked">Unlinked</option>
-        </Select>
+        <div className="asset-file-filter">
+          <label htmlFor={storageId}>Storage:</label>
+          <Select
+            id={storageId}
+            aria-label="Storage"
+            value={storage}
+            onChange={(e) => setStorage(e.target.value)}
+          >
+            <option value="all">Any</option>
+            <option value="board_file">Board file</option>
+            <option value="linked_file">Linked</option>
+            <option value="url">URL</option>
+          </Select>
+        </div>
+        <div className="asset-file-filter">
+          <label htmlFor={usedById}>Used by tasks:</label>
+          <Select
+            id={usedById}
+            aria-label="Used by tasks"
+            value={linked}
+            onChange={(e) => setLinked(e.target.value)}
+          >
+            <option value="all">Any</option>
+            {Object.entries(fileRoleLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <input
           aria-label="Search assets"
           placeholder="Search assets…"
@@ -500,6 +584,40 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
         phase={read.phase}
         resource="assets"
       />
+      {files.error && !assets.error && (
+        <p role="alert">
+          Could not read file storage and task roles: {files.error.message}.{" "}
+          <Button onClick={() => void files.refetch()}>Retry files</Button>
+        </p>
+      )}
+      {!!files.data?.catalog.length && (
+        <details className="task-section asset-file-usage">
+          <summary>
+            <ChevronRight size={16} aria-hidden="true" />
+            File usage and roles
+          </summary>
+          {files.data.catalog
+            .filter((file) => filtered.some((a) => a.id === file.id))
+            .map((file) => (
+              <div key={file.id} className="asset-file-usage-row">
+                <div className="asset-file-usage-name">
+                  <strong title={file.storedPath}>{file.name}</strong>
+                  <small>{storageLabel(file.storageType)}</small>
+                </div>
+                {files.data.usages[file.id]?.length ? (
+                  files.data.usages[file.id]?.map((usage) => (
+                    <Button key={usage.key} onClick={() => openTask(usage.key)}>
+                      {usage.key} ·{" "}
+                      {fileRoleLabels[usage.role as FileRole] ?? usage.role}
+                    </Button>
+                  ))
+                ) : (
+                  <span className="muted">No task links</span>
+                )}
+              </div>
+            ))}
+        </details>
+      )}
       {assets.error && (
         <QueryError
           error={assets.error}
@@ -570,6 +688,8 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
                               audio: "Audio",
                               level: "Levels",
                               font: "Fonts",
+                              model: "Models",
+                              document: "Documents",
                               other: "Other",
                             } as Record<string, string>
                           )[k]
@@ -589,6 +709,9 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
                           <AssetCard
                             key={a.id}
                             asset={a}
+                            file={files.data?.catalog.find(
+                              (file) => file.id === a.id,
+                            )}
                             openTask={openTask}
                             edit={() => setEdit(a)}
                             link={() => setLink(a.id)}
@@ -600,12 +723,13 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               ))}
             </div>
           )
-        ) : assets.data.length ? (
+        ) : combined?.length ? (
           <EmptyState text="No assets match these filters">
             <Button
               onClick={() => {
                 setKind("all");
                 setLinked("all");
+                setStorage("all");
                 setText("");
               }}
             >

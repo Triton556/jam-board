@@ -104,10 +104,13 @@ it.each(["B", "ABA"])(
         client.setQueryData(["app"], { jam: { id: "A" } });
     });
     const other = screen.getByRole("button", { name: "New view control" });
+    // The modal makes background controls inert until it closes.
     other.focus();
+    expect(other).not.toHaveFocus();
     view.rerender(shell());
     expect(card.isConnected).toBe(true);
-    expect(other).toHaveFocus();
+    expect(document.body).toHaveFocus();
+    expect(card).not.toHaveFocus();
   },
 );
 it("route-owner unmount cannot restore into another still-mounted Board", () => {
@@ -130,7 +133,10 @@ it("route-owner unmount cannot restore into another still-mounted Board", () => 
   const destination = screen.getByRole("button", { name: "Destination" });
   destination.focus();
   view.rerender(shell(false));
-  expect(destination).toHaveFocus();
+  expect(document.body).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: "Unrelated board card" }),
+  ).not.toHaveFocus();
 });
 it("task A to task B handoff keeps the new dialog focus and returns to B", () => {
   const view = render(wrap(<Owner taskKey="JB-1" />));

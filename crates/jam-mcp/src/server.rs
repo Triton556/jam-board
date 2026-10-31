@@ -25,8 +25,16 @@ struct SessionContext {
     project_id: String,
     key_prefix: String,
     project_name: String,
-    /// Saved filesystem hint, not verified existence or filesystem permission.
+    /// Verified folder anchor; legacy stores can return an unverified hint. Never a filesystem grant.
     project_folder: Option<String>,
+    project_instance_id: String,
+    database_generation: String,
+    board_revision: i64,
+    repository_root: Option<String>,
+    working_directory: Option<String>,
+    folder_rules: std::collections::BTreeMap<String, String>,
+    manifest_revision: Option<String>,
+    file_capabilities: jam_core::FileCapabilities,
     binding: String,
     can_switch_project: bool,
     /// Project-filtered global activity high-water; capture before fresh baseline reads.
@@ -43,10 +51,14 @@ pub struct JamServer {
     agent_name: Option<String>,
     recent: RecentCalls,
     report_stdio: bool,
+    project_manager: Option<Arc<jam_core::ProjectManager>>,
 }
 struct ProjectBinding {
     store: Arc<Store>,
     selector: Option<String>,
+    folder: Option<std::path::PathBuf>,
+    generation: String,
+    _lease: jam_core::ProjectLease,
 }
 impl JamServer {
     pub fn new(store: Arc<Store>, agent_name: Option<String>, recent: RecentCalls) -> Self {
@@ -58,7 +70,12 @@ impl JamServer {
             agent_name,
             recent,
             report_stdio: false,
+            project_manager: None,
         }
+    }
+    pub fn with_project_manager(mut self, manager: Arc<jam_core::ProjectManager>) -> Self {
+        self.project_manager = Some(manager);
+        self
     }
     pub fn with_project(mut self, project: Option<String>) -> Self {
         self.project_hint = project;
@@ -67,7 +84,11 @@ impl JamServer {
     fn session_store(&self) -> jam_core::Result<Arc<Store>> {
         self.session_store
             .get()
-            .map(|b| b.store.clone())
+            .map(|b| {
+                b.store.validate_session_generation(&b.generation)?;
+                Ok::<_, jam_core::Error>(b.store.clone())
+            })
+            .transpose()?
             .ok_or_else(|| {
                 jam_core::Error::Forbidden("This session has not bound a project".into())
             })
@@ -77,8 +98,18 @@ impl JamServer {
             .extensions
             .get::<axum::http::request::Parts>()
             .and_then(|parts| parts.headers.get("X-Jam-Project"))
-            .and_then(|v| v.to_str().ok())
-            .map(str::to_owned);
+            .map(|v| {
+                v.to_str().map(str::to_owned).map_err(|_| {
+                    ErrorData::invalid_params("Invalid explicit project selector", None)
+                })
+            })
+            .transpose()?;
+        let folder_header = ctx
+            .extensions
+            .get::<axum::http::request::Parts>()
+            .and_then(|parts| parts.headers.get("X-Jam-Project-Folder"))
+            .map(crate::http::decode_project_folder_header)
+            .transpose()?;
         let requested = header.clone().or_else(|| self.project_hint.clone());
         // Inline clients may begin with any request and send concurrent lists.
         // Resolve the active project only once, even if the desktop later switches.
@@ -87,7 +118,27 @@ impl JamServer {
             .get_or_try_init(|| async {
                 let base = self.store.clone();
                 let selector = requested.clone();
+                let manager = self.project_manager.clone();
+                let folder = folder_header.clone();
                 let scoped = tokio::task::spawn_blocking(move || {
+                    if let Some(manager) = manager {
+                        let use_registry = folder.is_some()
+                            || selector.as_ref().is_some_and(|id| {
+                                manager.registry.entries().is_ok_and(|entries| {
+                                    entries.iter().any(|e| e.project_id == *id)
+                                })
+                            })
+                            || selector.is_none() && manager.capture_selected().is_ok();
+                        if use_registry {
+                            return manager
+                                .resolve_handle(selector.as_deref(), folder.as_deref())
+                                .map(|h| h.store.clone());
+                        }
+                    } else if folder.is_some() {
+                        return Err(jam_core::Error::Forbidden(
+                            "Folder header needs the app registry resolver".into(),
+                        ));
+                    }
                     let selected = selector
                         .map(Ok)
                         .unwrap_or_else(|| base.active_jam().map(|j| j.id))?;
@@ -99,12 +150,26 @@ impl JamServer {
                     ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
                 })?;
                 let _ = self.session_identity.set(self.identity(ctx));
+                let context = scoped.folder_session_context().map_err(internal)?;
+                let lease = scoped.project_lease().map_err(internal)?;
+                let folder = context.project_folder.map(std::path::PathBuf::from);
                 Ok::<_, ErrorData>(ProjectBinding {
+                    folder,
+                    generation: context.database_generation,
+                    _lease: lease,
                     store: scoped,
                     selector: requested.clone(),
                 })
             })
             .await?;
+        if let Some(folder) = folder_header
+            && binding.folder.as_ref() != Some(&folder.canonicalize().map_err(internal)?)
+        {
+            return Err(ErrorData::invalid_params(
+                "This session is already bound; reconnect to change folders",
+                None,
+            ));
+        }
         // An explicit subsequent selector must still address the captured project.
         if let Some(requested) = header {
             let bound = binding.store.bound_project_id().map_err(internal)?;
@@ -189,11 +254,22 @@ impl JamServer {
             "get_session_context" => {
                 parse::<Empty>(args)?;
                 let (project, latest_activity_cursor) = store.project_activity_context()?;
+                let folder = store.folder_session_context()?;
                 value(SessionContext {
+                    project_instance_id: folder.project_instance_id,
+                    database_generation: folder.database_generation,
+                    board_revision: folder.board_revision,
+                    repository_root: folder.repository_root,
+                    working_directory: folder.working_directory,
+                    folder_rules: folder.folder_rules,
+                    manifest_revision: folder.manifest_revision,
+                    file_capabilities: folder.file_capabilities,
                     project_id: project.id,
                     key_prefix: project.key_prefix,
                     project_name: project.name,
-                    project_folder: store.get_settings()?.project_folder,
+                    project_folder: folder
+                        .project_folder
+                        .or(store.get_settings()?.project_folder),
                     binding: "session".into(),
                     can_switch_project: false,
                     latest_activity_cursor,
@@ -249,9 +325,38 @@ impl JamServer {
                 parse::<Empty>(args)?;
                 value(store.list_members()?)
             }
+            "register_file" => value(store.register_file(&actor.id, parse(args)?)?),
+            "link_task_file" => value(store.link_task_file(&actor.id, parse(args)?)?),
+            "set_task_file_role" => value(store.set_task_file_role(&actor.id, parse(args)?)?),
+            "unlink_task_file" => value(store.unlink_task_file(&actor.id, parse(args)?)?),
+            "resolve_file" => value(store.resolve_file(parse(args)?)?),
             "list_assets" => {
-                let a = parse::<Assets>(args)?;
-                value(store.list_assets(a.kind.as_deref(), a.query.as_deref())?)
+                let a = parse::<jam_core::FileAssetQuery>(args)?;
+                if a.limit.is_some() || a.cursor.is_some() {
+                    let offset = a
+                        .cursor
+                        .as_deref()
+                        .unwrap_or("0")
+                        .parse::<usize>()
+                        .map_err(|_| jam_core::Error::Validation {
+                            field: "cursor".into(),
+                            reason: "Invalid offset".into(),
+                        })?;
+                    let limit = a.limit.unwrap_or(100);
+                    let mut q = a;
+                    q.limit = Some(limit);
+                    let items = store.list_file_assets(q.clone())?;
+                    q.cursor = Some((offset + items.len()).to_string());
+                    q.limit = Some(1);
+                    let next = if store.list_file_assets(q)?.is_empty() {
+                        None
+                    } else {
+                        Some((offset + items.len()).to_string())
+                    };
+                    Ok(json!({"assets":items,"nextCursor":next}))
+                } else {
+                    value(store.list_file_assets(a)?)
+                }
             }
             _ => Err(jam_core::Error::NotFound(format!("tool {name}"))),
         }
@@ -284,6 +389,39 @@ pub(crate) fn tool<T: JsonSchema>(
     // Schema hints use the domain's vocabulary; validation still runs in jam-core
     // so invalid tool input becomes isError rather than a JSON-RPC protocol error.
     if let Some(properties) = input.get_mut("properties").and_then(Value::as_object_mut) {
+        for field in ["fileKind", "kind"] {
+            if (name == "register_file" || name == "list_assets" || name == "add_reference")
+                && properties.contains_key(field)
+                && !(name == "add_reference" && field == "kind")
+            {
+                let mut kinds = jam_core::FILE_KINDS
+                    .iter()
+                    .map(|s| json!(s))
+                    .collect::<Vec<_>>();
+                kinds.push(Value::Null);
+                properties.insert(field.into(), json!({"type":["string","null"],"enum":kinds}));
+            }
+        }
+        for field in ["role", "fileRole"] {
+            if properties.contains_key(field) {
+                let mut roles = jam_core::FILE_ROLES
+                    .iter()
+                    .map(|s| json!(s))
+                    .collect::<Vec<_>>();
+                roles.push(Value::Null);
+                properties.insert(field.into(), json!({"type":["string","null"],"enum":roles}));
+            }
+        }
+        if properties.contains_key("requestId") {
+            properties.insert(
+                "requestId".into(),
+                if name == "add_reference" {
+                    json!({"type":["string","null"],"minLength":1,"maxLength":200})
+                } else {
+                    json!({"type":"string","minLength":1,"maxLength":200})
+                },
+            );
+        }
         if name == "create_task" {
             properties.insert("storyKey".into(), json!({"type":"string","minLength":1}));
         }
@@ -349,6 +487,12 @@ pub(crate) fn tool<T: JsonSchema>(
             a.push(json!("storyKey"));
         }
     }
+    if ["link_task_file", "set_task_file_role"].contains(&name)
+        && let Some(required) = input.get_mut("required").and_then(Value::as_array_mut)
+        && !required.iter().any(|v| v == "role")
+    {
+        required.push(json!("role"));
+    }
     let freshness = match name {
         "claim_task" | "move_task" | "mark_ready" | "archive_task" | "update_task"
         | "update_task_brief" => {
@@ -372,6 +516,10 @@ pub(crate) fn tool<T: JsonSchema>(
         "create_task" | "update_task" | "get_task" | "claim_task" => {
             Some(schema::<jam_core::TaskDetail>())
         }
+        "register_file" | "link_task_file" | "set_task_file_role" | "unlink_task_file" => {
+            Some(schema::<jam_core::FileMutationResult>())
+        }
+        "resolve_file" => Some(schema::<jam_core::FileResolution>()),
         "get_execution" => Some(schema::<jam_core::ExecutionState>()),
         "get_canvas" => Some(schema::<jam_core::CanvasPage>()),
         "create_frame" | "update_frame" => Some(schema::<jam_core::RefFrame>()),
@@ -468,14 +616,25 @@ fn tools() -> Vec<Tool> {
             "List humans and agents with counts by status, online presence, and in-progress task keys. Agents are online for 120 seconds after their most recent call.",
             true,
         ),
-        tool::<Assets>(
+        tool::<jam_core::FileAssetQuery>(
             "list_assets",
-            "List asset references in the active jam, optionally filtered by kind and text. Files stay at their original locations and are never copied.",
+            "List files with ownership, stored paths and per-context status. Optional storageType/taskKey/role filters. Without limit/cursor returns the legacy unpaginated array; paging returns {assets,nextCursor}.",
             true,
         ),
     ];
+    list.extend([
+        tool::<jam_core::RegisterFile>("register_file","Register/copy a board file, link a local file, or register an HTTP(S) URL. Read folderRules first. requestId is idempotent. Optional task association needs both inspected validators. Never executes or downloads files.",false),
+        tool::<jam_core::TaskFileInput>("link_task_file","Link an existing same-project file to a task with to_edit, reference or result role. Requires captured task validators and requestId.",false),
+        tool::<jam_core::TaskFileInput>("set_task_file_role","Change one task/file role and optional order. Requires captured task validators and requestId.",false),
+        tool::<jam_core::TaskFileInput>("unlink_task_file","Remove only a task/file association; keep bytes, references and history. Requires captured task validators and requestId.",false),
+        tool::<jam_core::ResolveFile>("resolve_file","Resolve a file without opening/executing/downloading it. workingDirectory is a resolution hint, never authority; its repository must match the board anchor.",true),
+    ]);
     list.extend(crate::v2::tools());
     list
+}
+/// The same schemas served by tools/list; useful for offline integration contracts.
+pub fn tool_catalog() -> Vec<Tool> {
+    tools()
 }
 
 impl ServerHandler for JamServer {
@@ -805,12 +964,6 @@ struct Archive {
     expected_claim_generation: String,
     expected_updated_at: String,
     reason: Option<String>,
-}
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct Assets {
-    kind: Option<String>,
-    query: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

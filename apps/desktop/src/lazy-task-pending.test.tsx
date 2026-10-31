@@ -46,6 +46,7 @@ beforeAll(async () => {
   // Compile the real editor outside the interaction deadline. The lazy-facing
   // promise below still stays pending until this test explicitly releases it.
   load.actual = await vi.importActual("./features/task/TaskDrawer");
+  await vi.importActual("./features/task/TaskView");
 });
 afterEach(() => {
   vi.unstubAllGlobals();

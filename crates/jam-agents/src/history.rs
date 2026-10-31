@@ -105,6 +105,23 @@ fn safe_id(value: &str) -> Result<()> {
     Ok(())
 }
 impl HistoryStore {
+    // Additive private metadata, outside the public history DTO. Existing records
+    // without this field retain their original cwd/transcript matching rules.
+    pub fn load_binding(&self, id: &str) -> Result<Option<crate::wiring::ProjectBinding>> {
+        match File::open(self.path(id, false)?) {
+            Ok(file) => {
+                let value: serde_json::Value = serde_json::from_reader(file)?;
+                value
+                    .get("projectBinding")
+                    .cloned()
+                    .map(serde_json::from_value)
+                    .transpose()
+                    .map_err(Into::into)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
     pub(crate) fn recover_all(data_dir: &Path, enabled: Arc<AtomicBool>, lock: Arc<Mutex<()>>) {
         if !enabled.load(Ordering::SeqCst) {
             return;
@@ -157,8 +174,15 @@ impl HistoryStore {
     }
     fn save(&self, record: &StoredHistory) -> Result<()> {
         let path = self.path(&record.entry.id, false)?;
+        let mut value = serde_json::to_value(record)?;
+        if let Some(binding) = self.load_binding(&record.entry.id)? {
+            value["projectBinding"] = serde_json::to_value(binding)?;
+        }
+        Self::save_json(&path, &value)
+    }
+    fn save_json(path: &Path, value: &serde_json::Value) -> Result<()> {
         // Serialize before writing so a serialization failure cannot destroy metadata.
-        let bytes = serde_json::to_vec(record)?;
+        let bytes = serde_json::to_vec(value)?;
         let temporary = path.with_extension("json.tmp");
         let mut file = File::create(&temporary)?;
         file.write_all(&bytes)?;
@@ -167,7 +191,15 @@ impl HistoryStore {
         fs::rename(temporary, path)?;
         Ok(())
     }
-    pub fn create(&self, mut record: StoredHistory) -> Result<Option<HistoryWriter>> {
+    #[cfg(test)]
+    pub fn create(&self, record: StoredHistory) -> Result<Option<HistoryWriter>> {
+        self.create_bound(record, None)
+    }
+    pub fn create_bound(
+        &self,
+        mut record: StoredHistory,
+        binding: Option<&crate::wiring::ProjectBinding>,
+    ) -> Result<Option<HistoryWriter>> {
         if !self.enabled.load(Ordering::SeqCst) {
             return Ok(None);
         }
@@ -180,7 +212,13 @@ impl HistoryStore {
         if record.entry.kind == HistoryKind::Chat {
             record.entry.empty = false;
         }
-        self.save(&record)?;
+        if let Some(binding) = binding {
+            let mut value = serde_json::to_value(&record)?;
+            value["projectBinding"] = serde_json::to_value(binding)?;
+            Self::save_json(&self.path(&record.entry.id, false)?, &value)?;
+        } else {
+            self.save(&record)?;
+        }
         let path = self.path(&record.entry.id, true)?;
         let repair = OpenOptions::new()
             .create(true)

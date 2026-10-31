@@ -8,8 +8,10 @@ bound to records read during the same decision; they are not literal values.
 
 1. Call `get_session_context`; verify the intended exact `projectId` before
    reading board records. A matching name/prefix does not replace the ID.
-   Its `projectFolder` is a saved filesystem hint: verify existence in this
-   environment; if absent, ask for a folder rather than guessing or creating one.
+   Its `projectFolder` is the canonical folder anchor for folder boards; legacy
+   stores may return an unverified hint. Read `repositoryRoot`, `workingDirectory`,
+   `folderRules` and `manifestRevision` too. If the folder is absent, ask for its
+   location rather than guessing or creating one. None of these fields grants access.
 2. For a new context only, retain `latestActivityCursor` BEFORE baseline reads.
    Read the selected scope and relevant children, questions, comments, reports
    and references. `get_board` is a summary; page `list_tasks` for a full inventory.
@@ -58,6 +60,75 @@ create the example records only for a genuinely new requested plan.
   decision. Never silently fetch new validators merely to replay old intent.
 - A returned task requires a new claim and report round. Old evidence remains
   history, not proof that the corrected version was checked.
+
+## Task files and worktrees
+
+Use `get_task` and inspect `files` (the task Files section), including each asset
+and its role. Copy vs link and manifest folder rules are described in the guide.
+`register_file` requires `storageType` and `requestId`, plus `sourcePath` for a
+local file or `url` for a web link. Board storage copies the source; linked
+storage retains its path. For repo-relative registration, supply your verified
+`workingDirectory`. Optional registration with `taskKey` also needs `role`,
+`expectedClaimGeneration` and `expectedUpdatedAt` for an atomic task link.
+
+`link_task_file` and `set_task_file_role` require `taskKey`, `assetId`, `role`,
+`expectedClaimGeneration`, `expectedUpdatedAt` and `requestId`. `unlink_task_file`
+requires those same fields except `role`; it removes only the task association,
+never the asset, bytes, canvas references or history. Role/order writes change
+the task revision. Read current `claimGeneration` and `updatedAt` with `get_task`
+before each new decision; pass them as the expected validators. Preserve intent
+and reread/reconcile on stale/conflict instead of blindly retrying with new tokens.
+Reuse a request ID only for an uncertain retry of the identical payload; a new
+intent needs a new ID. These writes do not grant Start or create agent sessions.
+
+Resolve again before opening or editing. `resolve_file` with `assetId` and your
+`workingDirectory` resolves repo links in a worktree of the same Git common-dir;
+an unrelated repository is refused. Inspect `resolutionBasis` and `worktreeRoot`:
+without a caller cwd the basis is the anchor repository, not a guessed worktree.
+Board files always use the canonical board anchor regardless of cwd.
+
+- `status:"missing"`: report the missing path and ask for the source or corrected
+  link; do not create a replacement silently.
+- `status:"unreadable"`: report access failure; do not describe it as missing.
+  `status:"unknown"` is unverified, not permission to open or edit.
+- Outside project is `pathBase:"absolute"`, not an availability status. Check the
+  exact resolved path and explicit authorized scope before access; ask if outside
+  scope. Do not turn an escaping repo path into an absolute link to bypass refusal.
+- URL assets are web links, not worktree files. Resolution does not fetch them.
+
+### Worked example: fix the boat model
+
+Assume the user selected this task, execution is running, and you have claimed
+it through the normal protocol. Placeholders below come from inspected records
+and your authorized workspace; each line is a tool call, executed in order.
+
+1. Get the task and see Files. Select the model whose role is `to_edit`, not a
+   `reference`. Resolve its asset in your worktree and inspect availability and
+   scope, then edit that resolved model within the brief. Export the produced
+   result to your workspace through your existing authorized tools.
+2. Register that result as a board-owned copy using the current folder rules.
+   Use the returned `asset.id` as `$resultAsset`, reread the task, and link the
+   result with the fresh task validators. Registration alone is not a task link.
+
+```json
+[
+  {"tool":"get_task","arguments":{"key":"$task"}},
+  {"tool":"resolve_file","arguments":{"assetId":"$toEditAsset","workingDirectory":"$workingDirectory"}},
+  {"tool":"register_file","arguments":{"storageType":"board_file","sourcePath":"$exportedBoatPath","fileKind":"model","requestId":"boat-result-copy-1"}},
+  {"tool":"get_task","arguments":{"key":"$task"}},
+  {"tool":"link_task_file","arguments":{"taskKey":"$task","assetId":"$resultAsset","role":"result","expectedClaimGeneration":"$freshGeneration","expectedUpdatedAt":"$freshUpdatedAt","requestId":"boat-result-link-1"}}
+]
+```
+
+For an explicitly requested role correction or unlink, inspect the task again
+and use the appropriate call below, not both as a sequence:
+
+```json
+[
+  {"tool":"set_task_file_role","arguments":{"taskKey":"$task","assetId":"$asset","role":"reference","expectedClaimGeneration":"$freshGeneration","expectedUpdatedAt":"$freshUpdatedAt","requestId":"file-role-1"}},
+  {"tool":"unlink_task_file","arguments":{"taskKey":"$task","assetId":"$asset","expectedClaimGeneration":"$freshGeneration","expectedUpdatedAt":"$freshUpdatedAt","requestId":"file-unlink-1"}}
+]
+```
 
 ## Ideas canvas and moodboards
 

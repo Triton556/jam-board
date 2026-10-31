@@ -184,8 +184,14 @@ impl Store {
     /// Only registered local files are exposed to the desktop's per-file protocol scope.
     pub fn reference_media_path(&self, id: &str) -> Result<Option<String>> {
         self.read(|c| {
-            let a: Asset = fetch(c, "assets", "id", id)?;
-            let p = std::path::Path::new(&a.location);
+            let file = crate::file_model::load_file_with_refresh(c, id, None, true)?;
+            if file.storage_type == "url" || file.resolution.status != "available" {
+                return Ok(None);
+            }
+            let Some(location) = file.resolution.resolved_path else {
+                return Ok(None);
+            };
+            let p = std::path::Path::new(&location);
             if !p.is_absolute() || !p.is_file() {
                 return Ok(None);
             }
@@ -225,13 +231,14 @@ impl Store {
             AddReference {
                 kind: "asset".into(),
                 file_path: Some(path.to_string_lossy().into_owned()),
+                copy: crate::project_folders::folder_for_db(&self.path).map(|_| true),
                 title: Some("Clipboard image".into()),
                 x: Some(x),
                 y: Some(y),
                 ..Default::default()
             },
         );
-        if result.is_err() {
+        if result.is_err() || crate::project_folders::folder_for_db(&self.path).is_some() {
             let _ = std::fs::remove_file(path);
         }
         result

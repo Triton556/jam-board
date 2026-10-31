@@ -1,5 +1,7 @@
 //! Fencing regressions use caller-captured context, never the test auto-observe wrappers.
 mod support;
+#[path = "support/v9_fixture.rs"]
+mod v9_fixture;
 use jam_core::*;
 use serde_json::json;
 
@@ -525,6 +527,7 @@ fn legacy_live_claim_migrates_and_restarts_without_grant_or_lost_evidence() {
     let before = f.store.get_task(&f.key).unwrap();
     drop(f.store);
     let db = rusqlite::Connection::open(&path).unwrap();
+    v9_fixture::strip(&db);
     db.execute_batch("DROP TABLE ref_frame_links; ALTER TABLE ref_items DROP COLUMN verdict; ALTER TABLE ref_items DROP COLUMN archived_by; DROP TRIGGER tasks_advance_claim_generation;ALTER TABLE tasks DROP COLUMN claim_generation;PRAGMA user_version=6;").unwrap();
     drop(db);
     for _ in 0..2 {

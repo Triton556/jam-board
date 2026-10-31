@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { makeSnippets } from "../lib/mcp-config";
 import { MockBridge, mockApi } from "../lib/mock-bridge";
+import { acceptProjectSelection } from "../lib/project-selection";
 import { ProjectsPage } from "./projects/ProjectsPage";
 
 const navigate = vi.hoisted(() => vi.fn());
@@ -134,12 +135,17 @@ it("all connection snippets explicitly pin the current project", () => {
 
 it("project picker opens a chosen board, clears stale UI feedback but preserves planning drafts", async () => {
   const original = await mockApi.appState();
-  await mockApi.createJam(blank("Second project"));
   const client = new QueryClient();
+  await acceptProjectSelection(client, original);
   client.setQueryData(["planning-draft", "safe-id"], {
     dirty: true,
     draft: "My note",
   });
+  await acceptProjectSelection(
+    client,
+    await mockApi.createJam(blank("Second project")),
+  );
+  expect(client.getQueryData(["planning-draft", "safe-id"])).toBeUndefined();
   render(
     <QueryClientProvider client={client}>
       <ProjectsPage />

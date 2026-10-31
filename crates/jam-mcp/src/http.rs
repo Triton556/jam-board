@@ -13,6 +13,55 @@ use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use std::{path::Path, sync::Arc};
+pub(crate) fn encode_project_folder_header(folder: &str) -> String {
+    let mut encoded = "utf8:".to_string();
+    for byte in folder.as_bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(byte) {
+            encoded.push(*byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+pub(crate) fn decode_project_folder_header(
+    value: &axum::http::HeaderValue,
+) -> Result<std::path::PathBuf, rmcp::ErrorData> {
+    let raw = std::str::from_utf8(value.as_bytes())
+        .map_err(|_| rmcp::ErrorData::invalid_params("Folder header must use UTF-8", None))?;
+    let text = if let Some(encoded) = raw.strip_prefix("utf8:") {
+        let mut bytes = Vec::new();
+        let mut input = encoded.as_bytes().iter();
+        while let Some(byte) = input.next() {
+            if *byte == b'%' {
+                let a = input.next().and_then(|v| (*v as char).to_digit(16));
+                let b = input.next().and_then(|v| (*v as char).to_digit(16));
+                match (a, b) {
+                    (Some(a), Some(b)) => bytes.push((a * 16 + b) as u8),
+                    _ => {
+                        return Err(rmcp::ErrorData::invalid_params(
+                            "Malformed percent-encoded folder header",
+                            None,
+                        ));
+                    }
+                }
+            } else {
+                bytes.push(*byte);
+            }
+        }
+        String::from_utf8(bytes)
+            .map_err(|_| rmcp::ErrorData::invalid_params("Invalid UTF-8 folder header", None))?
+    } else {
+        raw.into()
+    };
+    if text.is_empty() || text.chars().any(char::is_control) {
+        return Err(rmcp::ErrorData::invalid_params(
+            "Invalid folder header",
+            None,
+        ));
+    }
+    Ok(text.into())
+}
 
 pub fn token(data_dir: &Path) -> std::io::Result<String> {
     std::fs::create_dir_all(data_dir)?;
@@ -128,6 +177,22 @@ pub async fn start_http(
     bearer: String,
     recent: RecentCalls,
 ) -> Result<HttpServer, Box<dyn std::error::Error + Send + Sync>> {
+    let data_dir = store
+        .path
+        .parent()
+        .ok_or("Missing app-local data directory")?;
+    if data_dir.file_name().is_some_and(|n| n == ".state") {
+        return Err("Folder HTTP requires an explicit app-local registry resolver".into());
+    }
+    let manager = Arc::new(jam_core::ProjectManager::new(data_dir)?);
+    start_http_with_manager(store, bearer, recent, manager).await
+}
+pub async fn start_http_with_manager(
+    store: Arc<Store>,
+    bearer: String,
+    recent: RecentCalls,
+    manager: Arc<jam_core::ProjectManager>,
+) -> Result<HttpServer, Box<dyn std::error::Error + Send + Sync>> {
     let preferred = store
         .setting("mcp_http_port")?
         .and_then(|s| s.parse::<u16>().ok())
@@ -140,7 +205,10 @@ pub async fn start_http(
                 let s = store.clone();
                 let cancellation = tokio_util::sync::CancellationToken::new();
                 let service = StreamableHttpService::new(
-                    move || Ok(JamServer::new(s.clone(), None, recent.clone())),
+                    move || {
+                        Ok(JamServer::new(s.clone(), None, recent.clone())
+                            .with_project_manager(manager.clone()))
+                    },
                     Arc::new(LocalSessionManager::default()),
                     StreamableHttpServerConfig::default()
                         .with_cancellation_token(cancellation.clone()),
@@ -186,6 +254,24 @@ pub async fn start_http(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mc_folder_headers_round_trip_unicode_and_reject_malformed_explicit_selectors() {
+        for path in [
+            r"C:\Work With Spaces\JamBoard",
+            r"D:\Игры\Доска",
+            r"\\?\C:\long\board",
+        ] {
+            let header: axum::http::HeaderValue =
+                encode_project_folder_header(path).parse().unwrap();
+            assert_eq!(
+                decode_project_folder_header(&header).unwrap(),
+                std::path::PathBuf::from(path)
+            );
+        }
+        for raw in ["utf8:%FF", "utf8:%0A", "utf8:%", "utf8:"] {
+            assert!(decode_project_folder_header(&raw.parse().unwrap()).is_err());
+        }
+    }
     #[test]
     fn origins() {
         for s in ["http://127.0.0.1:47321", "http://localhost:3000"] {

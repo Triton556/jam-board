@@ -1,9 +1,17 @@
 [
   "binding",
+  "boardRevision",
   "canSwitchProject",
+  "databaseGeneration",
+  "fileCapabilities",
+  "folderRules",
   "keyPrefix",
   "latestActivityCursor",
+  "manifestRevision",
   "projectFolder",
   "projectId",
-  "projectName"
+  "projectInstanceId",
+  "projectName",
+  "repositoryRoot",
+  "workingDirectory"
 ]

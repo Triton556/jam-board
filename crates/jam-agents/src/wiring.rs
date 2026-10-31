@@ -24,7 +24,10 @@ impl BoardContext {
     ) -> Result<Self> {
         let pinned = store.selected_snapshot()?;
         let project = pinned.active_jam()?;
-        let project_folder = pinned.get_settings()?.project_folder;
+        let project_folder = pinned
+            .folder_session_context()?
+            .project_folder
+            .or(pinned.get_settings()?.project_folder);
         Ok(Self {
             project_id: project.id,
             project_name: project.name,
@@ -57,6 +60,75 @@ impl BoardContext {
         self.mcp_server_name = Some(format!("jam-board-{prefix}-{}", ulid::Ulid::generate()));
     }
 }
+/// Private launch identity, independent of the process cwd and desktop selection.
+/// Kept outside public DTOs so old history and profile schemas remain compatible.
+#[derive(Clone, Serialize, Deserialize)]
+pub(crate) struct ProjectBinding {
+    pub project_id: String,
+    pub database_path: PathBuf,
+    pub database_generation: String,
+    pub folder: Option<String>,
+    pub default_cwd: Option<String>,
+}
+impl ProjectBinding {
+    pub fn capture(store: &jam_core::Store) -> Result<(Self, jam_core::ProjectLease)> {
+        let pinned = store.selected_snapshot()?;
+        // Acquire before reading context: a move cannot cut over during capture.
+        let lease = pinned.project_lease()?;
+        let context = pinned.folder_session_context()?;
+        let settings = pinned.get_settings()?;
+        let default_cwd = context
+            .working_directory
+            .filter(|s| !s.trim().is_empty())
+            .or(context.repository_root)
+            .or_else(|| context.project_folder.clone())
+            .or(settings.project_folder.filter(|s| !s.trim().is_empty()));
+        Ok((
+            Self {
+                project_id: pinned.active_jam()?.id,
+                database_path: std::path::absolute(&pinned.path)?,
+                database_generation: context.database_generation,
+                folder: context.project_folder,
+                default_cwd,
+            },
+            lease,
+        ))
+    }
+    pub fn reconnect(&self) -> Result<(Self, jam_core::ProjectLease)> {
+        if !self.database_path.is_file() {
+            return Err(err(
+                "The original board is unavailable; reconnect to the project before resuming",
+            ));
+        }
+        let store = jam_core::Store::open(&self.database_path)?.for_project(&self.project_id)?;
+        let captured = Self::capture(&store)?;
+        // Validate while the shared owner lease prevents move/recovery cutover.
+        store.validate_session_generation(&self.database_generation)?;
+        if captured.0.folder != self.folder {
+            return Err(err("The board locator changed; reconnect before resuming"));
+        }
+        Ok(captured)
+    }
+    pub fn cwd(&self, board: &BoardContext, explicit: Option<&str>) -> Result<PathBuf> {
+        let requested = explicit.or(self.default_cwd.as_deref());
+        if requested.is_some_and(|path| !Path::new(path).is_dir()) {
+            return Err(err(
+                "The project's working directory is missing or unreachable; choose an existing directory before launching",
+            ));
+        }
+        choose_cwd(board, requested)
+    }
+    pub fn wire(&self, entries: &mut [McpEntry]) {
+        if let Some(folder) = &self.folder {
+            let entry = &mut entries[0];
+            entry.project_locator = Some((self.project_id.clone(), folder.clone()));
+            entry.env.push(Env {
+                name: "JAM_BOARD_PROJECT_FOLDER".into(),
+                value: folder.clone(),
+            });
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct McpEntry {
@@ -72,6 +144,10 @@ pub struct McpEntry {
     #[serde(skip)]
     #[specta(skip)]
     pub bearer_token: Option<String>,
+    /// Verified board identity for an HTTP entry; never a persisted profile selector.
+    #[serde(skip)]
+    #[specta(skip)]
+    pub project_locator: Option<(String, String)>,
     pub name: String,
     #[serde(default)]
     pub command: String,
@@ -107,6 +183,7 @@ impl Default for McpEntry {
             trust_read_only: None,
             http: None,
             bearer_token: None,
+            project_locator: None,
             name: String::new(),
             command: String::new(),
             args: vec![],
@@ -115,6 +192,23 @@ impl Default for McpEntry {
     }
 }
 impl McpEntry {
+    pub(crate) fn locator_headers(&self) -> std::collections::BTreeMap<String, String> {
+        self.project_locator
+            .as_ref()
+            .map(|(id, folder)| {
+                // The frozen HTTP contract accepts utf8: percent-encoded UTF-8.
+                let encoded = folder
+                    .as_bytes()
+                    .iter()
+                    .map(|b| format!("%{b:02X}"))
+                    .collect::<String>();
+                std::collections::BTreeMap::from([
+                    ("X-Jam-Project".into(), id.clone()),
+                    ("X-Jam-Project-Folder".into(), format!("utf8:{encoded}")),
+                ])
+            })
+            .unwrap_or_default()
+    }
     pub fn trusts_read_only(&self) -> bool {
         self.trust_read_only
             .unwrap_or(self.preset == McpPreset::Web)
@@ -140,6 +234,7 @@ pub fn mcp_entries(
         trust_read_only: Some(true),
         http: None,
         bearer_token: None,
+        project_locator: None,
         name: board.server_name().into(),
         command: board.sidecar_path.to_string_lossy().into_owned(),
         args: vec![],
@@ -251,6 +346,8 @@ pub fn choose_cwd(board: &BoardContext, explicit: Option<&str>) -> Result<PathBu
         }
         return Ok(std::path::absolute(cwd)?);
     }
+    // Legacy callers may still supply an unverified folder hint. Verified
+    // launches pass their captured default as an explicit cwd through binding.cwd.
     if let Some(folder) = &board.project_folder
         && Path::new(folder).is_dir()
     {
@@ -284,7 +381,8 @@ pub fn terminal_command(
     if family == Some("claude") {
         let servers: serde_json::Map<String, serde_json::Value> = entries.iter().enumerate().map(|(i, e)| {
             let spec = if let Some(http) = &e.http {
-                let headers: std::collections::BTreeMap<_, _> = e.bearer_token.as_ref().map(|_| ("Authorization", format!("Bearer ${{{}}}", bearer_env(i)))).into_iter().collect();
+                let mut headers = e.locator_headers();
+                if e.bearer_token.is_some() { headers.insert("Authorization".into(), format!("Bearer ${{{}}}", bearer_env(i))); }
                 serde_json::json!({"type":"http","url":http.url,"headers":headers})
             } else { serde_json::json!({"command":e.command,"args":e.args,"env":e.env.iter().enumerate().map(|(j,v)|(v.name.clone(),format!("${{{}}}", entry_env(i,j)))).collect::<std::collections::BTreeMap<_,_>>()}) };
             (e.name.clone(), spec)
@@ -303,6 +401,24 @@ pub fn terminal_command(
                     "-c".into(),
                     format!("{key}.url={}", toml_string(&http.url)?),
                 ]);
+                let headers = entry.locator_headers();
+                if !headers.is_empty() {
+                    args.extend([
+                        "-c".into(),
+                        format!(
+                            "{key}.http_headers={{{}}}",
+                            headers
+                                .iter()
+                                .map(|(k, v)| Ok(format!(
+                                    "{}={}",
+                                    toml_string(k)?,
+                                    toml_string(v)?
+                                )))
+                                .collect::<Result<Vec<_>>>()?
+                                .join(",")
+                        ),
+                    ]);
+                }
                 if entry.bearer_token.is_some() {
                     args.extend([
                         "-c".into(),
@@ -449,3 +565,7 @@ fn toml_string(value: &str) -> Result<String> {
 #[cfg(test)]
 #[path = "launch_wiring_tests.rs"]
 mod launch_wiring_tests;
+
+#[cfg(test)]
+#[path = "project_folder_tests.rs"]
+mod project_folder_tests;

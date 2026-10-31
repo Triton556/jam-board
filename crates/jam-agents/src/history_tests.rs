@@ -10,6 +10,61 @@ use std::sync::{
 #[path = "terminal_history_tests.rs"]
 mod terminal_history_tests;
 
+#[test]
+fn r11_terminal_history_uses_original_cwd_after_launch_default_changes() {
+    let s = session(SessionStatus::Stopped);
+    let (store, mut record) = history(&s);
+    let original_cwd = r"F:\Unity\original-worktree";
+    let changed_cwd = r"F:\Unity\new-worktree";
+    let config = s.board.data_dir.join("r11-fictional-codex");
+    let transcripts = config.join("sessions/2026/10/30");
+    std::fs::create_dir_all(&transcripts).unwrap();
+    record.cwd = original_cwd.into();
+    record.board.project_folder = Some(changed_cwd.into());
+    record.entry.created_at = "2026-10-30T00:00:00Z".into();
+    record.profile.kind = RuntimeKind::Terminal;
+    record.profile.preset = Some("codex-cli".into());
+    record.profile.env = vec![Env {
+        name: "CODEX_HOME".into(),
+        value: config.to_string_lossy().into_owned(),
+    }];
+    record.prepare_terminal(None);
+    for (id, cwd, title) in [
+        ("original-native", original_cwd, "Original task"),
+        ("other-native", changed_cwd, "Another project"),
+    ] {
+        let rows = [
+            serde_json::json!({"type":"session_meta","timestamp":"2026-10-30T00:00:00Z","payload":{"id":id,"cwd":cwd,"timestamp":"2026-10-30T00:00:00Z"}}),
+            serde_json::json!({"type":"response_item","timestamp":"2026-10-30T00:00:01Z","payload":{"type":"message","id":"fictional-user","role":"user","content":[{"type":"input_text","text":title}]}}),
+        ];
+        std::fs::write(
+            transcripts.join(format!("rollout-{id}.jsonl")),
+            rows.iter().map(|v| format!("{v}\n")).collect::<String>(),
+        )
+        .unwrap();
+    }
+    let binding = crate::wiring::ProjectBinding {
+        project_id: record.entry.project_id.clone(),
+        database_path: s.board.data_dir.join("test.db"),
+        database_generation: "fictional-generation".into(),
+        folder: Some("F:/canonical-board".into()),
+        default_cwd: Some(changed_cwd.into()),
+    };
+    drop(store.create_bound(record, Some(&binding)).unwrap());
+    let entries = store.list(None, None).unwrap();
+    assert_eq!(entries[0].title, "Original task");
+    assert_eq!(
+        entries[0].agent_session_id.as_deref(),
+        Some("original-native")
+    );
+    assert_eq!(store.load("session-a").unwrap().cwd, original_cwd);
+    store.rename("session-a", "Retained title").unwrap();
+    let retained = store.load_binding("session-a").unwrap().unwrap();
+    assert_eq!(retained.database_generation, binding.database_generation);
+    assert_eq!(retained.default_cwd.as_deref(), Some(changed_cwd));
+    assert_eq!(store.list(None, None).unwrap()[0].title, "Retained title");
+}
+
 pub(crate) fn history(s: &crate::session::Session) -> (HistoryStore, StoredHistory) {
     let store = Arc::new(jam_core::Store::open(s.board.data_dir.join("test.db")).unwrap());
     let profiles = Profiles::new(store, Arc::new(MemoryCredentials::default()));

@@ -156,7 +156,7 @@ async fn exercise_lifecycle(inline: bool, hinted: bool) {
     assert!(member.online);
     let before = member.member.last_seen_at.unwrap();
     let tools = client.request("tools/list", json!({})).await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 52);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 57);
     let resources = client.request("resources/list", json!({})).await;
     assert!(
         resources["resources"]

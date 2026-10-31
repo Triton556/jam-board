@@ -42,6 +42,23 @@ export interface JamApi
     ReferencesApi,
     ProjectsApi,
     ExecutionApi {
+  projectSelectionContext(): Promise<
+    import("../bindings").FolderCommandContext | null
+  >;
+  projectFolderInfo(): Promise<import("../bindings").ProjectFolderInfo>;
+  listProjectFolders(): Promise<import("../bindings").RegistryEntry[]>;
+  createProjectFolder: import("./project-folder-api").ProjectFolderApi["create"];
+  openProjectFolder: import("./project-folder-api").ProjectFolderApi["open"];
+  registerFile: import("./task-files-api").TaskFilesApi["register"];
+  linkTaskFile: import("./task-files-api").TaskFilesApi["link"];
+  setTaskFileRole: import("./task-files-api").TaskFilesApi["setRole"];
+  unlinkTaskFile: import("./task-files-api").TaskFilesApi["unlink"];
+  listFileAssets: import("./task-files-api").TaskFilesApi["list"];
+  fileOperationStatus: import("./task-files-api").TaskFilesApi["status"];
+  cancelFileOperation: import("./task-files-api").TaskFilesApi["cancel"];
+  resolveFile: import("./task-files-api").TaskFilesApi["resolve"];
+  openFile: import("./task-files-api").TaskFilesApi["open"];
+
   getProject(): Promise<import("../bindings").Project>;
   updateProject(
     input: Partial<import("../bindings").ProjectEditInput> & {
@@ -75,7 +92,10 @@ export interface JamApi
   createMember(input: NewMember): Promise<Member>;
   updateMember(input: MemberEdit): Promise<Member>;
   getSettings(): Promise<Settings>;
-  setSettings(input: SettingsPatch): Promise<Settings>;
+  setSettings(
+    input: SettingsPatch,
+    context?: import("../bindings").FolderCommandContext,
+  ): Promise<Settings>;
   resetJam(input: { confirmName: string }): Promise<AppState>;
   exportJamJson(): Promise<{ path: string }>;
   importJamJson(path: string): Promise<AppState>;
@@ -115,7 +135,12 @@ export interface JamApi
   listMembers(): Promise<MemberWithStats[]>;
   listActivity(input?: Partial<ActivityQuery>): Promise<ActivityEvent[]>;
   setTheme(theme: Theme): Promise<void>;
-  onBoardChanged(cb: (events: ActivityEvent[]) => void): () => void;
+  onBoardChanged(
+    cb: (
+      events: ActivityEvent[],
+      context?: import("../bindings").ProjectEventContext | null,
+    ) => void,
+  ): () => void;
 }
 const baseApi: JamApi =
   import.meta.env.VITE_MOCK_BRIDGE === "1"

@@ -1,4 +1,6 @@
 mod support;
+#[path = "support/v9_fixture.rs"]
+mod v9_fixture;
 use jam_core::*;
 use std::{sync::Arc, thread, time::Duration};
 use support::FreshContext;
@@ -327,6 +329,7 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
     let agent = s.identify_agent("Legacy worker", "codex").unwrap();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
+    v9_fixture::strip(&c);
     c.execute_batch("DROP TABLE ref_frame_links; ALTER TABLE ref_items DROP COLUMN verdict; ALTER TABLE ref_items DROP COLUMN archived_by; DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests; DROP TABLE execution_states; DROP TABLE project_members; DROP TABLE task_idempotency; DELETE FROM settings WHERE key='current_project_id' OR key LIKE 'project.%.current_member_id'; PRAGMA user_version=4;").unwrap();
     c.execute(
         "UPDATE tasks SET idempotency_key='legacy-token' WHERE id=?",

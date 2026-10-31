@@ -175,10 +175,46 @@ pub async fn get_settings(
 #[specta::specta]
 pub async fn set_settings(
     input: SettingsPatch,
+    expected_context: Option<FolderCommandContext>,
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<Settings> {
-    execute(&state, app, false, move |s| s.set_settings(input)).await
+    let manager = app
+        .try_state::<std::sync::Arc<ProjectManager>>()
+        .map(|m| m.inner().clone());
+    let legacy = state.store.clone();
+    let captured = if expected_context.is_none() {
+        Some(
+            manager
+                .as_ref()
+                .and_then(|m| m.capture_selected().ok())
+                .map(|h| (*h.store).clone())
+                .map(Ok)
+                .unwrap_or_else(|| legacy.selected_snapshot())?,
+        )
+    } else {
+        None
+    };
+    tokio::task::spawn_blocking(move || match manager {
+        Some(manager) => manager.with_expected_context(&legacy, expected_context.as_ref(), |s| {
+            if expected_context.is_some() {
+                s.set_settings(input)
+            } else {
+                captured
+                    .as_ref()
+                    .expect("legacy caller captured its store")
+                    .set_settings(input)
+            }
+        }),
+        None if expected_context.is_some() => Err(jam_core::Error::Conflict),
+        None => captured
+            .as_ref()
+            .expect("legacy caller captured its store")
+            .set_settings(input),
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[derive(serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

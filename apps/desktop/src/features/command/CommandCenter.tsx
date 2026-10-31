@@ -1,6 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button, Dialog, Kbd } from "../../components/ui";
 import { shortcutAction } from "../../lib/shortcuts";
 import { CommandLoadBoundary, CommandLoading } from "./CommandLoadBoundary";
@@ -11,9 +18,11 @@ const CommandPalette = lazy(() =>
 export function CommandCenter({
   newTask,
   toggleTheme,
+  renderTrigger,
 }: {
   newTask(): void;
   toggleTheme(): void;
+  renderTrigger?(trigger: ReactNode, open: () => void): ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [help, setHelp] = useState(false);
@@ -33,18 +42,22 @@ export function CommandCenter({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [navigate, newTask]);
+  const openPalette = () => setOpen(true);
+  const trigger = (
+    <Button
+      variant="ghost"
+      className="palette-trigger"
+      onClick={openPalette}
+      aria-label="Search and commands"
+    >
+      <Search size={17} />
+      <span>Search</span>
+      <Kbd>Ctrl K</Kbd>
+    </Button>
+  );
   return (
     <>
-      <Button
-        variant="ghost"
-        className="palette-trigger"
-        onClick={() => setOpen(true)}
-        aria-label="Search and commands"
-      >
-        <Search size={17} />
-        <span>Search</span>
-        <Kbd>Ctrl K</Kbd>
-      </Button>
+      {renderTrigger ? renderTrigger(trigger, openPalette) : trigger}
       {open && (
         <CommandLoadBoundary close={() => setOpen(false)}>
           <Suspense fallback={<CommandLoading close={() => setOpen(false)} />}>

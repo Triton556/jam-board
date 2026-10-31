@@ -115,6 +115,9 @@ pub struct TaskSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskDetail {
+    #[serde(default)]
+    #[specta(optional)]
+    pub files: Vec<crate::TaskFile>,
     #[serde(flatten)]
     pub task: TaskSummary,
     pub assets: Vec<Asset>,

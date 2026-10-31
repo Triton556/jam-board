@@ -404,3 +404,20 @@ are product repairs; Theme/whole-text assertions were stale. Later note Edit and
 frame-label assertions also follow the current round-5 contracts. Exact reruns,
 full CI mirror and hosted results are recorded in alpha42 verification. Native
 install/upgrade, live providers and OS-specific usability remain unrun.
+
+## Round 11 folders / Files / task presentation boundary
+
+[Verification](../verification/round11.md) now records G1 integration and G3 verification/Polish 1. U 3/6 and T 4/5 remain historical package checkpoints; their shared integration failures are superseded for the tested fixture/DOM/browser source by G3. Native/package acceptance remains separate.
+
+- One live board per project ID per machine. Old app binaries are unsupported concurrently; no SQL-trigger fences against old writers. Disconnect agent/MCP owners before move; current code marks moved legacy sources read-only and redirects.
+- G1/G3 integrated mock state/selected routing, scoped caches/drafts/events, recovery, persisted names, JSON other and legacy tests. G3 observed 29 initial PNGs and 13 final polish PNGs for header/menu/focus/stepper repairs; these are mock-browser observations, not native acceptance.
+- ci-local now **PASS on Node 26.13.0 via explicit `-AllowNodeMajor 26`**, exit 0: **18 PASS / 5 SKIP / 0 FAIL / 0 NOT RUN** runner steps, including full final Vitest **175 files / 1,366 tests**, functional browser **156/156** and the debug build. The original strict Node 22 failure is historical; the default gate and CI workflow/fingerprint remain unchanged. The first flagged run exposed a drawer close/filter race, fixed and verified by a complete rerun. **Node 22 runtime parity remains checked only by GitHub CI and is unverified locally.** No Node install, app launch, push or tag was performed. [Runner log](../../test-visuals/round11/R11-G3/ci26/ci-local.log), [step receipt](../../test-visuals/round11/R11-G3/ci26/results.json), [failure/fix](../../test-visuals/round11/R11-G3/report.md#ci-local-on-node-26).
+- Linux not run locally. A/C2 cross-target clippy stopped at absent x86_64-linux-gnu-gcc; no compiler installed. Windows results are not Linux acceptance.
+- Native pickers, shell drop/Open/Reveal, package crash/upgrade and DPI unverified. Fake opener/Chromium pixels cannot clear FQ33/FQ34. Real agents/providers/history are owner-only, NOT RUN (FQ35).
+- No previews/renderers yet (phase 2); placeholders only. No git badges/status calls (phase 3); repository/common-dir discovery serves file resolution only.
+- Physical disk-full, AV and sync-client cases unobserved. Cloud tests use synthetic roots; real file-lock and injected interruption cover journal paths only. Dedicated non-BMP/mapped-remote/offline/case-sensitive matrix remains unrun in C.
+- Non-Windows free-space preflight, batched bounded-parallel stat and repository-context cache absent. Orphan cleanup retains uncertain companions; not general garbage collection.
+- Snapshot comparison checks syntax/version/identity; full relational/path validation occurs during restore. Allowlisted board.json, no free-text secret scanner; cwd/tokens/connection settings/logs/instance metadata remain private.
+- Move preview gives owner categories, not individual names; never invent identities. Existing empty destination refused even when nonEmpty is false.
+
+Owner recheck: disposable profile/registry/fictional folders only, never production AppData; follow FQ33–FQ36 and package steps. This task publishes no package.

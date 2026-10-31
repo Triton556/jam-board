@@ -108,6 +108,12 @@ pub(crate) fn fetch<T: DeserializeOwned>(
             value["id"].as_str().unwrap_or(""),
         )?)?;
     }
+    if table == "ref_items"
+        && let Some(asset) = value.get("assetId").and_then(Value::as_str)
+    {
+        let file = crate::file_model::load_file(c, asset, None)?;
+        value["file"] = serde_json::to_value(file)?;
+    }
     Ok(serde_json::from_value(value)?)
 }
 pub(crate) fn records<T: DeserializeOwned>(
@@ -128,6 +134,12 @@ pub(crate) fn records<T: DeserializeOwned>(
                     c,
                     value["id"].as_str().unwrap_or(""),
                 )?)?;
+            }
+            if table == "ref_items"
+                && let Some(asset) = value.get("assetId").and_then(Value::as_str)
+            {
+                let file = crate::file_model::load_file(c, asset, None)?;
+                value["file"] = serde_json::to_value(file)?;
             }
             Ok(serde_json::from_value(value)?)
         })
@@ -152,6 +164,7 @@ pub(crate) fn insert(c: &Connection, table: &str, data: &impl Serialize) -> Resu
             fields.remove("links");
         }
         if table == "ref_items" {
+            fields.remove("file");
             fields.remove("via");
             fields.remove("frameTitle");
         }
@@ -427,6 +440,7 @@ impl Store {
             event(c, Some(&j.id), actor, "project.updated", None,
                 json!({"fields":["name","template","milestoneAt","startsAt","endsAt","timezone"]}))
         })?;
+        self.refresh_registry_name()?;
         self.get_project()
     }
     pub fn create_epic(&self, actor: &str, input: NewEpic) -> Result<Epic> {

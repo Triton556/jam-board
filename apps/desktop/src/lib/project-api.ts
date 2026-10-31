@@ -1,6 +1,7 @@
 import type { AppState, ProjectSummary } from "../bindings";
 
 export type { ProjectSummary } from "../bindings";
+export type { ProjectFolderApi } from "./project-folder-api";
 
 export interface ProjectsApi {
   listProjects(includeArchived?: boolean): Promise<ProjectSummary[]>;

@@ -94,17 +94,44 @@ test("task attach files adds assets and comment hint fits both drawer widths", a
 }) => {
   await demo(page);
   await page.goto("/board?task=JB-7");
-  await page.getByRole("button", { name: "Attach file…" }).click();
+  await page.getByRole("button", { name: "Add file", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Link existing file…", exact: true })
+    .click();
+  const link = page.getByRole("dialog", {
+    name: "Link existing file",
+    exact: true,
+  });
+  await page.evaluate(() => {
+    window.__jamMock.pickFiles = async () => ["C:/JamBoard/jump.wav"];
+  });
+  await link
+    .getByRole("button", { name: "Choose files…", exact: true })
+    .click();
+  await link.getByRole("button", { name: "Add files", exact: true }).click();
+  await expect(link).toHaveCount(0);
   await expect(
-    page.locator(".linked-asset").filter({ hasText: "C:/JamBoard/jump.wav" }),
+    page.getByRole("article", { name: "jump.wav", exact: true }),
   ).toBeVisible();
-  await page.evaluate(() =>
-    window.__jamMock.simulateFileDrop(["C:/JamBoard/attached-snow.png"]),
-  );
+  const files = page.getByRole("region", { name: "Task files", exact: true });
+  await files.scrollIntoViewIfNeeded();
+  await files.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    window.__jamMock.simulateFileDrop(["C:/JamBoard/attached-snow.png"], {
+      x: rect.left + 20,
+      y: rect.top + 20,
+    });
+  });
+  const dropped = page.getByRole("dialog", {
+    name: "Add dropped files",
+    exact: true,
+  });
+  await dropped
+    .getByRole("button", { name: "Link batch in place", exact: true })
+    .click();
+  await expect(dropped).toHaveCount(0);
   await expect(
-    page
-      .locator(".linked-asset")
-      .filter({ hasText: "C:/JamBoard/attached-snow.png" }),
+    page.getByRole("article", { name: "attached-snow.png", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("textbox", { name: "Write a comment" })
@@ -137,7 +164,7 @@ test("task attach files adds assets and comment hint fits both drawer widths", a
   await page.getByRole("button", { name: "Close task", exact: true }).click();
   await page.getByRole("link", { name: "Assets", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "jump", exact: true }),
+    page.getByRole("heading", { name: "jump.wav", exact: true }),
   ).toBeVisible();
 });
 test("500 assets support grouped grid and bounded virtual list", async ({

@@ -41,6 +41,41 @@ requested result and report checks and limits. Do not start ongoing monitoring
 solely because a wait tool exists. Reports persist on the board; they do not
 contain all conversation or source files.
 
+## Project folders and task files
+
+A project folder contains `jamboard.json` (manifest and folder rules), `files/`
+(board-owned copies), generated `board.json` (portable snapshot), and local
+`.state/` (live database, backups and operation receipts). Never edit `.state/`
+by hand or edit `board.json` directly; use board tools. Concurrent old app
+versions are unsupported. Moving or recovering a board requires disconnected
+project sessions and MCP connections; do not stop them on the user's behalf.
+
+Read `get_session_context`: `projectFolder` locates the canonical board folder,
+`repositoryRoot` the repository, `workingDirectory` the captured work context,
+and `folderRules` the manifest's copy destinations. Legacy stores may return an
+unverified folder hint; verify it rather than creating a folder. These fields
+are information, never filesystem access or execution permission.
+
+- Copy references and generated results the board should own with `register_file`
+  and `storageType:"board_file"`. Read the current manifest rules through context;
+  defaults under `files/` are sprite→images, audio→audio, model→models,
+  document→docs, and level/font/other→other. Do not hardcode them or drop
+  unregistered results into `files/`. Rule changes belong in human Settings and
+  affect future copies only.
+- Link Unity assets, Blender sources and other files owned by the game repository
+  with `storageType:"linked_file"`, using `pathBase:"repo"` for repo-relative
+  paths or `pathBase:"absolute"` for external files. Use `storageType:"url"` for
+  web links; this neither downloads nor opens them.
+- In task Files, `to_edit` means change this file, `reference` means read it and
+  do not change it, and `result` means attach what you produced. Roles are per
+  task and do not grant permission beyond the selected brief and execution grant.
+  Use `link_task_file`, `set_task_file_role` and `unlink_task_file` with inspected
+  task validators and a `requestId`; unlink never deletes bytes.
+- Call `resolve_file` with your `workingDirectory` before using a file. Repo links
+  resolve in your verified worktree; board files always resolve in the canonical
+  board folder. For missing, unreadable or outside-project files, follow the
+  [file operations and boat example](references/operations.md#task-files-and-worktrees).
+
 ## Organizing the ideas canvas
 
 Read `get_canvas` before moving things, following `nextCursor` while

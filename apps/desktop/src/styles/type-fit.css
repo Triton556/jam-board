@@ -154,3 +154,121 @@ textarea::placeholder {
 .status-filters button[aria-pressed="true"] .chip {
   font-weight: 700;
 }
+.topbar-actions,
+.topbar-desktop-actions {
+  display: contents;
+}
+.topbar-action-items {
+  display: none;
+}
+.topbar-more {
+  display: none;
+}
+@media (max-width: 600px) {
+  .topbar {
+    gap: 6px;
+    padding-inline: 12px;
+    min-width: 0;
+  }
+  .topbar .theme-stamp,
+  .topbar-space {
+    display: none;
+  }
+  .topbar .project-switcher {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+    margin-left: 0;
+    gap: 4px;
+    padding-inline: 0;
+  }
+  .topbar .project-switcher small {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .topbar .project-switcher-title {
+    font-size: 14px;
+  }
+  .topbar > :not(.project-switcher) {
+    flex-shrink: 0;
+  }
+  .topbar-actions {
+    display: block;
+    position: relative;
+  }
+  .topbar-more {
+    display: inline-flex;
+    width: 32px;
+    padding-inline: 0;
+  }
+  .topbar-action-items {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 40px;
+    z-index: 50;
+    width: min(280px, calc(100vw - 24px));
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: 0 8px 24px #0002;
+  }
+  .topbar-desktop-actions {
+    display: none;
+  }
+  .topbar-action-items {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+  }
+  .topbar-action-items [role="menuitem"] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .topbar-action-items [role="menuitem"]:hover {
+    background: var(--paper);
+  }
+  .topbar-action-items [role="menuitem"] > svg {
+    flex-shrink: 0;
+  }
+  .topbar-action-items [role="menuitem"] > kbd,
+  .topbar-action-items [role="menuitem"] > .inbox-badge {
+    margin-left: auto;
+  }
+  .topbar-action-items .agent-status-wrap {
+    min-width: 0;
+  }
+  .topbar-action-items .agent-status-trigger {
+    height: auto;
+  }
+  .topbar-agent-label {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .topbar-agent-label strong {
+    font-weight: 600;
+  }
+  .topbar-actions .topbar-agent-label small {
+    color: var(--ink-2);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .topbar-action-items .agent-status-popover {
+    right: 0;
+    width: 260px;
+    max-width: calc(100vw - 48px);
+  }
+}

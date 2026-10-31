@@ -166,7 +166,51 @@ test("archive with an omitted reason, URL archived flag and unarchive", async ({
   await expect(
     page.locator(".notice").filter({ hasText: "Archived ·" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Close task", exact: true }).click();
+  // Hold the deferred teardown so a background filter cannot resurrect the
+  // still-pending task route before the drawer owner accepts the close.
+  const idleClose = await page.evaluateHandle(() => {
+    const request = window.requestIdleCallback.bind(window);
+    const cancel = window.cancelIdleCallback.bind(window);
+    const callbacks = new Map<number, IdleRequestCallback>();
+    let nextId = 1000000;
+    window.requestIdleCallback = (callback) => {
+      callbacks.set(++nextId, callback);
+      return nextId;
+    };
+    window.cancelIdleCallback = (id) => {
+      if (!callbacks.delete(id)) cancel(id);
+    };
+    return {
+      release() {
+        window.requestIdleCallback = request;
+        window.cancelIdleCallback = cancel;
+        for (const callback of callbacks.values()) {
+          callback({ didTimeout: false, timeRemaining: () => 16 });
+        }
+        callbacks.clear();
+      },
+    };
+  });
+  try {
+    await page.getByRole("button", { name: "Close task", exact: true }).click();
+    await expect(page.locator(".drawer")).toHaveClass(/closed/);
+    await expect(page).toHaveURL(/[?&]task=JB-7/);
+    expect(
+      await page
+        .locator(".app-shell")
+        .evaluate((node) => !!node.closest("[inert]")),
+    ).toBe(true);
+  } finally {
+    await idleClose.evaluate((fixture) => fixture.release());
+    await idleClose.dispose();
+  }
+  await expect(page).not.toHaveURL(/[?&]task=/);
+  await expect(page.locator(".drawer")).toHaveCount(0);
+  expect(
+    await page
+      .locator(".app-shell")
+      .evaluate((node) => !!node.closest("[inert]")),
+  ).toBe(false);
   await page.getByRole("switch", { name: "Show archived" }).click();
   await page.reload();
   await expect(

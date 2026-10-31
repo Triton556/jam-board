@@ -14,6 +14,7 @@ import {
   setMockProviderScenario,
 } from "./agent-dock-retry-mock";
 import { api } from "./api";
+import { mockApi } from "./mock-bridge";
 import { JamError } from "./types";
 
 type Payload = AgentDockEvent extends infer E
@@ -349,6 +350,7 @@ export function resetMockDock() {
   }
   turns.clear();
   sessions.clear();
+  mockApi.sessionLocators.clear();
   configs.clear();
   attachments.clear();
   histories.clear();
@@ -371,6 +373,11 @@ function emit(sessionId: string, payload: Payload) {
   if (session && profile) recordMockHistoryEvent(session, profile, event);
   if (payload.kind === "status")
     Object.assign(sessions.get(sessionId) ?? {}, { status: payload.status });
+  if (payload.kind === "status") {
+    const locator = mockApi.sessionLocators.get(sessionId);
+    if (locator)
+      locator.active = !["stopped", "failed"].includes(payload.status);
+  }
   for (const cb of listeners) cb(event);
 }
 function output(sessionId: string, data: string) {
@@ -607,6 +614,27 @@ export const mockDockApi: AgentDockApi = {
       throw new JamError("missing_model", "Choose a model");
     const app = await api.appState();
     if (!app.jam) throw new JamError("no_project", "Open a project first.");
+    const context = await api.projectSelectionContext();
+    const settings = await api.getSettings();
+    const info = mockApi.folders.selected;
+    const capturedCwd =
+      cwd?.trim() ||
+      settings.workingDirectory ||
+      info?.folder ||
+      settings.projectFolder ||
+      "C:/work/cozy-jam";
+    if (/missing|unavailable|nonexistent/i.test(capturedCwd))
+      throw new JamError(
+        "unavailable",
+        "The working directory is unavailable. Choose an existing folder.",
+      );
+    const current = await api.projectSelectionContext();
+    if (
+      !context ||
+      current?.instanceId !== context.instanceId ||
+      current.selectionEpoch !== context.selectionEpoch
+    )
+      throw new JamError("conflict", "Project changed before launch");
     const s: AgentSessionView = {
       id: crypto.randomUUID(),
       profileId,
@@ -614,7 +642,7 @@ export const mockDockApi: AgentDockApi = {
       kind: p.kind,
       title: p.label,
       status: launchDelayMs ? "starting" : "ready",
-      cwd: cwd ?? "C:/work/cozy-jam",
+      cwd: capturedCwd,
       createdAt: new Date().toISOString(),
       capabilities: {
         images: false,
@@ -624,6 +652,14 @@ export const mockDockApi: AgentDockApi = {
       },
     };
     sessions.set(s.id, s);
+    mockApi.sessionLocators.set(s.id, {
+      projectId: app.jam.id,
+      instanceId: context.instanceId,
+      generation: info?.databaseGeneration ?? "legacy",
+      folder: info?.folder ?? null,
+      cwd: capturedCwd,
+      active: true,
+    });
     emit(s.id, {
       kind: "status",
       status: s.status,

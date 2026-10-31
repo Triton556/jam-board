@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { mockApi } from "../lib/mock-bridge";
 import { invalidatePlanning } from "../lib/planning-queries";
+import { acceptProjectSelection } from "../lib/project-selection";
 import { ProjectsPage } from "./projects/ProjectsPage";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -16,6 +17,7 @@ it("reviewer project picker updates task counts after task creation", async () =
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, retry: false } },
   });
+  await acceptProjectSelection(client, await mockApi.appState());
   const view = () => (
     <QueryClientProvider client={client}>
       <ProjectsPage />
@@ -47,22 +49,37 @@ it("reviewer project picker updates task counts after task creation", async () =
 
 it("reviewer canceled old-project result cannot overwrite new active query", async () => {
   const { QueryObserver } = await import("@tanstack/react-query");
-  const { acceptProjectSelection } = await import("../lib/project-selection");
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, retry: false } },
   });
+  await acceptProjectSelection(client, await mockApi.appState());
   let resolveOld!: (value: string[]) => void;
   const old = new Promise<string[]>((resolve) => {
     resolveOld = resolve;
   });
   let selected = "A";
-  const observer = new QueryObserver(client, {
+  const options = {
     queryKey: ["epics"],
     queryFn: () => (selected === "A" ? old : Promise.resolve(["B epic"])),
-  });
+  };
+  const observer = new QueryObserver(client, options);
   const stop = observer.subscribe(() => {});
   selected = "B";
-  await acceptProjectSelection(client, await mockApi.appState());
+  await acceptProjectSelection(
+    client,
+    await mockApi.createJam({
+      name: "Observer B",
+      yourName: "Human",
+      theme: null,
+      startsAt: "",
+      endsAt: "",
+      timezone: "UTC",
+      template: "custom",
+    }),
+  );
+  // React observers rebind on the selection render; this standalone observer does so explicitly.
+  observer.setOptions(options);
+  await observer.refetch();
   expect(client.getQueryData(["epics"])).toEqual(["B epic"]);
   resolveOld(["A epic"]);
   await old;

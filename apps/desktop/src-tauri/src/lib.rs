@@ -8,6 +8,7 @@ mod canvas_commands;
 pub mod commands;
 mod execution_commands;
 mod m5_commands;
+mod project_folder_commands;
 mod skill_commands;
 mod skill_runner;
 mod startup_probe;
@@ -23,8 +24,30 @@ pub struct DesktopState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
 pub struct BoardChanged {
     pub events: Vec<ActivityEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub project_context: Option<ProjectEventContext>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectEventContext {
+    pub instance_id: String,
+    pub project_id: String,
+    pub selection_epoch: u64,
+    pub database_generation: String,
+}
+impl ProjectEventContext {
+    fn capture(h: &jam_core::ProjectHandle) -> Self {
+        Self {
+            instance_id: h.instance_id.clone(),
+            project_id: h.project_id.clone(),
+            selection_epoch: h.selection_epoch,
+            database_generation: h.database_generation.clone(),
+        }
+    }
 }
 
 pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
@@ -40,6 +63,7 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
             v2_commands::set_reference_verdict,v2_commands::link_ref_frame,v2_commands::unlink_ref_frame,v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
             v2_commands::get_project,v2_commands::update_project,v2_commands::list_epics,v2_commands::get_epic,v2_commands::get_story,v2_commands::create_epic,v2_commands::update_epic,v2_commands::set_epic_status,v2_commands::create_story,v2_commands::update_story,v2_commands::set_story_status,v2_commands::update_task_brief,v2_commands::check_ready,v2_commands::mark_ready,v2_commands::answer_question,v2_commands::ask_user,v2_commands::withdraw_question,v2_commands::list_questions,v2_commands::review_task,v2_commands::submit_report,v2_commands::set_brain,v2_commands::list_changes_since,v2_commands::epic_journal,v2_commands::add_reference,v2_commands::list_references,v2_commands::update_reference,v2_commands::link_reference,v2_commands::unlink_reference,v2_commands::archive_reference,v2_commands::list_ref_frames,v2_commands::create_ref_frame,v2_commands::update_ref_frame,v2_commands::archive_ref_frame,v2_commands::list_ref_edges,v2_commands::create_ref_edge,v2_commands::archive_ref_edge,v2_commands::update_ref_geometry,
             execution_commands::get_execution,execution_commands::list_execution,execution_commands::set_execution,execution_commands::list_execution_requests,execution_commands::resolve_execution_request,
+            project_folder_commands::remove_recent_project_folder,project_folder_commands::locate_project_folder,project_folder_commands::preview_project_move,project_folder_commands::project_selection_context,project_folder_commands::open_file_asset,project_folder_commands::reveal_file_asset,project_folder_commands::create_project_folder,project_folder_commands::open_project_folder,project_folder_commands::close_project_folder,project_folder_commands::project_folder_info,project_folder_commands::list_project_folders,project_folder_commands::set_project_folder_rules,project_folder_commands::move_project_to_folder,project_folder_commands::project_operation_status,project_folder_commands::rollback_project_move,project_folder_commands::recover_project_folder,project_folder_commands::save_board_snapshot,project_folder_commands::register_file,project_folder_commands::link_task_file,project_folder_commands::set_task_file_role,project_folder_commands::unlink_task_file,project_folder_commands::resolve_file,project_folder_commands::file_operation_status,project_folder_commands::cancel_file_operation,project_folder_commands::list_file_assets,project_folder_commands::compare_board_snapshot,project_folder_commands::keep_live_board,
             commands::list_projects, commands::select_project, commands::restore_project,
             commands::app_ready, commands::app_state, commands::create_jam, commands::load_demo_jam,
             commands::set_current_member, commands::add_self, commands::get_board,
@@ -168,6 +192,7 @@ pub fn run() {
                 store: store.clone(),
                 feed: feed.clone(),
             });
+            app.manage(runtime.projects.clone());
             app.manage(runtime.clone());
             app.manage(agent_commands::manager(store.clone(), app.handle().clone()));
             app.manage(voice_commands::manager(&data_dir, app.handle().clone())?);
@@ -195,8 +220,15 @@ pub fn run() {
                         call_stamp = stamp;
                         let _ = McpCallsChanged {}.emit(&handle);
                     }
-                    let feed = feed.clone();
-                    let selected_store = store.clone();
+                    let folder_handle = runtime.projects.capture_selected().ok();
+                    let feed = folder_handle
+                        .as_ref()
+                        .map(|h| h.feed.clone())
+                        .unwrap_or_else(|| feed.clone());
+                    let selected_store = folder_handle
+                        .as_ref()
+                        .map(|h| h.store.clone())
+                        .unwrap_or_else(|| store.clone());
                     let result = tokio::task::spawn_blocking(move || {
                         let mut f = feed
                             .lock()
@@ -212,7 +244,14 @@ pub fn run() {
                     .await;
                     match result {
                         Ok(Ok(events)) if !events.is_empty() => {
-                            if let Err(e) = (BoardChanged { events }).emit(&handle) {
+                            if let Err(e) = (BoardChanged {
+                                events,
+                                project_context: folder_handle
+                                    .as_deref()
+                                    .map(ProjectEventContext::capture),
+                            })
+                            .emit(&handle)
+                            {
                                 tracing::warn!(%e,"Cannot emit board-changed");
                             }
                         }

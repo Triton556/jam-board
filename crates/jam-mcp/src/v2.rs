@@ -409,7 +409,7 @@ pub(crate) fn tools() -> Vec<Tool> {
 }
 
 // Shared by handoff resources and prompts so bootstrap/recovery policy stays aligned.
-pub(crate) const OBSERVATION_GUIDANCE: &str = "Use the human's established language. Verify get_session_context against the intended exact project ID before reads; matching names/prefixes are insufficient. Unknown/mismatched ID: stop and ask. Preserve saved cursor and project/epic/filter identity; never replace/reset unprocessed checkpoints. Fresh bootstrap only: capture latestActivityCursor BEFORE baseline reads, then replay; finish the baseline before checkpointing. No historical-audit shortcut. Missing differs from 0: older servers require conservative saved-checkpoint recovery, or cursor0 for genuinely new history. Recover with wait_for_changes(cursor, epicKey, includeProject=true, excludeSelf=false, timeoutSeconds=1), omitting actions/actorKind unless intentionally filtering. Handle each page before checkpointing nextCursor, including timeouts; drain until timedOut=true, not a short page, use timeoutSeconds=60 only if the assigned role/request requires continued observation. Finish/report at the assigned stopping condition; recovery creates no monitoring assignment. With epicKey, includeProject adds only project-wide human events; otherwise it does not narrow scope. Filters consume exclusions: widening needs explicit reconciliation. Foreign/nonmatching sequences advance nextCursor beyond project high-water; never infer rewind. No database-generation identity: restore needs explicit reconciliation, not automatic recovery. 100 events is not a byte cap; continuous catch-up may never finish. Checkpoint handled progress and honestly summarize incompleteness before context limits. Baseline/replay is neither atomic snapshot nor audit; deduplicate overlapping observations. Use targeted list_tasks/get_task while preserving required questions/comments/reports/reviews/linked evidence and inspected validators; resource duplication only for missing content. list_changes_since remains for deliberate audit. No execution grant or OS-session launch follows from bootstrap/waiting.";
+pub(crate) const OBSERVATION_GUIDANCE: &str = "Use the human's established language. Verify get_session_context against the intended exact project ID before reads; matching names/prefixes are insufficient. Unknown/mismatched ID: stop and ask. Preserve saved cursor and project/epic/filter identity; never replace/reset unprocessed checkpoints. Fresh bootstrap only: capture latestActivityCursor BEFORE baseline reads, then replay; finish the baseline before checkpointing. No historical-audit shortcut. Missing differs from 0: older servers require conservative saved-checkpoint recovery, or cursor0 for genuinely new history. Recover with wait_for_changes(cursor, epicKey, includeProject=true, excludeSelf=false, timeoutSeconds=1), omitting actions/actorKind unless intentionally filtering. Handle each page before checkpointing nextCursor, including timeouts; drain until timedOut=true, not a short page, use timeoutSeconds=60 only if the assigned role/request requires continued observation. Finish/report at the assigned stopping condition; recovery creates no monitoring assignment. With epicKey, includeProject adds only project-wide human events; otherwise it does not narrow scope. Filters consume exclusions: widening needs explicit reconciliation. Foreign/nonmatching sequences advance nextCursor beyond project high-water; never infer rewind. Capture databaseGeneration with cursor checkpoints. A generation change after move/recovery requires reconnecting and explicit baseline reconciliation, not automatic recovery; never replay saved validators against a new generation. 100 events is not a byte cap; continuous catch-up may never finish. Checkpoint handled progress and honestly summarize incompleteness before context limits. Baseline/replay is neither atomic snapshot nor audit; deduplicate overlapping observations. Use targeted list_tasks/get_task while preserving required questions/comments/reports/reviews/linked evidence and inspected validators; resource duplication only for missing content. list_changes_since remains for deliberate audit. No execution grant or OS-session launch follows from bootstrap/waiting.";
 
 pub(crate) fn epic_markdown(tree: &EpicTree) -> String {
     let e = &tree.epic;
@@ -545,7 +545,20 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
     for change in &t.brief.changes {
         md.push_str(&format!("### {}\n\nNow: {}\n\nCause: {}\n\nRequired: {}\n\nWhere: {}\n\nFollow: {}\n\nKeep: {}\n\n",change.title,change.now,change.cause,change.required,change.r#where,change.follow,change.keep));
     }
-    md.push_str("## Tests\n\n");
+    md.push_str("## Files\n\n| File | Role | Ownership | Stored path | Status | Resolution basis |\n| --- | --- | --- | --- | --- | --- |\n");
+    for file in &t.files {
+        let esc = |s: &str| s.replace('|', "\\|").replace(['\n', '\r'], " ");
+        md.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} |\n",
+            esc(&file.asset.asset.name),
+            file.role,
+            file.asset.storage_type,
+            esc(&file.asset.stored_path),
+            file.asset.resolution.status,
+            file.asset.resolution.resolution_basis
+        ));
+    }
+    md.push_str("\n## Tests\n\n");
     for (i, test) in t.brief.tests.iter().enumerate() {
         md.push_str(&format!(
             "{}. Setup: {}\n   Expected: {}\n\n",

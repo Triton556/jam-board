@@ -88,6 +88,11 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
         .optional()?
         .ok_or_else(|| Error::NotFound(key.into()))?;
     crate::projects::ensure_scope(c, &t.jam_id)?;
+    let generation: String =
+        c.query_row("SELECT database_generation FROM board_meta", [], |r| {
+            r.get(0)
+        })?;
+    t.claim_generation = format!("{generation}:{}", t.claim_generation);
     t.idempotency_key = c
         .query_row(
             "SELECT token FROM task_idempotency WHERE task_id=?",
@@ -322,7 +327,8 @@ impl Store {
         if timezone.trim().is_empty() {
             return Err(invalid("timezone", "must not be empty"));
         }
-        self.write(|c| {
+        self.write_control(|c| {
+            if crate::project_folders::folder_for_db(&self.path).is_some()&&c.query_row("SELECT count(*) FROM jams",[],|r|r.get::<_,i64>(0))?>0{return Err(invalid("project","Folder DBs contain exactly one project"));}
             let mid=id();
  let jid=id();
  let stamp=now();
@@ -375,7 +381,9 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
                 ),
             )?;
             jam(c)
-        })
+        })?;
+        self.refresh_registry_name()?;
+        self.active_jam()
     }
     pub fn add_human(
         &self,
@@ -1086,7 +1094,7 @@ NULL AND key<>? ORDER BY position, key",
         location: &str,
         notes: Option<&str>,
     ) -> Result<Asset> {
-        if !["sprite", "audio", "level", "font", "other"].contains(&kind) {
+        if !crate::FILE_KINDS.contains(&kind) {
             return Err(invalid("kind", "invalid asset kind"));
         }
         title(name)?;
@@ -1149,7 +1157,7 @@ NULL AND key<>? ORDER BY position, key",
                 return Err(invalid("asset", "belongs to another jam"));
             }
             c.execute(
-                "INSERT OR IGNORE INTO task_assets VALUES (?,?)",
+                "INSERT OR IGNORE INTO task_assets(task_id,asset_id) VALUES (?,?)",
                 [&t.id, asset_id],
             )?;
             touch(c, &t.id, actor)?;
@@ -1298,7 +1306,7 @@ status_stale:!m.status_text.is_empty()&&m.status_at.as_deref().and_then(|s|time:
     }
     pub fn list_assets(&self, kind: Option<&str>, query: Option<&str>) -> Result<Vec<Asset>> {
         if let Some(k) = kind
-            && !["sprite", "audio", "level", "font", "other"].contains(&k)
+            && !crate::FILE_KINDS.contains(&k)
         {
             return Err(invalid("kind", "invalid asset kind"));
         }
@@ -1438,16 +1446,20 @@ pub(crate) fn asset_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Asset> {
     })
 }
 pub(crate) fn all_assets(c: &Connection, jid: &str) -> Result<Vec<Asset>> {
-    Ok(c.prepare(
-        "SELECT id, jam_id, kind, name, location, notes, created_by, created_at,role FROM
+    let rows: Vec<Asset> = c
+        .prepare(
+            "SELECT id, jam_id, kind, name, location, notes, created_by, created_at,role FROM
 assets WHERE jam_id=? ORDER BY created_at, id",
-    )?
-    .query_map([jid], asset_row)?
-    .collect::<std::result::Result<_, _>>()?)
+        )?
+        .query_map([jid], asset_row)?
+        .collect::<std::result::Result<_, _>>()?;
+    rows.into_iter()
+        .map(|asset| Ok(crate::file_model::load_file(c, &asset.id, None)?.asset))
+        .collect()
 }
 pub(crate) fn detail(c: &Connection, key: &str) -> Result<TaskDetail> {
     let t = task(c, key)?;
-    let assets = c
+    let assets: Vec<Asset> = c
         .prepare(
             "SELECT a.id, a.jam_id, a.kind, a.name, a.location, a.notes, a.created_by,
 a.created_at,a.role FROM assets a JOIN task_assets ta ON ta.asset_id=a.id WHERE
@@ -1455,6 +1467,10 @@ ta.task_id=?",
         )?
         .query_map([&t.id], asset_row)?
         .collect::<std::result::Result<_, _>>()?;
+    let assets = assets
+        .into_iter()
+        .map(|asset| Ok(crate::file_model::load_file(c, &asset.id, None)?.asset))
+        .collect::<Result<Vec<_>>>()?;
     let comments = c
         .prepare(
             "SELECT id, task_id, author_id, body_md, created_at FROM comments WHERE
@@ -1473,6 +1489,7 @@ task_id=? ORDER BY created_at, id",
     let activity = crate::db::activity(c, 0, Some(&t.id), Some(20))?;
     let history = crate::db::activity(c, 0, Some(&t.id), Some(50))?;
     Ok(TaskDetail {
+        files: crate::file_model::task_files(c, &t.id)?,
         review_context_revision: crate::context::review_revision(c, &t)?,
         ancestor_questions: crate::planning::records(
             c,

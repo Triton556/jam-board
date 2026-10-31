@@ -256,6 +256,10 @@ pub(crate) fn validate(s: &JamExport) -> Result<()> {
     Ok(())
 }
 pub(crate) fn export(c: &Connection, jam_id: &str) -> Result<PlanningExport> {
+    let mut items: Vec<RefItem> = records(c, "ref_items", "jam_id=?", &[&jam_id])?;
+    for item in &mut items {
+        item.file = None;
+    }
     let keys = c
         .prepare("SELECT id,key FROM tasks WHERE jam_id=?")?
         .query_map([jam_id], |r| {
@@ -288,7 +292,7 @@ pub(crate) fn export(c: &Connection, jam_id: &str) -> Result<PlanningExport> {
         )?,
         questions: records(c, "questions", "jam_id=?", &[&jam_id])?,
         frames: records(c, "ref_frames", "jam_id=?", &[&jam_id])?,
-        items: records(c, "ref_items", "jam_id=?", &[&jam_id])?,
+        items,
         edges: records(c, "ref_edges", "jam_id=?", &[&jam_id])?,
         reference_links: records(
             c,

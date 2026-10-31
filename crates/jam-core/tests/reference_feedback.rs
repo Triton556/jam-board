@@ -1,4 +1,6 @@
 //! W4 / AC14: persisted frame references and human moodboard feedback.
+#[path = "support/v9_fixture.rs"]
+mod v9_fixture;
 use jam_core::*;
 use serde_json::json;
 
@@ -469,6 +471,7 @@ fn ac14_migration_from_schema_seven_preserves_records_and_defaults() {
     )
     .unwrap();
     c.execute("DELETE FROM activity WHERE json_extract(payload,'$.itemId')=? AND json_extract(payload,'$.archived')=1",[&unknown.audit.id]).unwrap();
+    v9_fixture::strip(&c);
     c.execute_batch("DROP TABLE ref_frame_links; ALTER TABLE ref_items DROP COLUMN verdict; ALTER TABLE ref_items DROP COLUMN archived_by; PRAGMA user_version=7;").unwrap();
     drop(c);
     let store = Store::open(&path).unwrap();

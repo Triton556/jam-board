@@ -4,6 +4,8 @@ export const assetKinds = [
   "audio",
   "level",
   "font",
+  "model",
+  "document",
   "other",
 ] as const;
 export function assetKind(location: string) {
@@ -16,7 +18,36 @@ export function assetKind(location: string) {
         ? "font"
         : ["tmx", "ldtk"].includes(ext ?? "")
           ? "level"
-          : "other";
+          : [
+                "glb",
+                "gltf",
+                "obj",
+                "fbx",
+                "blend",
+                "stl",
+                "ply",
+                "dae",
+                "3mf",
+                "usd",
+                "usda",
+                "usdc",
+                "usdz",
+              ].includes(ext ?? "")
+            ? "model"
+            : [
+                  "md",
+                  "txt",
+                  "pdf",
+                  "doc",
+                  "docx",
+                  "rtf",
+                  "odt",
+                  "csv",
+                  "yaml",
+                  "yml",
+                ].includes(ext ?? "")
+              ? "document"
+              : "other";
 }
 export function assetName(location: string) {
   return (

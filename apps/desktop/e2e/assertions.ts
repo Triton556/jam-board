@@ -96,3 +96,34 @@ export async function openAgentPlan(page: Page) {
     await plan.locator(":scope > summary").click();
   await expect(plan).toHaveAttribute("open", "");
 }
+
+/** Complete the real folder step with the browser mock picker. */
+export async function completeProjectFolder(
+  page: Page,
+  folder = "C:/fictional/e2e/Onboarding",
+) {
+  const dialog = page.getByRole("dialog", {
+    name: "Create project folder",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await page.evaluate((path) => {
+    window.__jamMock.pickFolder = async () => path;
+  }, folder);
+  await dialog
+    .getByRole("button", { name: "Choose folder…", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Create project", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+}
+
+/** Availability checks may refresh their observation time without editing a task. */
+export function withoutFileCheckTimes(value: unknown): unknown {
+  return JSON.parse(
+    JSON.stringify(value, (key, item) =>
+      key === "checkedAt" ? undefined : item,
+    ),
+  );
+}

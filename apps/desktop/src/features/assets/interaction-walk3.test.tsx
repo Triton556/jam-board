@@ -44,7 +44,7 @@ it.each(["assets", "tasks"] as const)(
   async (source) => {
     const asset = (await mockApi.listAssets())[0];
     if (!asset) throw new Error("Missing asset fixture");
-    const link = vi.spyOn(mockApi, "linkAsset");
+    const link = vi.spyOn(mockApi, "linkTaskFile");
     const close = vi.fn();
     await mount(
       <AssetLinkDialog
@@ -82,17 +82,28 @@ it.each(["assets", "tasks"] as const)(
     await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
     expect(link).toHaveBeenCalledTimes(1);
     expect(link).toHaveBeenCalledWith(
-      source === "assets"
-        ? { assetId: asset.id, taskKey: "JB-1" }
-        : { assetId: asset.id, taskKey: first.textContent?.split(" ")[0] },
+      expect.objectContaining({
+        projectId: expect.any(String),
+        instanceId: expect.any(String),
+        selectionEpoch: expect.any(Number),
+      }),
+      expect.objectContaining({
+        assetId: asset.id,
+        taskKey:
+          source === "assets" ? "JB-1" : first.textContent?.split(" ")[0],
+        role: "reference",
+        expectedUpdatedAt: expect.any(String),
+        expectedClaimGeneration: expect.any(String),
+        requestId: expect.any(String),
+      }),
     );
   },
 );
 it("F01 filtering clears stale active/selected results; empty results cannot link", async () => {
-  const link = vi.spyOn(mockApi, "linkAsset");
+  const link = vi.spyOn(mockApi, "linkTaskFile");
   await mount(<AssetLinkDialog taskKey="JB-1" close={vi.fn()} />);
   await screen.findAllByRole("option");
-  const search = screen.getByRole("combobox");
+  const search = screen.getByRole("combobox", { name: "Search" });
   const user = userEvent.setup();
   await user.click(search);
   await user.keyboard("{ArrowUp}{Enter}");
@@ -107,10 +118,10 @@ it("F01 failed source results cannot be activated or linked by Enter", async () 
   vi.spyOn(mockApi, "listAssets").mockRejectedValue(
     new Error("Link list failed"),
   );
-  const link = vi.spyOn(mockApi, "linkAsset");
+  const link = vi.spyOn(mockApi, "linkTaskFile");
   await mount(<AssetLinkDialog taskKey="JB-1" close={vi.fn()} />);
   await screen.findByRole("alert");
-  const search = screen.getByRole("combobox");
+  const search = screen.getByRole("combobox", { name: "Search" });
   const user = userEvent.setup();
   await user.click(search);
   await user.keyboard("{ArrowDown}{Enter}");
@@ -119,7 +130,7 @@ it("F01 failed source results cannot be activated or linked by Enter", async () 
   expect(link).not.toHaveBeenCalled();
 });
 it("F01 Escape closes the link dialog and restores its trigger without linking", async () => {
-  const link = vi.spyOn(mockApi, "linkAsset");
+  const link = vi.spyOn(mockApi, "linkTaskFile");
   function Example() {
     const [open, setOpen] = useState(false);
     return (
@@ -138,7 +149,7 @@ it("F01 Escape closes the link dialog and restores its trigger without linking",
   const trigger = screen.getByRole("button", { name: "Open asset link" });
   await user.click(trigger);
   await screen.findAllByRole("option");
-  await user.click(screen.getByRole("combobox"));
+  await user.click(screen.getByRole("combobox", { name: "Search" }));
   await user.keyboard("{ArrowDown}{Escape}");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();

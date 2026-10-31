@@ -1,16 +1,20 @@
 # Windows pre-tag gates, in .github/workflows/ci.yml order (PowerShell 5.1+).
 # Run from any directory: pwsh -File scripts/ci-local.ps1
+# Optional local-only override: -AllowNodeMajor 26 (also accepts CI Node 22).
 # Does not commit, push, tag, switch checkout, or change the global toolchain.
-# Setup actions require installed stable Rust (rustfmt/clippy) and Node 22.
+# Setup actions require installed stable Rust (rustfmt/clippy) and Node 22 by default.
+# An explicit -AllowNodeMajor accepts that installed major with a parity warning;
+# it does not install Node or change the CI workflow/strict default.
 # npm ci and Chromium installation DO download/install their CI dependencies.
 [CmdletBinding()]
-param()
+param([ValidateRange(1, 2147483647)][int]$AllowNodeMajor)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $desktop = Join-Path $repo 'apps/desktop'
 $results = [Collections.Generic.List[object]]::new()
 $failed = $false
+$nodeOverrideDetail = $null
 $oldToolchain = $env:RUSTUP_TOOLCHAIN
 $oldCI = $env:CI
 
@@ -40,7 +44,12 @@ $steps = @(
     @{ Name='Swatinem/rust-cache@v2'; Skip='Hosted cache action; existing local Cargo cache used' }
     @{ Name='actions/setup-node@v4 (Node 22)'; Action={
         $nodeVersion = & node -p 'process.versions.node'
-        if ($LASTEXITCODE -ne 0 -or "$nodeVersion".Split('.')[0] -ne '22') { throw 'Install/use Node 22 before running these gates (same major as CI)' }
+        $nodeMajor = "$nodeVersion".Split('.')[0]
+        if ($LASTEXITCODE -ne 0 -or ($nodeMajor -ne '22' -and ($AllowNodeMajor -eq 0 -or $nodeMajor -ne "$AllowNodeMajor"))) { throw 'Install/use Node 22 before running these gates (same major as CI)' }
+        if ($nodeMajor -ne '22') {
+            $script:nodeOverrideDetail = "Node $nodeVersion (CI uses 22; allowed by -AllowNodeMajor)"
+            Write-Warning $script:nodeOverrideDetail
+        }
         Invoke-Checked 'npm.cmd' @('--version')
     } }
     @{ Name='npm ci'; Desktop=$true; Action={ Invoke-Checked 'npm.cmd' @('ci') } }
@@ -92,7 +101,9 @@ try {
         Push-Location $location
         try {
             & $step.Action
-            Add-Result $step.Name 'PASS' 'Completed'
+            $detail = 'Completed'
+            if ($step.Name -eq 'actions/setup-node@v4 (Node 22)' -and $nodeOverrideDetail) { $detail = $nodeOverrideDetail }
+            Add-Result $step.Name 'PASS' $detail
         } catch {
             $failed = $true
             Add-Result $step.Name 'FAIL' $_.Exception.Message
@@ -108,6 +119,7 @@ try {
     $env:CI = $oldCI
     Pop-Location
     $results | Format-Table -AutoSize -Wrap | Out-Host
+    if ($nodeOverrideDetail) { Write-Host "Node major mismatch: this run did not match the CI Node major (22). $nodeOverrideDetail" }
     Write-Host 'Linux behavior is only checked on GitHub. Push the branch, wait for green Windows AND Ubuntu CI on the exact release commit, then tag. A local PASS does not replace either hosted job.'
 }
 if ($failed) { exit 1 }

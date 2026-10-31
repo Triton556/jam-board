@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openExternalAgents } from "./assertions";
+import { completeProjectFolder, openExternalAgents } from "./assertions";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -110,14 +110,10 @@ test("new projects keep existing boards and the picker restores their hierarchy"
   const original = await page.evaluate(() => window.__jamMock.appState());
   await page.getByRole("link", { name: /^Switch project ·/ }).click();
   await page.getByRole("button", { name: "New project", exact: true }).click();
-  await page.getByRole("button", { name: "Custom", exact: true }).click();
   await page
     .getByLabel("Project name", { exact: true })
     .fill("Fictional second project");
-  await page.getByLabel("Your name", { exact: true }).fill("Human");
-  await page
-    .getByRole("button", { name: "Create project", exact: true })
-    .click();
+  await completeProjectFolder(page, "C:/fictional/e2e/Second");
   await expect(
     page.getByRole("link", {
       name: "Switch project · Fictional second project",

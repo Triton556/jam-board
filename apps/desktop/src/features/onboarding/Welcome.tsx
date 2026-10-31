@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import boardImage from "../../assets/chibi/duo-board-512.webp";
+import type { NewJamInput } from "../../bindings";
 import { Button } from "../../components/ui";
 import { api } from "../../lib/api";
 import { acceptProjectSelection } from "../../lib/project-selection";
@@ -15,6 +16,7 @@ import {
   templates,
 } from "../../lib/project-template";
 import { appQuery } from "../../lib/queries";
+import { ProjectFolderDialog } from "../projects/ProjectFolderDialog";
 export const welcomeSchema = z
   .object({
     name: z
@@ -56,6 +58,8 @@ export function Welcome() {
   const client = useQueryClient(),
     navigate = useNavigate();
   const app = useQuery(appQuery);
+  const [folderInitialization, setFolderInitialization] =
+    useState<NewJamInput | null>(null);
   const [step, setStep] = useState(1),
     [template, setTemplate] = useState<Template>("game_jam");
   const {
@@ -80,27 +84,11 @@ export function Welcome() {
     await acceptProjectSelection(client, state);
     await navigate({ to: "/board", ignoreBlocker: true });
   };
-  const create = useMutation({
-    mutationFn: (v: Fields) =>
-      api.createJam({
-        ...v,
-        template,
-        theme: v.theme.trim() || null,
-        startsAt:
-          template === "game_jam" ? new Date(v.startsAt).toISOString() : "",
-        endsAt: template === "game_jam" ? new Date(v.endsAt).toISOString() : "",
-        milestoneAt:
-          (template === "gamedev" || template === "webapp") && v.milestoneAt
-            ? new Date(v.milestoneAt).toISOString()
-            : null,
-      }),
-    onSuccess: finish,
-  });
   const demo = useMutation({
     mutationFn: () => api.loadDemoJam(),
     onSuccess: finish,
   });
-  const busy = create.isPending || demo.isPending;
+  const busy = folderInitialization !== null || demo.isPending;
   useBlocker({ shouldBlockFn: () => busy, enableBeforeUnload: busy });
   const info = templateInfo(template);
   return (
@@ -170,7 +158,29 @@ export function Welcome() {
             <Button variant="ghost" onClick={() => setStep(1)}>
               ← Change template · {info.label}
             </Button>
-            <form onSubmit={handleSubmit((v) => create.mutate(v))} noValidate>
+            <form
+              onSubmit={handleSubmit((v) =>
+                setFolderInitialization({
+                  ...v,
+                  template,
+                  theme: v.theme.trim() || null,
+                  startsAt:
+                    template === "game_jam"
+                      ? new Date(v.startsAt).toISOString()
+                      : "",
+                  endsAt:
+                    template === "game_jam"
+                      ? new Date(v.endsAt).toISOString()
+                      : "",
+                  milestoneAt:
+                    (template === "gamedev" || template === "webapp") &&
+                    v.milestoneAt
+                      ? new Date(v.milestoneAt).toISOString()
+                      : null,
+                }),
+              )}
+              noValidate
+            >
               <label>
                 {template === "game_jam" ? "Jam name" : "Project name"}
                 <input
@@ -244,18 +254,15 @@ export function Welcome() {
                 </p>
               )}
               <Button variant="primary" type="submit" disabled={busy}>
-                {create.isPending
-                  ? "Creating project…"
-                  : template === "game_jam"
-                    ? "Create jam"
-                    : "Create project"}
+                {template === "game_jam" ? "Create jam" : "Create project"}
               </Button>
+              <p className="small muted">Next: choose a project folder.</p>
             </form>
           </>
         )}
-        {(create.error || demo.error) && (
+        {demo.error && (
           <p role="alert" className="field-error">
-            {(create.error ?? demo.error)?.message}
+            {demo.error.message}
           </p>
         )}
         <div className="welcome-or">
@@ -272,6 +279,22 @@ export function Welcome() {
           Connect an AI agent later in Settings → Agents
         </p>
       </div>
+      {folderInitialization !== null && (
+        <ProjectFolderDialog
+          mode="create"
+          draftKey={`welcome:${app.data?.jam?.id ?? "none"}`}
+          initialName={folderInitialization.name}
+          initialization={folderInitialization}
+          onClose={() => setFolderInitialization(null)}
+          onOpened={async (info) => {
+            const state = await api.appState();
+            if (state.jam?.id !== info.projectId)
+              throw new Error("Project changed — reopen");
+            setFolderInitialization(null);
+            await finish(state);
+          }}
+        />
+      )}
     </main>
   );
 }

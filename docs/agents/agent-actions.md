@@ -22,7 +22,7 @@ release or native-acceptance exception.
 
 | ID | Actor / entry → depth and actions | Result / authority boundary | Failure/recovery and human counterpart |
 |---|---|---|---|
-| AG01 | New client → initialized or discovery-first binding → get_session_context → scoped baseline | Connection captures project and identity once; current desktop project is not retargeting | Wrong/archived project fails closed. Identity precedence: X-Jam-Agent, JAM_AGENT_NAME, initialized client, request metadata, Agent. Verify immutable ID before reads; H-G04/S01 |
+| AG01 | New client → initialized or discovery-first binding → get_session_context → scoped baseline | Connection captures project and identity once; current desktop project is not retargeting |Wrong/archived project fails closed. Identity precedence: X-Jam-Agent, JAM_AGENT_NAME, initialized client, request metadata, Agent. Verify immutable ID before reads; H-G04/S01 Round 11: verify canonical projectFolder/projectInstanceId/databaseGeneration/boardRevision plus repositoryRoot/workingDirectory/rules/capabilities, AF01/AF02; reconnect rather than retarget. |
 | AG02 | Human Refine heading action -> scoped prompt -> stage in dock composer or secondary copy -> inspect scope/sources -> refine | Compose/copy is guidance, not Send, execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
 | AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04 |
 | AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06 |
@@ -32,13 +32,13 @@ release or native-acceptance exception.
 | AG08 | Holder submits report → Review → human/brain reviews captured report/context → accept or changes requested | Accept → Done; changes requested → Ready, same worker retained; next round needs current permission | Evidence names test setup/command/expected/actual/PASS/FAIL/NOT_RUN; stale context reread/reconcile, not token substitution; H-D09 |
 | AG09 | Human Pause / holder or human release → tracking recovery | Pause blocks new rounds/claims, existing holder may report; release clears holder, returns Backlog/Ready | Neither kills process; no Done via release. Archive retains evidence/flags; project archive refuses In-progress work; H-D08/S03 |
 | AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate from board activity; bounded replay and optional persisted history are described in AG15; H-M02/H01 |
-| AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent | Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 |
-| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets | File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 |
-| AG13 | Agent searches/reads tasks/assets/members; comments or allowed task edits | Reads do not authorize mutations; comments append, update fields use current contract | Foreign-project addresses rejected; pages/tails are not complete history; capture validators before overwrites; H-D03/A01/M01 |
-| AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch | Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 |
-| AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start | First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay and, when enabled, persisted history with supported resume after restart; H-BD01/BD02/BD05/BD06  Package preparation precedes initialize with 180 s / 60 s budgets; status and command routing follow the Round-8 brain-dock contract. Starting/running terminal history focuses existing sessions; load/startup recovery relinks alpha.44 empty records without launching or rewriting transcripts. R10-A only changes session-option presentation; configuring/busy/turn guards, explicit setConfigOption and execution grants are unchanged. |
-| AG16 | Dock session startup -> project-pinned jam-board MCP and cwd -> ordinary agent calls | In-app agent is an ordinary MCP client with stable profile JAM_AGENT_NAME; exact project/data dir/cwd captured before dispatch | Navigation cannot retarget; same normalized name shares a member, not independent worker identity; custom terminal needs compatible CLI wiring; H-BD01/BD03 |
-| AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims | Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; retained launch logs are bounded in memory, while enabled history is stored separately; H-BD03/BD08  Startup timeout offers explicit Retry / Show logs; recovery relinks missing/stale transcript references on load/reconciliation, preserving native transcript bytes. Session status is evidence, never proof of task work or a grant. |
+| AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent |Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 Round 11: preserved original source DB/generation required; moved/missing/changed-generation history requires reconnect, no fallback DB; AF04. |
+| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets |File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 Round 11: additive add_reference ownership/file inputs; canvas links separate from Files roles; register_file owns copies, AF03/AF05. |
+| AG13 | Agent searches/reads tasks/assets/members; comments or allowed task edits | Reads do not authorize mutations; comments append, update fields use current contract |Foreign-project addresses rejected; pages/tails are not complete history; capture validators before overwrites; H-D03/A01/M01 Round 11: get_task.files and jam://task Files include role/order/ownership/status; list_assets adds storage/task/role/paging, AF05. |
+| AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch |Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 Round 11 phase hooks are metadata only, no renderers/previews/git badges or canvas authorization. |
+| AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start |First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay and, when enabled, persisted history with supported resume after restart; H-BD01/BD02/BD05/BD06  Package preparation precedes initialize with 180 s / 60 s budgets; status and command routing follow the Round-8 brain-dock contract. Starting/running terminal history focuses existing sessions; load/startup recovery relinks alpha.44 empty records without launching or rewriting transcripts. R10-A only changes session-option presentation; configuring/busy/turn guards, explicit setConfigOption and execution grants are unchanged. Round 11: capture source/locator + lease → validate cwd → Starting → Ready/Running → Stop/Failed → release lease; A fixtures, shared mock parity G1 integrated; G3 fixture/mock verified. |
+| AG16 | Dock session startup -> project-pinned jam-board MCP and cwd -> ordinary agent calls | In-app agent is an ordinary MCP client with stable profile JAM_AGENT_NAME; exact project/data dir/cwd captured before dispatch |Navigation cannot retarget; same normalized name shares a member, not independent worker identity; custom terminal needs compatible CLI wiring; H-BD01/BD03 Round 11: explicit cwd → workingDirectory → repository root → canonical anchor; unavailable configured cwd fails before launch; legacy no-location retains isolated workspace; AF04. |
+| AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims |Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; retained launch logs are bounded in memory, while enabled history is stored separately; H-BD03/BD08  Startup timeout offers explicit Retry / Show logs; recovery relinks missing/stale transcript references on load/reconciliation, preserving native transcript bytes. Session status is evidence, never proof of task work or a grant. Round 11: unique lease IDs prevent late cleanup releasing resumed lease; stop/crash/startup failure release ownership; bound move refuses, old-source resume needs reconnect; AF04. |
 | AG18 | Built-in API chat -> MCP tool metadata -> automatic read or explicit write permission | Board and enabled per-connection MCP servers, including Web, are available. Board read-only tools auto-run; extra-server tools also require that server to be trusted. Writes and other calls ask Allow once / Always allow this tool for this session / Reject | Rejection/cancel does not execute; session allow is not a board Start grant and does not bypass project/claim/review validators; H-BD02/BD07/BD08; BC10 |
 
 ## State meanings: never collapse these into “agent working”
@@ -55,13 +55,13 @@ release --------------------------------------------> Backlog or permitted Ready
 
 An epic running grant is inherited only by inheriting stories. Explicit story pause wins. Pausing epic clears explicit child running grants; a later explicitly started story can run under a paused epic. Closing/archiving revokes grants; reopening does not silently resurrect them. Consult [inheritance matrix](../mcp.md#inheritance-and-pause-matrix) rather than guessing from one badge.
 
-## Complete baseline tool inventory (52)
+## Complete current tool inventory (57; round 11)
 
-This is an indexed copy of the current MCP inventory for map completeness; argument evolution must update this table and `docs/mcp.md` together. Tools are grouped into AG paths above, not exposed as invented UI actions. Human-only native `set_execution`, `resolve_execution_request`, `answer_question`, preview/restore and application settings actions are represented in the human map. AG14 exposes the listed canvas geometry/frame/edge tools; dock lifecycle invokes remain native commands, not additional MCP tools.
+This is an indexed copy of the current MCP inventory (52 prior tools plus five Files tools) for map completeness; argument evolution must update this table and `docs/mcp.md` together. Tools are grouped into AG paths above, not exposed as invented UI actions. Human-only native `set_execution`, `resolve_execution_request`, `answer_question`, preview/restore and application settings actions are represented in the human map. AG14 exposes the listed canvas geometry/frame/edge tools; dock lifecycle invokes remain native commands, not additional MCP tools.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
-| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor } |
+| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor, projectInstanceId, databaseGeneration, boardRevision, projectFolder, repositoryRoot, workingDirectory, folderRules, manifestRevision, fileCapabilities } |
 | get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
 | list_execution | {} | ExecutionState[] for the pinned project |
 | request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
@@ -84,7 +84,7 @@ This is an indexed copy of the current MCP inventory for map completeness; argum
 | check_ready | key | { ready, missing: [{ code, message }] } |
 | mark_ready | key, expectedClaimGeneration, expectedUpdatedAt; overrideReason? | TaskSummary |
 | list_tasks | status?: string[], assignee?, tag?, query?, includeArchived?=false, limit?=50, cursor?, epic?, story?, ready?, changesRequested?, needsInfo? | { tasks, nextCursor? } |
-| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, all reports/reviews, comments/history |
+| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, files, all reports/reviews, comments/history |
 | claim_task | key, expectedClaimGeneration, expectedUpdatedAt | TaskDetail; assigns caller and moves Ready > In progress |
 | release_task | key, expectedClaimGeneration; status?=backlog | TaskSummary; current holder/human only |
 | move_task | key, status, expectedClaimGeneration, expectedUpdatedAt; beforeKey?, afterKey?, overrideReason? | TaskSummary |
@@ -99,7 +99,7 @@ This is an indexed copy of the current MCP inventory for map completeness; argum
 | set_status | text (0..120), scope? | Member; empty text clears the status/scope |
 | list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
 | wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
+| add_reference | storageType?, fileKind?, requestId?, fileRole?, expectedClaimGeneration?, expectedUpdatedAt?; kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
 | list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
 | link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
 | unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
@@ -112,8 +112,12 @@ This is an indexed copy of the current MCP inventory for map completeness; argum
 | remove_connection | id | { archived: true }; retains the connection record |
 | arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
 | list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
-| list_assets | kind?, query? | Asset[] with role=asset/reference |
-
+| list_assets | kind?, query?, storageType?, taskKey?, role?, limit?, cursor? | Without limit/cursor legacy array; paging {assets,nextCursor}; per-task role differs from asset role |
+| register_file | storageType, requestId; companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, role?, sourcePath?, taskKey?, url?, workingDirectory? | FileMutationResult; task version/request identity |
+| link_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
+| set_task_file_role | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
+| unlink_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId; position?, role? | FileMutationResult; task version/request identity |
+| resolve_file | assetId; workingDirectory? | FileResolution; read-only, no launch |
 
 ## Freshness and recovery
 
@@ -253,7 +257,7 @@ Use the app's current schemas and captured validators, not legacy playbook calls
 
 ## Ideas canvas tools (current additive baseline)
 
-The current inventory has **52 tools**: the historical 44 plus unlink_reference and the seven canvas
+The pre-round-11 inventory had **52 tools**: the historical 44 plus unlink_reference and the seven canvas
 tools above. AG12 retains content/link operations; AG14 adds organization. Read
 `get_canvas` before moving content, prefer a frame per epic and preserve manual
 human layouts unless asked. Canvas geometry has no CAS/idempotency token; an
@@ -339,3 +343,152 @@ The loading-drawer close and keyboard image-preview repairs change human paths
 H-D01/H-R05 only. Agent actions/states, captured project identity, execution grants,
 presence semantics, reference writes and persisted data are unchanged. Browser
 fixtures' explicit Start actions remain fixture authorization, not an agent grant.
+
+## Round 11 folder and Files paths
+
+[Verification](../verification/round11.md) records G1 integration and G3 fixture/DOM/browser checks, separate from unrun owner native/package/real-agent checks. These ordinary board calls never grant execution.
+
+| ID | Actor / entry → actions | Result / authority boundary | Failure/recovery and human counterpart |
+|---|---|---|---|
+| AF01 | Connect → get_session_context → verify identity | projectFolder is canonical anchor for folder boards; legacy may remain unverified hint. projectInstanceId/databaseGeneration identify local state, boardRevision differs from activity cursor. repositoryRoot/workingDirectory/folderRules/manifestRevision/fileCapabilities explain resolution/copy rules | No cross-project read on missing/ambiguous identity; H-PF02/PF11, AG01 |
+| AF02 | Stdio --project-folder / JAM_BOARD_PROJECT_FOLDER; HTTP X-Jam-Project-Folder | Explicit CLI location → explicit environment location → exact registry ID → legacy default; conflicting explicit selectors fail. Folder + project must match exact ID. HTTP accepts UTF-8 or utf8: plus percent-encoded UTF-8 bytes; binds once | Missing/ambiguous folder never creates fallback DB; later headers cannot retarget. Token/JAM_BOARD_DATA_DIR app-local and separate from cwd; H-S01/PF03 |
+| AF03 | register_file → link_task_file / set_task_file_role / unlink_task_file → reread | board_file copies, linked_file retains source, url never fetches. to_edit/reference/result per task; position orders association; inspect expectedClaimGeneration/expectedUpdatedAt and retain requestId for identical retry | Optional registration+task link needs validators; separate UI register/link failure may leave reusable registered asset; unlink keeps bytes/evidence; reconcile uncertainty/CAS, H-TF01–TF07 |
+| AF04 | In-app explicit start → capture locator/store/lease → validate cwd → launch → stop/crash | Explicit cwd → workingDirectory → repository root → anchor; legacy no-location isolated workspace. JAM_BOARD_PROJECT_FOLDER and exact ID independent of cwd. Original StoredHistory.cwd and private source binding retained for resume | A→B never retargets. Unavailable configured cwd fails before startup. Moved/missing DB or generation mismatch needs reconnect. Bound agent/MCP owner blocks move; stop/failure/crash release lease; H-BD01/BD03/PF06 |
+| AF05 | get_task.files / jam://task Files / list_assets → resolve_file in caller worktree | Ordered role associations expose ownership/resolution. Board files anchor; repo links use verified caller worktree; absolute paths retain outside-scope identity. Resolution is read-only, no launch/download | Missing/unreadable/unknown distinct; outside scope is pathBase absolute, not availability enum or filesystem permission; reference is not edit authority; H-D10/A01/TF05 |
+| AF06 | Read jam://guide and jam://guide/operations → boat example | Read task/to_edit → resolve at cwd → explicitly authorized edit/export → register owned result → reread validators → link result; same board-owned sources, no retired bundled playbook | Instructions/roles do not grant Start/claim/tool/filesystem permission; H five Node checks are fixture evidence; H-S02 |
+
+### Frozen round 11 MCP schemas
+
+Canonical machine references: [tool-name fixture](../../crates/jam-mcp/tests/fixtures/tools-v2.json) (57 names, including all five Files tools) and [full R11-C schemas](../../test-visuals/round11/r11-c/mcp-tools.json).
+
+Tables preserve schema types/required markers, not every nested definition. Required means key presence; nullable values and runtime validation are separate. Inputs reject unknown fields. Desktop commands/transport headers are not MCP tools.
+
+#### get_session_context
+
+<!-- r11-fields:get_session_context -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| output.projectInstanceId | string | Yes | Local instance identity; not portable project ID. |
+| output.databaseGeneration | string | Yes | Restore generation; stale contexts must reconnect. |
+| output.boardRevision | integer | Yes | Board revision, separate from activity cursor. |
+| output.projectFolder | string or null | No | Canonical folder anchor; legacy may return an unverified hint, never access permission. |
+| output.repositoryRoot | string or null | No | Detected repository root, separate from the board anchor. |
+| output.workingDirectory | string or null | No | Caller worktree for resolution or configured session cwd; never a board selector. |
+| output.folderRules | Record<string,string> | Yes | Kind-to-folder rules for future owned copies. |
+| output.manifestRevision | string or null | No | Inspected rules revision for conflict detection. |
+| output.fileCapabilities | FileCapabilities | Yes | Supported storageTypes, kinds, roles, tools and legacyCopyLimitBytes. |
+
+Read-only, input `{}`; folder additions shown here, baseline identity/cursor fields remain in the inventory.
+
+#### register_file
+
+<!-- r11-fields:register_file -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| input.companions | FileCompanion[] or null | No | Companion records: sourcePath and relativeUri; both required per record. |
+| input.expectedClaimGeneration | string or null | No | Inspected task generation; needed when registration also links a task. |
+| input.expectedUpdatedAt | string or null | No | Inspected task update validator; needed when registration also links a task. |
+| input.fileKind | string or null | No | sprite, audio, model, document, level, font or other. |
+| input.name | string or null | No | Optional display name. |
+| input.notes | string or null | No | Optional file notes. |
+| input.pathBase | string or null | No | Stored path basis; absolute outside-scope paths grant no access. |
+| input.requestId | string | Yes | 1-200 characters; retain identity/payload for an identical retry. |
+| input.role | string or null | No | Per-task to_edit, reference or result; nullable schema does not replace runtime validation. |
+| input.sourcePath | string or null | No | Local source for copy/link; choose sourcePath or url to match storage. |
+| input.storageType | FileStorageType | Yes | board_file owns a copy; linked_file retains source; url does not fetch. |
+| input.taskKey | string or null | No | Exact task to associate; optional registration link needs both task validators. |
+| input.url | string or null | No | URL source, never fetched by registration. |
+| input.workingDirectory | string or null | No | Caller worktree for resolution or configured session cwd; never a board selector. |
+| output.asset | FileAsset or null | No | Returned file asset when applicable. |
+| output.operationId | string | Yes | Operation receipt identity for reconciliation. |
+| output.reference | RefItem or null | No | Returned canvas reference when applicable. |
+| output.taskFile | TaskFile or null | No | Returned task association when applicable. |
+| output.taskVersion | FileTaskVersion or null | No | Returned task validators; inspect before a later decision. |
+| output.unlinked | boolean | Yes | Whether an association was removed; bytes are retained. |
+| output.warnings | string[] | Yes | Nonfatal warnings; preserve them with the receipt. |
+
+Mutation returns FileMutationResult; uncertain outcomes need reconciliation, not fresh-validator replay.
+
+#### link_task_file
+
+<!-- r11-fields:link_task_file -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| input.assetId | string | Yes | Registered file identity in this project. |
+| input.expectedClaimGeneration | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.expectedUpdatedAt | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.position | number or null | No | Optional numeric association order within its role. |
+| input.requestId | string | Yes | 1-200 characters; retain identity/payload for an identical retry. |
+| input.role | string or null | Yes | Per-task to_edit, reference or result; nullable schema does not replace runtime validation. |
+| input.taskKey | string | Yes | Exact task in the pinned project. |
+| output.asset | FileAsset or null | No | Returned file asset when applicable. |
+| output.operationId | string | Yes | Operation receipt identity for reconciliation. |
+| output.reference | RefItem or null | No | Returned canvas reference when applicable. |
+| output.taskFile | TaskFile or null | No | Returned task association when applicable. |
+| output.taskVersion | FileTaskVersion or null | No | Returned task validators; inspect before a later decision. |
+| output.unlinked | boolean | Yes | Whether an association was removed; bytes are retained. |
+| output.warnings | string[] | Yes | Nonfatal warnings; preserve them with the receipt. |
+
+Mutation returns FileMutationResult; uncertain outcomes need reconciliation, not fresh-validator replay.
+
+#### set_task_file_role
+
+<!-- r11-fields:set_task_file_role -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| input.assetId | string | Yes | Registered file identity in this project. |
+| input.expectedClaimGeneration | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.expectedUpdatedAt | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.position | number or null | No | Optional numeric association order within its role. |
+| input.requestId | string | Yes | 1-200 characters; retain identity/payload for an identical retry. |
+| input.role | string or null | Yes | Per-task to_edit, reference or result; nullable schema does not replace runtime validation. |
+| input.taskKey | string | Yes | Exact task in the pinned project. |
+| output.asset | FileAsset or null | No | Returned file asset when applicable. |
+| output.operationId | string | Yes | Operation receipt identity for reconciliation. |
+| output.reference | RefItem or null | No | Returned canvas reference when applicable. |
+| output.taskFile | TaskFile or null | No | Returned task association when applicable. |
+| output.taskVersion | FileTaskVersion or null | No | Returned task validators; inspect before a later decision. |
+| output.unlinked | boolean | Yes | Whether an association was removed; bytes are retained. |
+| output.warnings | string[] | Yes | Nonfatal warnings; preserve them with the receipt. |
+
+Mutation returns FileMutationResult; uncertain outcomes need reconciliation, not fresh-validator replay.
+
+#### unlink_task_file
+
+<!-- r11-fields:unlink_task_file -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| input.assetId | string | Yes | Registered file identity in this project. |
+| input.expectedClaimGeneration | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.expectedUpdatedAt | string | Yes | Inspected task validator; reconcile stale context before new intent. |
+| input.position | number or null | No | Optional numeric association order within its role. |
+| input.requestId | string | Yes | 1-200 characters; retain identity/payload for an identical retry. |
+| input.role | string or null | No | Optional compatibility field; unlink does not require a new role. |
+| input.taskKey | string | Yes | Exact task in the pinned project. |
+| output.asset | FileAsset or null | No | Returned file asset when applicable. |
+| output.operationId | string | Yes | Operation receipt identity for reconciliation. |
+| output.reference | RefItem or null | No | Returned canvas reference when applicable. |
+| output.taskFile | TaskFile or null | No | Returned task association when applicable. |
+| output.taskVersion | FileTaskVersion or null | No | Returned task validators; inspect before a later decision. |
+| output.unlinked | boolean | Yes | Whether an association was removed; bytes are retained. |
+| output.warnings | string[] | Yes | Nonfatal warnings; preserve them with the receipt. |
+
+Mutation returns FileMutationResult; uncertain outcomes need reconciliation, not fresh-validator replay.
+
+#### resolve_file
+
+<!-- r11-fields:resolve_file -->
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| input.assetId | string | Yes | Registered file identity in this project. |
+| input.workingDirectory | string or null | No | Caller worktree for resolution or configured session cwd; never a board selector. |
+| output.checkedAt | string | Yes | Resolution observation time. |
+| output.pathBase | string | Yes | Stored path basis; absolute outside-scope paths grant no access. |
+| output.resolutionBasis | string | Yes | How this path was resolved. |
+| output.resolvedPath | string or null | No | Resolved local path or URL when available; no launch side effect. |
+| output.status | string | Yes | Availability observation, not authorization. |
+| output.storageType | string | Yes | Resolved ownership discriminator. |
+| output.storedPath | string | Yes | Persisted path or URL. |
+| output.worktreeRoot | string or null | No | Verified caller worktree when applicable. |
+
+Read-only; never Open/Reveal/download.
