@@ -37,6 +37,11 @@ Follow: Paper palette
 
 Keep: Keyboard controls
 
+## Files
+
+| File | Role | Ownership | Stored path | Status | Resolution basis |
+| --- | --- | --- | --- | --- | --- |
+
 ## Tests
 
 1. Setup: Hold the lantern

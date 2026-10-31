@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 52);
+    assert_eq!(actual.len(), 57);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -745,6 +745,18 @@ fn assert_session_context_compatibility(context: &serde_json::Value) {
     // serde_json map ordering. The full current payload must still be rejected.
     assert!(serde_json::from_value::<StrictOldContext>(context.clone()).is_err());
     let mut older_server = context.clone();
+    for field in [
+        "projectInstanceId",
+        "databaseGeneration",
+        "boardRevision",
+        "repositoryRoot",
+        "workingDirectory",
+        "folderRules",
+        "manifestRevision",
+        "fileCapabilities",
+    ] {
+        older_server.as_object_mut().unwrap().remove(field);
+    }
     older_server
         .as_object_mut()
         .unwrap()

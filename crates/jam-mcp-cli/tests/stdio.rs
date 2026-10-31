@@ -70,7 +70,7 @@ fn assert_tools(tools: &[Tool]) {
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual.len(), expected.len());
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 52);
+    assert_eq!(actual.len(), 57);
     assert!(!actual.iter().any(|name| name == "set_reference_verdict"));
     let wait = tools.iter().find(|t| t.name == "wait_for_changes").unwrap();
     assert_eq!(wait.input_schema["required"], json!(["cursor"]));

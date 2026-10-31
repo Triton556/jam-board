@@ -11,6 +11,13 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
 import { mockApi } from "../lib/mock-bridge";
+
+vi.mock("../lib/project-folder-api", async (original) => ({
+  ...(await original<typeof import("../lib/project-folder-api")>()),
+  projectFolders: (await import("../lib/mock-project-folders"))
+    .mockProjectFolders,
+}));
+
 import { AssetLinkDialog } from "./assets/AssetLinkDialog";
 import { AssetDialog } from "./assets/AssetsPage";
 import {
@@ -176,7 +183,18 @@ it.each(["asset", "note", "caption", "link"] as const)(
       });
     if (!asset) throw Error("Missing asset");
     vi.spyOn(api, "updateAsset").mockImplementation(save);
-    vi.spyOn(api, "linkAsset").mockImplementation(save);
+    vi.spyOn(api, "linkTaskFile").mockImplementation(async () => {
+      await save();
+      return {
+        reference: null,
+        asset: null,
+        taskFile: null,
+        taskVersion: null,
+        operationId: "fixture",
+        unlinked: false,
+        warnings: [],
+      };
+    });
     function Host() {
       const [revision, setRevision] = useState(0);
       return (
@@ -227,7 +245,7 @@ it.each(["asset", "note", "caption", "link"] as const)(
     fireEvent.click(screen.getByRole("button", { name: "External remount" }));
     const fresh =
       kind === "link"
-        ? screen.getByRole("combobox")
+        ? screen.getByRole("combobox", { name: "Search" })
         : screen.getByLabelText(
             kind === "asset"
               ? "Notes"
@@ -332,7 +350,7 @@ it.each(["assets", "tasks"] as const)(
       read = vi
         .spyOn(api, method)
         .mockRejectedValueOnce(new Error("Fictional list unavailable"));
-    const link = vi.spyOn(api, "linkAsset");
+    const link = vi.spyOn(api, "linkTaskFile");
     await mount(
       <AssetLinkDialog
         {...(source === "assets"
@@ -347,7 +365,7 @@ it.each(["assets", "tasks"] as const)(
     expect(screen.queryByText(/No (assets|tasks) yet/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Link" })).toBeDisabled();
     await user.type(
-      screen.getByRole("combobox"),
+      screen.getByRole("combobox", { name: "Search" }),
       "nonmatching retained search",
     );
     read.mockImplementation(original as never);
@@ -355,10 +373,10 @@ it.each(["assets", "tasks"] as const)(
     expect(
       await screen.findByText("No matches. Try another search."),
     ).toBeVisible();
-    expect(screen.getByRole("combobox")).toHaveValue(
+    expect(screen.getByRole("combobox", { name: "Search" })).toHaveValue(
       "nonmatching retained search",
     );
-    await user.clear(screen.getByRole("combobox"));
+    await user.clear(screen.getByRole("combobox", { name: "Search" }));
     await user.click(must((await screen.findAllByRole("option"))[0]));
     expect(screen.getByRole("button", { name: "Link" })).toBeEnabled();
     expect(link).not.toHaveBeenCalled();

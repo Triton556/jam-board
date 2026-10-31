@@ -150,7 +150,7 @@ it("a pending 2000-row old-project response cannot replace a selected 1000-row p
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  client.setQueryData(["app"], selectedA);
+  await acceptProjectSelection(client, selectedA);
   client.setQueryData(["planning-draft", a.jam?.id], {
     dirty: true,
     value: "Preserve unsaved A plan",
@@ -195,6 +195,14 @@ it("a pending 2000-row old-project response cannot replace a selected 1000-row p
       .getAllByTestId("table-row")
       .every((row) => row.dataset.taskKey?.startsWith(`${c.jam?.keyPrefix}-`)),
   ).toBe(true);
+  expect(client.getQueryData(["planning-draft", a.jam?.id])).toBeUndefined();
+  await act(async () =>
+    acceptProjectSelection(
+      client,
+      await mockApi.selectProject(a.jam?.id ?? ""),
+    ),
+  );
+  await screen.findByText("2000 tasks", { exact: true });
   expect(client.getQueryData(["planning-draft", a.jam?.id])).toEqual({
     dirty: true,
     value: "Preserve unsaved A plan",

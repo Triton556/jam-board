@@ -1,4 +1,6 @@
 mod support;
+#[path = "support/v9_fixture.rs"]
+mod v9_fixture;
 use jam_core::*;
 use support::FreshContext;
 
@@ -472,6 +474,7 @@ fn migration_adds_no_grant_but_existing_worker_may_submit_evidence() {
     let path = s.path.clone();
     drop(s);
     let c = rusqlite::Connection::open(&path).unwrap();
+    v9_fixture::strip(&c);
     c.execute_batch(
         "DROP TABLE ref_frame_links; ALTER TABLE ref_items DROP COLUMN verdict; ALTER TABLE ref_items DROP COLUMN archived_by; DROP TRIGGER tasks_advance_claim_generation; ALTER TABLE tasks DROP COLUMN claim_generation; DROP TABLE execution_requests;DROP TABLE execution_states;PRAGMA user_version=5;",
     )

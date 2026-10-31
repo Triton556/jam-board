@@ -118,7 +118,49 @@ export const commands = {
 	setExecution: (input: SetExecution) => typedError<ExecutionState, ApiError_Serialize>(__TAURI_INVOKE("set_execution", { input })),
 	listExecutionRequests: (status: "pending" | "approved" | "declined" | "superseded" | null) => typedError<ExecutionRequest[], ApiError_Serialize>(__TAURI_INVOKE("list_execution_requests", { status })),
 	resolveExecutionRequest: (input: ResolveExecutionRequest) => typedError<ExecutionRequest, ApiError_Serialize>(__TAURI_INVOKE("resolve_execution_request", { input })),
-	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
+	removeRecentProjectFolder: (instanceId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("remove_recent_project_folder", { instanceId })),
+	locateProjectFolder: (instanceId: string, expectedProjectId: string, folder: string, cloudAcknowledged: boolean) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("locate_project_folder", { instanceId, expectedProjectId, folder, cloudAcknowledged })),
+	previewProjectMove: (projectId: string, destination: string) => typedError<ProjectMovePreview, ApiError_Serialize>(__TAURI_INVOKE("preview_project_move", { projectId, destination })),
+	projectSelectionContext: () => typedError<FolderCommandContext, ApiError_Serialize>(__TAURI_INVOKE("project_selection_context")),
+	openFileAsset: (context: FolderCommandContext, assetId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("open_file_asset", { context, assetId })),
+	revealFileAsset: (context: FolderCommandContext, assetId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("reveal_file_asset", { context, assetId })),
+	createProjectFolder: (folder: string, name: string, cloudAcknowledged: boolean, initialization: {
+	name: string,
+	theme: string | null,
+	startsAt: string,
+	endsAt: string,
+	timezone: string,
+	yourName: string,
+	template?: string | null,
+	milestoneAt?: string | null,
+} | null) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("create_project_folder", { folder, name, cloudAcknowledged, initialization })),
+	openProjectFolder: (folder: string, cloudAcknowledged: boolean, separateCopy: boolean) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("open_project_folder", { folder, cloudAcknowledged, separateCopy })),
+	closeProjectFolder: (context: FolderCommandContext) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("close_project_folder", { context })),
+	projectFolderInfo: () => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("project_folder_info")),
+	listProjectFolders: () => typedError<RegistryEntry[], ApiError_Serialize>(__TAURI_INVOKE("list_project_folders")),
+	setProjectFolderRules: (context: {
+	instanceId: string,
+	selectionEpoch: number,
+} | null, rules: { [key in string]: string }, expectedManifestRevision: string) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("set_project_folder_rules", { context, rules, expectedManifestRevision })),
+	moveProjectToFolder: (input: MoveProject, expectedContext: {
+	instanceId: string,
+	selectionEpoch: number,
+} | null) => typedError<MoveReceipt, ApiError_Serialize>(__TAURI_INVOKE("move_project_to_folder", { input, expectedContext })),
+	projectOperationStatus: (requestId: string) => typedError<MoveReceipt, ApiError_Serialize>(__TAURI_INVOKE("project_operation_status", { requestId })),
+	rollbackProjectMove: (requestId: string) => typedError<MoveReceipt, ApiError_Serialize>(__TAURI_INVOKE("rollback_project_move", { requestId })),
+	recoverProjectFolder: (folder: string, cloudAcknowledged: boolean) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("recover_project_folder", { folder, cloudAcknowledged })),
+	saveBoardSnapshot: (context: FolderCommandContext) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("save_board_snapshot", { context })),
+	registerFile: (context: FolderCommandContext, input: RegisterFile) => typedError<FileMutationResult_Serialize, ApiError_Serialize>(__TAURI_INVOKE("register_file", { context, input })),
+	linkTaskFile: (context: FolderCommandContext, input: TaskFileInput) => typedError<FileMutationResult_Serialize, ApiError_Serialize>(__TAURI_INVOKE("link_task_file", { context, input })),
+	setTaskFileRole: (context: FolderCommandContext, input: TaskFileInput) => typedError<FileMutationResult_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_task_file_role", { context, input })),
+	unlinkTaskFile: (context: FolderCommandContext, input: TaskFileInput) => typedError<FileMutationResult_Serialize, ApiError_Serialize>(__TAURI_INVOKE("unlink_task_file", { context, input })),
+	resolveFile: (context: FolderCommandContext, input: ResolveFile) => typedError<FileResolution, ApiError_Serialize>(__TAURI_INVOKE("resolve_file", { context, input })),
+	fileOperationStatus: (context: FolderCommandContext, requestId: string) => typedError<FileOperationStatus, ApiError_Serialize>(__TAURI_INVOKE("file_operation_status", { context, requestId })),
+	cancelFileOperation: (context: FolderCommandContext, requestId: string) => typedError<FileOperationStatus, ApiError_Serialize>(__TAURI_INVOKE("cancel_file_operation", { context, requestId })),
+	listFileAssets: (context: FolderCommandContext, input: FileAssetQuery) => typedError<FileAsset[], ApiError_Serialize>(__TAURI_INVOKE("list_file_assets", { context, input })),
+	compareBoardSnapshot: (context: FolderCommandContext) => typedError<SnapshotComparison, ApiError_Serialize>(__TAURI_INVOKE("compare_board_snapshot", { context })),
+	keepLiveBoard: (context: FolderCommandContext, expectedExternalHash: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("keep_live_board", { context, expectedExternalHash })),
+	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
 	selectProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("select_project", { projectId })),
 	restoreProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("restore_project", { projectId })),
 	/**  A local first-content-frame receipt for reproducible release measurements. */
@@ -153,7 +195,10 @@ export const commands = {
 	createMember: (input: NewMember) => typedError<Member, ApiError_Serialize>(__TAURI_INVOKE("create_member", { input })),
 	updateMember: (input: MemberEdit) => typedError<Member, ApiError_Serialize>(__TAURI_INVOKE("update_member", { input })),
 	getSettings: () => typedError<Settings, ApiError_Serialize>(__TAURI_INVOKE("get_settings")),
-	setSettings: (input: SettingsPatch) => typedError<Settings, ApiError_Serialize>(__TAURI_INVOKE("set_settings", { input })),
+	setSettings: (input: SettingsPatch, expectedContext: {
+	instanceId: string,
+	selectionEpoch: number,
+} | null) => typedError<Settings, ApiError_Serialize>(__TAURI_INVOKE("set_settings", { input, expectedContext })),
 	resetJam: (input: ResetInput) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("reset_jam", { input })),
 	exportJamJson: () => typedError<ExportPath, ApiError_Serialize>(__TAURI_INVOKE("export_jam_json")),
 	importJamJson: (path: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("import_jam_json", { path })),
@@ -222,6 +267,12 @@ export type AddAgentAttachmentInput = {
 };
 
 export type AddReference = {
+	storageType?: string | null,
+	fileKind?: string | null,
+	requestId?: string | null,
+	fileRole?: string | null,
+	expectedClaimGeneration?: string | null,
+	expectedUpdatedAt?: string | null,
 	kind: string,
 	filePath: string | null,
 	copy?: boolean | null,
@@ -509,10 +560,12 @@ export type BoardChanged = BoardChanged_Serialize | BoardChanged_Deserialize;
 
 export type BoardChanged_Deserialize = {
 	events: ActivityEvent_Deserialize[],
+	projectContext?: ProjectEventContext | null,
 };
 
 export type BoardChanged_Serialize = {
 	events: ActivityEvent_Serialize[],
+	projectContext?: ProjectEventContext | null,
 };
 
 export type BoardColumn = {
@@ -857,6 +910,86 @@ export type ExportPath = {
 	path: string,
 };
 
+export type FileAsset = {
+	storageType: string,
+	pathBase: string,
+	storedPath: string,
+	originalName: string,
+	mimeType: string | null,
+	byteSize: number | null,
+	contentHash: string | null,
+	contentRevision: number,
+	metadata: { [key in string]: JsonPayload },
+	resolution: FileResolution,
+} & Asset;
+
+export type FileAssetQuery = {
+	kind: string | null,
+	query: string | null,
+	storageType: string | null,
+	taskKey: string | null,
+	role: string | null,
+	limit: number | null,
+	cursor: string | null,
+	workingDirectory: string | null,
+};
+
+export type FileCompanion = {
+	sourcePath: string,
+	relativeUri: string,
+};
+
+export type FileMutationResult = FileMutationResult_Serialize | FileMutationResult_Deserialize;
+
+export type FileMutationResult_Deserialize = {
+	reference: RefItem_Deserialize | null,
+	asset: FileAsset | null,
+	taskFile: TaskFile | null,
+	taskVersion: FileTaskVersion | null,
+	operationId: string,
+	unlinked: boolean,
+	warnings: string[],
+};
+
+export type FileMutationResult_Serialize = {
+	reference: RefItem_Serialize | null,
+	asset: FileAsset | null,
+	taskFile: TaskFile | null,
+	taskVersion: FileTaskVersion | null,
+	operationId: string,
+	unlinked: boolean,
+	warnings: string[],
+};
+
+export type FileOperationStatus = {
+	requestId: string,
+	state: string,
+	canCancel: boolean,
+};
+
+export type FileResolution = {
+	storageType: string,
+	pathBase: string,
+	storedPath: string,
+	resolvedPath: string | null,
+	worktreeRoot: string | null,
+	resolutionBasis: string,
+	status: string,
+	checkedAt: string,
+};
+
+export type FileStorageType = "board_file" | "linked_file" | "url";
+
+export type FileTaskVersion = {
+	updatedAt: string,
+	claimGeneration: string,
+};
+
+export type FolderCommandContext = {
+	instanceId: string,
+	selectionEpoch: number,
+};
+
 export type FrameEditInput = FrameEditInput_Serialize | FrameEditInput_Deserialize;
 
 export type FrameEditInput_Deserialize = {
@@ -1118,6 +1251,14 @@ export type ModelInfo_Serialize = {
 	completionPricePerM?: string | null,
 };
 
+export type MoveDestinationPolicy = {
+	allowed: boolean,
+	cloudAcknowledgementNeeded: boolean,
+	nonEmpty: boolean,
+	errorField: string | null,
+	message: string | null,
+};
+
 export type MoveInput = {
 	key: string,
 	expectedUpdatedAt: string,
@@ -1125,6 +1266,34 @@ export type MoveInput = {
 	beforeKey: string | null,
 	afterKey: string | null,
 	overrideReason: string | null,
+};
+
+export type MoveInventory = {
+	count: number,
+	bytes: number,
+};
+
+export type MoveProject = {
+	projectId: string,
+	destination: string,
+	requestId: string,
+	cloudAcknowledged: boolean,
+};
+
+export type MoveReceipt = {
+	id: string,
+	projectId: string,
+	state: string,
+	destination: string,
+	staging: string,
+	sourceBackup: string,
+	sourceDigest: string,
+	destinationDigest: string,
+	tableCounts: { [key in string]: number },
+	fileHashes: { [key in string]: string },
+	byteTotal: number,
+	unresolvedLinks: string[],
+	error: string | null,
 };
 
 export type NewAsset = {
@@ -1232,7 +1401,57 @@ export type ProjectEditInput = {
 	timezone: string | null,
 };
 
-export type ProjectSummary = {
+export type ProjectEventContext = {
+	instanceId: string,
+	projectId: string,
+	selectionEpoch: number,
+	databaseGeneration: string,
+};
+
+export type ProjectFolderInfo = {
+	context: FolderCommandContext,
+	lastSnapshotAt: string | null,
+	instanceId: string,
+	projectId: string,
+	folder: string,
+	selectionEpoch: number,
+	databaseGeneration: string,
+	manifest: ProjectManifest,
+	manifestRevision: string,
+	sqliteVersion: string,
+};
+
+export type ProjectManifest = {
+	schemaVersion: number,
+	id: string,
+	name: string,
+	folderRules: { [key in string]: string },
+	repository: RepositoryLocator | null,
+};
+
+export type ProjectMovePreview = {
+	tasks: MoveInventory,
+	managedCopies: MoveInventory,
+	linkedFiles: MoveInventory,
+	missingFiles: string[],
+	missingFileCount: number,
+	agentSessionBound: boolean,
+	hasBoundOwners: boolean,
+	destinationPolicy: MoveDestinationPolicy,
+};
+
+export type ProjectSummary = ProjectSummary_Serialize | ProjectSummary_Deserialize;
+
+export type ProjectSummary_Deserialize = {
+	movedTo?: string | null,
+	archived: boolean,
+	selected: boolean,
+	taskCount: number,
+	inProgressCount: number,
+} & Jam;
+
+export type ProjectSummary_Serialize = {
+	movedTo?: string | null,
 	archived: boolean,
 	selected: boolean,
 	taskCount: number,
@@ -1339,6 +1558,7 @@ export type RefFrameTarget = {
 export type RefItem = RefItem_Serialize | RefItem_Deserialize;
 
 export type RefItem_Deserialize = {
+	file?: FileAsset | null,
 	kind: string,
 	assetId: string | null,
 	url: string | null,
@@ -1360,6 +1580,7 @@ export type RefItem_Deserialize = {
 } & Audit;
 
 export type RefItem_Serialize = {
+	file?: FileAsset | null,
 	kind: string,
 	assetId: string | null,
 	url: string | null,
@@ -1456,6 +1677,35 @@ export type ReferenceVerdictInput = {
 	verdict: ReferenceVerdict | null,
 };
 
+export type RegisterFile = {
+	storageType: FileStorageType,
+	sourcePath: string | null,
+	url: string | null,
+	pathBase: string | null,
+	fileKind: string | null,
+	name: string | null,
+	notes: string | null,
+	companions: FileCompanion[] | null,
+	requestId: string,
+	taskKey: string | null,
+	role: string | null,
+	expectedClaimGeneration: string | null,
+	expectedUpdatedAt: string | null,
+	workingDirectory: string | null,
+};
+
+export type RegistryEntry = {
+	instanceId: string,
+	projectId: string,
+	projectName?: string,
+	canonicalFolder: string,
+	displayFolder: string,
+	repoCommonDir: string | null,
+	lastOpenedAt: string,
+	availability: string,
+	migrationId: string | null,
+};
+
 /**  Human confirmation of a captured claim; neither actor nor destination is caller-controlled. */
 export type ReleaseClaim = {
 	key: string,
@@ -1488,6 +1738,10 @@ export type ReportTest = {
 	result: string,
 };
 
+export type RepositoryLocator = {
+	rootRelative: string,
+};
+
 export type ResetInput = {
 	confirmName: string,
 };
@@ -1502,6 +1756,11 @@ export type ResolveExecutionRequest = {
 	id: string,
 	decision: ExecutionDecision,
 	expectedRevision: string,
+};
+
+export type ResolveFile = {
+	assetId: string,
+	workingDirectory: string | null,
 };
 
 export type Resumable = "native" | "transcript" | "none";
@@ -1569,6 +1828,9 @@ export type SetExecution = {
 };
 
 export type Settings = {
+	backupRecentCount?: number,
+	backupDailyCount?: number,
+	workingDirectory?: string | null,
 	projectId: string | null,
 	projectFolder: string | null,
 	colorBy: string,
@@ -1581,6 +1843,9 @@ export type Settings = {
 };
 
 export type SettingsPatch = {
+	backupRecentCount?: number | null,
+	backupDailyCount?: number | null,
+	workingDirectory?: string | null,
 	projectFolder: string | null,
 	expectedProjectId: string | null,
 	colorBy: string | null,
@@ -1612,6 +1877,16 @@ export type SkillResult = {
 	exitCode: number | null,
 	cancelled: boolean,
 	timedOut: boolean,
+};
+
+export type SnapshotComparison = {
+	liveHash: string,
+	externalHash: string,
+	liveRevision: number,
+	externalRevision: number | null,
+	externalValid: boolean,
+	changedTables: string[],
+	error: string | null,
 };
 
 export type StartAgentSessionInput = StartAgentSessionInput_Serialize | StartAgentSessionInput_Deserialize;
@@ -1714,6 +1989,7 @@ export type TaskBrief = {
 export type TaskDetail = TaskDetail_Serialize | TaskDetail_Deserialize;
 
 export type TaskDetail_Deserialize = {
+	files?: TaskFile[],
 	assets: Asset[],
 	comments: Comment[],
 	activity: ActivityEvent_Deserialize[],
@@ -1730,6 +2006,7 @@ export type TaskDetail_Deserialize = {
 } & TaskSummary;
 
 export type TaskDetail_Serialize = {
+	files?: TaskFile[],
 	assets: Asset[],
 	comments: Comment[],
 	activity: ActivityEvent_Serialize[],
@@ -1756,6 +2033,22 @@ export type TaskEditInput_Serialize = {
 	key: string,
 	expectedUpdatedAt: string,
 } & TaskPatch_Serialize;
+
+export type TaskFile = {
+	asset: FileAsset,
+	role: string,
+	position: number | null,
+};
+
+export type TaskFileInput = {
+	taskKey: string,
+	assetId: string,
+	role: string | null,
+	position: number | null,
+	expectedClaimGeneration: string,
+	expectedUpdatedAt: string,
+	requestId: string,
+};
 
 export type TaskListPage = {
 	tasks: TaskSummary[],

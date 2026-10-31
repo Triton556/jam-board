@@ -16,8 +16,8 @@ tool for this session, or Reject. Tool permission does not approve board Start
 or bypass core project/claim/review validators. Starting a dock session launches
 the selected runtime explicitly; a planning prompt, Ready state or board Start
 operation does not. Refine/Continue/Ask brain stage editable composer drafts and
-context chips, never automatic Send. History replay is in memory only; no resume
-after app restart. Live adapters/providers and packaged cleanup remain pending
+context chips, never automatic Send. With history enabled, supported chat and linked terminal histories resume
+using captured source/original cwd; opening history alone launches nothing. Live adapters/providers and packaged cleanup remain pending
 [acceptance](agents/acceptance-matrix.md#brain-dock-increment-acceptance-current-source-browsernative-qa-pending).
 
 ## Build and connect
@@ -32,7 +32,7 @@ $env:JAM_BOARD_DATA_DIR = Join-Path (Get-Location) '.dev-data'
 
 `--seed-demo` explicitly creates a new demo jam before serving stdio. Omit it for normal use. The process waits for MCP input; human-readable logging goes to stderr and `<data-dir>/logs/mcp-stdio.log`. stdout contains only JSON-RPC protocol messages. Closing stdin terminates the process.
 
-Database lookup order:
+Legacy database lookup order (without a project-folder selector):
 
 1. `--db <path>` (a database file, not a directory).
 2. `JAM_BOARD_DB`.
@@ -119,8 +119,8 @@ MCP lifecycle and framing are handled by [rmcp 3.5.1](https://docs.rs/rmcp/3.5.1
 
 The desktop can keep several projects and stores the explicitly selected project across restarts. Each MCP connection is pinned **once, during initialization**, independently of that selection:
 
-- stdio: `--project <id-or-key-prefix>`, then `JAM_BOARD_PROJECT`, then the desktop's selected project at initialization;
-- HTTP: the initialization request's `X-Jam-Project: <id-or-key-prefix>` header, or the selected project at initialization.
+- stdio: folder selection and explicit location precedence follow [Project folders](#project-folders-and-task-files-round-11); within a legacy store, `--project <id-or-key-prefix>`, then `JAM_BOARD_PROJECT`, then the selected project at initialization;
+- HTTP: `X-Jam-Project-Folder` selects a folder with exact `X-Jam-Project` identity; without a folder header, the initialization request's `X-Jam-Project` uses registry-aware resolution or the selected project. Unknown or ambiguous folder selectors fail closed.
 
 Use Settings → Agents to copy a configuration containing the current project's immutable ID. `get_session_context` is the source of truth for a connected agent. To work on another project, open another connection or reconnect with its ID. Changing the desktop selector, subsequent HTTP headers, or another agent's selection cannot retarget an existing connection. An unknown/archived project or missing selection fails initialization rather than silently choosing another project.
 
@@ -150,7 +150,7 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 - V2.2 refines needsInfo: a task flag and the list_tasks needsInfo filter cover only open questions scoped to that task. Story and epic questions stay at their own level. get_task adds ancestorQuestions (open story/epic questions); jam://task/{key} renders them under "Open questions above this task". Project questions remain Inbox items. This prevents an epic interview from flagging every card.
 - JSON exports use version 2 to retain hierarchy, briefs, reports, reviews, questions and references. Version-1 imports remain supported.
 
-## Tool contract (52 tools)
+## Tool contract (57 tools)
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means this session’s pinned project, not the board currently displayed in the UI. Reference items/questions use their returned IDs.
 
@@ -158,7 +158,7 @@ Success contains structuredContent plus a one-line content summary. Failures are
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
-| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor } |
+| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor, projectInstanceId, databaseGeneration, boardRevision, projectFolder, repositoryRoot, workingDirectory, folderRules, manifestRevision, fileCapabilities } |
 | get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
 | list_execution | {} | ExecutionState[] for the pinned project |
 | request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
@@ -181,7 +181,7 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | check_ready | key | { ready, missing: [{ code, message }] } |
 | mark_ready | key, expectedClaimGeneration, expectedUpdatedAt; overrideReason? | TaskSummary |
 | list_tasks | status?: string[], assignee?, tag?, query?, includeArchived?=false, limit?=50, cursor?, epic?, story?, ready?, changesRequested?, needsInfo? | { tasks, nextCursor? } |
-| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, all reports/reviews, comments/history |
+| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, files, all reports/reviews, comments/history |
 | claim_task | key, expectedClaimGeneration, expectedUpdatedAt | TaskDetail; assigns caller and moves Ready > In progress |
 | release_task | key, expectedClaimGeneration; status?=backlog | TaskSummary; current holder/human only |
 | move_task | key, status, expectedClaimGeneration, expectedUpdatedAt; beforeKey?, afterKey?, overrideReason? | TaskSummary |
@@ -196,7 +196,7 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | set_status | text (0..120), scope? | Member; empty text clears the status/scope |
 | list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
 | wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
+| add_reference | storageType?, fileKind?, requestId?, fileRole?, expectedClaimGeneration?, expectedUpdatedAt?; kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
 | list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
 | link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
 | unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
@@ -209,7 +209,12 @@ Success contains structuredContent plus a one-line content summary. Failures are
 | remove_connection | id | { archived: true }; retains the connection record |
 | arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
 | list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
-| list_assets | kind?, query? | Asset[] with role=asset/reference |
+| list_assets | kind?, query?, storageType?, taskKey?, role?, limit?, cursor? | Legacy array without limit/cursor; paging {assets,nextCursor} |
+| register_file | storageType, requestId; companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, role?, sourcePath?, taskKey?, url?, workingDirectory? | FileMutationResult; task version/request identity |
+| link_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
+| set_task_file_role | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
+| unlink_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId; position?, role? | FileMutationResult; task version/request identity |
+| resolve_file | assetId; workingDirectory? | FileResolution; read-only, no launch |
 
 ## Human-authorized execution
 
@@ -369,7 +374,7 @@ linkTo/targetKey address an epic, story or task. A frame implicitly links its it
 
 RefFrame stores id/jamId/epicId/title/x/y/w/h/color/collapsed. RefItem adds audit, kind/assetId/url/linkPreview/title/captionMd/tags, x/y/w/h/z/frameId and nullable JSON-string metadata (file size and cached audio peaks/duration). RefEdge connects items with an optional label; RefLink maps items to targets. The References screen uses React Flow and native commands for geometry, frame binding, edge labels, archival/restoration and per-human viewport settings. No hard-delete API exists.
 
-Remote previews are a separate explicit human action, never part of an MCP reference tool or canvas render. Fetching has a five-second deadline, a 2 MiB response cap and HTTP(S)-only redirects; only the page title and absolute og:image URL are retained. That remote image is not downloaded automatically. Clipboard images are encoded as PNG and written only into the data directory's references folder; other local files are copied only when add_reference explicitly sets copy:true (up to 50 MiB). Media URLs are granted per registered asset ID by Rust, without general frontend filesystem permission.
+Remote previews are a separate explicit human action, never part of an MCP reference tool or canvas render. Fetching has a five-second deadline, a 2 MiB response cap and HTTP(S)-only redirects; only the page title and absolute og:image URL are retained. That remote image is not downloaded automatically. Clipboard images are encoded as PNG and written only into the data directory's references folder; other local files can be copied through register_file with storageType board_file, or legacy add_reference copy:true (up to 50 MiB on that legacy path). Media URLs are granted per registered asset ID by Rust, without general frontend filesystem permission.
 
 ## Resources and prompts
 
@@ -499,8 +504,9 @@ Frames expose their explicit links in RefFrame.links. These writes use the same
 project checks and activity services as desktop link_ref_frame/unlink_ref_frame.
 
 add_reference { kind:"asset", filePath, copy:true } reads a local regular file,
-up to 50 MiB, and copies it into the database data directory's references folder,
-using the clipboard-<ULID>.<extension> naming pattern. Existing supported local
+up to 50 MiB. For folder boards it registers an owned copy under the manifest's
+file rules; legacy stores retain the data-directory references folder and
+clipboard-<ULID>.<extension> naming pattern. Existing supported local
 file types remain accepted; extension and original title are retained. Missing,
 unreadable, non-file and oversized sources fail with filePath validation errors.
 A failed reference mutation removes its new copy. Omit copy or use false to retain
@@ -509,3 +515,66 @@ the agent client's own authorized tools, then copy downloaded assets to keep
 references after temporary workspace cleanup.
 
 For the moodboard loop, read [the board-owned guide](../integrations/agent-skill/jam-board/SKILL.md#building-and-refining-a-moodboard).
+
+## Project folders and task files (round 11)
+
+A folder board keeps jamboard.json (manifest/rules), files/ (owned copies),
+board.json (generated portable snapshot) and .state/ (local live DB, backups,
+journals). Do not hand-edit board.json or .state/. Settings → Folder controls
+rules, working directory, local backups and Save now; use explicit recovery
+after external snapshot changes. Tokens, connection settings, logs and cwd
+stay outside board.json. No concurrent old app binaries are supported.
+
+Stdio accepts --project-folder / JAM_BOARD_PROJECT_FOLDER, independent of cwd.
+Precedence: explicit CLI location → explicit environment location → exact
+registry project ID → legacy default. Conflicting explicit selectors fail;
+a project ID supplied with a folder must match exactly. HTTP accepts
+X-Jam-Project-Folder with X-Jam-Project; non-ASCII paths can use utf8: plus
+percent-encoded UTF-8 bytes. Binding is immutable: reconnect to change it.
+Missing/ambiguous folders never create fallback DBs. Token and
+JAM_BOARD_DATA_DIR stay app-local.
+
+Read get_session_context first: projectFolder is the canonical folder anchor
+(legacy may return an unverified hint). projectInstanceId/databaseGeneration/
+boardRevision identify state; repositoryRoot, workingDirectory, folderRules,
+manifestRevision and fileCapabilities describe file handling. Activity cursor
+is separate. In-app cwd precedence is explicit session cwd → workingDirectory
+→ detected repo root → anchor; unavailable configured cwd fails before launch.
+Legacy projects with no location keep their isolated workspace. History uses
+original cwd/source; moved/generation-invalid source needs reconnect. Running
+sessions never follow UI selection.
+
+Five new tools bring the inventory from 52 to 57:
+
+- register_file requires storageType and requestId. board_file copies into
+  manifest rules; linked_file retains external bytes; url never fetches.
+  Supply sourcePath or url for that storage; optional taskKey/role linking
+  needs inspected expectedClaimGeneration and expectedUpdatedAt.
+- link_task_file and set_task_file_role require taskKey, assetId, role,
+  expectedClaimGeneration, expectedUpdatedAt, requestId; position optional.
+  Roles to_edit/reference/result are independent per task.
+- unlink_task_file requires taskKey, assetId, expectedClaimGeneration,
+  expectedUpdatedAt, requestId; optional role/position accepted. Removes the
+  association, preserving bytes, other tasks, canvas and historical evidence.
+- resolve_file requires assetId; workingDirectory optional. Read-only, no
+  Open/Reveal/download. Board files anchor; repo links use verified caller
+  worktree; an absolute outside-scope path grants no access.
+
+get_task.files and jam://task/{key} Files expose roles/order/ownership/status.
+list_assets adds storageType/taskKey/role/limit/cursor: without limit/cursor
+legacy array; with paging {assets,nextCursor}. Asset role differs from task
+role. [Compact field tables](agents/agent-actions.md#frozen-round-11-mcp-schemas)
+link the [exact frozen schemas](../test-visuals/round11/r11-c/mcp-tools.json).
+Preserve request identity/payload for identical retry; reconcile stale/uncertain
+outcomes before a new decision. A separately registered file can survive failed
+task linking and be picked again. Missing/unreadable/unknown are not permission;
+reference does not authorize editing. Native Open/Reveal re-resolves under
+captured context; MCP resolution never launches.
+
+Duplicate open offers the registered board or a separate copy with a new ID;
+one live board per ID per machine. Move refuses bound agent/MCP connections.
+Cloud-synced folders require explicit acknowledgement; remote/UNC refused.
+No previews/renderers or git badges this phase. [Round 11 evidence](verification/round11.md)
+records G1 integration and G3 DOM/browser verification, including configured-cwd
+connection prompts. Linux clippy, native pickers/DPI, packaging and real-agent
+checks remain NOT RUN; ci-local failed the Node 22 environment prerequisite.

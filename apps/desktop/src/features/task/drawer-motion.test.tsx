@@ -214,6 +214,27 @@ it("H-D01: a completed exit stays hidden while its asynchronous owner finishes c
   expect(shell).toHaveAttribute("aria-hidden", "true");
 });
 
+it("H-D01: a hidden exit keeps modal ownership until the route owner finishes closing", async () => {
+  const background = document.createElement("button");
+  background.textContent = "Background filter";
+  document.body.append(background);
+  try {
+    const { shell, close, unmount } = await open();
+    expect(background.inert).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Close task" }));
+    animationEnd(shell, "drawer-out");
+    expect(shell).toHaveClass("closed");
+    expect(background.inert).toBe(true);
+    flushIdle();
+    expect(close).toHaveBeenCalledOnce();
+    expect(background.inert).toBe(true);
+    unmount();
+    expect(background.inert).toBeFalsy();
+  } finally {
+    background.remove();
+  }
+});
+
 it("H-D01: shell phase changes do not rerender heavy content before idle teardown", () => {
   const rendered = vi.fn();
   function Heavy() {
@@ -327,4 +348,32 @@ it("H-D01/R20: canvas focus and idle-close retention never grant the hidden task
   expect(shell).toHaveClass("closed");
   expect(fireEvent.keyDown(window, { key: "s", ctrlKey: true })).toBe(true);
   expect(update).not.toHaveBeenCalled();
+});
+
+it("R11-M: modal data-read failure retries within the same shell before the editor mounts", async () => {
+  const original = mockApi.getTask.bind(mockApi);
+  vi.spyOn(mockApi, "getTask")
+    .mockImplementation(original)
+    .mockRejectedValueOnce(new Error("Synthetic task read failure"));
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <TaskDrawer
+        taskKey="JB-7"
+        presentation="modal"
+        close={vi.fn()}
+        onPresentationChange={vi.fn()}
+      />
+    </QueryClientProvider>,
+  );
+  const shell = screen.getByRole("dialog", { name: "JB-7" });
+  expect(shell).toHaveAttribute("data-presentation", "modal");
+  animationEnd(shell, "drawer-in");
+  await screen.findByRole("button", { name: "Try again" });
+  expect(screen.queryByRole("textbox", { name: "Task title" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await screen.findByRole("textbox", { name: "Task title" });
+  expect(screen.getByRole("dialog", { name: "JB-7" })).toBe(shell);
 });

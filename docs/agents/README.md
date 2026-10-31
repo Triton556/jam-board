@@ -4,8 +4,8 @@ This is the maintained map of **what people and agents can do**, how nested inte
 
 ## Read in this order
 
-1. [Human interaction tree](human-interactions.md): 86 stable route/action-family IDs (46 original plus BD01-BD24 and R09-R24, including the round-5 inventory and round-7 additions) and nested surfaces.
-2. [Agent action/state map](agent-actions.md): all 52 current MCP tools, human-only decisions, lifecycle, recovery and handover.
+1. [Human interaction tree](human-interactions.md): 108 stable route/action-family IDs (86 prior plus 22 round-11 folder, Files and task-view families) and nested surfaces.
+2. [Agent action/state map](agent-actions.md): all 57 current MCP tools, human-only decisions, lifecycle, recovery and handover.
 3. [Behavioral and visual acceptance](acceptance-matrix.md): scenario IDs, functional assertions, visual states and honest result recording.
 4. [Known gaps / next work](known-gaps.md): observed source causes, planned changes and open choices.
 5. [UX evidence and decisions](ux-evidence.md): authoritative web sources applied to this application, not generic styling rules.
@@ -31,7 +31,7 @@ Human description is not the agent's entire implementation schema. A prepared pr
 
 ## Map ownership and completeness
 
-`human-interactions.md` covers the discovered route/action families, including hidden controls. `agent-actions.md` enumerates the entire 52-tool current inventory rather than an illustrative subset. Neither claims to enumerate infinitely many content/state combinations. Every new route, action, agent tool, permission/state transition or hidden layer must add/update an ID and acceptance rows. Maintain existing IDs; mark retired behavior rather than silently reusing identifiers. If a code/contract change and this map disagree, investigate the source/live schema and update both; never invent compatibility or skip permission checks to match prose.
+`human-interactions.md` covers the discovered route/action families, including hidden controls. `agent-actions.md` enumerates the entire 57-tool current inventory rather than an illustrative subset. Neither claims to enumerate infinitely many content/state combinations. Every new route, action, agent tool, permission/state transition or hidden layer must add/update an ID and acceptance rows. Maintain existing IDs; mark retired behavior rather than silently reusing identifiers. If a code/contract change and this map disagree, investigate the source/live schema and update both; never invent compatibility or skip permission checks to match prose.
 
 ## Alpha29 validation handoff (2026-10-22)
 
@@ -143,7 +143,7 @@ they do not substitute for exact-version packaged/native or live-provider QA.
 [Known gaps](known-gaps.md#brain-dock-integration-boundary) records live-provider,
 packaged cleanup, terminal rendering confirmation and live-adapter limits. Historical 46-family
 and alpha40/41 results retain their exact source boundary, not this increment's
-acceptance. The seven canvas organization tools plus unlink_reference bring the current MCP inventory to 52.
+acceptance. The seven canvas organization tools plus unlink_reference brought the pre-round-11 inventory to 52; round 11 adds five Files tools for 57.
 
 ## Round 8 contracts
 
@@ -160,3 +160,7 @@ icon-only actions, shared control sizing, disabled reasons and voice-strip
 placement. AG15 session, dispatch and cancellation semantics are unchanged.
 R9-A evidence is scoped DOM/Chromium/mock; see alpha46 verification for release
 gates and remaining native/live boundaries.
+
+## Round 11 project folders, Files and task views
+
+[Round 11 verification](../verification/round11.md) records C/C2/M/U/T/A/H checkpoints, G1 integration and G3 fixture/DOM/browser verification plus Polish 1. PF01–PF11, TF01–TF08, TV01–TV03 extend existing human rows; AF01–AF06 extend agent paths; FQ01–FQ46 separate fixture/mock from owner native/package/real-agent checks. Compact field tables link canonical machine schemas; current inventory is 57. Final polish whole DOM is 175 files / 1,365 tests passed; ci-local remains blocked at Node 22. No release or native/package acceptance implied.

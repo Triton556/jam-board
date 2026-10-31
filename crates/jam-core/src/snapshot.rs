@@ -16,6 +16,15 @@ pub struct TaskTagRow {
 pub struct TaskAssetRow {
     pub task_id: String,
     pub asset_id: String,
+    #[serde(default = "default_task_role")]
+    #[specta(optional)]
+    pub role: String,
+    #[serde(default)]
+    #[specta(optional)]
+    pub position: f64,
+}
+fn default_task_role() -> String {
+    "reference".into()
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -55,7 +64,7 @@ impl Store {
         let members=c.prepare("SELECT id,kind,name,handle,color,avatar,client,last_seen_at,created_at,status_text,status_scope_json,status_at FROM members WHERE id IN (SELECT member_id FROM project_members WHERE jam_id=?) ORDER BY created_at,id")?.query_map([&j.id],crate::service::member_row)?.collect::<std::result::Result<Vec<_>,_>>()?.into_iter().map(|m|crate::projects::project_member(c,m)).collect::<Result<Vec<_>>>()?;
         let assets=crate::service::all_assets(c,&j.id)?;
         let tags=tasks.iter().flat_map(|t|t.tags.iter().map(|tag|TaskTagRow{task_id:t.id.clone(),tag:tag.clone()})).collect();
-        let links=c.prepare("SELECT l.task_id,l.asset_id FROM task_assets l JOIN tasks t ON t.id=l.task_id WHERE t.jam_id=?")?.query_map([&j.id],|r|Ok(TaskAssetRow{task_id:r.get(0)?,asset_id:r.get(1)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
+        let links=c.prepare("SELECT l.task_id,l.asset_id,l.role,l.position FROM task_assets l JOIN tasks t ON t.id=l.task_id WHERE t.jam_id=?")?.query_map([&j.id],|r|Ok(TaskAssetRow{task_id:r.get(0)?,asset_id:r.get(1)?,role:r.get(2)?,position:r.get(3)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let comments=c.prepare("SELECT c.id,c.task_id,c.author_id,c.body_md,c.created_at FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.jam_id=? ORDER BY c.created_at,c.id")?.query_map([&j.id],|r|Ok(Comment{id:r.get(0)?,task_id:r.get(1)?,author_id:r.get(2)?,body_md:r.get(3)?,created_at:r.get(4)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
         let seqs=c.prepare("SELECT seq FROM activity WHERE jam_id=? ORDER BY seq")?.query_map([&j.id],|r|r.get::<_,i64>(0))?.collect::<std::result::Result<BTreeSet<_>,_>>()?;
         let activity=crate::db::activity(c,0,None,None)?.into_iter().filter(|e|seqs.contains(&e.seq)).collect();
@@ -99,7 +108,7 @@ impl Store {
             }
             for tag in &snapshot.tags{c.execute("INSERT INTO task_tags VALUES (?,?)",params![mapped(&tag.task_id)?,tag.tag])?;}
             for a in &snapshot.assets{c.execute("INSERT INTO assets(id,jam_id,kind,name,location,notes,created_by,created_at,role) VALUES (?,?,?,?,?,?,?,?,?)",params![mapped(&a.id)?,jid,a.kind,a.name,a.location,a.notes,mapped(&a.created_by)?,a.created_at,a.role])?;}
-            for l in &snapshot.links{c.execute("INSERT INTO task_assets VALUES (?,?)",params![mapped(&l.task_id)?,mapped(&l.asset_id)?])?;}
+            for l in &snapshot.links{c.execute("INSERT INTO task_assets(task_id,asset_id,role,position) VALUES (?,?,?,?)",params![mapped(&l.task_id)?,mapped(&l.asset_id)?,l.role,l.position])?;}
             for x in &snapshot.comments{c.execute("INSERT INTO comments VALUES (?,?,?,?,?)",params![mapped(&x.id)?,mapped(&x.task_id)?,mapped(&x.author_id)?,x.body_md,x.created_at])?;}
             crate::snapshot_v2::finish(c,snapshot.planning.as_ref(),&ids,&keys)?;
             for e in &snapshot.activity {
@@ -282,6 +291,9 @@ fn validate_snapshot(s: &JamExport) -> Result<()> {
     }
     let mut links = BTreeSet::new();
     for l in &s.links {
+        if !FILE_ROLES.contains(&l.role.as_str()) || !l.position.is_finite() {
+            return Err(invalid("links", "Invalid task file role/position"));
+        }
         if !tasks.contains(l.task_id.as_str())
             || !assets.contains(l.asset_id.as_str())
             || !links.insert((&l.task_id, &l.asset_id))

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { TaskQuery } from "../../lib/types";
 import { statuses } from "../../lib/types";
+import { taskViewSearch } from "../task/task-view-route";
 export const sortFields = [
   "key",
   "title",
@@ -57,6 +58,7 @@ export const tableSearchSchema = z.object({
     )
     .catch("updatedAt:desc")
     .optional(),
+  taskView: z.preprocess(taskViewSearch, z.literal("modal").optional()),
   task: z
     .string()
     .regex(/^[A-Za-z0-9]+-\d+$/)

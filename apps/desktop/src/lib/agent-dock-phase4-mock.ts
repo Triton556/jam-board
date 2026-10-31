@@ -193,8 +193,23 @@ export const mockPhase4Api: Phase4Api = {
         "fictional-history-key",
       );
     }
+    const { mockApi } = await import("./mock-bridge");
+    const locator = mockApi.sessionLocators.get(id);
+    if (locator) {
+      const context = await api.projectSelectionContext();
+      const generation =
+        mockApi.folders.selected?.databaseGeneration ?? "legacy";
+      if (
+        context?.instanceId !== locator.instanceId ||
+        generation !== locator.generation
+      )
+        throw Error(
+          "This board moved or was recovered. Reconnect in a new session.",
+        );
+    }
     const session = await mockDockApi.startSession({
       profileId: entry.profileId,
+      cwd: locator?.cwd,
       userConfig,
     });
     const temporary = sessionEntries.get(session.id);

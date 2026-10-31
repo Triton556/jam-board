@@ -58,6 +58,7 @@ import {
 } from "./components/ui/LazyBoundary";
 import { BoardHeader } from "./features/board/BoardHeader";
 import { EpicFilters } from "./features/board/EpicFilters";
+import { TopbarActions } from "./features/board/TopbarActions";
 import { useBoardReturnFocus } from "./features/board/use-board-return-focus";
 import {
   BrainButton,
@@ -73,6 +74,10 @@ import {
   loadReadinessDialog,
 } from "./features/task/LazyReadinessDialog";
 import { TaskTitlePreview } from "./features/task/TaskTitle";
+import {
+  taskPresentation,
+  taskViewSearch,
+} from "./features/task/task-view-route";
 import { executionRequestsQuery } from "./lib/execution-queries";
 import { useMemberPresenceRefresh } from "./lib/use-member-presence-refresh";
 
@@ -196,15 +201,18 @@ import { validateTableSearch } from "./features/table/search";
 const TaskTable = lazy(() =>
   import("./features/table/TaskTable").then((m) => ({ default: m.TaskTable })),
 );
-const LazyTaskDrawer = lazy(() =>
+const TaskDrawerSurface = lazy(() =>
   import("./features/task/TaskDrawer").then((m) => ({ default: m.TaskDrawer })),
 );
-
 function TaskDrawer(props: {
   taskKey: string;
   close(): void;
   returnFocus?: ModalFocusReturn;
 }) {
+  const search = useRouterState({
+    select: (state) => state.location.search,
+  }) as { taskView?: string };
+  const navigate = useNavigate();
   return (
     <LazyDrawerBoundary
       title={props.taskKey}
@@ -213,7 +221,22 @@ function TaskDrawer(props: {
       close={props.close}
       returnFocus={props.returnFocus}
     >
-      <LazyTaskDrawer {...props} />
+      <TaskDrawerSurface
+        {...props}
+        presentation={taskPresentation(search.taskView)}
+        onPresentationChange={(presentation) =>
+          void navigate({
+            to: ".",
+            search: (previous) => ({
+              ...previous,
+              taskView: taskViewSearch(presentation),
+            }),
+            replace: true,
+            resetScroll: false,
+            ignoreBlocker: true,
+          })
+        }
+      />
     </LazyDrawerBoundary>
   );
 }
@@ -221,9 +244,16 @@ const TeamPage = lazy(() =>
   import("./features/team/TeamPage").then((m) => ({ default: m.TeamPage })),
 );
 
+import { GlobalBoardRecovery } from "./features/projects/GlobalBoardRecovery";
 import { api } from "./lib/api";
 import { FileDropSessionProvider } from "./lib/file-drop-batch";
 import { preparePaperGrain } from "./lib/grain";
+import {
+  acceptProjectSelection,
+  matchingSelection,
+  selectedContext,
+  selectionIdentity,
+} from "./lib/project-selection";
 import { appQuery, boardQuery, membersQuery, tasksQuery } from "./lib/queries";
 import { paperRustle } from "./lib/sound";
 import type { Theme } from "./lib/types";
@@ -285,6 +315,20 @@ function Root() {
       useUiStore.setState({ soundEnabled: savedSettings.data.soundEnabled });
   }, [savedSettings.data]);
   const queryClient = useQueryClient();
+  const scope = useQuery({
+    queryKey: ["selection-scope"],
+    queryFn: async () => selectedContext(queryClient) ?? null,
+    staleTime: Infinity,
+  });
+  useEffect(() => {
+    if (
+      app.data &&
+      app.data.jam?.id !== selectedContext(queryClient)?.projectId
+    )
+      void acceptProjectSelection(queryClient, app.data).catch((error) =>
+        useUiStore.getState().error(error.message),
+      );
+  }, [app.data, queryClient]);
   const shown = useRef(false);
   useEffect(() => {
     void preparePaperGrain();
@@ -292,7 +336,14 @@ function Root() {
       () => useUiStore.getState().tick(Date.now()),
       100,
     );
-    const stop = api.onBoardChanged((events) => {
+    const stop = api.onBoardChanged((events, context) => {
+      if (context && !matchingSelection(queryClient, context)) return;
+      if (
+        !context &&
+        selectedContext(queryClient) &&
+        !selectedContext(queryClient)?.instanceId.includes("legacy")
+      )
+        return;
       for (const event of events) {
         if (
           event.action.startsWith("jam.") ||
@@ -315,6 +366,12 @@ function Root() {
         ["tableTasks"],
         ["tags"],
         ["assets"],
+        ["file-assets"],
+        ["folder-info"],
+        ["project-folder"],
+        ["project-folders"],
+        ["settings"],
+        ["board-snapshot"],
         ["references"],
         ["members"],
         ["execution"],
@@ -379,9 +436,19 @@ function Root() {
       </main>
     );
   if (!app.data) return null;
+  if (app.data.hasJam && scope.data?.projectId !== app.data.jam?.id)
+    return (
+      <main className="center-page" role="status">
+        Loading project…
+      </main>
+    );
   return (
     <AvatarMembersContext value={allMembers.data ?? []}>
-      <Suspense fallback={<p className="muted">Loading…</p>}>
+      <Suspense
+        key={`${selectionIdentity(scope.data ?? undefined)}:${scope.data?.selectionEpoch}`}
+        fallback={<p className="muted">Loading…</p>}
+      >
+        {app.data.hasJam && <GlobalBoardRecovery />}
         <Outlet />
       </Suspense>
       <Toasts />
@@ -588,17 +655,6 @@ function Shell() {
               memberId={app.data.currentMember.id}
             />
           )}
-          <IconButton label="New task · N" onClick={newTask}>
-            <Plus size={17} />
-          </IconButton>
-          <IconButton
-            className="icon-button top-inbox"
-            label="Open inbox"
-            onClick={() => void navigate({ to: "/inbox" })}
-          >
-            <Inbox size={18} />
-            <InboxBadge count={questionCount} />
-          </IconButton>
           <CommandCenter
             newTask={newTask}
             toggleTheme={() =>
@@ -608,26 +664,55 @@ function Shell() {
                   : "dark",
               )
             }
-          />
-          <ProjectTiming
-            template={app.data.jam?.template}
-            endsAt={app.data.jam?.endsAt ?? null}
-            milestoneAt={app.data.jam?.milestoneAt}
-          />
-          <div className="agent-stack">
-            {board.data?.onlineAgents
-              .filter(
-                (agent) =>
-                  now * 1000 - Date.parse(agent.lastSeenAt ?? "") < 120000,
-              )
-              .map((agent) => (
-                <AgentStatus
-                  key={agent.id}
-                  member={agent}
-                  pulse={!!pulse[agent.handle]}
+            renderTrigger={(searchTrigger, openSearch) => (
+              <TopbarActions
+                newTask={newTask}
+                openInbox={() => void navigate({ to: "/inbox" })}
+                openSearch={openSearch}
+                inboxCount={questionCount}
+                agents={
+                  board.data?.onlineAgents.filter(
+                    (agent) =>
+                      now * 1000 - Date.parse(agent.lastSeenAt ?? "") < 120000,
+                  ) ?? []
+                }
+                pulse={pulse}
+              >
+                <IconButton label="New task · N" onClick={newTask}>
+                  <Plus size={17} />
+                </IconButton>
+                <IconButton
+                  className="icon-button top-inbox"
+                  label="Open inbox"
+                  onClick={() => void navigate({ to: "/inbox" })}
+                >
+                  <Inbox size={18} />
+                  <InboxBadge count={questionCount} />
+                </IconButton>
+                {searchTrigger}
+                <ProjectTiming
+                  template={app.data.jam?.template}
+                  endsAt={app.data.jam?.endsAt ?? null}
+                  milestoneAt={app.data.jam?.milestoneAt}
                 />
-              ))}
-          </div>
+                <div className="agent-stack">
+                  {board.data?.onlineAgents
+                    .filter(
+                      (agent) =>
+                        now * 1000 - Date.parse(agent.lastSeenAt ?? "") <
+                        120000,
+                    )
+                    .map((agent) => (
+                      <AgentStatus
+                        key={agent.id}
+                        member={agent}
+                        pulse={!!pulse[agent.handle]}
+                      />
+                    ))}
+                </div>
+              </TopbarActions>
+            )}
+          />
         </header>
         <div className="brain-workspace-layout">
           <div className="brain-routed-content">
@@ -650,7 +735,10 @@ function BoardRoute() {
     [navigate, search],
   );
   const close = useCallback(() => {
-    void navigate({ to: "/board", search: { ...search, task: undefined } });
+    void navigate({
+      to: "/board",
+      search: { ...search, task: undefined, taskView: undefined },
+    });
   }, [navigate, search]);
   return (
     <>
@@ -697,7 +785,7 @@ function TableRoute() {
           close={() => {
             void navigate({
               to: "/table",
-              search: { ...search, task: undefined },
+              search: { ...search, task: undefined, taskView: undefined },
             });
           }}
         />
@@ -751,7 +839,11 @@ function FeatureRoute({ name }: { name: string }) {
           close={() =>
             void navigate({
               to: path,
-              search: { section: search.section, task: undefined },
+              search: {
+                section: search.section,
+                task: undefined,
+                taskView: undefined,
+              },
             })
           }
         />
@@ -906,7 +998,7 @@ const boardRoute = createRoute({
   path: "/board",
   validateSearch: (
     search: Record<string, unknown>,
-  ): { task?: string; epics?: string } => ({
+  ): { task?: string; taskView?: "modal"; epics?: string } => ({
     epics:
       typeof search.epics === "string"
         ? search.epics
@@ -915,6 +1007,7 @@ const boardRoute = createRoute({
             .join(",") || undefined
         : undefined,
     task: typeof search.task === "string" ? search.task : undefined,
+    taskView: taskViewSearch(search.taskView),
   }),
   component: BoardRoute,
 });
@@ -931,6 +1024,7 @@ const placeholders = navigation
         search: Record<string, unknown>,
       ): {
         task?: string;
+        taskView?: "modal";
         section?: string;
         question?: string;
         status?: string;
@@ -939,6 +1033,7 @@ const placeholders = navigation
           typeof search.question === "string" ? search.question : undefined,
         status: typeof search.status === "string" ? search.status : undefined,
         task: typeof search.task === "string" ? search.task : undefined,
+        taskView: taskViewSearch(search.taskView),
         section:
           typeof search.section === "string" ? search.section : undefined,
       }),
@@ -949,9 +1044,18 @@ function PlanRoute() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const search = useRouterState({
     select: (s) => s.location.search,
-  }) as PlanSearch;
+  }) as PlanSearch & { taskView?: "modal" };
   const navigate = useNavigate();
   const epicKey = pathname.split("/")[2];
+  // Root Plan normally selects its first epic and clears search. A task deep link
+  // supplies its own epic so that background selection cannot dismiss the task.
+  const taskBackground = useQuery({
+    queryKey: ["task", search.task],
+    queryFn: () => api.getTask(search.task ?? ""),
+    enabled: !epicKey && !!search.task,
+  });
+  const backgroundEpic =
+    epicKey ?? (search.task ? taskBackground.data?.epic.key : undefined);
   const update = (patch: PlanSearch) => {
     void navigate({
       to: epicKey ? "/plan/$epicKey" : "/plan",
@@ -962,12 +1066,18 @@ function PlanRoute() {
   return (
     <>
       <LazyPageBoundary label="Plan">
-        <PlanPage
-          epicKey={epicKey}
-          search={search}
-          openTask={(task) => update({ task })}
-          openStory={(story) => update({ story })}
-        />
+        {!epicKey && search.task && !backgroundEpic ? (
+          <main className="feature-page">
+            <h1>Plan</h1>
+          </main>
+        ) : (
+          <PlanPage
+            epicKey={backgroundEpic}
+            search={search}
+            openTask={(task) => update({ task })}
+            openStory={(story) => update({ story })}
+          />
+        )}
       </LazyPageBoundary>
       {search.story && (
         <LazyDrawerBoundary
@@ -985,13 +1095,22 @@ function PlanRoute() {
       {search.task && (
         <TaskDrawer
           taskKey={search.task}
-          close={() => update({ task: undefined })}
+          close={() => {
+            void navigate({
+              to: epicKey ? "/plan/$epicKey" : "/plan",
+              params: { epicKey: epicKey ?? "" },
+              search: { ...search, task: undefined, taskView: undefined },
+            });
+          }}
         />
       )}
     </>
   );
 }
-const planSearch = (raw: Record<string, unknown>): PlanSearch => ({
+const planSearch = (
+  raw: Record<string, unknown>,
+): PlanSearch & { taskView?: "modal" } => ({
+  taskView: taskViewSearch(raw.taskView),
   tab:
     typeof raw.tab === "string" &&
     ["Overview", "Stories", "Journal", "Questions"].includes(raw.tab)

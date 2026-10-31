@@ -55,6 +55,48 @@ export function modalTabStops(root: HTMLElement) {
 }
 
 const layers: symbol[] = [];
+const layerState = new Map<
+  symbol,
+  {
+    root(): HTMLElement | null;
+    modal(): boolean;
+    active(): boolean;
+    close(): void;
+  }
+>();
+const inerted = new Map<HTMLElement, boolean>();
+function syncModalBackground() {
+  for (const [node, previous] of inerted) node.inert = previous;
+  inerted.clear();
+  const top = layers
+    .map((token) => layerState.get(token))
+    .filter((layer) => layer?.active())
+    .at(-1);
+  const root = top?.root();
+  if (!top?.modal() || !root) return;
+  for (const node of Array.from(document.body.children)) {
+    if (!(node instanceof HTMLElement) || node.contains(root)) continue;
+    inerted.set(node, node.inert);
+    node.inert = true;
+  }
+}
+export function isActiveModalSurface(root: HTMLElement) {
+  const top = layers
+    .map((token) => layerState.get(token))
+    .filter((layer) => layer?.active())
+    .at(-1)
+    ?.root();
+  return !top || top === root;
+}
+/** Backdrop dismissal follows the same innermost-layer policy as Escape. */
+export function closeTopModal(fallback: () => void) {
+  const top = layers
+    .map((token) => layerState.get(token))
+    .filter((layer) => layer?.active())
+    .at(-1);
+  if (top) top.close();
+  else fallback();
+}
 export type ModalFocusReturn = () => HTMLElement | null;
 export function useModal(
   onClose: () => void,
@@ -76,8 +118,21 @@ export function useModal(
   useEffect(() => {
     const token = Symbol();
     layers.push(token);
+    layerState.set(token, {
+      root: () => ref.current,
+      modal: () => mode.current.modal !== false,
+      active: () => mode.current.active !== false,
+      close: () => close.current(),
+    });
+    syncModalBackground();
+    const backgroundObserver = new MutationObserver(syncModalBackground);
+    backgroundObserver.observe(document.body, { childList: true });
     const previous = origin.current;
     const root = ref.current;
+    if (root)
+      root.dataset.focusOrigin = previous?.matches(":focus-visible")
+        ? "keyboard"
+        : "pointer";
     // Child autofocus/effects may already have deliberately selected a field.
     if (
       !mode.current.firstField ||
@@ -144,17 +199,21 @@ export function useModal(
         first.focus();
       }
     };
+    // Inner editors/selects consume Escape before the layer sees it. Tab still wraps at capture.
     const capture = (event: KeyboardEvent) => {
-      if (mode.current.modal !== false) key(event);
+      if (event.key === "Tab" && mode.current.modal !== false) key(event);
     };
     const bubble = (event: KeyboardEvent) => {
-      if (mode.current.modal === false && !event.defaultPrevented) key(event);
+      if (event.key !== "Tab" && !event.defaultPrevented) key(event);
     };
     document.addEventListener("keydown", capture, true);
     document.addEventListener("keydown", bubble);
     return () => {
       const wasTop = layers.at(-1) === token;
       layers.splice(layers.indexOf(token), 1);
+      layerState.delete(token);
+      backgroundObserver.disconnect();
+      syncModalBackground();
       document.removeEventListener("keydown", capture, true);
       document.removeEventListener("keydown", bubble);
       document.removeEventListener("focusin", focus);
@@ -182,16 +241,27 @@ export function useModal(
         return;
       }
       if (previous?.isConnected && previous !== document.body) previous.focus();
-      else
-        Array.from(
-          document.querySelectorAll<HTMLElement>(
-            '[role="dialog"][aria-modal="true"]',
-          ),
-        )
-          .at(-1)
-          ?.focus();
+      else {
+        const target =
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '[role="dialog"][aria-modal="true"]',
+            ),
+          ).at(-1) ??
+          document.querySelector<HTMLElement>(
+            'main h1, [role="main"] h1, .page-heading h1, .board-scroll',
+          );
+        if (target) {
+          if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+          target.focus();
+        }
+      }
     };
   }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Mode changes refresh siblings; registered layers read options through a ref.
+  useEffect(() => {
+    syncModalBackground();
+  }, [options.modal, options.active]);
   return ref;
 }
 export function Dialog({

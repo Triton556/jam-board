@@ -661,7 +661,7 @@ fn compare_exact_retained_fictional_fixture() {
         readonly
             .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
             .unwrap(),
-        8
+        9
     );
     drop(readonly);
     let before = logical_snapshot(&path);

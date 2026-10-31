@@ -24,7 +24,7 @@ it("infers every asset kind including query strings and Windows paths", () => {
   expect(assetKind("https://local.invalid/snow.ogg?v=1")).toBe("audio");
   expect(assetKind("font.woff2")).toBe("font");
   expect(assetKind("world.ldtk")).toBe("level");
-  expect(assetKind("README.md")).toBe("other");
+  expect(assetKind("README.md")).toBe("document");
 });
 it("validates file and URL modes without accepting script URLs", () => {
   const values = {

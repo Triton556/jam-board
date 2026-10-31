@@ -676,9 +676,8 @@ it("a partial save acknowledgement cannot erase input queued after its captured 
   await pasteFixture(goal, "Pending technical goal");
   await userEvent.click(planSummary());
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
-  expect(description).toBeDisabled();
-  // A queued change is injected to exercise acknowledgement reconciliation;
-  // ordinary typing is intentionally locked while this request is pending.
+  expect(description).toBeEnabled();
+  // The human description stays editable during a technical partial save.
   fireEvent.change(description, {
     target: { value: "Newer queued human draft" },
   });

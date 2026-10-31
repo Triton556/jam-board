@@ -24,6 +24,7 @@ function deferred<T>() {
 }
 let a: BoardTasks, b: BoardTasks;
 let state: Awaited<ReturnType<typeof api.appState>>;
+let secondState: Awaited<ReturnType<typeof api.appState>>;
 beforeEach(async () => {
   mockApi.setLatency(0);
   await mockApi.resetDemo();
@@ -35,6 +36,17 @@ beforeEach(async () => {
       task.key = `B-${task.key}`;
       task.title = `B ${task.title}`;
     }
+  secondState = await mockApi.createJam({
+    name: "Move fixture B",
+    yourName: "Human",
+    theme: null,
+    startsAt: "",
+    endsAt: "",
+    timezone: "UTC",
+    template: "custom",
+  });
+  if (!state.jam) throw new Error("Missing A fixture");
+  await mockApi.selectProject(state.jam.id);
   useUiStore.setState({ toasts: [], readyRequest: null });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -62,14 +74,12 @@ function setup() {
     status: "review" as const,
   };
   const select = async (project: "A" | "B") =>
-    act(async () =>
-      acceptProjectSelection(
-        client,
-        project === "A"
-          ? state
-          : { ...state, jam: state.jam ? { ...state.jam, id: "B" } : null },
-      ),
-    );
+    act(async () => {
+      const target = project === "A" ? state : secondState;
+      if (!target.jam) throw new Error("Missing selected fixture");
+      const selected = await mockApi.selectProject(target.jam.id);
+      await acceptProjectSelection(client, selected);
+    });
   return { client, hook, source, input, select };
 }
 it("keeps last-read positions while pending; success reconciles without speculative movement", async () => {

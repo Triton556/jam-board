@@ -3,6 +3,7 @@ import { assetKind, assetName } from "../features/assets/model";
 import type { JamApi, LinkedFrame, ReferenceVerdict, VerdictItem } from "./api";
 import fixture from "./demo-fixture.json";
 import { makeSnippets } from "./mcp-config";
+import { installMockBridge } from "./mock-adapter";
 import {
   emptyExecution,
   MockExecution,
@@ -14,7 +15,9 @@ import {
   type PlanData,
   validateBrief,
 } from "./mock-planning";
+import { MockProjectFolders } from "./mock-project-folders";
 import { emptyCanvas, MockReferences } from "./mock-references";
+import { asFileAsset, MockTaskFiles } from "./mock-task-files";
 import type { ProjectSummary } from "./project-api";
 import { tagSuggestions, templateInfo } from "./project-template";
 import type { ReferenceInput } from "./references-api";
@@ -85,6 +88,141 @@ type MockProjectSnapshot = {
   archived: boolean;
 };
 export class MockBridge implements JamApi {
+  readonly folders = new MockProjectFolders(this);
+  readonly taskFiles = new MockTaskFiles(this);
+  folderSnapshots: Record<string, MockProjectSnapshot> = {};
+  saveFolderSnapshot(projectId: string) {
+    const snapshot =
+      this.currentProjectId === projectId
+        ? this.snapshot()
+        : this.projects[projectId];
+    if (snapshot) this.folderSnapshots[projectId] = clone(snapshot);
+  }
+  restoreFolderSnapshot(projectId: string) {
+    const snapshot = this.folderSnapshots[projectId];
+    if (snapshot) this.openProject(snapshot);
+    if (this.state.jam) this.folders.renamed(projectId, this.state.jam.name);
+    this.revokeRecoveredAuthority();
+  }
+  readonly sessionLocators = new Map<
+    string,
+    {
+      projectId: string;
+      instanceId: string;
+      generation: string;
+      folder: string | null;
+      cwd: string;
+      active: boolean;
+    }
+  >();
+  get currentProjectId() {
+    return this.state.jam?.id ?? null;
+  }
+  hasActiveSessions(projectId: string) {
+    return [...this.sessionLocators.values()].some(
+      (row) => row.projectId === projectId && row.active,
+    );
+  }
+  fileInventory() {
+    return { assets: this.assets, tasks: this.tasks };
+  }
+  moveInventory(projectId: string) {
+    const data =
+      this.currentProjectId === projectId
+        ? this.snapshot()
+        : this.projects[projectId];
+    const assets = (data?.assets ?? []).map(asFileAsset);
+    const copies = assets.filter((asset) => asset.storageType === "board_file");
+    const links = assets.filter((asset) => asset.storageType === "linked_file");
+    const missing = links.filter((asset) =>
+      ["missing", "unreadable"].includes(asset.resolution.status),
+    );
+    return {
+      tasks: {
+        count: data?.tasks.filter((task) => !task.archivedAt).length ?? 0,
+        bytes: 0,
+      },
+      managedCopies: {
+        count: copies.length,
+        bytes: copies.reduce(
+          (total, asset) => total + (asset.byteSize ?? 0),
+          0,
+        ),
+      },
+      linkedFiles: {
+        count: links.length,
+        bytes: links.reduce((total, asset) => total + (asset.byteSize ?? 0), 0),
+      },
+      missingFiles: missing.map((asset) => asset.storedPath),
+      missingFileCount: missing.length,
+    };
+  }
+  writeFileAsset(asset: import("../bindings").FileAsset) {
+    this.assets.push(clone(asset));
+  }
+  writeTaskFiles(
+    key: string,
+    files: import("../bindings").TaskFile[],
+    version: import("../bindings").FileTaskVersion,
+  ) {
+    const task = this.tasks.find((row) => row.key === key);
+    if (!task || task.archivedAt)
+      throw new JamError("not_found", "Task is unavailable");
+    task.files = clone(files);
+    task.assets = files.map((row) => clone(row.asset));
+    task.updatedAt = version.updatedAt;
+  }
+  filesChanged(key?: string) {
+    this.event(
+      "file.updated",
+      this.human(),
+      this.tasks.find((task) => task.key === key),
+    );
+  }
+  revokeRecoveredAuthority() {
+    this.executionData = emptyExecution();
+    for (const task of this.tasks) {
+      task.assigneeId = null;
+      task.claimGeneration = String(
+        (Number(task.claimGeneration ?? "0") || 0) + 1,
+      );
+    }
+    this.checkpoint();
+  }
+  projectSelectionContext = () => this.folders.selection();
+  projectFolderInfo = () => this.folders.info();
+  listProjectFolders = () => this.folders.list();
+  createProjectFolder: JamApi["createProjectFolder"] = (...args) =>
+    this.folders.create(...args);
+  openProjectFolder: JamApi["openProjectFolder"] = (...args) =>
+    this.folders.open(...args);
+  registerFile: JamApi["registerFile"] = async (context, input) => {
+    await this.call("register_file", input);
+    return this.taskFiles.register(context, input);
+  };
+  linkTaskFile: JamApi["linkTaskFile"] = async (context, input) => {
+    await this.call("link_task_file", input);
+    return this.taskFiles.link(context, input);
+  };
+  setTaskFileRole: JamApi["setTaskFileRole"] = async (context, input) => {
+    await this.call("set_task_file_role", input);
+    return this.taskFiles.setRole(context, input);
+  };
+  unlinkTaskFile: JamApi["unlinkTaskFile"] = async (context, input) => {
+    await this.call("unlink_task_file", input);
+    return this.taskFiles.unlink(context, input);
+  };
+  listFileAssets: JamApi["listFileAssets"] = (context, query) =>
+    this.taskFiles.list(context, query);
+  fileOperationStatus: JamApi["fileOperationStatus"] = (context, id) =>
+    this.taskFiles.status(context, id);
+  cancelFileOperation: JamApi["cancelFileOperation"] = (context, id) =>
+    this.taskFiles.cancel(context, id);
+  resolveFile: JamApi["resolveFile"] = (context, id) =>
+    this.taskFiles.resolve(context, id);
+  openFile: JamApi["openFile"] = (context, id, reveal) =>
+    this.taskFiles.open(context, id, reveal);
+
   private projects: Record<string, MockProjectSnapshot> = {};
   private snapshot(archived = false): MockProjectSnapshot {
     return clone({
@@ -136,6 +274,11 @@ export class MockBridge implements JamApi {
               {
                 ...p.state.jam,
                 archived: p.archived,
+                movedTo:
+                  this.folders.entries.find(
+                    (entry) =>
+                      entry.projectId === p.state.jam?.id && entry.migrationId,
+                  )?.canonicalFolder ?? null,
                 selected: p.state.jam?.id === this.state.jam?.id,
                 taskCount: p.tasks.filter((t) => !t.archivedAt).length,
                 inProgressCount: p.tasks.filter(
@@ -149,13 +292,17 @@ export class MockBridge implements JamApi {
   }
   async selectProject(projectId: string) {
     await this.call("select_project", { projectId });
-    if (this.state.jam?.id === projectId) return clone(this.state);
+    if (this.state.jam?.id === projectId) {
+      this.folders.selectedProject(projectId);
+      return clone(this.state);
+    }
     const project = this.projects[projectId];
     if (!project) throw new JamError("not_found", "Project not found");
     if (project.archived)
       throw new JamError("archived", "Restore this project first");
     this.stashProject();
     this.openProject(project);
+    this.folders.selectedProject(projectId);
     return clone(this.state);
   }
   async restoreProject(projectId: string) {
@@ -170,6 +317,10 @@ export class MockBridge implements JamApi {
   /** Unit-test fixture reset; unlike the product action this deliberately replaces all mock data. */
   async resetDemo() {
     this.projects = {};
+    this.folderSnapshots = {};
+    this.folders.reset();
+    this.taskFiles.reset();
+    this.sessionLocators.clear();
     this.state.jam = null;
     return this.loadDemoJam();
   }
@@ -501,6 +652,9 @@ export class MockBridge implements JamApi {
       estimatesEnabled: boolean;
       wipLimit: number;
       projectFolder?: string | null;
+      workingDirectory?: string | null;
+      backupRecentCount?: number;
+      backupDailyCount?: number;
     }
   > = {};
   private assetsView = "grid";
@@ -510,7 +664,7 @@ export class MockBridge implements JamApi {
   private mockToken = "mock-token-for-local-tests-only";
   private mcpListeners = new Set<() => void>();
   private fileDropListeners = new Set<{
-    cb: (paths: string[]) => void;
+    cb: (paths: string[], point?: { x: number; y: number }) => void;
     active?: (value: boolean) => void;
   }>();
   private exported: {
@@ -524,7 +678,12 @@ export class MockBridge implements JamApi {
   } | null = null;
   private members: Member[] = [];
   private activity: ActivityEvent[] = [];
-  private listeners = new Set<(events: ActivityEvent[]) => void>();
+  private listeners = new Set<
+    (
+      events: ActivityEvent[],
+      context?: import("../bindings").ProjectEventContext | null,
+    ) => void
+  >();
   private failures = new Set<string>();
   private latency = 0;
   readonly calls: { command: string; input: unknown }[] = [];
@@ -570,6 +729,7 @@ export class MockBridge implements JamApi {
           "jam.mock",
           JSON.stringify({
             projects: this.projects,
+            folderSnapshots: this.folderSnapshots,
             skillPath: this.skillPath,
             canvasData: this.canvasData,
             canvasViewportValue: this.canvasViewportValue,
@@ -595,8 +755,31 @@ export class MockBridge implements JamApi {
   }
   private async call(command: string, input?: unknown) {
     this.calls.push({ command, input });
+    const projectId = this.currentProjectId;
+    const epoch = this.folders.epoch;
     if (this.latency)
       await new Promise((resolve) => setTimeout(resolve, this.latency));
+    const unscoped = [
+      "app_state",
+      "list_projects",
+      "select_project",
+      "restore_project",
+      "create_jam",
+      "load_demo_jam",
+      "import_jam_json",
+      "set_theme",
+      "pick_file",
+      "pick_files",
+      "pick_folder",
+    ];
+    if (
+      !unscoped.includes(command) &&
+      (projectId !== this.currentProjectId || epoch !== this.folders.epoch)
+    )
+      throw new JamError(
+        "conflict",
+        "Project changed before the command was applied",
+      );
     if (this.failures.delete(command))
       throw new JamError("internal", "Simulated failure");
   }
@@ -606,14 +789,28 @@ export class MockBridge implements JamApi {
   setLatency(ms: number) {
     this.latency = Math.max(0, ms);
   }
-  onBoardChanged(cb: (events: ActivityEvent[]) => void) {
+  onBoardChanged(
+    cb: (
+      events: ActivityEvent[],
+      context?: import("../bindings").ProjectEventContext | null,
+    ) => void,
+  ) {
     this.listeners.add(cb);
     return () => {
       this.listeners.delete(cb);
     };
   }
   emit(events: ActivityEvent[]) {
-    for (const cb of this.listeners) cb(clone(events));
+    const info = this.folders.selected;
+    const context = this.state.jam
+      ? {
+          instanceId: info?.instanceId ?? `mock-legacy:${this.state.jam.id}`,
+          projectId: this.state.jam.id,
+          selectionEpoch: this.folders.epoch,
+          databaseGeneration: info?.databaseGeneration ?? "legacy",
+        }
+      : null;
+    for (const cb of this.listeners) cb(clone(events), context);
   }
   private event(
     action: string,
@@ -638,6 +835,14 @@ export class MockBridge implements JamApi {
         fields.wasClosed && entity ? { type, id: entity.id } : undefined,
       );
     }
+    if (action === "project.updated" && this.state.jam)
+      this.folders.renamed(this.state.jam.id, this.state.jam.name);
+    if (
+      action === "jam.created" ||
+      action === "jam.imported" ||
+      action === "jam.archived"
+    )
+      this.folders.selectedProject(this.currentProjectId);
     if (action === "jam.archived") this.execution.revokeClosed(actor, true);
     if (task) this.planning.sync(task);
     else if (action.startsWith("epic.") || action.startsWith("story."))
@@ -653,6 +858,8 @@ export class MockBridge implements JamApi {
       sentence,
     };
     this.activity.push(event);
+    if (this.folders.selected && !this.folders.external)
+      this.saveFolderSnapshot(this.folders.selected.projectId);
     this.checkpoint();
     this.emit([event]);
   }
@@ -831,6 +1038,7 @@ export class MockBridge implements JamApi {
         createdAt: now,
       },
     };
+    this.folders.selectedProject(this.currentProjectId);
     this.event("jam.updated", human);
     return clone(this.state);
   }
@@ -908,6 +1116,7 @@ export class MockBridge implements JamApi {
     this.activity = data.activity;
     this.executionData = emptyExecution();
     this.checkpoint();
+    this.folders.selectedProject(this.currentProjectId);
     return clone(this.state);
   }
   async setCurrentMember(id: string) {
@@ -1016,6 +1225,8 @@ export class MockBridge implements JamApi {
     const task = this.tasks.find((t) => t.key === key);
     if (!task) throw new JamError("not_found", `Task ${key} was not found`);
     this.planning.sync(task);
+    task.files = this.taskFiles.projectTaskFiles(task);
+    task.assets = task.files.map((row) => row.asset);
     const targetIds = new Set([task.id, task.epic.id, task.story.id]);
     const targetKeys = new Set([task.key, task.epic.key, task.story.key]);
     const references = this.canvasData.items.flatMap((item) => {
@@ -1381,7 +1592,15 @@ export class MockBridge implements JamApi {
   }
   private validateAsset(input: NewAsset) {
     if (
-      !["sprite", "audio", "level", "font", "other"].includes(input.kind) ||
+      ![
+        "sprite",
+        "audio",
+        "model",
+        "document",
+        "level",
+        "font",
+        "other",
+      ].includes(input.kind) ||
       !input.name.trim() ||
       input.name.length > 140 ||
       !input.location.trim() ||
@@ -1415,6 +1634,12 @@ export class MockBridge implements JamApi {
     };
     this.assets.push(asset);
     task.assets.push(clone(asset));
+    if (task.files && !task.files.some((row) => row.asset.id === asset.id))
+      task.files.push({
+        asset: asFileAsset(asset),
+        role: "reference",
+        position: task.files.length,
+      });
     task.updatedAt = new Date().toISOString();
     this.event("asset.linked", this.human(), task, {
       assetId: asset.id,
@@ -1478,6 +1703,12 @@ export class MockBridge implements JamApi {
     if (task.archivedAt) throw new JamError("archived", "Task is archived");
     if (!task.assets.some((a) => a.id === asset.id))
       task.assets.push(clone(asset));
+    if (task.files && !task.files.some((row) => row.asset.id === asset.id))
+      task.files.push({
+        asset: asFileAsset(asset),
+        role: "reference",
+        position: task.files.length,
+      });
     task.updatedAt = new Date(
       Math.max(Date.now(), Date.parse(task.updatedAt) + 1),
     ).toISOString();
@@ -1494,6 +1725,8 @@ export class MockBridge implements JamApi {
     if (!task.assets.some((a) => a.id === input.assetId))
       throw new JamError("not_found", "Asset link not found");
     task.assets = task.assets.filter((a) => a.id !== input.assetId);
+    if (task.files)
+      task.files = task.files.filter((row) => row.asset.id !== input.assetId);
     task.updatedAt = new Date(
       Math.max(Date.now(), Date.parse(task.updatedAt) + 1),
     ).toISOString();
@@ -1592,16 +1825,36 @@ export class MockBridge implements JamApi {
       theme: this.state.theme,
       soundEnabled: this.soundEnabled,
       projectId: this.state.jam?.id ?? null,
-      projectFolder: null,
+      projectFolder: this.folders.selected?.folder ?? null,
+      workingDirectory: null,
+      backupRecentCount: 10,
+      backupDailyCount: 7,
       colorBy: "epic",
       estimatesEnabled: false,
       wipLimit: 6,
       ...this.boardSettings[this.state.jam?.id ?? ""],
+      ...(this.folders.selected
+        ? { projectFolder: this.folders.selected.folder }
+        : {}),
       assetsView: this.assetsView,
       collapsedAssetKinds: this.collapsedAssetKinds,
     };
   }
-  async setSettings(input: SettingsPatch) {
+  async setSettings(
+    input: SettingsPatch,
+    context?: import("../bindings").FolderCommandContext,
+  ) {
+    if (context) {
+      const current = await this.projectSelectionContext();
+      if (
+        current?.instanceId !== context.instanceId ||
+        current.selectionEpoch !== context.selectionEpoch
+      )
+        throw new JamError(
+          "conflict",
+          "Project changed before saving settings",
+        );
+    }
     await this.call("set_settings", input);
     if (input.theme != null) {
       if (!["system", "light", "dark"].includes(input.theme))
@@ -1640,13 +1893,32 @@ export class MockBridge implements JamApi {
       throw new JamError("validation", "Choose grid or list");
     if (
       input.collapsedAssetKinds?.some(
-        (kind) => !["sprite", "audio", "level", "font", "other"].includes(kind),
+        (kind) =>
+          ![
+            "sprite",
+            "audio",
+            "model",
+            "document",
+            "level",
+            "font",
+            "other",
+          ].includes(kind),
       )
     )
       throw new JamError("validation", "Unknown asset kind");
     if (input.theme != null) this.state.theme = input.theme;
     if (input.soundEnabled != null) this.soundEnabled = input.soundEnabled;
     this.boardSettings[id] = {
+      workingDirectory:
+        input.workingDirectory ??
+        this.boardSettings[id]?.workingDirectory ??
+        null,
+      backupRecentCount:
+        input.backupRecentCount ??
+        this.boardSettings[id]?.backupRecentCount ??
+        10,
+      backupDailyCount:
+        input.backupDailyCount ?? this.boardSettings[id]?.backupDailyCount ?? 7,
       projectFolder:
         input.projectFolder != null
           ? input.projectFolder.trim() || null
@@ -1677,6 +1949,7 @@ export class MockBridge implements JamApi {
     this.stashProject(true);
     this.state.hasJam = false;
     this.state.jam = null;
+    this.folders.selectedProject(null);
     this.tasks = [];
     this.planData = { epics: [], stories: [], questions: [] };
     this.executionData = emptyExecution();
@@ -1819,6 +2092,7 @@ export class MockBridge implements JamApi {
       createdBy: mapped(t.createdBy),
       updatedBy: mapped(t.updatedBy),
       assigneeId: t.assigneeId ? mapped(t.assigneeId) : null,
+      files: t.files ? remap(t.files) : undefined,
       assets: t.assets
         .map((a) => this.assets.find((x) => x.id === mapped(a.id)))
         .filter((a): a is Asset => !!a),
@@ -1894,17 +2168,20 @@ export class MockBridge implements JamApi {
       this.mcpListeners.delete(cb);
     };
   }
-  onFileDrop(cb: (paths: string[]) => void, active?: (value: boolean) => void) {
+  onFileDrop(
+    cb: (paths: string[], point?: { x: number; y: number }) => void,
+    active?: (value: boolean) => void,
+  ) {
     const listener = { cb, active };
     this.fileDropListeners.add(listener);
     return () => {
       this.fileDropListeners.delete(listener);
     };
   }
-  simulateFileDrop(paths: string[]) {
+  simulateFileDrop(paths: string[], point?: { x: number; y: number }) {
     for (const listener of this.fileDropListeners) {
       listener.active?.(false);
-      listener.cb(paths);
+      listener.cb(paths, point);
     }
   }
   async showInFolder(path: string) {
@@ -2519,6 +2796,7 @@ export class MockBridge implements JamApi {
   }
 }
 export const mockApi = new MockBridge(import.meta.env.VITE_MOCK_BRIDGE === "1");
+installMockBridge(mockApi);
 declare global {
   interface Window {
     __jamMock: MockBridge;

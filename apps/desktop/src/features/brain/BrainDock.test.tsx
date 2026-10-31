@@ -724,7 +724,7 @@ it("a portaled task drawer keeps its scope while Escape dismisses dock suggestio
   const user = await openChat();
   const closed = vi.fn();
   render(
-    <Drawer title="JB-1" onClose={closed}>
+    <Drawer title="JB-1" onClose={closed} modal={false}>
       <button type="button">Task action</button>
     </Drawer>,
   );

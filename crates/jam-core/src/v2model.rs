@@ -286,6 +286,8 @@ pub struct RefFrameLinkInput {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RefItem {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<crate::FileAsset>,
     #[serde(flatten)]
     pub audit: Audit,
     pub kind: String,
@@ -317,6 +319,18 @@ record!(RefLink {item_id:String,target_type:String,target_id:String,archived_at:
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AddReference {
+    #[specta(optional)]
+    pub storage_type: Option<String>,
+    #[specta(optional)]
+    pub file_kind: Option<String>,
+    #[specta(optional)]
+    pub request_id: Option<String>,
+    #[specta(optional)]
+    pub file_role: Option<String>,
+    #[specta(optional)]
+    pub expected_claim_generation: Option<String>,
+    #[specta(optional)]
+    pub expected_updated_at: Option<String>,
     pub kind: String,
     pub file_path: Option<String>,
     #[serde(default)]

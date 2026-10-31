@@ -512,8 +512,10 @@ pub(crate) async fn run_connection<T: sdk::ConnectTo<sdk::Client>>(
             };
             let servers = entries.iter().filter(|e| e.enabled).map(|e| {
                 if let Some(http) = &e.http {
+                    let mut headers = e.locator_headers();
+                    if let Some(token) = &e.bearer_token { headers.insert("Authorization".into(), format!("Bearer {token}")); }
                     a::McpServer::Http(a::McpServerHttp::new(&e.name, &http.url).headers(
-                        e.bearer_token.as_ref().map(|v| a::HttpHeader::new("Authorization", format!("Bearer {v}"))).into_iter().collect()
+                        headers.into_iter().map(|(name,value)| a::HttpHeader::new(name,value)).collect()
                     ))
                 } else {
                     a::McpServer::Stdio(a::McpServerStdio::new(&e.name, &e.command).args(e.args.clone()).env(e.env.iter().map(|v| a::EnvVariable::new(&v.name, &v.value)).collect()))

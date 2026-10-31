@@ -61,6 +61,7 @@ import { api } from "./lib/api";
 import fixture from "./lib/demo-fixture.json";
 import { tauriApi } from "./lib/tauri-bridge";
 import { useUiStore } from "./lib/ui-store";
+import { nativeFileFixture } from "./test/native-file-fixture";
 
 function deferred<T = void>() {
   let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
@@ -83,6 +84,7 @@ const settings = {
 let referenceStores: Record<Project, Payload[]> = { A: [], B: [] };
 let clipboardGate: ReturnType<typeof deferred<void>> | null = null;
 let clipboardRejectAfterPersist = false;
+let selectionEpoch = 1;
 let selected: Project = "A",
   stores: Record<Project, ReturnType<typeof asset>[]> = { A: [], B: [] },
   calls: NativeCall[] = [],
@@ -149,6 +151,16 @@ function installTransport() {
       switch (command) {
         case "app_state":
           return appState();
+        case "project_selection_context":
+          return { instanceId: `legacy:synthetic:${selected}`, selectionEpoch };
+        case "project_folder_info":
+          throw { code: "not_found", message: "No folder project selected" };
+        case "list_project_folders":
+          return [];
+        case "list_file_assets":
+          return (readOverride ? await readOverride(scope) : stores[scope]).map(
+            nativeFileFixture,
+          );
         case "get_settings":
           return structuredClone(settings);
         case "set_settings":
@@ -208,6 +220,7 @@ function installTransport() {
           }));
         case "select_project":
           selected = args.projectId as Project;
+          selectionEpoch++;
           return appState();
         case "list_questions":
         case "list_execution_requests":

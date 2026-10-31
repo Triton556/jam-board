@@ -1,4 +1,28 @@
 use std::sync::Arc;
+#[test]
+fn mc_folder_snippets_keep_native_stdio_paths_and_ascii_http_selectors() {
+    let folder = r"D:\Игры With Spaces\JamBoard";
+    let snippets = jam_mcp::folder_config_snippets("sidecar", "appdata", 47321, "exact-id", folder);
+    assert!(
+        snippets
+            .codex_stdio
+            .contains(&serde_json::to_string(folder).unwrap())
+    );
+    assert!(!snippets.codex_stdio.contains("utf8:"));
+    assert!(snippets.claude_stdio.contains(folder));
+    assert!(snippets.codex_http.contains("utf8:"));
+    let json: serde_json::Value = serde_json::from_str(&snippets.claude_http).unwrap();
+    assert!(
+        json["mcpServers"]["jam-board"]["headers"]["X-Jam-Project-Folder"]
+            .as_str()
+            .unwrap()
+            .is_ascii()
+    );
+    assert_eq!(
+        json["mcpServers"]["jam-board"]["headers"]["Authorization"],
+        "Bearer ${JAM_BOARD_TOKEN}"
+    );
+}
 #[tokio::test]
 async fn runtime_can_toggle_and_rotate_http_without_restarting() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/tests");
@@ -61,11 +85,7 @@ fn snippets_escape_windows_paths_as_valid_toml_strings() {
     let decoded: String = serde_json::from_str(line.strip_prefix("command = ").unwrap()).unwrap();
     assert_eq!(decoded, path);
     assert!(snippets.codex_http.contains("47325"));
-    assert!(
-        snippets
-            .claude_http
-            .contains("Authorization: Bearer test-placeholder")
-    );
+    assert!(snippets.claude_http.contains("Bearer ${JAM_BOARD_TOKEN}"));
 }
 
 #[tokio::test]
@@ -95,7 +115,7 @@ async fn snippets_and_recent_calls_follow_selected_project_but_never_retarget_se
     assert!(
         a_snippets
             .claude_http
-            .contains(&format!("'X-Jam-Project: {}'", a.id))
+            .contains(&format!("\"X-Jam-Project\": \"{}\"", a.id))
     );
     let (b, _) = store
         .create_jam("Board B", None, None, None, "UTC", "Human")

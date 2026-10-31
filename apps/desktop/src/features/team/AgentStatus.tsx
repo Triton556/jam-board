@@ -30,13 +30,15 @@ export function AgentStatusLine({ member }: { member: Member }) {
 export const AgentStatus = memo(function AgentStatus({
   member,
   pulse,
+  menu = false,
 }: {
   member: Member;
   pulse?: boolean;
+  menu?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { root, trigger } = useDismissible(open, () => setOpen(false));
-  useTableClock();
+  const now = useTableClock();
   const epics = useQuery(epicsQuery),
     stories = useQuery(storiesQuery),
     tasks = useQuery(tasksQuery),
@@ -56,22 +58,33 @@ export const AgentStatus = memo(function AgentStatus({
     <div
       className="agent-status-wrap"
       ref={root}
-      onMouseEnter={() => setOpen(true)}
+      onMouseEnter={() => !menu && setOpen(true)}
       onMouseLeave={() => {
         if (!root.current?.contains(document.activeElement)) setOpen(false);
       }}
-      onFocus={() => setOpen(true)}
+      onFocus={() => !menu && setOpen(true)}
     >
       <button
         className="agent-status-trigger"
         ref={trigger}
         type="button"
-        aria-label={`${member.name} status`}
+        role={menu ? "menuitem" : undefined}
+        tabIndex={menu ? -1 : undefined}
+        aria-label={menu ? undefined : `${member.name} status`}
         aria-expanded={open}
         onClick={() => setOpen(true)}
       >
         <Avatar member={member} size={30} />
         {pulse && <i className="agent-pulse" />}
+        {menu && (
+          <span className="topbar-agent-label">
+            <strong>{member.name}</strong>
+            <small>
+              {member.statusText || "No activity message reported"}
+              {statusStale(member, now) ? " (stale)" : ""}
+            </small>
+          </span>
+        )}
       </button>
       {open && (
         <section

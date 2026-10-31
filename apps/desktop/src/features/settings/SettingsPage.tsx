@@ -20,6 +20,7 @@ import {
   projectConnectionPrompt,
 } from "../../lib/brain-handoff";
 import { makeSnippets } from "../../lib/mcp-config";
+import { projectFolders } from "../../lib/project-folder-api";
 import { acceptProjectSelection } from "../../lib/project-selection";
 import { appQuery } from "../../lib/queries";
 import { paperRustle } from "../../lib/sound";
@@ -77,6 +78,12 @@ export function SettingsPage({
   const [section, setSection] = useState(
     initialSection === "MCP" ? "Agents" : initialSection,
   );
+  const folder = useQuery({
+    queryKey: ["project-folder", app.data?.jam?.id],
+    queryFn: () => projectFolders.info(),
+    enabled: section === "Data",
+    retry: false,
+  });
   const [tab, setTab] = useState(tabs[0] ?? "Codex · stdio");
   const [shown, setShown] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -202,7 +209,10 @@ export function SettingsPage({
     });
   };
   return (
-    <main className="feature-page settings-page">
+    <main
+      className="feature-page settings-page"
+      data-settings-section={section}
+    >
       <PageHeading title="Settings" note="make yourself at home" />
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
@@ -624,16 +634,26 @@ export function SettingsPage({
             <SettingsSection title="Project data">
               <SettingsRow label="Database">
                 <p className="mono path-value">
-                  {data?.dataDir}
-                  {data?.dataDir.includes("\\") ? "\\" : "/"}jam.db
+                  {folder.data?.projectId === app.data?.jam?.id
+                    ? `${folder.data?.folder}/.state/board.db`
+                    : `${data?.dataDir ?? ""}/jam.db`}
                 </p>
                 <Button
                   onClick={() =>
-                    void run(() => api.showInFolder(`${data?.dataDir}/jam.db`))
+                    void run(() =>
+                      api.showInFolder(
+                        folder.data?.projectId === app.data?.jam?.id
+                          ? `${folder.data?.folder}/.state/board.db`
+                          : `${data?.dataDir}/jam.db`,
+                      ),
+                    )
                   }
                 >
                   <FolderOpen size={16} />
                   Open folder
+                </Button>
+                <Button onClick={() => setSection("Project")}>
+                  Project folder settings
                 </Button>
               </SettingsRow>
               <SettingsRow

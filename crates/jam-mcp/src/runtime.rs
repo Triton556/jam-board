@@ -1,5 +1,5 @@
 //! In-process runtime control and authenticated loopback-only stdio call notifications.
-use crate::{HttpServer, RecentCall, RecentCalls, start_http, token};
+use crate::{HttpServer, RecentCall, RecentCalls, start_http_with_manager, token};
 use jam_core::Store;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -30,6 +30,7 @@ pub struct ConfigSnippets {
     pub claude_http: String,
 }
 pub struct McpRuntime {
+    pub projects: Arc<jam_core::ProjectManager>,
     pub store: Arc<Store>,
     pub recent: RecentCalls,
     pub data_dir: PathBuf,
@@ -39,8 +40,16 @@ pub struct McpRuntime {
 impl McpRuntime {
     pub fn new(store: Arc<Store>, sidecar_path: PathBuf) -> Result<Arc<Self>, Failure> {
         let data_dir = std::path::absolute(store.path.parent().ok_or("Missing data directory")?)?;
+        if data_dir.file_name().is_some_and(|n| n == ".state") {
+            return Err(
+                "MCP token and runtime must remain app-local; use the global runtime resolver"
+                    .into(),
+            );
+        }
         token(&data_dir)?;
+        let projects = Arc::new(jam_core::ProjectManager::new(&data_dir)?);
         Ok(Arc::new(Self {
+            projects,
             store,
             recent: Arc::new(Mutex::new(Default::default())),
             data_dir,
@@ -51,7 +60,12 @@ impl McpRuntime {
     pub async fn status(&self) -> Result<McpStatus, Failure> {
         let server = self.server.lock().await;
         let token = token(&self.data_dir)?;
-        let project = self.store.active_jam().ok();
+        let project = self
+            .projects
+            .capture_selected()
+            .ok()
+            .and_then(|h| h.store.active_jam().ok())
+            .or_else(|| self.store.active_jam().ok());
         Ok(McpStatus {
             project_id: project.as_ref().map(|j| j.id.clone()),
             project_key_prefix: project.as_ref().map(|j| j.key_prefix.clone()),
@@ -82,10 +96,11 @@ impl McpRuntime {
             server.take();
         } else if server.is_none() {
             *server = Some(
-                start_http(
+                start_http_with_manager(
                     self.store.clone(),
                     token(&self.data_dir)?,
                     self.recent.clone(),
+                    self.projects.clone(),
                 )
                 .await?,
             );
@@ -103,7 +118,15 @@ impl McpRuntime {
         let bearer = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
         std::fs::write(self.data_dir.join("mcp-token"), &bearer)?;
         if enabled {
-            *server = Some(start_http(self.store.clone(), bearer, self.recent.clone()).await?);
+            *server = Some(
+                start_http_with_manager(
+                    self.store.clone(),
+                    bearer,
+                    self.recent.clone(),
+                    self.projects.clone(),
+                )
+                .await?,
+            );
         }
         Ok(())
     }
@@ -112,6 +135,15 @@ impl McpRuntime {
     }
     pub async fn snippets(&self) -> Result<ConfigSnippets, Failure> {
         let status = self.status().await?;
+        if let Ok(h) = self.projects.capture_selected() {
+            return Ok(folder_config_snippets(
+                &self.sidecar_path.to_string_lossy(),
+                &self.data_dir.to_string_lossy(),
+                status.port.unwrap_or(47321),
+                &h.project_id,
+                &h.folder.to_string_lossy(),
+            ));
+        }
         Ok(project_config_snippets(
             &status.sidecar_path,
             &status.data_dir,
@@ -201,7 +233,7 @@ pub fn project_config_snippets(
     sidecar: &str,
     data_dir: &str,
     port: u16,
-    bearer: &str,
+    _bearer: &str,
     project: Option<&str>,
 ) -> ConfigSnippets {
     let quoted = |s: &str| serde_json::to_string(s).expect("string encoding");
@@ -215,9 +247,11 @@ pub fn project_config_snippets(
     let cli_env = project
         .map(|p| format!(" --env JAM_BOARD_PROJECT={}", shell_quote(p)))
         .unwrap_or_default();
-    let cli_header = project
-        .map(|p| format!(" --header {}", shell_quote(&format!("X-Jam-Project: {p}"))))
-        .unwrap_or_default();
+    let mut http_headers =
+        serde_json::json!({"Authorization":"Bearer ${JAM_BOARD_TOKEN}","X-Jam-Agent":"Claude"});
+    if let Some(project) = project {
+        http_headers["X-Jam-Project"] = serde_json::json!(project);
+    }
     ConfigSnippets {
         codex_stdio: format!(
             "[mcp_servers.jam-board]\ncommand = {}\nenv = {{ JAM_AGENT_NAME = \"Codex\", JAM_BOARD_DATA_DIR = {}{env} }}",
@@ -225,17 +259,50 @@ pub fn project_config_snippets(
             quoted(data_dir)
         ),
         codex_http: format!(
-            "# Set JAM_BOARD_TOKEN to {bearer} in your environment.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\"\nhttp_headers = {{ \"X-Jam-Agent\" = \"Codex\"{header} }}"
+            "# Set JAM_BOARD_TOKEN in the client environment using the app's token display.\n[mcp_servers.jam-board-http]\nurl = \"http://127.0.0.1:{port}/mcp\"\nbearer_token_env_var = \"JAM_BOARD_TOKEN\"\nhttp_headers = {{ \"X-Jam-Agent\" = \"Codex\"{header} }}"
         ),
         claude_stdio: format!(
             "claude mcp add jam-board --env JAM_AGENT_NAME=Claude --env JAM_BOARD_DATA_DIR={}{cli_env} -- {}",
             shell_quote(data_dir),
             shell_quote(sidecar)
         ),
-        claude_http: format!(
-            "claude mcp add --transport http jam-board http://127.0.0.1:{port}/mcp --header \"Authorization: Bearer {bearer}\" --header \"X-Jam-Agent: Claude\"{cli_header}"
-        ),
+        claude_http: serde_json::to_string_pretty(&serde_json::json!({"mcpServers":{"jam-board":{"type":"http","url":format!("http://127.0.0.1:{port}/mcp"),"headers":http_headers}}})).expect("HTTP config"),
     }
+}
+pub fn folder_config_snippets(
+    sidecar: &str,
+    data_dir: &str,
+    port: u16,
+    project: &str,
+    folder: &str,
+) -> ConfigSnippets {
+    let mut snippets = project_config_snippets(sidecar, data_dir, port, "", Some(project));
+    snippets.codex_stdio = snippets.codex_stdio.replace(
+        "env = {",
+        &format!(
+            "env = {{ JAM_BOARD_PROJECT_FOLDER = {},",
+            serde_json::to_string(folder).unwrap()
+        ),
+    );
+    snippets.claude_stdio = snippets.claude_stdio.replace(
+        " -- ",
+        &format!(
+            " --env JAM_BOARD_PROJECT_FOLDER='{}' -- ",
+            folder.replace('\'', "''")
+        ),
+    );
+    snippets.codex_http = snippets.codex_http.replace(
+        "http_headers = {",
+        &format!(
+            "http_headers = {{ \"X-Jam-Project-Folder\" = {},",
+            serde_json::to_string(&crate::http::encode_project_folder_header(folder)).unwrap()
+        ),
+    );
+    let mut json: serde_json::Value = serde_json::from_str(&snippets.claude_http).unwrap();
+    json["mcpServers"]["jam-board"]["headers"]["X-Jam-Project-Folder"] =
+        serde_json::json!(crate::http::encode_project_folder_header(folder));
+    snippets.claude_http = serde_json::to_string_pretty(&json).unwrap();
+    snippets
 }
 
 #[cfg(test)]

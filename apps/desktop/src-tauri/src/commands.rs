@@ -2,7 +2,7 @@ use crate::{BoardChanged, DesktopState};
 use jam_core::*;
 use serde::{Deserialize, Serialize};
 use std::result::Result;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_specta::Event;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -63,8 +63,15 @@ pub(crate) async fn execute<T: Send + 'static>(
     f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
 ) -> Result<T, ApiError> {
     // Capture the project before scheduling; later navigation cannot retarget this command.
-    let scoped = captured_project_store(&state.store)?;
-    execute_with_store(state, app, mutation, scoped, f).await
+    let handle = app
+        .try_state::<std::sync::Arc<jam_core::ProjectManager>>()
+        .and_then(|m| m.capture_selected().ok());
+    let scoped = if let Some(h) = &handle {
+        (*h.store).clone()
+    } else {
+        captured_project_store(&state.store)?
+    };
+    execute_with_store(state, app, mutation, scoped, handle, f).await
 }
 fn captured_project_store(store: &Store) -> Result<Store, ApiError> {
     store.selected_snapshot().map_err(ApiError::from)
@@ -75,17 +82,43 @@ pub(crate) async fn execute_unbound<T: Send + 'static>(
     mutation: bool,
     f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
 ) -> Result<T, ApiError> {
-    execute_with_store(state, app, mutation, (*state.store).clone(), f).await
+    let handle = app
+        .try_state::<std::sync::Arc<jam_core::ProjectManager>>()
+        .and_then(|m| m.capture_selected().ok());
+    let scoped = handle
+        .as_ref()
+        .map(|h| (*h.store).clone())
+        .unwrap_or_else(|| (*state.store).clone());
+    if mutation
+        && handle.is_none()
+        && let Some(manager) = app
+            .try_state::<std::sync::Arc<ProjectManager>>()
+            .map(|m| m.inner().clone())
+    {
+        let legacy = state.store.clone();
+        return execute_with_store(state, app, mutation, scoped, handle, move |s| {
+            manager.with_legacy_selection_update(&legacy, || f(s))
+        })
+        .await;
+    }
+    execute_with_store(state, app, mutation, scoped, handle, f).await
 }
 async fn execute_with_store<T: Send + 'static>(
     state: &DesktopState,
     app: tauri::AppHandle,
     mutation: bool,
     scoped: Store,
+    handle: Option<std::sync::Arc<jam_core::ProjectHandle>>,
     f: impl FnOnce(&Store) -> jam_core::Result<T> + Send + 'static,
 ) -> Result<T, ApiError> {
-    let selected = state.store.clone();
-    let feed = state.feed.clone();
+    let selected = handle
+        .as_ref()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let feed = handle
+        .as_ref()
+        .map(|h| h.feed.clone())
+        .unwrap_or_else(|| state.feed.clone());
     tokio::task::spawn_blocking(move || {
         let result = f(&scoped).map_err(ApiError::from)?;
         if mutation {
@@ -96,7 +129,12 @@ async fn execute_with_store<T: Send + 'static>(
                 .map_err(ApiError::from)?;
             let events = selected.selected_events(events).map_err(ApiError::from)?;
             if !events.is_empty() {
-                BoardChanged { events }.emit(&app).map_err(internal)?;
+                BoardChanged {
+                    events,
+                    project_context: handle.as_deref().map(crate::ProjectEventContext::capture),
+                }
+                .emit(&app)
+                .map_err(internal)?;
             }
         }
         Ok(result)
@@ -136,7 +174,7 @@ pub async fn list_projects(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<ProjectSummary>, ApiError> {
-    execute_unbound(&state, app, false, move |s| {
+    execute_with_store(&state, app, false, (*state.store).clone(), None, move |s| {
         s.list_projects(include_archived.unwrap_or(false))
     })
     .await
@@ -148,7 +186,25 @@ pub async fn select_project(
     state: State<'_, DesktopState>,
     app: tauri::AppHandle,
 ) -> Result<AppState, ApiError> {
-    execute_unbound(&state, app, false, move |s| s.select_project(&project_id)).await
+    let source = state.store.clone();
+    let manager = app
+        .try_state::<std::sync::Arc<jam_core::ProjectManager>>()
+        .map(|m| m.inner().clone());
+    tokio::task::spawn_blocking(move || {
+        if source.moved_project_folder(&project_id)?.is_some() {
+            let manager = manager.ok_or_else(|| {
+                jam_core::Error::Forbidden("Moved project needs the app registry resolver".into())
+            })?;
+            return manager.open_registered(&project_id)?.store.app_state();
+        }
+        if let Some(manager) = manager {
+            return manager.select_legacy_project(&source, &project_id);
+        }
+        source.select_project(&project_id)
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[tauri::command]
 #[specta::specta]

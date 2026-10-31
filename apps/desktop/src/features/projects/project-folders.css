@@ -1,0 +1,301 @@
+.project-folder-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.project-folder-form p {
+  margin: 0;
+}
+.project-folder-form label {
+  display: grid;
+  gap: 8px;
+}
+.folder-path,
+.folder-layout {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.folder-layout {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 12px;
+  max-width: 100%;
+}
+.folder-warning,
+.folder-recovery-banner,
+.folder-choice {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.project-folder-form .folder-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.folder-checkbox input {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+.folder-progress {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+@media (min-width: 600px) {
+  .dialog:has(.folder-progress) {
+    width: 680px;
+  }
+}
+.folder-progress li {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  white-space: nowrap;
+}
+.folder-progress li:last-child {
+  flex: 0 0 auto;
+}
+.folder-step-content {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+.folder-step-marker {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--ink-3);
+  border-radius: 50%;
+}
+.folder-step-marker.completed {
+  border: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+.folder-progress [aria-current="step"] {
+  font-weight: 700;
+  color: var(--coral-ink);
+}
+.folder-progress [aria-current="step"] .folder-step-marker {
+  border: 3px solid var(--card);
+  background: var(--coral-ink);
+  box-shadow: 0 0 0 1px var(--coral-ink);
+}
+.folder-step-connector {
+  flex: 1;
+  min-width: 0;
+  height: 1px;
+  margin-inline: clamp(4px, 1vw, 10px);
+  background: var(--ink-3);
+}
+.folder-project-subtitle {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.folder-picker {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  min-width: 0;
+}
+.folder-picker label {
+  flex: 1;
+  min-width: 0;
+}
+.folder-picker input {
+  width: 100%;
+  min-width: 0;
+}
+.folder-picker button {
+  flex: 0 0 auto;
+}
+.folder-details {
+  min-width: 0;
+  font-size: 13px;
+}
+.folder-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.folder-details[open] summary {
+  margin-bottom: 12px;
+}
+.project-folder-form .folder-radio {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.folder-radio input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 3px;
+}
+.folder-radio span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.folder-radio small {
+  display: block;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+.folder-choice {
+  margin: 0;
+  min-width: 0;
+}
+.folder-choice legend {
+  padding: 0 4px;
+  font-size: 13px;
+}
+.projects-page .projects-tabs {
+  margin-top: 24px;
+}
+.project-storage {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 4px;
+}
+.project-storage > span:first-child {
+  flex: 0 0 auto;
+}
+.project-storage .button {
+  padding: 0;
+  height: auto;
+  min-height: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.folder-path-short {
+  display: flex;
+  min-width: 0;
+}
+.folder-path-head {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-path-tail {
+  flex: 0 0 auto;
+}
+.folder-warning-chip {
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+.folder-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.folder-settings > * {
+  min-width: 0;
+}
+.folder-settings .button {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  min-height: 40px;
+}
+.folder-recovery-banner {
+  grid-template-columns: minmax(0, 1fr);
+}
+.folder-rules {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.folder-rules label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.folder-settings input {
+  max-width: 100%;
+  width: 100%;
+}
+.folder-settings .settings-row-control > .folder-path {
+  display: block;
+  margin-bottom: 8px;
+}
+.folder-recents {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.folder-recents article {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+}
+.folder-choice button {
+  min-width: 0;
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+@media (max-width: 600px) {
+  .settings-page[data-settings-section="Project"] .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .settings-page[data-settings-section="Project"] .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    position: static;
+    gap: 8px;
+  }
+  .settings-page[data-settings-section="Project"] .settings-card {
+    padding: 16px;
+    min-width: 0;
+  }
+  .settings-page[data-settings-section="Project"] .settings-draft-field input {
+    width: 100%;
+    min-width: 0;
+  }
+  .folder-rules {
+    grid-template-columns: 1fr;
+  }
+  .project-folder-form .dialog-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 599px) {
+  .folder-progress {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .folder-progress li {
+    justify-content: flex-start;
+  }
+  .folder-step-connector {
+    display: none;
+  }
+}

@@ -2,9 +2,11 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import {
+  completeProjectFolder,
   expectBoardReachable,
   expectPoliteNotice,
   setTheme,
+  withoutFileCheckTimes,
 } from "./assertions";
 
 async function demo(page: import("@playwright/test").Page) {
@@ -18,6 +20,7 @@ test("onboarding creates a jam and an empty board", async ({ page }) => {
   await page.getByLabel("Jam name", { exact: true }).fill("A little snowy jam");
   await page.getByLabel("Your name", { exact: true }).fill("Danil");
   await page.getByRole("button", { name: "Create jam", exact: true }).click();
+  await completeProjectFolder(page);
   await expect(page).toHaveURL(/\/board/);
   await expect(page.getByTestId("task-card")).toHaveCount(0);
   await expect(page.locator(".column-empty")).toHaveCount(5);
@@ -162,9 +165,11 @@ test("keyboard opens cards and edits status without dragging; reduced motion ret
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Space");
   await expect(page.getByRole("textbox", { name: "Task title" })).toBeVisible();
-  expect(await page.evaluate(() => window.__jamMock.getTask("JB-2"))).toEqual(
-    before,
-  );
+  expect(
+    withoutFileCheckTimes(
+      await page.evaluate(() => window.__jamMock.getTask("JB-2")),
+    ),
+  ).toEqual(withoutFileCheckTimes(before));
   expect(
     await page.evaluate(() =>
       window.__jamMock.calls.filter((call) => call.command === "move_task"),
@@ -279,9 +284,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(active).not.toHaveCSS("background-color", expected);
     await page.keyboard.press("Escape");
     await expect(status).toContainText("Ready");
-    expect(await page.evaluate(() => window.__jamMock.getTask("JB-2"))).toEqual(
-      before,
-    );
+    expect(
+      withoutFileCheckTimes(
+        await page.evaluate(() => window.__jamMock.getTask("JB-2")),
+      ),
+    ).toEqual(withoutFileCheckTimes(before));
   });
 }
 
@@ -299,6 +306,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByLabel("Your name", { exact: true })
       .fill("Synthetic reviewer");
     await page.getByRole("button", { name: "Create jam", exact: true }).click();
+    await completeProjectFolder(page);
     await expect(page.locator(".column-empty")).toHaveCount(5);
     await page.evaluate(
       (value) => document.documentElement.setAttribute("data-theme", value),
@@ -406,8 +414,10 @@ for (const theme of ["light", "dark"] as const) {
       await page.mouse.up();
       await expect(lifted).toHaveCount(0);
       expect(
-        await page.evaluate(() => window.__jamMock.getTask("JB-2")),
-      ).toEqual(before);
+        withoutFileCheckTimes(
+          await page.evaluate(() => window.__jamMock.getTask("JB-2")),
+        ),
+      ).toEqual(withoutFileCheckTimes(before));
       expect(
         await page.evaluate(() =>
           window.__jamMock.calls.filter((call) => call.command === "move_task"),

@@ -15,20 +15,9 @@ pub(crate) fn archive_actor(c: &Connection, actor: &str) -> Result<String> {
 }
 
 pub(crate) fn file_kind(path: &std::path::Path) -> &'static str {
-    match path
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "aseprite" => "sprite",
-        "wav" | "ogg" | "mp3" => "audio",
-        "ttf" | "otf" | "woff2" => "font",
-        "tmx" | "ldtk" | "json" => "level",
-        _ => "other",
-    }
+    crate::classify_file(path)
 }
+
 fn target(c: &Connection, key: &str) -> Result<(String, String, String)> {
     if key.rsplit('-').next().is_some_and(|s| s.starts_with('E')) {
         let e = epic(c, key)?;
@@ -211,6 +200,80 @@ impl Store {
         })
     }
     pub fn add_reference(&self, actor: &str, input: AddReference) -> Result<RefItem> {
+        if input.kind == "asset"
+            && let Some(path) = input.file_path.as_deref().map(std::path::Path::new)
+            && path.is_absolute()
+        {
+            crate::file_model::validate_private_source(
+                &self.path,
+                self.app_data_dir.as_deref(),
+                path,
+            )?;
+        }
+        if input.storage_type.is_some()
+            || input.file_role.is_some()
+            || input.request_id.is_some()
+            || (input.copy == Some(true)
+                && crate::project_folders::folder_for_db(&self.path).is_some())
+        {
+            if input.kind != "asset" {
+                return Err(invalid(
+                    "storageType",
+                    "File fields apply only to asset references",
+                ));
+            }
+            let storage = input
+                .storage_type
+                .as_deref()
+                .unwrap_or(if input.copy == Some(true) {
+                    "board_file"
+                } else {
+                    "linked_file"
+                });
+            if input
+                .copy
+                .is_some_and(|copy| copy != (storage == "board_file"))
+            {
+                return Err(invalid("copy", "copy and storageType conflict"));
+            }
+            if input.file_role.is_some() && input.link_to.is_none() {
+                return Err(invalid(
+                    "fileRole",
+                    "A task linkTo and inspected validators are required",
+                ));
+            }
+            if input.copy == Some(true)
+                && std::fs::metadata(input.file_path.as_deref().unwrap_or(""))?.len()
+                    > 50 * 1024 * 1024
+            {
+                return Err(invalid("filePath", "Legacy copy:true is limited to 50 MiB"));
+            }
+            let request = RegisterFile {
+                storage_type: match storage {
+                    "board_file" => FileStorageType::BoardFile,
+                    "linked_file" => FileStorageType::LinkedFile,
+                    _ => return Err(invalid("storageType", "Use board_file or linked_file")),
+                },
+                source_path: input.file_path.clone(),
+                url: None,
+                path_base: None,
+                file_kind: input.file_kind.clone(),
+                name: input.title.clone(),
+                notes: input.caption.clone(),
+                companions: None,
+                request_id: input.request_id.clone().unwrap_or_else(id),
+                task_key: input.file_role.as_ref().and(input.link_to.clone()),
+                role: input.file_role.clone(),
+                expected_claim_generation: input.expected_claim_generation.clone(),
+                expected_updated_at: input.expected_updated_at.clone(),
+                working_directory: None,
+            };
+            return self
+                .register_file_with_reference(actor, request, Some(input))?
+                .reference
+                .ok_or_else(|| invalid("reference", "Missing reference receipt"));
+        }
+
         if input.copy == Some(true) {
             return self.add_copied_reference(actor, input);
         }
@@ -230,6 +293,11 @@ impl Store {
         if !source.is_absolute() {
             return Err(invalid("filePath", "Use an absolute local file path"));
         }
+        crate::file_model::validate_private_source(
+            &self.path,
+            self.app_data_dir.as_deref(),
+            source,
+        )?;
         let file = std::fs::File::open(source)
             .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
         let metadata = file
@@ -305,237 +373,7 @@ impl Store {
         input: AddReference,
         untitled: bool,
     ) -> Result<RefItem> {
-        self.write(|c| {
-            let a = audit(c, actor)?;
-            if !["asset", "link", "note"].contains(&input.kind.as_str()) {
-                return Err(invalid("kind", "Choose asset, link or note"));
-            }
-            let mut asset_id = None;
-            let mut url = None;
-            let mut default_title = String::new();
-            let mut metadata = None;
-            if input.kind == "asset" {
-                let raw = input
-                    .file_path
-                    .as_deref()
-                    .ok_or_else(|| invalid("filePath", "A local file is required"))?;
-                let path = std::path::Path::new(raw);
-                if !path.is_absolute() {
-                    return Err(invalid("filePath", "Use an absolute local file path"));
-                }
-                let path = path
-                    .canonicalize()
-                    .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
-                let file = std::fs::File::open(&path)
-                    .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
-                if !file.metadata()?.is_file() {
-                    return Err(invalid("filePath", "Choose a file"));
-                }
-                metadata = Some(json!({"size":file.metadata()?.len()}).to_string());
-                default_title = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Reference")
-                    .into();
-                let asset = Asset {
-                    id: id(),
-                    jam_id: a.jam_id.clone(),
-                    kind: file_kind(&path).into(),
-                    name: input.title.clone().unwrap_or_else(|| default_title.clone()),
-                    location: path.to_string_lossy().into_owned(),
-                    notes: input.caption.clone(),
-                    created_by: actor.into(),
-                    created_at: now(),
-                    role: "reference".into(),
-                };
-                crate::m5::validate_name("name", &asset.name, 140)?;
-                insert(c, "assets", &asset)?;
-                asset_id = Some(asset.id);
-            } else if input.kind == "link" {
-                let value = input
-                    .url
-                    .as_deref()
-                    .ok_or_else(|| invalid("url", "A URL is required"))?;
-                if !(value.starts_with("http://") || value.starts_with("https://"))
-                    || value.chars().any(char::is_whitespace)
-                {
-                    return Err(invalid("url", "Use an http or https URL without spaces"));
-                }
-                url = Some(value.into());
-                default_title = value.chars().take(140).collect();
-            } else if input.text.as_deref().is_none_or(|s| s.trim().is_empty())
-                && input.title.as_deref().is_none_or(|s| s.trim().is_empty())
-            {
-                return Err(invalid("text", "A note needs text or a heading"));
-            }
-            let mut frame_id = None;
-            let mut event_epic = None;
-            if let Some(id) = input.frame_id.as_deref() {
-                if input.frame_epic_key.is_some() {
-                    return Err(invalid(
-                        "frameId",
-                        "Choose frameId or frameEpicKey, not both",
-                    ));
-                }
-                let f: RefFrame = fetch(c, "ref_frames", "id", id)?;
-                if f.archived_at.is_some() || f.jam_id != a.jam_id {
-                    return Err(invalid("frameId", "Choose an active frame in this project"));
-                }
-                event_epic = f.epic_id;
-                frame_id = Some(f.id);
-            }
-            if let Some(key) = input.frame_epic_key.as_deref() {
-                let e = epic(c, key)?;
-                editable_audit(&e.audit)?;
-                if e.audit.jam_id != a.jam_id {
-                    return Err(invalid(
-                        "frameEpicKey",
-                        "Choose an epic in the active project",
-                    ));
-                }
-                let frames: Vec<RefFrame> = records(
-                    c,
-                    "ref_frames",
-                    "epic_id=? AND archived_at IS NULL ORDER BY id",
-                    &[&e.audit.id],
-                )?;
-                frame_id = Some(if let Some(f) = frames.first() {
-                    f.id.clone()
-                } else {
-                    let f = RefFrame {
-                        id: id(),
-                        jam_id: a.jam_id.clone(),
-                        epic_id: Some(e.audit.id.clone()),
-                        title: format!("{} references", e.title),
-                        x: free_frame_x(c, &a.jam_id)?,
-                        y: 0.,
-                        w: 800.,
-                        h: 600.,
-                        color: e.color,
-                        archived_at: None,
-                        collapsed: false,
-                        links: vec![],
-                    };
-                    insert(c, "ref_frames", &f)?;
-                    f.id
-                });
-                event_epic = Some(e.audit.id);
-            }
-            if frame_id.is_none() && crate::service::member(c, actor)?.kind == "agent" {
-                let frames: Vec<RefFrame> = records(
-                    c,
-                    "ref_frames",
-                    "jam_id=? AND title='Agent inbox' AND archived_at IS NULL",
-                    &[&a.jam_id],
-                )?;
-                frame_id = Some(if let Some(f) = frames.first() {
-                    f.id.clone()
-                } else {
-                    let f = RefFrame {
-                        id: id(),
-                        jam_id: a.jam_id.clone(),
-                        epic_id: None,
-                        title: "Agent inbox".into(),
-                        x: free_frame_x(c, &a.jam_id)?,
-                        y: 0.,
-                        w: 320.,
-                        h: 1200.,
-                        color: "m4".into(),
-                        archived_at: None,
-                        collapsed: false,
-                        links: vec![],
-                    };
-                    insert(c, "ref_frames", &f)?;
-                    f.id
-                });
-            }
-            let count: i64 = if let Some(f) = &frame_id {
-                c.query_row(
-                    "SELECT count(*) FROM ref_items WHERE frame_id=? AND archived_at IS NULL",
-                    [f],
-                    |r| r.get(0),
-                )?
-            } else {
-                0
-            };
-            let columns = if let Some(f) = &frame_id {
-                let frame: RefFrame = fetch(c, "ref_frames", "id", f)?;
-                if frame.title == "Agent inbox" { 1 } else { 3 }
-            } else {
-                3
-            };
-            let x = input.x.unwrap_or(if frame_id.is_some() {
-                24. + (count % columns) as f64 * 260.
-            } else {
-                0.
-            });
-            let y = input.y.unwrap_or(if frame_id.is_some() {
-                56. + (count / columns) as f64 * 230.
-            } else {
-                0.
-            });
-            if let Some(f) = &frame_id {
-                c.execute(
-                    "UPDATE ref_frames SET h=max(h,?) WHERE id=?",
-                    params![y + 230., f],
-                )?;
-            }
-            geometry(x, y, 240., 180.)?;
-            let title = input.title.unwrap_or_else(|| {
-                if input.kind == "note" {
-                    "Note".into()
-                } else {
-                    default_title
-                }
-            });
-            if !untitled {
-                crate::m5::validate_name("title", &title, 140)?;
-            }
-            let item = RefItem {
-                audit: a,
-                kind: input.kind,
-                asset_id,
-                url,
-                title,
-                caption_md: [input.text, input.caption]
-                    .into_iter()
-                    .flatten()
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>()
-                    .join("\n\n"),
-                tags: normalize_tags(input.tags.as_deref().unwrap_or(&[]))?,
-                x,
-                y,
-                w: 240.,
-                h: 180.,
-                z: 0.,
-                frame_id,
-                link_preview: None,
-                metadata,
-                verdict: None,
-                archived_by: None,
-                via: None,
-                frame_title: None,
-            };
-            insert(c, "ref_items", &item)?;
-            let mut tid = None;
-            if let Some(key) = input.link_to.as_deref() {
-                let (kind, target_id, eid) = link(c, &item, key)?;
-                event_epic = Some(eid);
-                if kind == "task" {
-                    tid = Some(target_id);
-                }
-            }
-            v2_event(
-                c,
-                actor,
-                event_epic.as_deref(),
-                "reference.added",
-                tid.as_deref(),
-                json!({"itemId":item.audit.id,"title":item.title,"assetId":item.asset_id}),
-            )?;
-            Ok(item)
-        })
+        self.write(|c| add_reference_tx(c, actor, input, untitled, None))
     }
     pub fn link_reference(&self, actor: &str, id: &str, key: &str) -> Result<RefItem> {
         self.write(|c| {
@@ -890,4 +728,251 @@ pub(crate) fn create_edge_record(
         json!({"edgeId":edge.id}),
     )?;
     Ok(edge)
+}
+
+pub(crate) fn add_reference_tx(
+    c: &rusqlite::Connection,
+    actor: &str,
+    input: AddReference,
+    untitled: bool,
+    existing_asset: Option<&str>,
+) -> Result<RefItem> {
+    let a = audit(c, actor)?;
+    if !["asset", "link", "note"].contains(&input.kind.as_str()) {
+        return Err(invalid("kind", "Choose asset, link or note"));
+    }
+    let mut asset_id = None;
+    let mut url = None;
+    let mut default_title = String::new();
+    let mut metadata = None;
+    if input.kind == "asset"
+        && let Some(existing_asset) = existing_asset
+    {
+        let asset = crate::file_model::load_file(c, existing_asset, None)?;
+        default_title = asset.asset.name;
+        asset_id = Some(asset.asset.id);
+    } else if input.kind == "asset" {
+        let raw = input
+            .file_path
+            .as_deref()
+            .ok_or_else(|| invalid("filePath", "A local file is required"))?;
+        let path = std::path::Path::new(raw);
+        if !path.is_absolute() {
+            return Err(invalid("filePath", "Use an absolute local file path"));
+        }
+        let path = path
+            .canonicalize()
+            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+        let db: String = c.query_row("PRAGMA database_list", [], |r| r.get(2))?;
+        crate::file_model::validate_private_source(std::path::Path::new(&db), None, &path)?;
+        let file = std::fs::File::open(&path)
+            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+        if !file.metadata()?.is_file() {
+            return Err(invalid("filePath", "Choose a file"));
+        }
+        metadata = Some(json!({"size":file.metadata()?.len()}).to_string());
+        default_title = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Reference")
+            .into();
+        let asset = Asset {
+            id: id(),
+            jam_id: a.jam_id.clone(),
+            kind: file_kind(&path).into(),
+            name: input.title.clone().unwrap_or_else(|| default_title.clone()),
+            location: path.to_string_lossy().into_owned(),
+            notes: input.caption.clone(),
+            created_by: actor.into(),
+            created_at: now(),
+            role: "reference".into(),
+        };
+        crate::m5::validate_name("name", &asset.name, 140)?;
+        insert(c, "assets", &asset)?;
+        asset_id = Some(asset.id);
+    } else if input.kind == "link" {
+        let value = input
+            .url
+            .as_deref()
+            .ok_or_else(|| invalid("url", "A URL is required"))?;
+        if !(value.starts_with("http://") || value.starts_with("https://"))
+            || value.chars().any(char::is_whitespace)
+        {
+            return Err(invalid("url", "Use an http or https URL without spaces"));
+        }
+        url = Some(value.into());
+        default_title = value.chars().take(140).collect();
+    } else if input.text.as_deref().is_none_or(|s| s.trim().is_empty())
+        && input.title.as_deref().is_none_or(|s| s.trim().is_empty())
+    {
+        return Err(invalid("text", "A note needs text or a heading"));
+    }
+    let mut frame_id = None;
+    let mut event_epic = None;
+    if let Some(id) = input.frame_id.as_deref() {
+        if input.frame_epic_key.is_some() {
+            return Err(invalid(
+                "frameId",
+                "Choose frameId or frameEpicKey, not both",
+            ));
+        }
+        let f: RefFrame = fetch(c, "ref_frames", "id", id)?;
+        if f.archived_at.is_some() || f.jam_id != a.jam_id {
+            return Err(invalid("frameId", "Choose an active frame in this project"));
+        }
+        event_epic = f.epic_id;
+        frame_id = Some(f.id);
+    }
+    if let Some(key) = input.frame_epic_key.as_deref() {
+        let e = epic(c, key)?;
+        editable_audit(&e.audit)?;
+        if e.audit.jam_id != a.jam_id {
+            return Err(invalid(
+                "frameEpicKey",
+                "Choose an epic in the active project",
+            ));
+        }
+        let frames: Vec<RefFrame> = records(
+            c,
+            "ref_frames",
+            "epic_id=? AND archived_at IS NULL ORDER BY id",
+            &[&e.audit.id],
+        )?;
+        frame_id = Some(if let Some(f) = frames.first() {
+            f.id.clone()
+        } else {
+            let f = RefFrame {
+                id: id(),
+                jam_id: a.jam_id.clone(),
+                epic_id: Some(e.audit.id.clone()),
+                title: format!("{} references", e.title),
+                x: free_frame_x(c, &a.jam_id)?,
+                y: 0.,
+                w: 800.,
+                h: 600.,
+                color: e.color,
+                archived_at: None,
+                collapsed: false,
+                links: vec![],
+            };
+            insert(c, "ref_frames", &f)?;
+            f.id
+        });
+        event_epic = Some(e.audit.id);
+    }
+    if frame_id.is_none() && crate::service::member(c, actor)?.kind == "agent" {
+        let frames: Vec<RefFrame> = records(
+            c,
+            "ref_frames",
+            "jam_id=? AND title='Agent inbox' AND archived_at IS NULL",
+            &[&a.jam_id],
+        )?;
+        frame_id = Some(if let Some(f) = frames.first() {
+            f.id.clone()
+        } else {
+            let f = RefFrame {
+                id: id(),
+                jam_id: a.jam_id.clone(),
+                epic_id: None,
+                title: "Agent inbox".into(),
+                x: free_frame_x(c, &a.jam_id)?,
+                y: 0.,
+                w: 320.,
+                h: 1200.,
+                color: "m4".into(),
+                archived_at: None,
+                collapsed: false,
+                links: vec![],
+            };
+            insert(c, "ref_frames", &f)?;
+            f.id
+        });
+    }
+    let count: i64 = if let Some(f) = &frame_id {
+        c.query_row(
+            "SELECT count(*) FROM ref_items WHERE frame_id=? AND archived_at IS NULL",
+            [f],
+            |r| r.get(0),
+        )?
+    } else {
+        0
+    };
+    let columns = if let Some(f) = &frame_id {
+        let frame: RefFrame = fetch(c, "ref_frames", "id", f)?;
+        if frame.title == "Agent inbox" { 1 } else { 3 }
+    } else {
+        3
+    };
+    let x = input.x.unwrap_or(if frame_id.is_some() {
+        24. + (count % columns) as f64 * 260.
+    } else {
+        0.
+    });
+    let y = input.y.unwrap_or(if frame_id.is_some() {
+        56. + (count / columns) as f64 * 230.
+    } else {
+        0.
+    });
+    if let Some(f) = &frame_id {
+        c.execute(
+            "UPDATE ref_frames SET h=max(h,?) WHERE id=?",
+            params![y + 230., f],
+        )?;
+    }
+    geometry(x, y, 240., 180.)?;
+    let title = input.title.unwrap_or_else(|| {
+        if input.kind == "note" {
+            "Note".into()
+        } else {
+            default_title
+        }
+    });
+    if !untitled {
+        crate::m5::validate_name("title", &title, 140)?;
+    }
+    let item = RefItem {
+        file: None,
+        audit: a,
+        kind: input.kind,
+        asset_id,
+        url,
+        title,
+        caption_md: [input.text, input.caption]
+            .into_iter()
+            .flatten()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n"),
+        tags: normalize_tags(input.tags.as_deref().unwrap_or(&[]))?,
+        x,
+        y,
+        w: 240.,
+        h: 180.,
+        z: 0.,
+        frame_id,
+        link_preview: None,
+        metadata,
+        verdict: None,
+        archived_by: None,
+        via: None,
+        frame_title: None,
+    };
+    insert(c, "ref_items", &item)?;
+    let mut tid = None;
+    if let Some(key) = input.link_to.as_deref() {
+        let (kind, target_id, eid) = link(c, &item, key)?;
+        event_epic = Some(eid);
+        if kind == "task" {
+            tid = Some(target_id);
+        }
+    }
+    v2_event(
+        c,
+        actor,
+        event_epic.as_deref(),
+        "reference.added",
+        tid.as_deref(),
+        json!({"itemId":item.audit.id,"title":item.title,"assetId":item.asset_id}),
+    )?;
+    Ok(item)
 }

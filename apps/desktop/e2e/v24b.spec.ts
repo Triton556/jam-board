@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openExternalAgents } from "./assertions";
+import { completeProjectFolder, openExternalAgents } from "./assertions";
 
 test("Web app onboarding, milestone and project template confirmation", async ({
   page,
@@ -13,6 +13,7 @@ test("Web app onboarding, milestone and project template confirmation", async ({
   await page
     .getByRole("button", { name: "Create project", exact: true })
     .click();
+  await completeProjectFolder(page);
   await expect(
     page.getByRole("heading", { name: /The product board/ }),
   ).toBeVisible();

@@ -1,4 +1,4 @@
-import { type ModalFocusReturn, useModal } from "./controls";
+import { closeTopModal, type ModalFocusReturn, useModal } from "./controls";
 
 export type { ModalFocusReturn } from "./controls";
 
@@ -281,6 +281,7 @@ export function Drawer({
   hideHeading = false,
   onRequestClose,
   modal = true,
+  presentation = "drawer",
 }: {
   children: ReactNode | ((close: () => void) => ReactNode);
   onClose(): void;
@@ -293,6 +294,7 @@ export function Drawer({
   hideHeading?: boolean;
   onRequestClose?(close: () => void): void;
   modal?: boolean;
+  presentation?: "drawer" | "modal";
 }) {
   const [phase, setPhase] = useState<
     "entering" | "open" | "closing" | "closed"
@@ -308,10 +310,8 @@ export function Drawer({
     if (onRequestClose) onRequestClose(animateClose);
     else animateClose();
   };
-  const ref = useModal(requestClose, returnFocus, {
-    modal,
-    active: phase !== "closed",
-  });
+  // Keep the background inert until the route owner accepts the deferred close.
+  const ref = useModal(requestClose, returnFocus, { modal });
   const id = useId();
   const context = useMemo(() => ({ titleId: id, restore }), [id, restore]);
   const content = useMemo(
@@ -360,14 +360,16 @@ export function Drawer({
     <DrawerTitleContext.Provider value={context}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: The backdrop closes only on a direct pointer click; Escape and Close provide keyboard access. */}
       <div
-        className={`drawer-backdrop ${phase}${modal ? "" : " non-modal"}`}
+        className={`drawer-backdrop ${phase}${modal ? "" : " non-modal"} task-presentation-${presentation}`}
         onClick={(event) => {
-          if (modal && event.target === event.currentTarget) requestClose();
+          if (modal && event.target === event.currentTarget)
+            closeTopModal(requestClose);
         }}
         role="presentation"
       >
         <div
-          className={`drawer ${phase}`}
+          className={`drawer ${phase} task-presentation-${presentation}`}
+          data-presentation={presentation}
           role="dialog"
           aria-modal={modal ? true : undefined}
           aria-hidden={phase === "closed" || undefined}

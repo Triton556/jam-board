@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui";
 import { SettingsRow, SettingsSection } from "../../components/ui/SettingsForm";
@@ -7,6 +7,11 @@ import {
   type BoardConnectionSetup,
   boardConnectionPrompt,
 } from "../../lib/brain-handoff";
+import {
+  readFolderSettings,
+  useFolderGuard,
+  writeFolderSettings,
+} from "../../lib/project-folder-api";
 
 export function BoardConnectSetup({
   setup,
@@ -16,10 +21,11 @@ export function BoardConnectSetup({
   disabled?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const capture = useFolderGuard();
   const settings = useQuery({
     queryKey: ["settings", setup.project.id],
     queryFn: async () => {
-      const result = await api.getSettings();
+      const result = await readFolderSettings(setup.project.id);
       if (result.projectId !== setup.project.id)
         throw new Error(
           "Project changed. Reload this board before connecting.",
@@ -59,28 +65,40 @@ export function BoardConnectSetup({
   };
   const chooseFolder = () =>
     run("folder", async () => {
+      const check = await capture();
       const folder = await api.pickFolder();
+      await check();
       if (!folder || !current()) return;
-      await api.setSettings({
-        projectFolder: folder,
-        expectedProjectId: setup.project.id,
-      });
+      await writeFolderSettings(
+        setup.project.id,
+        {
+          workingDirectory: folder,
+          expectedProjectId: setup.project.id,
+        },
+        check.context,
+      );
+      await check();
       if (!current()) return;
       await settings.refetch();
+      await check();
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await check();
       if (current())
         setNotice(
-          "Project folder saved for this board. No files were created.",
+          "Agent working directory saved. Board storage has not moved.",
         );
     });
   const copy = () =>
     run("copy", async () => {
       if (settings.isPending || settings.isError) return;
+      const check = await capture();
       const prompt = boardConnectionPrompt({
         ...setup,
-        projectFolder: settings.data?.projectFolder,
+        projectFolder:
+          settings.data?.workingDirectory ?? settings.data?.projectFolder,
       });
       await navigator.clipboard.writeText(prompt);
+      await check();
       if (current())
         setNotice(
           "Connection prompt copied. Paste it into your agent chat; nothing has connected yet.",
@@ -112,8 +130,8 @@ export function BoardConnectSetup({
         </p>
       </SettingsRow>
       <SettingsRow
-        label="Project folder"
-        hint="An optional code folder for this board, not its identity or permission to change files."
+        label="Agent working directory"
+        hint="Optional code folder, such as your Unity project. Board storage is shown in Project settings → Folder."
       >
         {settings.isPending && !settings.isFetching ? (
           <span>Reading saved folder…</span>
@@ -134,7 +152,7 @@ export function BoardConnectSetup({
           </>
         ) : (
           <span className="path-value">
-            {settings.data?.projectFolder ||
+            {settings.data?.workingDirectory ||
               "Not set. The agent will ask where the project lives."}
           </span>
         )}

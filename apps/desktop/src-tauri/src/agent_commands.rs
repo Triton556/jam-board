@@ -104,10 +104,16 @@ pub async fn clear_agent_secret(
 #[tauri::command]
 #[specta::specta]
 pub async fn agent_sessions(
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<Vec<AgentSessionLaunchView>> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     Ok(runtime
         .sessions(&project.id)
         .into_iter()
@@ -118,16 +124,25 @@ pub async fn agent_sessions(
 #[specta::specta]
 pub async fn start_agent_session(
     input: StartAgentSessionInput,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<AgentSessionLaunchView> {
     // Snapshot before dispatch. Navigation after this point cannot retarget the child.
-    let board =
-        BoardContext::from_store(&state.store, mcp.data_dir.clone(), mcp.sidecar_path.clone())
-            .map_err(internal)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let store = store.selected_snapshot().map_err(ApiError::from)?;
     runtime
-        .start(board, input)
+        .start_for_store(
+            &store,
+            mcp.data_dir.clone(),
+            mcp.sidecar_path.clone(),
+            input,
+        )
         .await
         .map(|s| AgentSessionLaunchView::new(s, &runtime))
         .map_err(internal)
@@ -460,11 +475,17 @@ impl AttachmentMedia for DesktopAttachmentMedia {
 pub async fn agent_history(
     limit: Option<u32>,
     query: Option<String>,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<Vec<HistoryEntry>> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     let dir = mcp.data_dir.clone();
     let runtime = runtime.inner().clone();
     tokio::task::spawn_blocking(move || {
@@ -478,11 +499,17 @@ pub async fn agent_history(
 #[specta::specta]
 pub async fn agent_history_events(
     entry_id: String,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<Vec<AgentDockEvent>> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     let dir = mcp.data_dir.clone();
     let runtime = runtime.inner().clone();
     tokio::task::spawn_blocking(move || runtime.history_events(&dir, &project.id, &entry_id))
@@ -495,11 +522,17 @@ pub async fn agent_history_events(
 pub async fn resume_agent_session(
     entry_id: String,
     user_config: Option<UserConfigChoice>,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<AgentSessionLaunchView> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     runtime
         .resume_with_user_config(&mcp.data_dir, &project.id, &entry_id, user_config)
         .await
@@ -511,11 +544,17 @@ pub async fn resume_agent_session(
 pub async fn rename_agent_history(
     entry_id: String,
     title: String,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     runtime
         .rename_history(&mcp.data_dir, &project.id, &entry_id, &title)
         .map_err(internal)
@@ -524,11 +563,17 @@ pub async fn rename_agent_history(
 #[specta::specta]
 pub async fn delete_agent_history(
     entry_id: String,
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     runtime
         .delete_history(&mcp.data_dir, &project.id, &entry_id)
         .map_err(internal)
@@ -536,11 +581,17 @@ pub async fn delete_agent_history(
 #[tauri::command]
 #[specta::specta]
 pub async fn clear_agent_history(
+    projects: State<'_, Arc<jam_core::ProjectManager>>,
     state: State<'_, DesktopState>,
     mcp: State<'_, Arc<jam_mcp::McpRuntime>>,
     runtime: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    let project = state.store.active_jam().map_err(ApiError::from)?;
+    let store = projects
+        .capture_selected()
+        .ok()
+        .map(|h| h.store.clone())
+        .unwrap_or_else(|| state.store.clone());
+    let project = store.active_jam().map_err(ApiError::from)?;
     runtime
         .clear_history(&mcp.data_dir, &project.id)
         .map_err(internal)

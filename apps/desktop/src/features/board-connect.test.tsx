@@ -92,7 +92,7 @@ it("saves picked folder for this project and includes it in later prompts", asyn
   vi.spyOn(api, "pickFolder").mockResolvedValue("C:\\Code\\Game");
   await user.click(screen.getByRole("button", { name: "Choose code folder…" }));
   expect(await screen.findByText("C:\\Code\\Game")).toBeVisible();
-  expect((await api.getSettings()).projectFolder).toBe("C:\\Code\\Game");
+  expect((await api.getSettings()).workingDirectory).toBe("C:\\Code\\Game");
   await user.click(
     screen.getByRole("button", { name: "Copy agent connection prompt" }),
   );

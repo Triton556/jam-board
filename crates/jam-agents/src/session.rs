@@ -646,6 +646,7 @@ pub struct SessionManager {
     resuming: Mutex<BTreeSet<String>>,
     attachment_media: Option<Arc<dyn AttachmentMedia>>,
     sessions: Mutex<BTreeMap<String, Arc<Session>>>,
+    project_leases: Arc<Mutex<BTreeMap<String, (String, jam_core::ProjectLease)>>>,
     dock_sink: DockSink,
     terminal_sink: TerminalSink,
     shutting_down: std::sync::atomic::AtomicBool,
@@ -680,6 +681,7 @@ impl SessionManager {
             resuming: Mutex::new(BTreeSet::new()),
             attachment_media: None,
             sessions: Mutex::new(BTreeMap::new()),
+            project_leases: Arc::new(Mutex::new(BTreeMap::new())),
             dock_sink: Arc::new(dock_sink),
             terminal_sink: Arc::new(terminal_sink),
             shutting_down: std::sync::atomic::AtomicBool::new(false),
@@ -719,17 +721,43 @@ impl SessionManager {
         board: BoardContext,
         input: StartAgentSessionInput,
     ) -> Result<AgentSessionView> {
-        self.start_saved(board, input, None).await
+        let binding = match self.store.for_project(&board.project_id) {
+            Ok(store) => Some(crate::wiring::ProjectBinding::capture(&store)?),
+            // Retain the low-level adapter API for callers supplying a standalone
+            // context. Desktop launches always use start_for_store instead.
+            Err(jam_core::Error::NotFound(_)) => None,
+            Err(e) => return Err(e.into()),
+        };
+        self.start_saved(board, input, None, binding).await
+    }
+    /// Production launch boundary: capture a store, locator and owner lease before
+    /// the first await. The manager's global store owns profiles, not selection.
+    pub async fn start_for_store(
+        &self,
+        store: &jam_core::Store,
+        data_dir: std::path::PathBuf,
+        sidecar_path: std::path::PathBuf,
+        input: StartAgentSessionInput,
+    ) -> Result<AgentSessionView> {
+        let pinned = store.selected_snapshot()?;
+        let binding = crate::wiring::ProjectBinding::capture(&pinned)?;
+        let board = BoardContext::from_store(&pinned, data_dir, sidecar_path)?;
+        self.start_saved(board, input, None, Some(binding)).await
     }
     async fn start_saved(
         &self,
         mut board: BoardContext,
         input: StartAgentSessionInput,
         saved: Option<crate::history::StoredHistory>,
+        binding: Option<(crate::wiring::ProjectBinding, jam_core::ProjectLease)>,
     ) -> Result<AgentSessionView> {
         if self.shutting_down.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(err("The agent runtime is shutting down"));
         }
+        let cwd = match &binding {
+            Some((context, _)) => context.cwd(&board, input.cwd.as_deref())?,
+            None => choose_cwd(&board, input.cwd.as_deref())?,
+        };
         let mut profile = match &saved {
             Some(record) => record.profile.clone(),
             None => self.profiles.get(&input.profile_id)?,
@@ -779,7 +807,6 @@ impl SessionManager {
         } else {
             None
         };
-        let cwd = choose_cwd(&board, input.cwd.as_deref())?;
         let previous_server_name = board.server_name().to_string();
         let terminal_session_id =
             if profile.kind == RuntimeKind::Terminal && launch_resolution.is_ok() {
@@ -802,6 +829,9 @@ impl SessionManager {
             board.name_for_launch();
         }
         let mut entries = mcp_entries(&board, &profile.agent_name, &profile.extra_mcp_servers)?;
+        if let Some((context, _)) = &binding {
+            context.wire(&mut entries);
+        }
         for entry in &mut entries {
             if let Some(key) = entry
                 .http
@@ -969,7 +999,8 @@ impl SessionManager {
                 record.prepare_terminal(terminal_session_id.clone());
             }
         }
-        let writer = history_store.create(record)?;
+        let writer =
+            history_store.create_bound(record, binding.as_ref().map(|(context, _)| context))?;
         let mut last_prompt = None;
         let mut last_turn_failed = false;
         let mut last_failure_code = None;
@@ -1052,6 +1083,26 @@ impl SessionManager {
             }
             sessions.insert(session.view().id.clone(), session.clone());
         }
+        if let Some((_, lease)) = binding {
+            let id = session.view().id.clone();
+            let lease_id = ulid::Ulid::generate().to_string();
+            self.project_leases
+                .lock()
+                .expect("project leases lock")
+                .insert(id.clone(), (lease_id.clone(), lease));
+            let leases = self.project_leases.clone();
+            let finished = session.finished.clone();
+            tokio::spawn(async move {
+                finished.cancelled().await;
+                let mut leases = leases.lock().expect("project leases lock");
+                if leases
+                    .get(&id)
+                    .is_some_and(|(current, _)| current == &lease_id)
+                {
+                    leases.remove(&id);
+                }
+            });
+        }
         session.emit(AgentEventKind::Status {
             status: SessionStatus::Starting,
             message: None,
@@ -1073,6 +1124,10 @@ impl SessionManager {
             );
             session.fail("Cannot resolve agent executable", Some(error.to_string()));
             session.finished.cancel();
+            self.project_leases
+                .lock()
+                .expect("project leases lock")
+                .remove(&session.view().id);
             return Err(err(session.redact(&error.to_string())));
         }
         session.launch_step(
@@ -1185,6 +1240,10 @@ impl SessionManager {
                 session.fail("Cannot start agent session", Some(message.clone()));
             }
             session.finished.cancel();
+            self.project_leases
+                .lock()
+                .expect("project leases lock")
+                .remove(&session.view().id);
             return Err(err(message));
         }
         if saved.is_some() {
@@ -1388,7 +1447,29 @@ impl SessionManager {
             model: record.entry.model.clone(),
             effort: record.entry.effort.clone(),
         };
-        self.start_saved(record.board.clone(), input, Some(record))
+        let binding = self
+            .history_store(dir, project_id)?
+            .load_binding(entry_id)?;
+        let binding = if let Some(binding) = binding {
+            if binding.project_id != project_id {
+                return Err(err("History binding belongs to another project"));
+            }
+            Some(binding.reconnect()?)
+        } else {
+            // Pre-folder histories stay readable, but must never follow a moved
+            // legacy project to its new folder implicitly.
+            if self.store.moved_project_folder(project_id)?.is_some() {
+                return Err(err(
+                    "This project moved; reconnect to its folder before resuming",
+                ));
+            }
+            match self.store.for_project(project_id) {
+                Ok(store) => Some(crate::wiring::ProjectBinding::capture(&store)?),
+                Err(jam_core::Error::NotFound(_)) => None,
+                Err(e) => return Err(e.into()),
+            }
+        };
+        self.start_saved(record.board.clone(), input, Some(record), binding)
             .await
     }
     pub async fn model_catalog(
@@ -1444,6 +1525,10 @@ impl SessionManager {
         s.cancel_permissions();
         s.stop.cancel();
         s.finished.cancelled().await;
+        self.project_leases
+            .lock()
+            .expect("project leases lock")
+            .remove(id);
         Ok(())
     }
     pub async fn stop_all(&self) {
@@ -1463,6 +1548,10 @@ impl SessionManager {
         for s in sessions {
             s.finished.cancelled().await;
         }
+        self.project_leases
+            .lock()
+            .expect("project leases lock")
+            .clear();
     }
     pub fn history(&self, id: &str) -> Result<Vec<AgentDockEvent>> {
         Ok(self

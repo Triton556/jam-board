@@ -42,7 +42,13 @@ impl McpTools {
     ) -> Result<Arc<dyn ToolSource>> {
         use rmcp::ServiceExt;
         if let Some(http) = &entry.http {
-            return HttpTools::connect(session, http, entry.bearer_token.clone()).await;
+            return HttpTools::connect_with_headers(
+                session,
+                http,
+                entry.bearer_token.clone(),
+                entry.locator_headers(),
+            )
+            .await;
         }
         let (executable, args) = crate::profiles::mcp_launch_command(&entry.command, &entry.args)?;
         let (executable, args, launcher_env) =
@@ -159,14 +165,33 @@ struct HttpTools {
     next_id: std::sync::atomic::AtomicU64,
 }
 impl HttpTools {
+    #[cfg(test)]
     async fn connect(
         session: &Session,
         http: &McpHttp,
         token: Option<String>,
     ) -> Result<Arc<dyn ToolSource>> {
+        Self::connect_with_headers(session, http, token, BTreeMap::new()).await
+    }
+    async fn connect_with_headers(
+        session: &Session,
+        http: &McpHttp,
+        token: Option<String>,
+        headers: BTreeMap<String, String>,
+    ) -> Result<Arc<dyn ToolSource>> {
         crate::wiring::validate_mcp_url(&http.url)?;
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        for (name, value) in headers {
+            default_headers.insert(
+                reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|_| err("Invalid MCP selector header"))?,
+                reqwest::header::HeaderValue::from_str(&value)
+                    .map_err(|_| err("Invalid MCP selector header value"))?,
+            );
+        }
         let source = Arc::new(Self {
             client: reqwest::Client::builder()
+                .default_headers(default_headers)
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(Duration::from_secs(30))
                 .build()
@@ -298,6 +323,91 @@ impl HttpTools {
             return Err(err("MCP HTTP response ID did not match"));
         }
         http_rpc_result(value)
+    }
+}
+
+#[cfg(test)]
+mod project_folder_http_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn r11_http_locator_is_sent_on_every_request_without_retargeting() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut entry = McpEntry {
+            http: Some(McpHttp {
+                url: format!("http://{}/mcp", listener.local_addr().unwrap()),
+                bearer_secret_key: None,
+            }),
+            bearer_token: Some("fictional-r11-token".into()),
+            project_locator: Some(("project-A".into(), "F:/Доска 🪐/JamBoard".into())),
+            ..Default::default()
+        };
+        let expected = entry.locator_headers()["X-Jam-Project-Folder"].clone();
+        let fixture = tokio::spawn(async move {
+            for step in 0..3 {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut bytes = Vec::new();
+                let mut chunk = [0; 4096];
+                let end = loop {
+                    let n = socket.read(&mut chunk).await.unwrap();
+                    assert!(n > 0);
+                    bytes.extend_from_slice(&chunk[..n]);
+                    if let Some(at) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+                        break at + 4;
+                    }
+                };
+                let headers = String::from_utf8(bytes[..end].to_vec())
+                    .unwrap()
+                    .to_lowercase();
+                assert!(headers.contains("x-jam-project: project-a\r\n"));
+                assert!(headers.contains(&format!(
+                    "x-jam-project-folder: {}\r\n",
+                    expected.to_lowercase()
+                )));
+                assert!(headers.contains("authorization: bearer fictional-r11-token\r\n"));
+                let len: usize = headers
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:").map(str::trim))
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                while bytes.len() < end + len {
+                    let n = socket.read(&mut chunk).await.unwrap();
+                    assert!(n > 0);
+                    bytes.extend_from_slice(&chunk[..n]);
+                }
+                let request: Value = serde_json::from_slice(&bytes[end..end + len]).unwrap();
+                if step == 1 {
+                    socket.write_all(b"HTTP/1.1 202 Accepted\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
+                } else {
+                    let result = if step == 0 {
+                        json!({"protocolVersion":"2025-03-26","capabilities":{},"serverInfo":{"name":"fixture","version":"1"}})
+                    } else {
+                        json!({"tools":[]})
+                    };
+                    let body =
+                        json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
+                    socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+                }
+            }
+        });
+        let session = crate::tests::session(SessionStatus::Starting);
+        let source = HttpTools::connect_with_headers(
+            &session,
+            entry.http.as_ref().unwrap(),
+            entry.bearer_token.clone(),
+            entry.locator_headers(),
+        )
+        .await
+        .unwrap();
+        // Later caller selection cannot modify the captured HTTP client headers.
+        entry.project_locator = Some(("project-B".into(), "F:/other-board".into()));
+        assert!(source.list().await.unwrap().is_empty());
+        tokio::time::timeout(Duration::from_secs(5), fixture)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }
 fn http_rpc_result(value: Value) -> Result<Value> {

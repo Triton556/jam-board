@@ -1,6 +1,23 @@
 use jam_board_lib::{BoardChanged, export_event_bindings};
 use jam_core::{ActivityEvent, MemberRef};
 use tauri_specta::Event;
+#[test]
+fn folder_events_include_captured_instance_epoch_and_generation() {
+    let event = BoardChanged {
+        events: vec![],
+        project_context: Some(jam_board_lib::ProjectEventContext {
+            instance_id: "instance-a".into(),
+            project_id: "project-a".into(),
+            selection_epoch: 3,
+            database_generation: "generation-a".into(),
+        }),
+    };
+    let json = serde_json::to_value(&event).unwrap();
+    assert_eq!(json["projectContext"]["selectionEpoch"], 3);
+    assert_eq!(json["projectContext"]["instanceId"], "instance-a");
+    let decoded: BoardChanged = serde_json::from_value(json.clone()).unwrap();
+    assert_eq!(serde_json::to_value(decoded).unwrap(), json);
+}
 
 #[test]
 fn recursive_json_event_exports_without_changing_the_wire_shape() {
@@ -24,6 +41,7 @@ fn recursive_json_event_exports_without_changing_the_wire_shape() {
         "Regenerate bindings with cargo run -p jam-board --example export-bindings"
     );
     let event = BoardChanged {
+        project_context: None,
         events: vec![ActivityEvent {
             seq: 1,
             action: "jam.updated".into(),

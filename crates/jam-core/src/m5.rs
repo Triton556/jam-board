@@ -82,6 +82,15 @@ pub struct ActivityQuery {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    #[serde(default = "default_backup_recent")]
+    #[specta(optional)]
+    pub backup_recent_count: u32,
+    #[serde(default = "default_backup_daily")]
+    #[specta(optional)]
+    pub backup_daily_count: u32,
+    #[serde(default)]
+    #[specta(optional)]
+    pub working_directory: Option<String>,
     pub project_id: Option<String>,
     pub project_folder: Option<String>,
     pub color_by: String,
@@ -95,6 +104,12 @@ pub struct Settings {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    #[specta(optional)]
+    pub backup_recent_count: Option<u32>,
+    #[specta(optional)]
+    pub backup_daily_count: Option<u32>,
+    #[specta(optional)]
+    pub working_directory: Option<String>,
     pub project_folder: Option<String>,
     pub expected_project_id: Option<String>,
     pub color_by: Option<String>,
@@ -115,18 +130,7 @@ impl Store {
         }
         let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Asset");
         validate_name("name", name, 140)?;
-        let extension = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        let kind = match extension.as_str() {
-            "png" | "jpg" | "jpeg" | "webp" | "gif" | "aseprite" => "sprite",
-            "wav" | "ogg" | "mp3" => "audio",
-            "ttf" | "otf" | "woff2" => "font",
-            "tmx" | "ldtk" | "json" => "level",
-            _ => "other",
-        };
+        let kind = crate::classify_file(path);
         self.write(|c| {
             require_human(c, actor)?;
             let t = task(c, key)?;
@@ -159,7 +163,7 @@ impl Store {
                     a.created_at
                 ],
             )?;
-            c.execute("INSERT INTO task_assets VALUES (?,?)", params![t.id, a.id])?;
+            c.execute("INSERT INTO task_assets(task_id,asset_id) VALUES (?,?)", params![t.id, a.id])?;
             crate::service::touch(c, &t.id, actor)?;
             event(
                 c,
@@ -254,23 +258,16 @@ impl Store {
     }
     /// Only an existing registered local image can be added to the desktop asset scope.
     pub fn asset_preview_path(&self, id: &str) -> Result<Option<std::path::PathBuf>> {
-        let location = self.read(|c| {
-            let project = c
-                .query_row("SELECT jam_id FROM assets WHERE id=?", [id], |r| {
-                    r.get::<_, String>(0)
-                })
-                .optional()?
-                .ok_or_else(|| Error::NotFound("asset".into()))?;
-            crate::projects::ensure_scope(c, &project)?;
-            c.query_row("SELECT location FROM assets WHERE id=?", [id], |r| {
-                r.get::<_, String>(0)
-            })
-            .optional()?
-            .ok_or_else(|| Error::NotFound("asset".into()))
+        let resolution = self.resolve_file(crate::ResolveFile {
+            asset_id: id.into(),
+            working_directory: None,
         })?;
-        if location.starts_with("http://") || location.starts_with("https://") {
+        if resolution.storage_type == "url" || resolution.status != "available" {
             return Ok(None);
         }
+        let Some(location) = resolution.resolved_path else {
+            return Ok(None);
+        };
         let path = std::path::Path::new(&location);
         if !path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
             ["png", "jpg", "jpeg", "webp", "gif"].contains(&e.to_ascii_lowercase().as_str())
@@ -391,10 +388,25 @@ impl Store {
             .map(|id| format!("board.{id}."))
             .unwrap_or_default();
         Ok(Settings {
-            project_id,
-            project_folder: self
-                .setting(&format!("{prefix}project_folder"))?
+            backup_recent_count: self
+                .setting("backup_recent_count")?
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10),
+            backup_daily_count: self
+                .setting("backup_daily_count")?
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(7),
+            working_directory: self
+                .setting(&format!("{prefix}working_directory"))?
                 .filter(|v| !v.is_empty()),
+            project_id,
+            project_folder: if let Some(folder) = crate::project_folders::folder_for_db(&self.path)
+            {
+                Some(folder.to_string_lossy().into())
+            } else {
+                self.setting(&format!("{prefix}project_folder"))?
+                    .filter(|v| !v.is_empty())
+            },
             color_by: self
                 .setting(&format!("{prefix}color_by"))?
                 .unwrap_or_else(|| "epic".into()),
@@ -418,7 +430,44 @@ impl Store {
         })
     }
     pub fn set_settings(&self, input: SettingsPatch) -> Result<Settings> {
+        if input
+            .backup_recent_count
+            .is_some_and(|n| n == 0 || n > 1000)
+            || input.backup_daily_count.is_some_and(|n| n > 365)
+        {
+            return Err(invalid(
+                "backups",
+                "Keep 1–1000 recent and 0–365 daily backups; pinned backups are retained separately",
+            ));
+        }
+        if (input.backup_recent_count.is_some() || input.backup_daily_count.is_some())
+            && input.expected_project_id.as_deref() != Some(self.active_jam()?.id.as_str())
+        {
+            return Err(Error::Conflict);
+        }
+        if let Some(working) = &input.working_directory {
+            if input.expected_project_id.as_deref() != Some(self.active_jam()?.id.as_str()) {
+                return Err(Error::Conflict);
+            }
+            if working.len() > 4096
+                || working.chars().any(char::is_control)
+                || (!working.is_empty() && !std::path::Path::new(working).is_absolute())
+            {
+                return Err(invalid(
+                    "workingDirectory",
+                    "Use an absolute local cwd hint or an empty string",
+                ));
+            }
+        }
         if let Some(folder) = &input.project_folder {
+            if let Some(anchor) = crate::project_folders::folder_for_db(&self.path)
+                && std::path::Path::new(folder).canonicalize().ok() != Some(anchor.canonicalize()?)
+            {
+                return Err(invalid(
+                    "projectFolder",
+                    "Folder storage cannot be changed through a cwd hint; use Move project or workingDirectory",
+                ));
+            }
             let active = self.active_jam()?;
             if input.expected_project_id.as_deref() != Some(active.id.as_str()) {
                 return Err(Error::Conflict);
@@ -462,7 +511,7 @@ impl Store {
             .map(|j| format!("board.{}.", j.id))
             .unwrap_or_default();
         self.write(|c| {
-            if input.project_folder.is_some() {
+            if input.project_folder.is_some()||input.working_directory.is_some() {
                 let current = jam(c)?;
                 if input.expected_project_id.as_deref() != Some(current.id.as_str())
                     || prefix != format!("board.{}.", current.id)
@@ -470,7 +519,7 @@ impl Store {
                     return Err(Error::Conflict);
                 }
             }
-            for (key,value) in [(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
+            for (key,value) in [("backup_recent_count".into(),input.backup_recent_count.map(|v|v.to_string())),("backup_daily_count".into(),input.backup_daily_count.map(|v|v.to_string())),(format!("{prefix}working_directory"),input.working_directory.map(|v|v.trim().to_string())),(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
                 if let Some(v)=value { c.execute("INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,v])?; }
             }
             Ok(())
@@ -542,7 +591,7 @@ pub(crate) fn validate_name(field: &str, value: &str, max: usize) -> Result<()> 
     }
 }
 pub(crate) fn validate_kind(kind: &str) -> Result<()> {
-    if !["sprite", "audio", "level", "font", "other"].contains(&kind) {
+    if !crate::FILE_KINDS.contains(&kind) {
         Err(invalid(
             "kind",
             "Choose sprite, audio, level, font or other",
@@ -550,4 +599,11 @@ pub(crate) fn validate_kind(kind: &str) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn default_backup_recent() -> u32 {
+    10
+}
+fn default_backup_daily() -> u32 {
+    7
 }

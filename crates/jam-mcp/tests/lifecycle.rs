@@ -62,7 +62,7 @@ async fn http_inline_uses_project_and_agent_headers() {
     .serve(transport)
     .await
     .unwrap();
-    assert_eq!(client.list_all_tools().await.unwrap().len(), 52);
+    assert_eq!(client.list_all_tools().await.unwrap().len(), 57);
     assert!(
         client
             .list_all_resources()
@@ -204,7 +204,7 @@ async fn http_bound_session_rejects_project_change_and_keeps_identity() {
             .unwrap(),
     )
     .await;
-    assert_eq!(result["result"]["tools"].as_array().unwrap().len(), 52);
+    assert_eq!(result["result"]["tools"].as_array().unwrap().len(), 57);
     let members = store.for_project(&project).unwrap().list_members().unwrap();
     assert!(
         members

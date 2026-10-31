@@ -1,0 +1,158 @@
+/* Both presentations retain this exact portal, scroll root and editor tree. */
+body .drawer-backdrop.task-presentation-modal {
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+}
+body .drawer.task-presentation-modal {
+  width: min(1280px, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+  height: calc(100dvh - 48px);
+  max-height: calc(100dvh - 48px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-x: hidden;
+  container-type: inline-size;
+  overscroll-behavior: contain;
+}
+.task-view-content {
+  min-width: 0;
+}
+.task-view-content > *,
+.task-description,
+.task-metadata,
+.task-comments {
+  min-width: 0;
+}
+.task-view-content :is(p, small, strong, .mono) {
+  overflow-wrap: anywhere;
+}
+.task-files-slot .linked-asset > div {
+  min-width: 0;
+}
+.task-files-slot .linked-asset small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.task-view-content .task-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: var(--card);
+}
+/* Native content sizing keeps the task as the only vertical scroll surface. */
+.task-presentation-modal textarea.autosize-textarea {
+  max-height: none;
+  overflow-y: hidden;
+}
+@container (min-width: 1000px) {
+  .task-presentation-modal .task-view-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    grid-template-areas:
+      "identity identity"
+      "operational operational"
+      "description comments"
+      "metadata comments"
+      "brief comments"
+      "files rounds"
+      "references history"
+      "questions questions"
+      "feedback feedback"
+      "save save";
+    column-gap: 32px;
+    align-items: start;
+  }
+  .task-presentation-modal .task-form,
+  .task-presentation-modal .task-details {
+    display: contents;
+  }
+  .task-presentation-modal .task-identity {
+    grid-area: identity;
+  }
+  .task-presentation-modal .task-operational-status {
+    grid-area: operational;
+  }
+  .task-presentation-modal .task-description {
+    grid-area: description;
+  }
+  .task-presentation-modal .task-comments {
+    grid-area: comments;
+    margin-top: 0;
+  }
+  .task-presentation-modal .task-metadata {
+    grid-area: metadata;
+  }
+  .task-presentation-modal .agent-plan {
+    grid-area: brief;
+  }
+  .task-presentation-modal .task-files-slot {
+    grid-area: files;
+  }
+  .task-presentation-modal .task-rounds {
+    grid-area: rounds;
+  }
+  .task-presentation-modal .references-section {
+    grid-area: references;
+  }
+  .task-presentation-modal .history {
+    grid-area: history;
+  }
+  .task-presentation-modal .task-ancestor-questions {
+    grid-area: questions;
+  }
+  .task-presentation-modal .task-save-feedback {
+    grid-area: feedback;
+  }
+  .task-presentation-modal .task-savebar {
+    grid-area: save;
+  }
+}
+@media (max-width: 600px) {
+  .drawer-heading:has([data-task-presentation-switch]) > .mono {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .task-heading-actions .task-refine-action .button {
+    width: 32px;
+    min-width: 32px;
+    padding-inline: 6px;
+    font-size: 0;
+    gap: 0;
+  }
+  body .drawer.task-presentation-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    padding-inline: 16px;
+  }
+  .task-presentation-modal > .drawer-heading {
+    margin-inline: -16px;
+    padding-inline: 16px;
+    gap: 4px;
+  }
+  .task-presentation-modal .drawer-heading-actions {
+    gap: 4px;
+  }
+  .task-presentation-modal .task-heading-actions {
+    gap: 4px;
+  }
+  .task-presentation-modal .task-breadcrumb {
+    flex-wrap: wrap;
+  }
+  .task-presentation-modal .task-breadcrumb .button {
+    white-space: normal;
+    text-align: left;
+  }
+  .drawer-heading:has([data-task-presentation-switch]) .drawer-heading-actions {
+    flex-wrap: nowrap;
+  }
+}
+/* Pointer entry keeps the stable focus surface; keyboard entry and Tab retain outlines. */
+.drawer.task-presentation-modal[data-focus-origin="pointer"]:focus,
+.drawer.task-presentation-drawer[data-focus-origin="pointer"]:focus {
+  outline: none;
+}

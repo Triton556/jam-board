@@ -151,6 +151,8 @@ pub(crate) fn select(c: &Connection, project: &str, actor: Option<&str>) -> Resu
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved_to: Option<String>,
     #[serde(flatten)]
     pub jam: Jam,
     pub archived: bool,
@@ -159,6 +161,17 @@ pub struct ProjectSummary {
     pub in_progress_count: i64,
 }
 impl Store {
+    pub fn moved_project_folder(&self, project: &str) -> Result<Option<String>> {
+        self.read(|c| {
+            Ok(
+                c.query_row("SELECT moved_to FROM jams WHERE id=?", [project], |r| {
+                    r.get::<_, Option<String>>(0)
+                })
+                .optional()?
+                .flatten(),
+            )
+        })
+    }
     /// Immutable per-Store project identity; pooled connections are scoped only while locked.
     pub fn for_project(&self, selector: &str) -> Result<Self> {
         let id = self.read(|c| {
@@ -215,12 +228,17 @@ impl Store {
         self.read(|c| {
             let selected=selected_jam(c).ok().map(|j|j.id);
             let pin=bound_project(c)?;
-            let mut statement=c.prepare(&format!("SELECT {JAM_COLUMNS},archived,(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.archived_at IS NULL),(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.status='in_progress') FROM jams WHERE (?1 OR archived=0) AND (?2 IS NULL OR id=?2) ORDER BY archived,created_at DESC,id DESC"))?;
-            Ok(statement.query_map(params![include_archived,pin],|r|{let jam=jam_row(r)?;Ok(ProjectSummary{selected:selected.as_deref()==Some(&jam.id),jam,archived:r.get(11)?,task_count:r.get(12)?,in_progress_count:r.get(13)?})})?.collect::<std::result::Result<Vec<_>,_>>()?)
+            let mut statement=c.prepare(&format!("SELECT {JAM_COLUMNS},archived,(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.archived_at IS NULL),(SELECT count(*) FROM tasks t WHERE t.jam_id=jams.id AND t.status='in_progress'),moved_to FROM jams WHERE (?1 OR archived=0) AND (?2 IS NULL OR id=?2) ORDER BY archived,created_at DESC,id DESC"))?;
+            Ok(statement.query_map(params![include_archived,pin],|r|{let jam=jam_row(r)?;Ok(ProjectSummary{moved_to:r.get(14)?,selected:selected.as_deref()==Some(&jam.id),jam,archived:r.get(11)?,task_count:r.get(12)?,in_progress_count:r.get(13)?})})?.collect::<std::result::Result<Vec<_>,_>>()?)
         })
     }
     pub fn select_project(&self, project_id: &str) -> Result<AppState> {
-        self.write(|c| {
+        if let Some(folder) = self.moved_project_folder(project_id)? {
+            return Err(Error::Forbidden(format!(
+                "moved → {folder}; open the registered board"
+            )));
+        }
+        self.write_control(|c| {
             let actor = c
                 .query_row(
                     "SELECT value FROM settings WHERE key='current_member_id'",
