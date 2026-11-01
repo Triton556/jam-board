@@ -1,18 +1,49 @@
 # Changelog
 
-## Unreleased — round 12
-
-- Independent Board column scrolling with pinned controls and 192-card drag/anchor checks.
-- File viewer deep links, scoped project/epic/story documents, usage-aware deletion, archive, replacement/history and video metadata.
-- Contract v2: per-tool retry receipts, external references, dry-run plan imports/history/guarded undo, compact reads, enums, moves and prompt resources.
-- Human moodboard reasons, keyboard review, Send feedback events, variations and Collect Keep; Inbox Questions/Events with per-project seen state.
-- Per-shell connection snippets and integrated shared mock/project state. No version bump, release, native or real-agent acceptance is implied; see docs/verification/round12.md.
-
-
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.3.0-alpha.48] - 2026-11-01
+
+Moodboard review lets you rate references and send feedback to an agent.
+The Inbox now separates questions from events that need your attention.
+
+### Added
+
+- **Board columns scroll on their own.** Each column scrolls independently,
+  with its header and add controls pinned. Earlier source/mock checks used
+  192 cards; owner live checking of this prerelease is pending.
+- **File viewer.** Open task files inside the app. Links with `?file=…`
+  work across pages and browser Back/Forward. Projects, epics and stories
+  have their own documents. Deleting a file shows its usage; archive files,
+  replace them while keeping history, and view video metadata.
+- **Plan import.** Import a plan from a file, preview what will be created
+  or changed, apply it, inspect import history and undo unchanged items.
+- **Moodboard review.** Rate references with 1/2, C for a reason, arrows or
+  J/K. Send the review to the agent when ready; frames show Sent or Changed
+  since sent. Variations link to their source, and Collect gathers kept
+  references into a section.
+- **Inbox: Questions and Events.** Two tabs separate questions from grouped
+  reports to review, start requests and moodboard feedback, with unread
+  counts per project. Reviewing an event does not grant permission to start.
+- **Connect snippets per shell.** Settings → Connect provides PowerShell,
+  cmd and bash commands, with guidance for the Claude desktop copy of
+  `claude` when it is not on PATH.
+
+### Changed
+
+- **For agents (MCP).** Write request IDs make retries safe per actor and tool.
+  External references and find, dry-run plan import with history and guarded
+  undo, compact reads, partial-success add_references, send_reference_review,
+  collect_kept_references and inbox events are covered by the bundled guide.
+  The catalog contains 74 tools.
+- **Upgrade.** On first open, existing boards are backed up and upgraded to
+  database schema v10; alpha.47 refuses v10 boards, so returning to alpha.47
+  requires restoring a pre-upgrade backup instead of opening the upgraded
+  database.
+
 
 ## [0.3.0-alpha.47] - 2026-10-31
 
