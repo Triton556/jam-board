@@ -58,9 +58,9 @@ it("copies neutral exact-project bootstrap without tokens, role or task mutation
   );
   expect(copied).toContain("reload/restart");
   expect(copied).toContain("do not overwrite an existing connection");
-  expect(await screen.findByRole("status", { name: "Connection setup feedback" })).toHaveTextContent(
-    "nothing has connected yet",
-  );
+  expect(
+    await screen.findByRole("status", { name: "Connection setup feedback" }),
+  ).toHaveTextContent("nothing has connected yet");
   expect(
     mockApi.calls.some((c) =>
       [
@@ -139,18 +139,18 @@ it("copy failure is visible and permits retry without claiming connection succes
   await user.click(
     screen.getByRole("button", { name: "Copy agent connection prompt" }),
   );
-  expect(await screen.findByRole("status", { name: "Connection setup feedback" })).toHaveTextContent(
-    "Clipboard blocked",
-  );
+  expect(
+    await screen.findByRole("status", { name: "Connection setup feedback" }),
+  ).toHaveTextContent("Clipboard blocked");
   expect(
     screen.getByRole("button", { name: "Copy agent connection prompt" }),
   ).toBeEnabled();
   await user.click(
     screen.getByRole("button", { name: "Copy agent connection prompt" }),
   );
-  expect(await screen.findByRole("status", { name: "Connection setup feedback" })).toHaveTextContent(
-    "Connection prompt copied",
-  );
+  expect(
+    await screen.findByRole("status", { name: "Connection setup feedback" }),
+  ).toHaveTextContent("Connection prompt copied");
 });
 it("settings read failure blocks copying until retry", async () => {
   const user = userEvent.setup();
@@ -210,9 +210,9 @@ it("copy stays visibly pending and suppresses repeated clicks until clipboard re
   expect(
     screen.getByRole("button", { name: "Copy agent connection prompt" }),
   ).toBeEnabled();
-  expect(screen.getByRole("status", { name: "Connection setup feedback" })).toHaveTextContent(
-    "nothing has connected yet",
-  );
+  expect(
+    screen.getByRole("status", { name: "Connection setup feedback" }),
+  ).toHaveTextContent("nothing has connected yet");
 });
 
 it("failed folder save keeps the previous value and shows its error", async () => {
@@ -223,9 +223,9 @@ it("failed folder save keeps the previous value and shows its error", async () =
     new Error("Project changed"),
   );
   await user.click(screen.getByRole("button", { name: "Choose code folder…" }));
-  expect(await screen.findByRole("status", { name: "Connection setup feedback" })).toHaveTextContent(
-    "Project changed",
-  );
+  expect(
+    await screen.findByRole("status", { name: "Connection setup feedback" }),
+  ).toHaveTextContent("Project changed");
   expect(screen.getByText(/Not set. The agent will ask/)).toBeVisible();
   expect(
     screen.getByRole("button", { name: "Choose code folder…" }),

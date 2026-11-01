@@ -8,13 +8,20 @@ import {
   undoImport,
   validateImportPlan,
 } from "../../lib/import-plan-api";
-import { tauriApi } from "../../lib/tauri-bridge";
 import { mockApi } from "../../lib/mock-bridge";
+import { tauriApi } from "../../lib/tauri-bridge";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 beforeEach(async () => {
   vi.stubEnv("VITE_MOCK_BRIDGE", "0");
-  for (const key of ["importPlan", "undoImport", "listImportBatches", "moveStory", "moveTaskToStory"] as const) vi.spyOn(mockApi, key).mockImplementation(tauriApi[key] as never);
+  for (const key of [
+    "importPlan",
+    "undoImport",
+    "listImportBatches",
+    "moveStory",
+    "moveTaskToStory",
+  ] as const)
+    vi.spyOn(mockApi, key).mockImplementation(tauriApi[key] as never);
   vi.mocked(invoke).mockReset();
   mockApi.setLatency(0);
   await mockApi.resetDemo();

@@ -138,9 +138,9 @@ it("token failure leaves clipboard intact, unlocks setup, and only an explicit n
     .mockResolvedValueOnce("retry-fictional-token");
   const { user, region } = await mount();
   await user.click(region.getByRole("button", { name: "Copy" }));
-  expect(await screen.findByRole("status", { name: "Settings feedback" })).toHaveTextContent(
-    "Token unavailable",
-  );
+  expect(
+    await screen.findByRole("status", { name: "Settings feedback" }),
+  ).toHaveTextContent("Token unavailable");
   expect(await navigator.clipboard.readText()).toBe("previous clipboard");
   expect(reveal).toHaveBeenCalledOnce();
   expect(region.getByRole("tab", { name: "Codex · stdio" })).toBeEnabled();
