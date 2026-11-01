@@ -98,7 +98,7 @@ fn input(story: &Story) -> CreateTask {
     CreateTask {
         story_key: Some(story.key.clone()),
         title: "Task".into(),
-        status: Some("ready".into()),
+        status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
         brief: TaskBrief {
             goal_md: "Goal".into(),
             where_md: "src/feature".into(),
@@ -128,7 +128,7 @@ fn report(key: &str) -> SubmitReport {
             command: "check".into(),
             expected: "Pass".into(),
             actual: "Pass".into(),
-            result: "PASS".into(),
+            result: "PASS".parse::<jam_core::ReportResult>().unwrap(),
         }],
         deviations_md: None,
         not_verified_md: None,
@@ -216,7 +216,7 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
             Err(Error::ExecutionRequired(_))
         ));
         let mut create = input(&f.story);
-        create.status = Some("in_progress".into());
+        create.status = Some("in_progress".parse::<jam_core::TaskStatus>().unwrap());
         assert!(matches!(
             s.create_task(&actor.id, create),
             Err(Error::ExecutionRequired(_))
@@ -227,7 +227,7 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
             key: t.task.key.clone(),
             expected_updated_at: t.task.updated_at.clone(),
             patch: TaskPatch {
-                status: Some("in_progress".into()),
+                status: Some("in_progress".parse::<jam_core::TaskStatus>().unwrap()),
                 ..Default::default()
             }
         }),
@@ -278,7 +278,9 @@ fn ready_is_not_permission_and_no_role_or_status_path_bypasses_start() {
             expected_report_id: String::new(),
             expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
-            verdict: "changes_requested".into(),
+            verdict: "changes_requested"
+                .parse::<jam_core::ReviewVerdict>()
+                .unwrap(),
             comments_md: "One more check".into(),
             failed_tests: None,
         },
@@ -313,8 +315,9 @@ fn typed_requests_are_idempotent_exact_scope_human_only_and_revocable() {
         .ask_user(
             &f.brain.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "story".into(),
+                    kind: "story".parse::<jam_core::ScopeKind>().unwrap(),
                     id: f.story.key.clone(),
                 },
                 title: "Start?".into(),
@@ -425,7 +428,7 @@ fn close_reopen_and_archive_restore_never_resurrect_authority_or_drop_reports() 
             expected_report_id: String::new(),
             expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
-            verdict: "accept".into(),
+            verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
             comments_md: "Accepted".into(),
             failed_tests: None,
         },
@@ -617,7 +620,7 @@ fn demo_and_draft_starts_do_not_implicitly_authorize_claims() {
         .unwrap();
     change(s, &f.human, story(&draft), ExecutionAction::Start);
     let mut create = input(&draft);
-    create.status = Some("backlog".into());
+    create.status = Some("backlog".parse::<jam_core::TaskStatus>().unwrap());
     let task = s.create_task(&f.human.id, create).unwrap();
     s.mark_ready_fresh(
         &f.human.id,
@@ -640,7 +643,7 @@ fn demo_and_draft_starts_do_not_implicitly_authorize_claims() {
         !s.list_tasks(
             None,
             TaskFilter {
-                status: Some(vec!["in_progress".into()]),
+                status: Some(vec!["in_progress".parse::<jam_core::TaskStatus>().unwrap()]),
                 ..Default::default()
             }
         )
@@ -888,7 +891,7 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
-                verdict: "accept".into(),
+                verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
                 comments_md: "Self approval".into(),
                 failed_tests: None,
             }
@@ -915,7 +918,7 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
         Err(Error::Forbidden(_))
     ));
     let mut direct = input(&f.story);
-    direct.status = Some("done".into());
+    direct.status = Some("done".parse::<jam_core::TaskStatus>().unwrap());
     assert!(matches!(
         s.create_task(&f.brain.id, direct),
         Err(Error::Forbidden(_))
@@ -935,7 +938,7 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
                     expected_report_id: String::new(),
                     expected_review_context_revision: String::new(),
                     key: t.task.key.clone(),
-                    verdict: "accept".into(),
+                    verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
                     comments_md: "Changed holder".into(),
                     failed_tests: None,
                 }
@@ -977,7 +980,7 @@ fn agent_completion_always_requires_independent_review_but_human_manual_done_rem
         key: patched.task.key.clone(),
         expected_updated_at: patched.task.updated_at,
         patch: TaskPatch {
-            status: Some("done".into()),
+            status: Some("done".parse::<jam_core::TaskStatus>().unwrap()),
             ..Default::default()
         },
     })
@@ -1174,7 +1177,9 @@ fn native_release_is_project_pinned_and_preserves_archived_work_evidence() {
             expected_report_id: String::new(),
             expected_review_context_revision: String::new(),
             key: task.task.key.clone(),
-            verdict: "changes_requested".into(),
+            verdict: "changes_requested"
+                .parse::<jam_core::ReviewVerdict>()
+                .unwrap(),
             comments_md: "Another round".into(),
             failed_tests: None,
         },

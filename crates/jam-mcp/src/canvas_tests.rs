@@ -25,7 +25,12 @@ impl Fixture {
             actor,
         }
     }
-    fn call(&self, name: &str, args: Value) -> Value {
+    fn call(&self, name: &str, mut args: Value) -> Value {
+        if ["create_epic", "create_story", "create_task"].contains(&name)
+            && args.get("requestId").is_none()
+        {
+            args["requestId"] = json!(jam_core::now());
+        }
         execute(&self.store, &self.actor, name, args)
             .unwrap()
             .unwrap()
@@ -42,6 +47,30 @@ impl Fixture {
             json!({"kind":"note","title":title,"text":"🦀".repeat(250)}),
         )
     }
+}
+
+#[test]
+fn moodboard_batch_and_collection_dispatch_keep_feedback_and_partial_failures() {
+    let f = Fixture::new();
+    let frame = f.call("create_frame", json!({"title":"Moodboard"}));
+    let batch=f.call("add_references",json!({"requestId":"batch","frameId":frame["id"],"items":[{"kind":"link","url":"https://example.test/a","sourceUrl":"https://example.test/source","origin":"found"},{"kind":"link","url":"bad"},{"kind":"link","url":"https://example.test/b","derivedFrom":"#0"}]}));
+    assert_eq!(batch["created"].as_array().unwrap().len(), 2);
+    assert_eq!(batch["failed"][0]["index"], 1);
+    let human = f.store.current_member().unwrap();
+    f.store.set_reference_verdict(&human.id,serde_json::from_value(json!({"itemId":batch["created"][0]["id"],"verdict":"keep","verdictNote":"Palette"})).unwrap()).unwrap();
+    let canvas = f.call(
+        "get_canvas",
+        json!({"frameId":frame["id"],"verdict":"keep"}),
+    );
+    assert_eq!(canvas["references"].as_array().unwrap().len(), 1);
+    assert_eq!(canvas["references"][0]["verdictNote"], "Palette");
+    assert_eq!(canvas["references"][0]["origin"], "found");
+    let collected = f.call(
+        "collect_kept_references",
+        json!({"requestId":"collect","sourceFrameIds":[frame["id"]]}),
+    );
+    assert_eq!(collected["itemIds"].as_array().unwrap().len(), 1);
+    assert_eq!(collected["sections"][0]["count"], 1);
 }
 
 #[test]
@@ -407,7 +436,7 @@ fn ac14_paging_filters_links_and_foreign_ids_fail_closed() {
         f.store
             .create_task(
                 &f.actor.id,
-                serde_json::from_value(json!({"storyKey":story["key"],"title":"Linked task"}))
+                serde_json::from_value(json!({"storyKey":story["key"],"title":"Linked task","requestId":"linked-task"}))
                     .unwrap(),
             )
             .unwrap(),
@@ -461,7 +490,7 @@ fn ac14_paging_filters_links_and_foreign_ids_fail_closed() {
         .add_reference(
             &h.id,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Foreign".into()),
                 ..Default::default()
             },

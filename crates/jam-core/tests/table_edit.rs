@@ -39,7 +39,11 @@ fn edit(store: &Store, key: &str, fields: serde_json::Value) -> Result<TaskDetai
     let mut value = fields;
     value["key"] = key.into();
     value["expectedUpdatedAt"] = store.get_task(key)?.task.updated_at.into();
-    store.update_current_task(serde_json::from_value(value).unwrap())
+    let input = serde_json::from_value(value).map_err(|error| Error::Validation {
+        field: "input".into(),
+        reason: error.to_string(),
+    })?;
+    store.update_current_task(input)
 }
 #[test]
 fn sql_filters_and_ranked_numeric_sorts() {
@@ -47,8 +51,8 @@ fn sql_filters_and_ranked_numeric_sorts() {
     let list = |query| store.query_tasks(query).unwrap().tasks;
     let tasks = list(TaskQuery {
         sort: Some(TaskSort {
-            field: "key".into(),
-            dir: "asc".into(),
+            field: "key".parse::<jam_core::TaskSortField>().unwrap(),
+            dir: "asc".parse::<jam_core::SortDirection>().unwrap(),
         }),
         ..Default::default()
     });
@@ -61,8 +65,8 @@ fn sql_filters_and_ranked_numeric_sorts() {
     ] {
         let tasks = list(TaskQuery {
             sort: Some(TaskSort {
-                field: field.into(),
-                dir: "asc".into(),
+                field: field.parse::<jam_core::TaskSortField>().unwrap(),
+                dir: "asc".parse::<jam_core::SortDirection>().unwrap(),
             }),
             ..Default::default()
         });
@@ -109,40 +113,23 @@ fn sql_filters_and_ranked_numeric_sorts() {
     assert!(
         !list(TaskQuery {
             tags: Some(vec![" UI ".into()]),
-            status: Some(vec!["ready".into()]),
+            status: Some(vec!["ready".parse::<jam_core::TaskStatus>().unwrap()]),
             ..Default::default()
         })
         .is_empty()
     );
+    assert!(serde_json::from_value::<TaskQuery>(serde_json::json!({"status":["wrong"]})).is_err());
     assert!(
-        store
-            .query_tasks(TaskQuery {
-                status: Some(vec!["wrong".into()]),
-                ..Default::default()
-            })
-            .is_err()
+        serde_json::from_value::<TaskQuery>(
+            serde_json::json!({"sort":{"field":"key; DROP TABLE tasks","dir":"asc"}})
+        )
+        .is_err()
     );
     assert!(
-        store
-            .query_tasks(TaskQuery {
-                sort: Some(TaskSort {
-                    field: "key; DROP TABLE tasks".into(),
-                    dir: "asc".into()
-                }),
-                ..Default::default()
-            })
-            .is_err()
-    );
-    assert!(
-        store
-            .query_tasks(TaskQuery {
-                sort: Some(TaskSort {
-                    field: "key".into(),
-                    dir: "sideways".into()
-                }),
-                ..Default::default()
-            })
-            .is_err()
+        serde_json::from_value::<TaskQuery>(
+            serde_json::json!({"sort":{"field":"key","dir":"sideways"}})
+        )
+        .is_err()
     );
 }
 #[test]
@@ -163,8 +150,8 @@ fn updated_sort_keeps_rfc3339_fraction_precision_and_query_is_read_only() {
         .query_tasks(TaskQuery {
             text: Some("JB-".into()),
             sort: Some(TaskSort {
-                field: "updatedAt".into(),
-                dir: "desc".into(),
+                field: "updatedAt".parse::<jam_core::TaskSortField>().unwrap(),
+                dir: "desc".parse::<jam_core::SortDirection>().unwrap(),
             }),
             ..Default::default()
         })

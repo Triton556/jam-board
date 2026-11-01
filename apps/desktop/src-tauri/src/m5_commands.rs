@@ -43,11 +43,19 @@ type Result<T> = std::result::Result<T, ApiError>;
 #[tauri::command]
 #[specta::specta]
 pub async fn list_assets(
+    context: FolderCommandContext,
     input: AssetQuery,
     state: State<'_, DesktopState>,
-    app: tauri::AppHandle,
+    manager: State<'_, Arc<ProjectManager>>,
 ) -> Result<Vec<AssetWithTasks>> {
-    execute(&state, app, false, move |s| s.assets_with_tasks(input)).await
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        manager.with_expected_context(&legacy, Some(&context), |s| s.assets_with_tasks(input))
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[tauri::command]
 #[specta::specta]

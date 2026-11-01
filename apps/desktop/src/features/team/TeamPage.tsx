@@ -58,7 +58,11 @@ export function MemberDialog({
   const submit = () => {
     if (!valid || write.error || write.isLocked()) return;
     dispatched.current = false;
-    const input = { name: name.trim(), color, avatar: avatar || null };
+    const input = {
+      name: name.trim(),
+      color: color as import("../../bindings").MemberColor,
+      avatar: avatar || null,
+    };
     write.run(
       () => {
         dispatched.current = true;

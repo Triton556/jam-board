@@ -13,7 +13,7 @@ fn fixture() -> (tempfile::TempDir, Store, String) {
 fn round_trip(title: Option<&str>, body: &str, untitled: bool, clear_existing: bool) {
     let (dir, store, human) = fixture();
     let input = AddReference {
-        kind: "note".into(),
+        kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
         title: title.map(str::to_owned),
         text: Some(body.into()),
         tags: Some(vec!["capture".into()]),
@@ -167,7 +167,7 @@ fn brand_new_blank_native_note_is_still_rejected_without_a_record_or_event() {
         store.add_reference_untitled(
             &human,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some(" \n".into()),
                 ..Default::default()
             }

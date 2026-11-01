@@ -18,10 +18,30 @@ pub struct RecentCall {
     pub ok: bool,
 }
 pub type RecentCalls = Arc<Mutex<std::collections::VecDeque<RecentCall>>>;
+fn raw_client(ctx: &RequestContext<RoleServer>) -> String {
+    let info = ctx
+        .peer
+        .peer_info()
+        .map(|i| serde_json::to_value(&i.client_info).unwrap_or(Value::Null))
+        .or_else(|| {
+            ctx.meta
+                .client_info()
+                .and_then(|i| serde_json::to_value(i).ok())
+        })
+        .unwrap_or(Value::Null);
+    format!(
+        "{}/{}",
+        info["name"].as_str().unwrap_or("Agent"),
+        info["version"].as_str().unwrap_or("")
+    )
+}
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct SessionContext {
+    server_version: String,
+    schema_version: i64,
+    capabilities: Vec<String>,
     project_id: String,
     key_prefix: String,
     project_name: String,
@@ -47,6 +67,7 @@ pub struct JamServer {
     store: Arc<Store>,
     session_store: Arc<OnceCell<ProjectBinding>>,
     session_identity: Arc<OnceLock<(String, String)>>,
+    session_client: Arc<OnceLock<String>>,
     project_hint: Option<String>,
     agent_name: Option<String>,
     recent: RecentCalls,
@@ -66,6 +87,7 @@ impl JamServer {
             store,
             session_store: Arc::new(OnceCell::new()),
             session_identity: Arc::new(OnceLock::new()),
+            session_client: Arc::new(OnceLock::new()),
             project_hint: None,
             agent_name,
             recent,
@@ -150,9 +172,15 @@ impl JamServer {
                     ErrorData::invalid_params(format!("Cannot bind Jam Board project: {e}"), None)
                 })?;
                 let _ = self.session_identity.set(self.identity(ctx));
+                let _ = self.session_client.set(raw_client(ctx));
                 let context = scoped.folder_session_context().map_err(internal)?;
                 let lease = scoped.project_lease().map_err(internal)?;
-                let folder = context.project_folder.map(std::path::PathBuf::from);
+                let folder = context
+                    .project_folder
+                    .map(std::path::PathBuf::from)
+                    .map(|p| p.canonicalize())
+                    .transpose()
+                    .map_err(internal)?;
                 Ok::<_, ErrorData>(ProjectBinding {
                     folder,
                     generation: context.database_generation,
@@ -215,9 +243,9 @@ impl JamServer {
             .map(|i| i.client_info.name.clone())
             .or_else(|| ctx.meta.client_info().map(|i| i.name));
         let lower = info.as_deref().unwrap_or_default().to_lowercase();
-        let (client, default) = if lower.contains("codex") {
+        let (client, default) = if lower.starts_with("codex") {
             ("codex", "Codex")
-        } else if lower.contains("claude") {
+        } else if lower == "claude-code" {
             ("claude-code", "Claude")
         } else {
             ("other", info.as_deref().unwrap_or("Agent"))
@@ -239,14 +267,41 @@ impl JamServer {
     async fn heartbeat(&self, ctx: &RequestContext<RoleServer>) -> Result<Member, ErrorData> {
         self.bind_project(ctx).await?;
         let (name, client) = self.identity(ctx);
-        let store = self.session_store().map_err(internal)?;
+        let store = self
+            .session_store()
+            .map_err(internal)?
+            .with_activity_client(self.session_client.get().cloned());
         tokio::task::spawn_blocking(move || store.identify_agent(&name, &client))
             .await
             .map_err(internal)?
             .map_err(internal)
     }
     fn execute(&self, actor: &Member, name: &str, args: Value) -> jam_core::Result<Value> {
-        let store = self.session_store()?;
+        let result = self.execute_inner(actor, name, args.clone())?;
+        if let Some(kind) = mutation_kind(name) {
+            let mut compact = jam_core::compact_mutation(kind, &result);
+            if compact.get("id").is_none() {
+                for field in ["assetId", "itemId", "frameId", "id"] {
+                    if let Some(id) = args.get(field) {
+                        compact["id"] = id.clone();
+                        break;
+                    }
+                }
+            }
+            if compact["id"].as_str().is_none() {
+                return Err(jam_core::Error::Validation {
+                    field: "result".into(),
+                    reason: format!("{name} did not identify its result"),
+                });
+            }
+            return Ok(compact);
+        }
+        Ok(result)
+    }
+    fn execute_inner(&self, actor: &Member, name: &str, args: Value) -> jam_core::Result<Value> {
+        let store = self
+            .session_store()?
+            .with_activity_client(self.session_client.get().cloned());
         if let Some(result) = crate::v2::execute(&store, actor, name, args.clone()) {
             return result;
         }
@@ -256,6 +311,24 @@ impl JamServer {
                 let (project, latest_activity_cursor) = store.project_activity_context()?;
                 let folder = store.folder_session_context()?;
                 value(SessionContext {
+                    server_version: env!("CARGO_PKG_VERSION").into(),
+                    schema_version: store.schema_version()?,
+                    capabilities: [
+                        "idempotency.all",
+                        "import.v1",
+                        "externalRef",
+                        "compact.v1",
+                        "files.scopes",
+                        "files.archive",
+                        "files.revisions",
+                        "files.preview",
+                        "moves.v1",
+                        "prompts.resources",
+                        "references.batch",
+                        "references.collect",
+                    ]
+                    .map(str::to_owned)
+                    .into(),
                     project_instance_id: folder.project_instance_id,
                     database_generation: folder.database_generation,
                     board_revision: folder.board_revision,
@@ -269,7 +342,8 @@ impl JamServer {
                     project_name: project.name,
                     project_folder: folder
                         .project_folder
-                        .or(store.get_settings()?.project_folder),
+                        .or(store.get_settings()?.project_folder)
+                        .map(|p| jam_core::display_path(std::path::Path::new(&p))),
                     binding: "session".into(),
                     can_switch_project: false,
                     latest_activity_cursor,
@@ -279,8 +353,24 @@ impl JamServer {
                 parse::<Empty>(args)?;
                 store.board(Some(&actor.id))
             }
-            "list_tasks" => value(store.list_tasks(Some(&actor.id), parse::<TaskFilter>(args)?)?),
-            "get_task" => value(store.get_task(&parse::<Key>(args)?.key)?),
+            "list_tasks" => {
+                let filter = parse::<TaskFilter>(args)?;
+                let fields = filter.fields.clone();
+                let mut page = value(store.list_tasks(Some(&actor.id), filter)?)?;
+                if let Some(fields) = fields
+                    && let Some(rows) = page["tasks"].as_array_mut()
+                {
+                    for row in rows {
+                        if let Some(object) = row.as_object_mut() {
+                            object.retain(|key, _| {
+                                key == "key" || fields.iter().any(|field| field.as_str() == key)
+                            });
+                        }
+                    }
+                }
+                Ok(page)
+            }
+            "get_task" => store.get_task_compact(parse::<jam_core::GetTaskInput>(args)?),
             "create_task" => value(store.create_task(&actor.id, parse::<CreateTask>(args)?)?),
             "update_task" => value(store.update_task(&actor.id, parse::<UpdateTask>(args)?)?),
             "move_task" => {
@@ -362,11 +452,110 @@ impl JamServer {
         }
     }
 }
-pub(crate) fn parse<T: DeserializeOwned>(v: Value) -> jam_core::Result<T> {
+pub(crate) fn parse<T: DeserializeOwned + JsonSchema>(v: Value) -> jam_core::Result<T> {
+    let root = serde_json::to_value(schema::<T>())?;
+    validate_enum_fields(&root, &root, &v, "")?;
     serde_json::from_value(v).map_err(|e| jam_core::Error::Validation {
         field: "arguments".into(),
         reason: e.to_string(),
     })
+}
+fn enum_values(schema: &Value, root: &Value, values: &mut Vec<Value>) {
+    if let Some(reference) = schema["$ref"].as_str().and_then(|r| r.strip_prefix('#'))
+        && let Some(target) = root.pointer(reference)
+    {
+        enum_values(target, root, values);
+    }
+    if let Some(allowed) = schema["enum"].as_array() {
+        values.extend(allowed.iter().cloned());
+    }
+    if let Some(value) = schema.get("const") {
+        values.push(value.clone());
+    }
+    if schema["type"] == "null" {
+        values.push(Value::Null);
+    }
+    for keyword in ["oneOf", "anyOf", "allOf"] {
+        if let Some(variants) = schema[keyword].as_array() {
+            for variant in variants {
+                enum_values(variant, root, values);
+            }
+        }
+    }
+}
+fn validate_enum_fields(
+    schema: &Value,
+    root: &Value,
+    value: &Value,
+    path: &str,
+) -> jam_core::Result<()> {
+    let mut allowed = vec![];
+    enum_values(schema, root, &mut allowed);
+    // A nullable, otherwise unrestricted schema does not constrain non-null values.
+    if allowed.iter().any(|v| !v.is_null()) && !allowed.contains(value) {
+        let choices = allowed
+            .iter()
+            .filter(|v| !v.is_null())
+            .map(|v| {
+                format!(
+                    "`{}`",
+                    v.as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| v.to_string())
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(jam_core::Error::Validation {
+            field: path.into(),
+            reason: format!(
+                "unknown variant `{}`, expected one of {choices}",
+                value
+                    .as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| value.to_string())
+            ),
+        });
+    }
+    if allowed.iter().any(|v| !v.is_null()) {
+        return Ok(());
+    }
+    if let Some(reference) = schema["$ref"].as_str().and_then(|r| r.strip_prefix('#'))
+        && let Some(target) = root.pointer(reference)
+    {
+        validate_enum_fields(target, root, value, path)?;
+    }
+    if let Some(object) = value.as_object()
+        && let Some(properties) = schema["properties"].as_object()
+    {
+        for (field, child) in object {
+            if let Some(schema) = properties.get(field) {
+                let path = if path.is_empty() {
+                    field.clone()
+                } else {
+                    format!("{path}.{field}")
+                };
+                validate_enum_fields(schema, root, child, &path)?;
+            }
+        }
+    }
+    if let Some(items) = value.as_array()
+        && let Some(schema) = schema.get("items")
+    {
+        for (i, item) in items.iter().enumerate() {
+            validate_enum_fields(schema, root, item, &format!("{path}[{i}]"))?;
+        }
+    }
+    for keyword in ["oneOf", "anyOf", "allOf"] {
+        if let Some(variants) = schema[keyword].as_array() {
+            for variant in variants {
+                if variant["type"] != "null" {
+                    validate_enum_fields(variant, root, value, path)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 pub(crate) fn value<T: Serialize>(v: T) -> jam_core::Result<Value> {
     Ok(serde_json::to_value(v)?)
@@ -386,99 +575,6 @@ pub(crate) fn tool<T: JsonSchema>(
     read_only: bool,
 ) -> Tool {
     let mut input = schema::<T>();
-    // Schema hints use the domain's vocabulary; validation still runs in jam-core
-    // so invalid tool input becomes isError rather than a JSON-RPC protocol error.
-    if let Some(properties) = input.get_mut("properties").and_then(Value::as_object_mut) {
-        for field in ["fileKind", "kind"] {
-            if (name == "register_file" || name == "list_assets" || name == "add_reference")
-                && properties.contains_key(field)
-                && !(name == "add_reference" && field == "kind")
-            {
-                let mut kinds = jam_core::FILE_KINDS
-                    .iter()
-                    .map(|s| json!(s))
-                    .collect::<Vec<_>>();
-                kinds.push(Value::Null);
-                properties.insert(field.into(), json!({"type":["string","null"],"enum":kinds}));
-            }
-        }
-        for field in ["role", "fileRole"] {
-            if properties.contains_key(field) {
-                let mut roles = jam_core::FILE_ROLES
-                    .iter()
-                    .map(|s| json!(s))
-                    .collect::<Vec<_>>();
-                roles.push(Value::Null);
-                properties.insert(field.into(), json!({"type":["string","null"],"enum":roles}));
-            }
-        }
-        if properties.contains_key("requestId") {
-            properties.insert(
-                "requestId".into(),
-                if name == "add_reference" {
-                    json!({"type":["string","null"],"minLength":1,"maxLength":200})
-                } else {
-                    json!({"type":"string","minLength":1,"maxLength":200})
-                },
-            );
-        }
-        if name == "create_task" {
-            properties.insert("storyKey".into(), json!({"type":"string","minLength":1}));
-        }
-        if name == "add_reference" {
-            properties.insert(
-                "kind".into(),
-                json!({"type":"string","enum":["asset","link","note"]}),
-            );
-        }
-        if name == "wait_for_changes" {
-            properties.insert("cursor".into(), json!({"type":"integer","minimum":0}));
-            properties.insert(
-                "timeoutSeconds".into(),
-                json!({"type":"integer","minimum":1,"maximum":60,"default":30}),
-            );
-            properties.insert(
-                "actorKind".into(),
-                json!({"type":["string","null"],"enum":["human","agent",null]}),
-            );
-            properties.insert("actions".into(), json!({"type":["array","null"],"items":{"type":"string","enum":jam_core::ACTIVITY_ACTIONS}}));
-        }
-        if name == "review_task" {
-            properties.insert(
-                "verdict".into(),
-                json!({"type":"string","enum":["accept","changes_requested"]}),
-            );
-        }
-        if let Some(status) = properties.get_mut("status") {
-            if name == "list_questions" {
-                *status =
-                    json!({"type":["string","null"],"enum":["open","answered","withdrawn",null]});
-            } else if ["set_epic_status", "set_story_status"].contains(&name) {
-                *status = json!({"type":"string","enum":["draft","active","done","archived"]});
-            } else {
-                *status = if name == "list_tasks" {
-                    json!({"type":["array","null"],"items":{"type":"string","enum":jam_core::STATUSES}})
-                } else if name == "move_task" {
-                    json!({"type":"string","enum":jam_core::STATUSES})
-                } else {
-                    let mut choices = jam_core::STATUSES
-                        .iter()
-                        .map(|s| json!(s))
-                        .collect::<Vec<_>>();
-                    choices.push(Value::Null);
-                    json!({"type":["string","null"],"enum":choices})
-                };
-            }
-        }
-        if let Some(priority) = properties.get_mut("priority") {
-            let mut choices = jam_core::PRIORITIES
-                .iter()
-                .map(|s| json!(s))
-                .collect::<Vec<_>>();
-            choices.push(Value::Null);
-            *priority = json!({"type":["string","null"],"enum":choices});
-        }
-    }
     if name == "create_task" {
         let required = input.entry("required").or_insert_with(|| json!([]));
         if let Some(a) = required.as_array_mut()
@@ -513,6 +609,13 @@ pub(crate) fn tool<T: JsonSchema>(
             .open_world(false),
     );
     let output = match name {
+        "import_plan" => Some(schema::<jam_core::ImportPlanReport>()),
+        "undo_import" => Some(schema::<jam_core::UndoImportReport>()),
+        "list_import_batches" => Some(schema::<Vec<jam_core::ImportBatchSummary>>()),
+        "find" => Some(schema::<Vec<jam_core::RecordVersion>>()),
+        "asset_usage" => Some(schema::<jam_core::AssetUsage>()),
+        "list_asset_revisions" => Some(schema::<Vec<jam_core::AssetRevision>>()),
+        "list_assets" => Some(schema::<Vec<jam_core::FileAsset>>()),
         "create_task" | "update_task" | "get_task" | "claim_task" => {
             Some(schema::<jam_core::TaskDetail>())
         }
@@ -544,10 +647,22 @@ pub(crate) fn tool<T: JsonSchema>(
         "wait_for_answer" => Some(schema::<jam_core::AnswerWait>()),
         "wait_for_changes" => Some(schema::<jam_core::ChangesWait>()),
         "set_status" => Some(schema::<jam_core::Member>()),
+        "add_references" => Some(schema::<jam_core::AddReferencesResult>()),
+        "collect_kept_references" => Some(schema::<jam_core::CollectKeptResult>()),
         "add_reference" | "link_reference" | "update_reference" => {
             Some(schema::<jam_core::RefItem>())
         }
         _ => None,
+    };
+    let output = if mutation_kind(name).is_some() {
+        Some(schema::<jam_core::CompactMutation>())
+    } else {
+        match name {
+            "get_epic" => Some(schema::<jam_core::CompactEpic>()),
+            "get_task" => Some(schema::<jam_core::CompactTask>()),
+            "list_tasks" => Some(schema::<jam_core::ProjectedTaskPage>()),
+            _ => output,
+        }
     };
     if let Some(output) = output {
         result.output_schema = Some(Arc::new(output));
@@ -571,14 +686,14 @@ fn tools() -> Vec<Tool> {
             "Find tasks by status, assignee handle (or me/unassigned), tag, and title/description substring. Follow nextCursor for more results; limit defaults to 50 and is at most 200.",
             true,
         ),
-        tool::<Key>(
+        tool::<jam_core::GetTaskInput>(
             "get_task",
             "Read a task's full playbook brief, story intent and acceptance, epic context, references, reports, reviews, comments and the last 50 activity events. For example, read JB-12 before claiming it.",
             true,
         ),
         tool::<CreateTask>(
             "create_task",
-            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. Supply idempotencyKey to safely retry without creating duplicates. Agents cannot create Done tasks; completion requires independent review_task evidence.",
+            "Create a task under the required storyKey; status defaults to backlog and priority to medium. Accepts the complete brief fields. A stable requestId is required for retry-safe creation. Agents cannot create Done tasks; completion requires independent review_task evidence.",
             false,
         ),
         tool::<UpdateTask>(
@@ -688,7 +803,10 @@ impl ServerHandler for JamServer {
         let record_name = tool_name.clone();
         let args = Value::Object(request.arguments.unwrap_or_default());
         let result = tokio::task::spawn_blocking(move || {
-            let actor = this.session_store()?.identify_agent(&name, &client)?;
+            let actor = this
+                .session_store()?
+                .with_activity_client(this.session_client.get().cloned())
+                .identify_agent(&name, &client)?;
             this.execute(&actor, &tool_name, args)
         })
         .await;
@@ -727,22 +845,13 @@ impl ServerHandler for JamServer {
                 r
             }
             Err(e) => {
-                let code = match &e {
-                    jam_core::Error::NotFound(_) => "not_found",
-                    jam_core::Error::ClaimConflict { .. } => "claim_conflict",
-                    jam_core::Error::NotReady(_) => "not_ready",
-                    jam_core::Error::ExecutionRequired(_) => "execution_required",
-                    jam_core::Error::WrongStatus(_) => "wrong_status",
-                    jam_core::Error::Forbidden(_) => "forbidden",
-                    jam_core::Error::Archived(_) => "archived",
-                    jam_core::Error::Conflict => "conflict",
-                    jam_core::Error::StaleClaim => "stale_claim",
-                    _ => "validation",
-                };
-                let message = e.to_string();
-                let mut r =
-                    CallToolResult::error(vec![ContentBlock::text(format!("{code}: {message}"))]);
+                let code = e.code();
+                let message = e.protocol_message();
+                let mut r = CallToolResult::error(vec![ContentBlock::text(&message)]);
                 let mut data = json!({"code":code,"message":message});
+                if let jam_core::Error::InUse { usage } = &e {
+                    data["data"] = json!({"usage":usage});
+                }
                 if let jam_core::Error::Validation { field, .. } = &e {
                     data["field"] = json!(field);
                 }
@@ -765,6 +874,13 @@ impl ServerHandler for JamServer {
                     .with_mime_type("text/markdown"),
                 Resource::new("jam://guide/operations", "Jam Board operation examples")
                     .with_mime_type("text/markdown"),
+                Resource::new("jam://prompts/plan_epic", "Plan an epic protocol")
+                    .with_mime_type("text/plain"),
+                Resource::new(
+                    "jam://prompts/work_on_next_task",
+                    "Work on next task protocol",
+                )
+                .with_mime_type("text/plain"),
             ],
             ..Default::default()
         })
@@ -798,7 +914,12 @@ impl ServerHandler for JamServer {
         let text = tokio::task::spawn_blocking({
             let uri = uri.clone();
             move || -> jam_core::Result<String> {
-                if uri == "jam://guide" {
+                if let Some(name)=uri.strip_prefix("jam://prompts/") {
+                    if !["plan_epic","work_on_next_task"].contains(&name) { return Err(jam_core::Error::NotFound(uri)); }
+                    let mut text=crate::v2::prompt_with_args(name,Some("{epicKey}"),(name=="work_on_next_task").then_some("{tag}")).ok_or_else(||jam_core::Error::NotFound(uri.clone()))?;
+                    text.push_str("\n\nArguments: {epicKey} is an optional epic key, e.g. JB-E2; {tag} is an optional task tag filter for work_on_next_task.");
+                    Ok(text)
+                } else if uri == "jam://guide" {
                     Ok(
                         include_str!("../../../integrations/agent-skill/jam-board/SKILL.md")
                             .replace("references/operations.md", "jam://guide/operations"),
@@ -878,7 +999,12 @@ impl ServerHandler for JamServer {
                     name,
                     Some(description),
                     if name == "work_on_next_task" {
-                        Some(vec![PromptArgument::new("tag").with_required(false)])
+                        Some(vec![
+                            PromptArgument::new("epicKey").with_required(false),
+                            PromptArgument::new("tag").with_required(false),
+                        ])
+                    } else if name == "plan_epic" {
+                        Some(vec![PromptArgument::new("epicKey").with_required(false)])
                     } else {
                         None
                     },
@@ -894,29 +1020,46 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<GetPromptResponse, ErrorData> {
         self.heartbeat(&ctx).await?;
-        let mut instruction = crate::v2::prompt(&request.name)
-            .ok_or_else(|| ErrorData::invalid_params("Unknown prompt", None))?;
-        if let Some(tag) = request
-            .arguments
-            .and_then(|a| a.get("tag").and_then(|v| v.as_str()).map(str::to_owned))
-        {
-            instruction.push_str(&format!(" Filter tasks by tag={}", json!(tag)));
-        }
+        let args = request.arguments.as_ref();
+        let instruction = crate::v2::prompt_with_args(
+            &request.name,
+            args.and_then(|a| a.get("epicKey")).and_then(Value::as_str),
+            args.and_then(|a| a.get("tag")).and_then(Value::as_str),
+        )
+        .ok_or_else(|| ErrorData::invalid_params("Unknown prompt", None))?;
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(Role::User, instruction)]).into())
     }
 }
 
+fn mutation_kind(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "create_epic" | "update_epic" | "set_epic_status" | "become_brain" | "set_brain" => "epic",
+        "create_story" | "update_story" | "set_story_status" | "move_story" => "story",
+        "create_task" | "update_task" | "update_task_brief" | "mark_ready" | "move_task"
+        | "claim_task" | "release_task" | "archive_task" | "move_task_to_story" => "task",
+        "create_frame" | "update_frame" => "frame",
+        "add_reference" | "update_reference" | "link_reference" | "unlink_reference" => "reference",
+        "ask_user" | "withdraw_question" => "question",
+        "register_file" | "link_task_file" | "set_task_file_role" | "unlink_task_file"
+        | "rename_asset" | "replace_asset" | "delete_asset" | "archive_asset"
+        | "unarchive_asset" => "asset",
+        "link_file" | "unlink_file" => "scope_file",
+        "update_connection" => "connection",
+        _ => return None,
+    })
+}
 fn summary(name: &str, v: &Value) -> String {
     let key = v["key"].as_str().unwrap_or("");
     let title = v["title"].as_str().unwrap_or("");
     match name {
         "create_task" => format!(
-            "Created {key} '{title}' in {}.",
+            "Created {key} in {}.",
             v["status"].as_str().unwrap_or("backlog")
         ),
-        "claim_task" => format!("Claimed {key} '{title}'."),
+        "claim_task" => format!("Claimed {key}."),
         "move_task" => format!("Moved {key} to {}.", v["status"].as_str().unwrap_or("")),
-        "get_task" | "update_task" => format!("{key} · {title}"),
+        "get_task" => format!("{key} · {title}"),
+        "update_task" => format!("Updated {key}."),
         "list_tasks" => format!("Found {} tasks.", v["tasks"].as_array().map_or(0, Vec::len)),
         "list_members" | "list_assets" => {
             format!("Found {} entries.", v.as_array().map_or(0, Vec::len))
@@ -931,46 +1074,66 @@ pub(crate) struct Empty {}
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Key {
+    /// Stable item key in the connected project, e.g. JB-12; required.
     pub key: String,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Move {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     expected_updated_at: String,
-    status: String,
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
+    status: jam_core::TaskStatus,
+    /// Sibling key to place before, e.g. JB-10; omitted appends unless afterKey is supplied.
     before_key: Option<String>,
+    /// Sibling key to place after, e.g. JB-10; cannot be combined with beforeKey.
     after_key: Option<String>,
+    /// Reason for a permitted human override; omitted uses normal validation. Example: Review manually accepted this evidence.
     override_reason: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Release {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
-    status: Option<String>,
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
+    status: Option<jam_core::TaskStatus>,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct AddComment {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Comment in Markdown, 1–4000 characters; required. Example: Keep the existing image.
     body: String,
 }
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Archive {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     expected_updated_at: String,
+    /// Reason for a scoped request, e.g. Ready for implementation; required. A request is not approval.
     reason: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Claim {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     expected_updated_at: String,
 }
 macro_rules! write_context {

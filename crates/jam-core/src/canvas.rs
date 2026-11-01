@@ -229,7 +229,7 @@ impl Store {
         let result = self.add_reference(
             actor,
             AddReference {
-                kind: "asset".into(),
+                kind: ReferenceKind::Asset,
                 file_path: Some(path.to_string_lossy().into_owned()),
                 copy: crate::project_folders::folder_for_db(&self.path).map(|_| true),
                 title: Some("Clipboard image".into()),

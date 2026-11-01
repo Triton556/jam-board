@@ -53,7 +53,7 @@ const blank = (name: string) => ({
   startsAt: "",
   endsAt: "",
   timezone: "UTC",
-  template: "custom",
+  template: "custom" as const,
   milestoneAt: null,
 });
 function mount(search: TableSearch = { sort: "key:asc" }) {

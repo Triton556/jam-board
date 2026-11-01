@@ -11,21 +11,56 @@ pub struct BriefRow {
     pub task_id: String,
     pub brief: TaskBrief,
 }
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScopeFile {
+    pub id: String,
+    pub jam_id: String,
+    pub asset_id: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub role: String,
+    pub position: f64,
+    pub created_by: String,
+    pub created_at: String,
+}
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlanningExport {
+    #[serde(default)]
+    pub scope_files: Vec<ScopeFile>,
     pub epics: Vec<Epic>,
     pub stories: Vec<Story>,
     pub briefs: Vec<BriefRow>,
     pub reports: Vec<Report>,
     pub reviews: Vec<Review>,
     pub questions: Vec<Question>,
-    pub frames: Vec<RefFrame>,
+    pub frames: Vec<SnapshotRefFrame>,
     pub items: Vec<RefItem>,
     pub edges: Vec<RefEdge>,
     pub reference_links: Vec<RefLink>,
     #[serde(default)]
     pub frame_links: Vec<RefFrameLink>,
+}
+
+/// Durable frame metadata; the live review summary is computed from items.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotRefFrame {
+    #[serde(flatten)]
+    pub frame: RefFrame,
+    #[serde(default)]
+    pub review_sent_at: Option<String>,
+    #[serde(default)]
+    pub review_sent_by: Option<String>,
+    #[serde(default)]
+    pub review_hash: Option<String>,
+}
+impl std::ops::Deref for SnapshotRefFrame {
+    type Target = RefFrame;
+    fn deref(&self) -> &Self::Target {
+        &self.frame
+    }
 }
 
 /// Validate polymorphic relationships too: SQLite cannot put a foreign key on scope_id/target_id.
@@ -75,6 +110,23 @@ pub(crate) fn validate(s: &JamExport) -> Result<()> {
         "task" => tasks.contains(id),
         _ => false,
     };
+    let mut links = BTreeSet::new();
+    for link in &p.scope_files {
+        if link.jam_id != s.jam.id
+            || !["project", "epic", "story"].contains(&link.target_type.as_str())
+            || !target(&link.target_type, &link.target_id)
+            || !s.assets.iter().any(|a| a.id == link.asset_id)
+            || !members.contains(link.created_by.as_str())
+            || !link.position.is_finite()
+            || !["document", "reference"].contains(&link.role.as_str())
+            || !links.insert((&link.target_type, &link.target_id, &link.asset_id))
+        {
+            return Err(invalid(
+                "planning.scopeFiles",
+                "Invalid or duplicate scope file",
+            ));
+        }
+    }
     let audit = |a: &Audit| {
         a.jam_id == s.jam.id
             && members.contains(a.created_by.as_str())
@@ -190,11 +242,14 @@ pub(crate) fn validate(s: &JamExport) -> Result<()> {
     }
     for i in &p.items {
         let content = match i.kind.as_str() {
-            "asset" => i.asset_id.as_ref().is_some_and(|id| {
-                s.assets
-                    .iter()
-                    .any(|a| a.id == *id && a.role == "reference")
-            }),
+            "asset" => {
+                (i.audit.archived_at.is_some() && i.asset_id.is_none())
+                    || i.asset_id.as_ref().is_some_and(|id| {
+                        s.assets
+                            .iter()
+                            .any(|a| a.id == *id && a.role == "reference")
+                    })
+            }
             "link" => i
                 .url
                 .as_ref()
@@ -267,6 +322,7 @@ pub(crate) fn export(c: &Connection, jam_id: &str) -> Result<PlanningExport> {
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(PlanningExport {
+        scope_files: records(c, "scope_files", "jam_id=?", &[&jam_id])?,
         epics: records(c, "epics", "jam_id=?", &[&jam_id])?,
         stories: records(c, "stories", "jam_id=?", &[&jam_id])?,
         briefs: keys
@@ -335,6 +391,7 @@ pub(crate) fn prepare(
             &p.frames,
             &p.items,
             &p.edges,
+            &p.scope_files,
         ] {
             for record in value.values()? {
                 let old = record["id"]
@@ -425,6 +482,8 @@ pub(crate) fn finish(
     keys: &BTreeMap<String, String>,
 ) -> Result<()> {
     if let Some(p) = p {
+        // Reference ancestry may point forward in the export's stable row order.
+        c.execute_batch("PRAGMA defer_foreign_keys=ON;")?;
         for b in &p.briefs {
             crate::workflow::validate_brief(&b.brief)?;
             let id = ids
@@ -441,6 +500,7 @@ pub(crate) fn finish(
             ("ref_edges", &p.edges),
             ("ref_links", &p.reference_links),
             ("ref_frame_links", &p.frame_links),
+            ("scope_files", &p.scope_files),
         ] {
             for row in rows.values()? {
                 insert(c, table, &crate::snapshot::remap_payload(&row, ids, keys))?;

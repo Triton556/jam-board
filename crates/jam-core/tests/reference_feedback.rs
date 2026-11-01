@@ -29,6 +29,7 @@ fn frame(
         .create_canvas_frame(
             human,
             CanvasFrameCreate {
+                request_id: None,
                 title: title.into(),
                 x: Some(x),
                 y: Some(y),
@@ -44,7 +45,7 @@ fn note(store: &Store, actor: &str, frame: Option<&RefFrame>, title: &str) -> Re
         .add_reference(
             actor,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 title: Some(title.into()),
                 text: Some("Feedback".into()),
                 frame_id: frame.map(|f| f.id.clone()),
@@ -192,7 +193,16 @@ fn ac14_frame_links_inherit_current_future_items_and_unlink_without_duplicates()
 #[test]
 fn ac14_verdict_round_trip_and_archive_attribution_restore() {
     let (dir, s, h, a) = setup();
-    let item = note(&s, &h, None, "Candidate");
+    let item = s
+        .add_reference(
+            &h,
+            AddReference {
+                kind: ReferenceKind::Link,
+                url: Some("https://example.test/candidate".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
     for verdict in [
         Some(ReferenceVerdict::Keep),
         Some(ReferenceVerdict::Reject),
@@ -204,7 +214,8 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
                 &h,
                 ReferenceVerdictInput {
                     item_id: item.audit.id.clone(),
-                    verdict,
+                    verdict: Some(verdict),
+                    verdict_note: None,
                 },
             )
             .unwrap();
@@ -223,7 +234,8 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
             &a.id,
             ReferenceVerdictInput {
                 item_id: item.audit.id.clone(),
-                verdict: Some(ReferenceVerdict::Keep)
+                verdict: Some(Some(ReferenceVerdict::Keep)),
+                verdict_note: None,
             }
         )
         .is_err()
@@ -231,7 +243,7 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
     s.canvas_archive(
         &h,
         CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: item.audit.id.clone(),
             archived: true,
         },
@@ -241,7 +253,7 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
     s.canvas_archive(
         &a.id,
         CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: item.audit.id.clone(),
             archived: true,
         },
@@ -266,7 +278,7 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
         s.canvas_archive(
             &a.id,
             CanvasArchive {
-                kind: "item".into(),
+                kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
                 id: item.audit.id.clone(),
                 archived: false
             }
@@ -276,7 +288,7 @@ fn ac14_verdict_round_trip_and_archive_attribution_restore() {
     s.canvas_archive(
         &h,
         CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: item.audit.id.clone(),
             archived: false,
         },
@@ -348,7 +360,7 @@ fn ac14_copied_assets_survive_source_deletion_and_reject_large_missing_files() {
     let source = dir.path().join("candidate.png");
     std::fs::write(&source, b"existing local media contract").unwrap();
     let add = |copy| AddReference {
-        kind: "asset".into(),
+        kind: "asset".parse::<jam_core::ReferenceKind>().unwrap(),
         file_path: Some(source.to_string_lossy().into_owned()),
         copy: Some(copy),
         ..Default::default()
@@ -365,12 +377,14 @@ fn ac14_copied_assets_survive_source_deletion_and_reject_large_missing_files() {
         .find(|a| Some(&a.id) == copied.asset_id.as_ref())
         .unwrap();
     assert_eq!(
-        std::path::Path::new(&original_asset.location),
+        std::path::Path::new(&original_asset.location)
+            .canonicalize()
+            .unwrap(),
         source.canonicalize().unwrap()
     );
     let destination = std::path::Path::new(&copied_asset.location);
     assert_eq!(
-        destination.parent().unwrap(),
+        destination.parent().unwrap().canonicalize().unwrap(),
         dir.path().canonicalize().unwrap().join("references")
     );
     assert!(
@@ -411,7 +425,7 @@ fn ac14_copied_assets_survive_source_deletion_and_reject_large_missing_files() {
         s.add_reference(
             &h,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Note".into()),
                 copy: Some(true),
                 ..Default::default()
@@ -449,7 +463,7 @@ fn ac14_migration_from_schema_seven_preserves_records_and_defaults() {
         .canvas_archive(
             &h,
             CanvasArchive {
-                kind: "item".into(),
+                kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
                 id: item.audit.id.clone(),
                 archived: true,
             },

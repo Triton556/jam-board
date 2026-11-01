@@ -15,7 +15,9 @@ pub enum ExecutionScopeType {
 #[serde(deny_unknown_fields)]
 pub struct ExecutionScope {
     #[serde(rename = "type")]
+    /// Operation-specific enumerated kind, e.g. note for a text reference or story for a question scope; required unless stated otherwise.
     pub kind: ExecutionScopeType,
+    /// Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations.
     pub id: String,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
@@ -80,31 +82,41 @@ pub struct ExecutionState {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExecutionScopeInput {
+    /// Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution.
     pub scope: ExecutionScope,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SetExecution {
+    /// Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution.
     pub scope: ExecutionScope,
+    /// Explicit execution action: start or pause; required. Only a human may grant execution.
     pub action: ExecutionAction,
+    /// Exact execution revision inspected before this decision, e.g. scope:3; required. Reconcile conflicts before retrying.
     pub expected_revision: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestExecution {
+    /// Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution.
     pub scope: ExecutionScope,
+    /// Reason for a scoped request, e.g. Ready for implementation; required. A request is not approval.
     pub reason: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResolveExecutionRequest {
+    /// Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations.
     pub id: String,
+    /// Explicit human approve/decline decision; required. Generic answers never grant execution.
     pub decision: ExecutionDecision,
+    /// Exact execution revision inspected before this decision, e.g. scope:3; required. Reconcile conflicts before retrying.
     pub expected_revision: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExecutionRequestListInput {
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
     pub status: Option<ExecutionRequestStatus>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]

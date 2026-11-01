@@ -29,8 +29,9 @@ fn assets_links_and_preview_are_scoped_and_each_mutation_has_one_event() {
     assert_eq!(s.latest_seq().unwrap(), before + 2);
     assert_eq!(
         s.assets_with_tasks(AssetQuery {
-            kind: Some("sprite".into()),
-            text: Some("Player".into())
+            kind: Some("sprite".parse::<jam_core::FileKind>().unwrap()),
+            text: Some("Player".into()),
+            ..Default::default()
         })
         .unwrap()
         .iter()
@@ -94,7 +95,7 @@ fn member_identity_is_immutable_and_statistics_include_work() {
             MemberEdit {
                 id: a.id.clone(),
                 name: Some("Helpful Codex".into()),
-                color: Some(MEMBER_COLORS[4].into()),
+                color: Some(MEMBER_COLORS[4].parse::<jam_core::MemberColor>().unwrap()),
                 avatar: None,
             },
         )
@@ -142,7 +143,7 @@ fn activity_pages_filter_before_sequence_without_overlap() {
         .activity_page(ActivityQuery {
             before_seq: Some(first.last().unwrap().seq),
             limit: Some(10),
-            actor_kind: Some("agent".into()),
+            actor_kind: Some("agent".parse::<jam_core::ActorKind>().unwrap()),
         })
         .unwrap();
     assert!(
@@ -151,11 +152,8 @@ fn activity_pages_filter_before_sequence_without_overlap() {
             .all(|e| e.seq < first.last().unwrap().seq && e.actor.kind == "agent")
     );
     assert!(
-        s.activity_page(ActivityQuery {
-            actor_kind: Some("invalid".into()),
-            ..Default::default()
-        })
-        .is_err()
+        serde_json::from_value::<ActivityQuery>(serde_json::json!({"actorKind":"invalid"}))
+            .is_err()
     );
 }
 #[test]
@@ -197,7 +195,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
         .list_tasks(
             None,
             TaskFilter {
-                status: Some(vec!["in_progress".into()]),
+                status: Some(vec!["in_progress".parse::<jam_core::TaskStatus>().unwrap()]),
                 ..Default::default()
             },
         )
@@ -236,7 +234,7 @@ fn archive_jam_keeps_all_records_and_settings_persist() {
         before.comments.len() as i64
     );
     s.set_settings(SettingsPatch {
-        theme: Some("dark".into()),
+        theme: Some("dark".parse::<jam_core::ThemePreference>().unwrap()),
         sound_enabled: Some(true),
         ..Default::default()
     })
@@ -254,7 +252,7 @@ fn board_settings_are_scoped_and_validated() {
     assert!(!initial.estimates_enabled);
     assert_eq!(initial.wip_limit, 6);
     s.set_settings(SettingsPatch {
-        color_by: Some("assignee".into()),
+        color_by: Some("assignee".parse::<jam_core::BoardColorBy>().unwrap()),
         estimates_enabled: Some(true),
         wip_limit: Some(8),
         ..Default::default()
@@ -265,11 +263,7 @@ fn board_settings_are_scoped_and_validated() {
     assert!(!s.get_settings().unwrap().estimates_enabled);
     assert_eq!(s.get_settings().unwrap().color_by, "epic");
     assert!(
-        s.set_settings(SettingsPatch {
-            color_by: Some("rainbow".into()),
-            ..Default::default()
-        })
-        .is_err()
+        serde_json::from_value::<SettingsPatch>(serde_json::json!({"colorBy":"rainbow"})).is_err()
     );
     assert!(
         s.set_settings(SettingsPatch {

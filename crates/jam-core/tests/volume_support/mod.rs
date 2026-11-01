@@ -105,7 +105,7 @@ impl Fixture {
                                 "Synthetic text for repeatable serialized payload measurements. "
                                     .repeat(4),
                             ),
-                            status: Some(status.into()),
+                            status: Some(status.parse::<jam_core::TaskStatus>().unwrap()),
                             tags: Some(tags),
                             brief: if complete {
                                 TaskBrief {

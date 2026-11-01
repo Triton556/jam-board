@@ -19,7 +19,7 @@ fn registry_retains_display_name_after_rename_close_and_missing_folder() {
             &actor.id,
             ProjectEditInput {
                 name: Some("Renamed workshop".into()),
-                template: "custom".into(),
+                template: "custom".parse::<jam_core::ProjectTemplate>().unwrap(),
                 ..Default::default()
             },
         )

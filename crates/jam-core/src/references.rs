@@ -2,7 +2,7 @@
 use crate::planning::*;
 use crate::service::{jam, normalize_tags};
 use crate::*;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::json;
 
 pub(crate) fn archive_actor(c: &Connection, actor: &str) -> Result<String> {
@@ -18,7 +18,7 @@ pub(crate) fn file_kind(path: &std::path::Path) -> &'static str {
     crate::classify_file(path)
 }
 
-fn target(c: &Connection, key: &str) -> Result<(String, String, String)> {
+pub(crate) fn target(c: &Connection, key: &str) -> Result<(String, String, String)> {
     if key.rsplit('-').next().is_some_and(|s| s.starts_with('E')) {
         let e = epic(c, key)?;
         editable_audit(&e.audit)?;
@@ -169,53 +169,12 @@ impl Store {
             fetch(c,"ref_frames","id",frame_id)
         })
     }
-    pub fn set_reference_verdict(
-        &self,
-        actor: &str,
-        input: ReferenceVerdictInput,
-    ) -> Result<RefItem> {
-        self.write(|c| {
-            if crate::service::member(c, actor)?.kind != "human" {
-                return Err(Error::Forbidden(
-                    "Only humans set reference verdicts".into(),
-                ));
-            }
-            let item: RefItem = fetch(c, "ref_items", "id", &input.item_id)?;
-            editable_audit(&item.audit)?;
-            patch_record(
-                c,
-                "ref_items",
-                &input.item_id,
-                &json!({"verdict":input.verdict,"updatedBy":actor,"updatedAt":now()}),
-            )?;
-            v2_event(
-                c,
-                actor,
-                reference_epic(c, &item)?.as_deref(),
-                "reference.updated",
-                None,
-                json!({"itemId":input.item_id,"verdict":input.verdict}),
-            )?;
-            fetch(c, "ref_items", "id", &input.item_id)
-        })
-    }
     pub fn add_reference(&self, actor: &str, input: AddReference) -> Result<RefItem> {
-        if input.kind == "asset"
-            && let Some(path) = input.file_path.as_deref().map(std::path::Path::new)
-            && path.is_absolute()
-        {
-            crate::file_model::validate_private_source(
-                &self.path,
-                self.app_data_dir.as_deref(),
-                path,
-            )?;
-        }
-        if input.storage_type.is_some()
+        let registration = input.storage_type.is_some()
             || input.file_role.is_some()
-            || input.request_id.is_some()
             || (input.copy == Some(true)
-                && crate::project_folders::folder_for_db(&self.path).is_some())
-        {
+                && crate::project_folders::folder_for_db(&self.path).is_some());
+        if registration {
             if input.kind != "asset" {
                 return Err(invalid(
                     "storageType",
@@ -242,12 +201,6 @@ impl Store {
                     "A task linkTo and inspected validators are required",
                 ));
             }
-            if input.copy == Some(true)
-                && std::fs::metadata(input.file_path.as_deref().unwrap_or(""))?.len()
-                    > 50 * 1024 * 1024
-            {
-                return Err(invalid("filePath", "Legacy copy:true is limited to 50 MiB"));
-            }
             let request = RegisterFile {
                 storage_type: match storage {
                     "board_file" => FileStorageType::BoardFile,
@@ -257,13 +210,13 @@ impl Store {
                 source_path: input.file_path.clone(),
                 url: None,
                 path_base: None,
-                file_kind: input.file_kind.clone(),
+                file_kind: input.file_kind,
                 name: input.title.clone(),
                 notes: input.caption.clone(),
                 companions: None,
-                request_id: input.request_id.clone().unwrap_or_else(id),
+                request_id: input.request_id.clone(),
                 task_key: input.file_role.as_ref().and(input.link_to.clone()),
-                role: input.file_role.clone(),
+                role: input.file_role,
                 expected_claim_generation: input.expected_claim_generation.clone(),
                 expected_updated_at: input.expected_updated_at.clone(),
                 working_directory: None,
@@ -280,75 +233,126 @@ impl Store {
         self.add_reference_with_title_mode(actor, input, false)
     }
     fn add_copied_reference(&self, actor: &str, mut input: AddReference) -> Result<RefItem> {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
+        let mut copied_path = None;
+        let result = self.write(|tx| {
+            Ok(crate::receipts::with_receipt(
+                tx,
+                actor,
+                request.as_deref(),
+                "add_reference",
+                "reference",
+                &payload,
+                || {
+                    copied_path = Some(self.prepare_reference_copy(&mut input)?);
+                    add_reference_tx(tx, actor, input, false, None)
+                },
+                |receipt| {
+                    fetch(
+                        tx,
+                        "ref_items",
+                        "id",
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing reference ID"))?,
+                    )
+                },
+            )?
+            .value)
+        });
+        if result.is_err()
+            && let Some(path) = copied_path
+        {
+            let _ = std::fs::remove_file(path);
+        }
+        result
+    }
+    pub(crate) fn prepare_reference_copy(
+        &self,
+        input: &mut AddReference,
+    ) -> Result<std::path::PathBuf> {
         use std::io::{Read, Write};
-        if input.kind != "asset" {
-            return Err(invalid("copy", "Copy is only supported for assets"));
-        }
-        let source = std::path::Path::new(
-            input
-                .file_path
-                .as_deref()
-                .ok_or_else(|| invalid("filePath", "A local file is required"))?,
-        );
-        if !source.is_absolute() {
-            return Err(invalid("filePath", "Use an absolute local file path"));
-        }
-        crate::file_model::validate_private_source(
-            &self.path,
-            self.app_data_dir.as_deref(),
-            source,
-        )?;
-        let file = std::fs::File::open(source)
-            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
-        let metadata = file
-            .metadata()
-            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
-        if !metadata.is_file() {
-            return Err(invalid("filePath", "Choose a file"));
-        }
-        const CAP: u64 = 50 * 1024 * 1024;
-        if metadata.len() > CAP {
-            return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
-        }
-        let mut bytes = Vec::new();
-        file.take(CAP + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
-        if bytes.len() as u64 > CAP {
-            return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
-        }
-        if input.title.is_none() {
-            input.title = Some(
-                source
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Reference")
-                    .into(),
+        (|| {
+            if input.kind != "asset" {
+                return Err(invalid("copy", "Copy is only supported for assets"));
+            }
+            let source = std::path::Path::new(
+                input
+                    .file_path
+                    .as_deref()
+                    .ok_or_else(|| invalid("filePath", "A local file is required"))?,
             );
-        }
-        let extension = source.extension().and_then(|s| s.to_str()).unwrap_or("");
-        let directory = self.reference_directory()?;
-        let path = directory.join(format!(
-            "clipboard-{}{}{}",
-            id(),
-            if extension.is_empty() { "" } else { "." },
-            extension
-        ));
-        let result = (|| {
+            if !source.is_absolute() {
+                return Err(invalid("filePath", "Use an absolute local file path"));
+            }
+            crate::file_model::validate_private_source(
+                &self.path,
+                self.app_data_dir.as_deref(),
+                source,
+            )?;
+            let file = std::fs::File::open(source)
+                .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+            let metadata = file
+                .metadata()
+                .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+            if !metadata.is_file() {
+                return Err(invalid("filePath", "Choose a file"));
+            }
+            const CAP: u64 = 50 * 1024 * 1024;
+            if metadata.len() > CAP {
+                return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
+            }
+            let mut bytes = Vec::new();
+            file.take(CAP + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|_| invalid("filePath", "The file must exist and be readable"))?;
+            if bytes.len() as u64 > CAP {
+                return Err(invalid("filePath", "Copied assets must be at most 50 MiB"));
+            }
+            if input.title.is_none() {
+                input.title = Some(
+                    source
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("Reference")
+                        .into(),
+                );
+            }
+            let extension = source.extension().and_then(|s| s.to_str()).unwrap_or("");
+            let directory = if let Some(folder) = crate::project_folders::folder_for_db(&self.path)
+            {
+                let folder = folder.canonicalize()?;
+                let directory = folder.join("files");
+                std::fs::create_dir_all(&directory)?;
+                crate::storage_io::contained(&folder, "files")?
+            } else {
+                self.reference_directory()?
+            };
+            let path = directory.join(format!(
+                "clipboard-{}{}{}",
+                id(),
+                if extension.is_empty() { "" } else { "." },
+                extension
+            ));
             let mut destination = std::fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .open(&path)?;
-            destination.write_all(&bytes)?;
+
+            if let Err(error) = destination
+                .write_all(&bytes)
+                .and_then(|_| destination.sync_all())
+            {
+                drop(destination);
+                let _ = std::fs::remove_file(&path);
+                return Err(error.into());
+            }
             drop(destination);
             input.file_path = Some(path.to_string_lossy().into_owned());
             input.copy = None;
-            self.add_reference_with_title_mode(actor, input, false)
-        })();
-        if result.is_err() {
-            let _ = std::fs::remove_file(&path);
-        }
-        result
+            Ok(path)
+        })()
     }
     /// Native direct paper: retain an explicit no-heading choice without changing
     /// the legacy/MCP default title contract. No empty new records are accepted.
@@ -373,7 +377,42 @@ impl Store {
         input: AddReference,
         untitled: bool,
     ) -> Result<RefItem> {
-        self.write(|c| add_reference_tx(c, actor, input, untitled, None))
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
+        self.write(|c| {
+            Ok(crate::receipts::with_receipt(
+                c,
+                actor,
+                request.as_deref(),
+                "add_reference",
+                "reference",
+                &payload,
+                || {
+                    if input.kind == "asset"
+                        && let Some(path) = input.file_path.as_deref().map(std::path::Path::new)
+                        && path.is_absolute()
+                    {
+                        crate::file_model::validate_private_source(
+                            &self.path,
+                            self.app_data_dir.as_deref(),
+                            path,
+                        )?;
+                    }
+                    add_reference_tx(c, actor, input, untitled, None)
+                },
+                |receipt| {
+                    fetch(
+                        c,
+                        "ref_items",
+                        "id",
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing ID"))?,
+                    )
+                },
+            )?
+            .value)
+        })
     }
     pub fn link_reference(&self, actor: &str, id: &str, key: &str) -> Result<RefItem> {
         self.write(|c| {
@@ -433,6 +472,13 @@ impl Store {
             }) {
                 return Err(Error::Conflict);
             }
+            crate::moodboard::source_url(input.source_url.as_ref().and_then(|v| v.as_deref()))?;
+            crate::moodboard::derived_from(
+                c,
+                &item.audit.jam_id,
+                Some(id),
+                input.derived_from.as_ref().and_then(|v| v.as_deref()),
+            )?;
             let mut patch = serde_json::to_value(input)?;
             if let Some(title) = patch["title"].as_str()
                 && !(expected.is_some() && item.kind == "note" && title.is_empty())
@@ -737,10 +783,13 @@ pub(crate) fn add_reference_tx(
     untitled: bool,
     existing_asset: Option<&str>,
 ) -> Result<RefItem> {
+    validate_reference_input(c, actor, &input, untitled)?;
     let a = audit(c, actor)?;
     if !["asset", "link", "note"].contains(&input.kind.as_str()) {
         return Err(invalid("kind", "Choose asset, link or note"));
     }
+    crate::moodboard::source_url(input.source_url.as_deref())?;
+    crate::moodboard::derived_from(c, &a.jam_id, None, input.derived_from.as_deref())?;
     let mut asset_id = None;
     let mut url = None;
     let mut default_title = String::new();
@@ -777,6 +826,8 @@ pub(crate) fn add_reference_tx(
             .unwrap_or("Reference")
             .into();
         let asset = Asset {
+            archived_at: None,
+            archived_by: None,
             id: id(),
             jam_id: a.jam_id.clone(),
             kind: file_kind(&path).into(),
@@ -842,6 +893,8 @@ pub(crate) fn add_reference_tx(
             f.id.clone()
         } else {
             let f = RefFrame {
+                replayed: false,
+                updated_at: String::new(),
                 id: id(),
                 jam_id: a.jam_id.clone(),
                 epic_id: Some(e.audit.id.clone()),
@@ -854,6 +907,7 @@ pub(crate) fn add_reference_tx(
                 archived_at: None,
                 collapsed: false,
                 links: vec![],
+                review: None,
             };
             insert(c, "ref_frames", &f)?;
             f.id
@@ -871,6 +925,8 @@ pub(crate) fn add_reference_tx(
             f.id.clone()
         } else {
             let f = RefFrame {
+                replayed: false,
+                updated_at: String::new(),
                 id: id(),
                 jam_id: a.jam_id.clone(),
                 epic_id: None,
@@ -883,6 +939,7 @@ pub(crate) fn add_reference_tx(
                 archived_at: None,
                 collapsed: false,
                 links: vec![],
+                review: None,
             };
             insert(c, "ref_frames", &f)?;
             f.id
@@ -931,9 +988,10 @@ pub(crate) fn add_reference_tx(
         crate::m5::validate_name("title", &title, 140)?;
     }
     let item = RefItem {
+        replayed: false,
         file: None,
         audit: a,
-        kind: input.kind,
+        kind: input.kind.into(),
         asset_id,
         url,
         title,
@@ -953,6 +1011,11 @@ pub(crate) fn add_reference_tx(
         link_preview: None,
         metadata,
         verdict: None,
+        verdict_note: None,
+        source_url: input.source_url,
+        origin: input.origin,
+        derived_from: input.derived_from,
+        copied_from: None,
         archived_by: None,
         via: None,
         frame_title: None,
@@ -975,4 +1038,61 @@ pub(crate) fn add_reference_tx(
         json!({"itemId":item.audit.id,"title":item.title,"assetId":item.asset_id}),
     )?;
     Ok(item)
+}
+
+/// Preflight every field before assets, geometry, links or activity are written.
+pub(crate) fn validate_reference_input(
+    c: &Connection,
+    actor: &str,
+    input: &AddReference,
+    untitled: bool,
+) -> Result<()> {
+    crate::service::member(c, actor)?;
+    let project = jam(c)?.id;
+    crate::moodboard::source_url(input.source_url.as_deref())?;
+    crate::moodboard::derived_from(c, &project, None, input.derived_from.as_deref())?;
+    if let Some(title) = &input.title
+        && !untitled
+    {
+        crate::m5::validate_name("title", title, 140)?;
+    }
+    normalize_tags(input.tags.as_deref().unwrap_or(&[]))?;
+    if let Some(frame) = &input.frame_id {
+        let row = c
+            .query_row(
+                "SELECT jam_id,archived_at FROM ref_frames WHERE id=?",
+                [frame],
+                |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        if !row.is_some_and(|(scope, archived)| scope == project && archived.is_none()) {
+            return Err(invalid("frameId", "Choose an active frame in this project"));
+        }
+    }
+    if let Some(key) = &input.link_to {
+        let (_, _, eid) = target(c, key).map_err(|error| match error {
+            Error::NotFound(_) | Error::Archived(_) => {
+                invalid("linkTo", "Choose a target in this project")
+            }
+            other => other,
+        })?;
+        if epic(c, &eid)?.audit.jam_id != project {
+            return Err(invalid("linkTo", "Choose a target in this project"));
+        }
+    }
+    if input.kind == "link" {
+        let url = input
+            .url
+            .as_deref()
+            .ok_or_else(|| invalid("url", "A URL is required"))?;
+        if !(url.starts_with("http://") || url.starts_with("https://"))
+            || url.chars().any(char::is_whitespace)
+        {
+            return Err(invalid("url", "Use an http or https URL without spaces"));
+        }
+    }
+    if input.copy == Some(true) && input.kind != "asset" {
+        return Err(invalid("copy", "Copy is only supported for assets"));
+    }
+    Ok(())
 }

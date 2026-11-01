@@ -2,6 +2,7 @@
 // No SQLite writes, local file reads, native GUI or remote activity.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterContextProvider } from "@tanstack/react-router";
 import {
   act,
   fireEvent,
@@ -163,6 +164,22 @@ function installTransport() {
           return (readOverride ? await readOverride(scope) : stores[scope]).map(
             nativeFileFixture,
           );
+        case "asset_usage":
+          return {
+            tasks: [],
+            scopes: [],
+            canvas: [],
+            covers: [],
+            components: [],
+          };
+        case "list_inbox_events":
+          return {
+            events: [],
+            unread: 0,
+            openActions: 0,
+            seenSeq: 0,
+            nextBeforeSeq: null,
+          };
         case "get_settings":
           return structuredClone(settings);
         case "set_settings":
@@ -369,7 +386,9 @@ it("distinguishes asset reading, failures, genuine empty, no matches and retaine
   });
   const ui = render(
     <QueryClientProvider client={client}>
-      <AssetsPage openTask={() => {}} />
+      <RouterContextProvider router={router}>
+        <AssetsPage openTask={() => {}} />
+      </RouterContextProvider>
     </QueryClientProvider>,
   );
   await waitFor(() =>

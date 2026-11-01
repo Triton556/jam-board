@@ -7,6 +7,7 @@ for (const theme of ["light", "dark"] as const) {
   }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Load demo jam" }).click();
+    await page.evaluate(() => window.__jamMock.seedBulkReferences(0, 0, 0));
     const ids = await page.evaluate(async () => {
       const first = await window.__jamMock.createRefFrame({
         title: "Compact controls",
@@ -110,6 +111,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Load demo jam" }).click();
     const initial = await page.evaluate(async () => {
+      await window.__jamMock.seedBulkReferences(0, 0, 0);
       const frame = await window.__jamMock.createRefFrame({
         title: "Agent inbox",
         x: 0,

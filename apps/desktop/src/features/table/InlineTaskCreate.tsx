@@ -124,7 +124,12 @@ export function InlineTaskCreate({
         busy(true);
         save.mutate({
           projectId: id,
-          input: { title: title.trim(), storyKey: story, status, priority },
+          input: {
+            title: title.trim(),
+            storyKey: story,
+            status,
+            priority: priority as import("../../bindings").Priority,
+          },
         });
       }}
       onKeyDown={(event) => {

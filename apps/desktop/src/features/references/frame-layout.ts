@@ -7,13 +7,19 @@ export function frameHeaderScale(width: number, zoom: number): number {
   );
 }
 
-export function frameHeaderLayout(width: number, zoom: number, linked = false) {
+export function frameHeaderLayout(
+  width: number,
+  zoom: number,
+  linked = false,
+  review = false,
+) {
   const scale = frameHeaderScale(width, zoom);
   const cssWidth = width / scale;
-  const compact = cssWidth < 320;
+  const compact = cssWidth < (review ? 560 : 320);
   // Scaling the bounded header must never scale its targets below 24 screen px.
   const controlSize = Math.max(32, 24 / (Math.max(0.1, zoom) * scale));
-  const overflow = 26 + 4 * controlSize + 3 * 4 > cssWidth;
+  const overflow =
+    26 + (review ? 6 : 4) * controlSize + (review ? 5 : 3) * 4 > cssWidth;
   const linkedHeight = linked && !overflow ? controlSize + 8 : 0;
   return {
     scale,
@@ -26,14 +32,19 @@ export function frameHeaderLayout(width: number, zoom: number, linked = false) {
 }
 
 export type FitReference = Rect & {
-  frame?: { collapsed: boolean; linked?: boolean };
+  frame?: { collapsed: boolean; linked?: boolean; review?: boolean };
 };
 
 /** Reserve the taller header during Fit so a zoom-dependent row switch cannot clip it. */
 export function referenceFitBounds(nodes: FitReference[], zoom: number): Rect {
   const rectangles = nodes.map((node) => {
     if (!node.frame) return node;
-    const header = frameHeaderLayout(node.width, zoom, node.frame.linked);
+    const header = frameHeaderLayout(
+      node.width,
+      zoom,
+      node.frame.linked,
+      node.frame.review,
+    );
     const width = Math.max(node.width, header.cssWidth * header.scale);
     const height =
       (52 +

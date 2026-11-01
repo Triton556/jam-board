@@ -70,6 +70,8 @@ impl From<&Member> for MemberRef {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSummary {
+    #[serde(default)]
+    pub external_ref: Option<String>,
     pub id: String,
     pub jam_id: String,
     pub key: String,
@@ -115,6 +117,8 @@ pub struct TaskSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskDetail {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub replayed: bool,
     #[serde(default)]
     #[specta(optional)]
     pub files: Vec<crate::TaskFile>,
@@ -140,6 +144,10 @@ pub struct TaskDetail {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Asset {
+    #[serde(default)]
+    pub archived_at: Option<String>,
+    #[serde(default)]
+    pub archived_by: Option<String>,
     pub id: String,
     pub jam_id: String,
     pub kind: String,
@@ -164,6 +172,9 @@ pub struct Comment {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityEvent {
+    /// Raw MCP client name/version; absent for human or historical events.
+    #[serde(default)]
+    pub client: Option<String>,
     pub seq: i64,
     pub action: String,
     pub actor: MemberRef,
@@ -191,23 +202,38 @@ pub enum JsonPayload {
     Object(std::collections::BTreeMap<String, JsonPayload>),
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateTask {
+    /// Source reference, 1–120 characters, unique per project and entity kind. Example: ls/S0.1; omitted creates have no external reference.
+    #[schemars(length(min = 1, max = 120))]
+    #[specta(optional)]
+    pub external_ref: Option<String>,
+    /// Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it.
     pub title: String,
+    /// Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions.
     pub description: Option<String>,
-    pub status: Option<String>,
-    pub priority: Option<String>,
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
+    pub status: Option<crate::TaskStatus>,
+    /// Scheduling priority; default medium on create. Example: high. Omitted updates preserve it.
+    pub priority: Option<crate::Priority>,
+    /// 1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags.
     pub tags: Option<Vec<String>>,
-    pub estimate: Option<i64>,
+    /// Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates.
+    pub estimate: Option<crate::Estimate>,
+    /// Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted means no due date.
     pub due_at: Option<String>,
-    pub idempotency_key: Option<String>,
+    /// Stable retry ID, 1–100 characters, e.g. ls-S0.1.1; required. Reuse only for the same task payload.
+    #[schemars(length(min = 1, max = 100))]
+    pub request_id: String,
+    /// Parent story key in this project, e.g. JB-S3. Every task belongs to a story.
     pub story_key: Option<String>,
     #[serde(flatten)]
+    /// Structured work brief; omitted fields default to empty. Planning never grants execution permission.
     pub brief: crate::TaskBrief,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NewJamInput {
     pub name: String,
@@ -217,7 +243,7 @@ pub struct NewJamInput {
     pub timezone: String,
     pub your_name: String,
     #[serde(default)]
-    pub template: Option<String>,
+    pub template: Option<crate::ProjectTemplate>,
     #[serde(default)]
     pub milestone_at: Option<String>,
 }
@@ -279,16 +305,32 @@ pub type BoardTasks = std::collections::BTreeMap<String, Vec<TaskSummary>>;
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateTask {
+    /// Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it.
+    #[serde(
+        default,
+        deserialize_with = "crate::model::nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub external_ref: Option<Option<String>>,
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     pub key: String,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     pub expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     pub expected_updated_at: String,
+    /// Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it.
     pub title: Option<String>,
+    /// Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions.
     pub description: Option<String>,
-    pub priority: Option<String>,
+    /// Scheduling priority; default medium on create. Example: high. Omitted updates preserve it.
+    pub priority: Option<crate::Priority>,
+    /// 1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags.
     pub tags: Option<Vec<String>>,
     #[serde(default, deserialize_with = "nullable")]
-    pub estimate: Option<Option<i64>>,
+    /// Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates.
+    pub estimate: Option<Option<crate::Estimate>>,
     #[serde(default, deserialize_with = "nullable")]
+    /// Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted preserves it and null clears it.
     pub due_at: Option<Option<String>>,
 }
 pub(crate) fn nullable<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
@@ -297,27 +339,42 @@ pub(crate) fn nullable<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     Option::<T>::deserialize(d).map(Some)
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskPatch {
+    /// Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it.
+    #[serde(
+        default,
+        deserialize_with = "crate::model::nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[specta(type=Option<String>)]
+    pub external_ref: Option<Option<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Replacement structured work brief; omitted preserves it. Example: a complete goal/context/change/test record.
     pub brief: Option<crate::TaskBrief>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it.
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Human task description in Markdown; omitted preserves it. Example: Debounce lantern pickup.
     pub description_md: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
+    pub status: Option<crate::TaskStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<String>,
+    /// Scheduling priority; default medium on create. Example: high. Omitted updates preserve it.
+    pub priority: Option<crate::Priority>,
     #[serde(
         default,
         deserialize_with = "nullable",
         skip_serializing_if = "Option::is_none"
     )]
     #[specta(type = Option<String>)]
+    /// Existing project member ID, e.g. 01JMEMBER; omitted preserves it, null unassigns it. Does not launch a session.
     pub assignee_id: Option<Option<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// 1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags.
     pub tags: Option<Vec<String>>,
     #[serde(
         default,
@@ -325,16 +382,18 @@ pub struct TaskPatch {
         skip_serializing_if = "Option::is_none"
     )]
     #[specta(type = Option<i64>)]
-    pub estimate: Option<Option<i64>>,
+    /// Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates.
+    pub estimate: Option<Option<crate::Estimate>>,
     #[serde(
         default,
         deserialize_with = "nullable",
         skip_serializing_if = "Option::is_none"
     )]
     #[specta(type = Option<String>)]
+    /// Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted preserves it and null clears it.
     pub due_at: Option<Option<String>>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskEditInput {
     pub key: String,
@@ -343,14 +402,14 @@ pub struct TaskEditInput {
     pub patch: TaskPatch,
 }
 /// Human confirmation of a captured claim; neither actor nor destination is caller-controlled.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReleaseClaim {
     pub key: String,
     pub expected_updated_at: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskQuery {
     pub epic: Option<String>,
@@ -358,17 +417,17 @@ pub struct TaskQuery {
     pub ready: Option<bool>,
     pub changes_requested: Option<bool>,
     pub needs_info: Option<bool>,
-    pub status: Option<Vec<String>>,
+    pub status: Option<Vec<crate::TaskStatus>>,
     pub assignee: Option<String>,
     pub tags: Option<Vec<String>>,
     pub text: Option<String>,
     pub include_archived: Option<bool>,
     pub sort: Option<TaskSort>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 pub struct TaskSort {
-    pub field: String,
-    pub dir: String,
+    pub field: crate::TaskSortField,
+    pub dir: crate::SortDirection,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct TaskListPage {
@@ -384,17 +443,34 @@ pub struct TagCount {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TaskFilter {
-    pub status: Option<Vec<String>>,
+    /// Optional task-row projection; omitted returns every core field. Example: ["title","status","updatedAt"]. key is always present.
+    pub fields: Option<Vec<crate::TaskField>>,
+    /// Source reference, 1–120 characters, unique per project and entity kind. Example: ls/S0.1; omitted creates have no external reference.
+    #[schemars(length(min = 1, max = 120))]
+    pub external_ref: Option<String>,
+    /// Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it.
+    pub status: Option<Vec<crate::TaskStatus>>,
+    /// Optional assignee handle filter, e.g. claude; omitted includes all assignees.
     pub assignee: Option<String>,
+    /// Optional task tag filter, e.g. design; omitted includes all tags.
     pub tag: Option<String>,
+    /// Optional case-insensitive search substring, e.g. design; omission includes all matches.
     pub query: Option<String>,
+    /// Include archived records; default false. Example: true.
     pub include_archived: Option<bool>,
+    /// Maximum rows per page. Canvas allows 1–200; files allow 1–500. Omitted uses the operation default; example 50.
     pub limit: Option<usize>,
+    /// Captured activity cursor or paging offset; starts at 0. Follow nextCursor; pages are not an atomic snapshot.
     pub cursor: Option<String>,
+    /// Optional parent epic key filter, e.g. JB-E2; omission includes all epics.
     pub epic: Option<String>,
+    /// Optional parent story key filter, e.g. JB-S3; omission includes all stories.
     pub story: Option<String>,
+    /// Optional readiness filter, e.g. true; omitted includes both. Readiness is separate from execution authority.
     pub ready: Option<bool>,
+    /// Optional requested-changes filter, e.g. true; omitted includes both values.
     pub changes_requested: Option<bool>,
+    /// Optional unanswered-question filter, e.g. true; omitted includes both values.
     pub needs_info: Option<bool>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
@@ -414,4 +490,22 @@ pub struct MemberStats {
     pub online: bool,
     pub working_on: Vec<String>,
     pub status_stale: bool,
+}
+
+impl Default for CreateTask {
+    fn default() -> Self {
+        Self {
+            external_ref: None,
+            title: Default::default(),
+            description: None,
+            status: None,
+            priority: None,
+            tags: None,
+            estimate: None,
+            due_at: None,
+            request_id: crate::id(),
+            story_key: None,
+            brief: Default::default(),
+        }
+    }
 }

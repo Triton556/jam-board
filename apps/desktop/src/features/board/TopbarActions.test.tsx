@@ -12,12 +12,18 @@ async function mount() {
     (member) => member.kind === "agent",
   );
   const actions = { newTask: vi.fn(), openInbox: vi.fn(), openSearch: vi.fn() };
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  client.setQueryData(["activity", "inbox-events", "summary"], {
+    events: [],
+    unread: 0,
+    openActions: 0,
+    seenSeq: 0,
+    nextBeforeSeq: null,
+  });
   render(
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
-    >
+    <QueryClientProvider client={client}>
       <TopbarActions {...actions} inboxCount={3} agents={agents} pulse={{}}>
         <span>Desktop controls</span>
       </TopbarActions>

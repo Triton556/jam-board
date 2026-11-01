@@ -11,6 +11,18 @@ export type CanvasRuntime = {
   unlinkFrame?(frame: RefFrame, key: string): void;
   unlinkItem?(item: RefItem, key: string): void;
   verdict?(item: RefItem, verdict: "keep" | "reject" | null): Promise<void>;
+  reasonItemId?: string | null;
+  reason?(item: RefItem | null): void;
+  feedback?(input: {
+    itemId: string;
+    verdict?: "keep" | "reject" | null;
+    verdictNote?: string | null;
+  }): Promise<void>;
+  review?(frame: RefFrame): void;
+  sendReview?(frame: RefFrame): void;
+  collectKept?(frames: RefFrame[]): void;
+  variation?(item: RefItem): void;
+  clearVariation?(item: RefItem): void;
   open(key: string): void;
   lightbox(url: string, title: string, kind?: "video"): void;
   edgeLabel(id: string, label: string): void;

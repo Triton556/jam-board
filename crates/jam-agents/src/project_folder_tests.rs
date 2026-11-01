@@ -135,7 +135,8 @@ fn r11_canonical_locator_stdio_http_and_legacy_bytes() {
         entries[0]
             .env
             .iter()
-            .any(|e| e.name == "JAM_BOARD_PROJECT_FOLDER" && Path::new(&e.value) == handle.folder)
+            .any(|e| e.name == "JAM_BOARD_PROJECT_FOLDER"
+                && Path::new(&e.value).canonicalize().unwrap() == handle.folder)
     );
     entries[0].http = Some(McpHttp {
         url: "http://127.0.0.1:47321/mcp".into(),
@@ -274,8 +275,13 @@ async fn r11_worktree_launch_history_cwd_and_selection_are_immutable() {
     let env = recorded["params"]["mcpServers"][0]["env"]
         .as_array()
         .unwrap();
-    assert!(env.iter().any(|e| e["name"] == "JAM_BOARD_PROJECT_FOLDER"
-        && Path::new(e["value"].as_str().unwrap()) == a.folder));
+    assert!(env.iter().any(|e| {
+        e["name"] == "JAM_BOARD_PROJECT_FOLDER"
+            && Path::new(e["value"].as_str().unwrap())
+                .canonicalize()
+                .unwrap()
+                == a.folder
+    }));
     assert!(
         env.iter()
             .any(|e| e["name"] == "JAM_BOARD_PROJECT" && e["value"] == a.project_id)

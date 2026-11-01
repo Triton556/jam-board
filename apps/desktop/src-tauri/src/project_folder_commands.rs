@@ -91,6 +91,88 @@ trait AssetOpener {
     fn reveal_path(&self, path: &str) -> Result<(), ApiError>;
 }
 struct BackendOpener(tauri::AppHandle);
+fn launch_revision(
+    manager: &ProjectManager,
+    legacy: &Store,
+    context: &FolderCommandContext,
+    asset: &str,
+    revision: i64,
+    reveal: bool,
+    opener: &impl AssetOpener,
+) -> Result<(), ApiError> {
+    manager
+        .with_expected_context(legacy, Some(context), |store| {
+            let row = store
+                .list_asset_revisions(asset)?
+                .into_iter()
+                .find(|row| row.revision == revision)
+                .ok_or_else(|| Error::NotFound("Asset revision".into()))?;
+            let file = std::fs::File::open(&row.stored_path)
+                .map_err(|_| Error::NotFound("Asset revision file".into()))?;
+            if !file.metadata()?.is_file() {
+                return Err(Error::NotFound("Asset revision file".into()));
+            }
+            let result = if reveal {
+                opener.reveal_path(&row.stored_path)
+            } else {
+                opener.open_path(&row.stored_path)
+            };
+            result.map_err(|error| Error::Forbidden(error.message))
+        })
+        .map_err(Into::into)
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn open_asset_revision(
+    context: FolderCommandContext,
+    asset_id: String,
+    revision: i64,
+    state: State<'_, DesktopState>,
+    manager: State<'_, Arc<ProjectManager>>,
+    app: tauri::AppHandle,
+) -> Result<(), ApiError> {
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        launch_revision(
+            &manager,
+            &legacy,
+            &context,
+            &asset_id,
+            revision,
+            false,
+            &BackendOpener(app),
+        )
+    })
+    .await
+    .map_err(internal)?
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn reveal_asset_revision(
+    context: FolderCommandContext,
+    asset_id: String,
+    revision: i64,
+    state: State<'_, DesktopState>,
+    manager: State<'_, Arc<ProjectManager>>,
+    app: tauri::AppHandle,
+) -> Result<(), ApiError> {
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        launch_revision(
+            &manager,
+            &legacy,
+            &context,
+            &asset_id,
+            revision,
+            true,
+            &BackendOpener(app),
+        )
+    })
+    .await
+    .map_err(internal)?
+}
 impl AssetOpener for BackendOpener {
     fn open_url(&self, url: &str) -> Result<(), ApiError> {
         use tauri_plugin_opener::OpenerExt;
@@ -470,13 +552,19 @@ pub async fn keep_live_board(
 pub async fn register_file(
     context: FolderCommandContext,
     input: RegisterFile,
+    state: State<'_, DesktopState>,
     manager: State<'_, Arc<ProjectManager>>,
 ) -> Result<FileMutationResult, ApiError> {
-    let h = capture(&manager, &context)?;
-    tokio::task::spawn_blocking(move || h.store.register_file(&h.store.current_member()?.id, input))
-        .await
-        .map_err(internal)?
-        .map_err(Into::into)
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        manager.with_expected_context(&legacy, Some(&context), |store| {
+            store.register_file(&store.current_member()?.id, input)
+        })
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[tauri::command]
 #[specta::specta]
@@ -530,13 +618,17 @@ pub async fn unlink_task_file(
 pub async fn resolve_file(
     context: FolderCommandContext,
     input: ResolveFile,
+    state: State<'_, DesktopState>,
     manager: State<'_, Arc<ProjectManager>>,
 ) -> Result<FileResolution, ApiError> {
-    let h = capture(&manager, &context)?;
-    tokio::task::spawn_blocking(move || h.store.resolve_file(input))
-        .await
-        .map_err(internal)?
-        .map_err(Into::into)
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        manager.with_expected_context(&legacy, Some(&context), |store| store.resolve_file(input))
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[tauri::command]
 #[specta::specta]
@@ -559,13 +651,19 @@ pub async fn file_operation_status(
 pub async fn list_file_assets(
     context: FolderCommandContext,
     input: FileAssetQuery,
+    state: State<'_, DesktopState>,
     manager: State<'_, Arc<ProjectManager>>,
 ) -> Result<Vec<FileAsset>, ApiError> {
-    let h = capture(&manager, &context)?;
-    tokio::task::spawn_blocking(move || h.store.list_file_assets(input))
-        .await
-        .map_err(internal)?
-        .map_err(Into::into)
+    let manager = manager.inner().clone();
+    let legacy = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        manager.with_expected_context(&legacy, Some(&context), |store| {
+            store.list_file_assets(input)
+        })
+    })
+    .await
+    .map_err(internal)?
+    .map_err(Into::into)
 }
 #[tauri::command]
 #[specta::specta]
@@ -600,6 +698,71 @@ mod tests {
         fn reveal_path(&self, path: &str) -> Result<(), ApiError> {
             self.0.borrow_mut().push(("reveal".into(), path.into()));
             Ok(())
+        }
+    }
+    #[test]
+    fn revision_openers_use_retained_bytes_in_both_layouts_and_fence_selection() {
+        for folder in [false, true] {
+            let d = Fixture::new();
+            let manager = ProjectManager::new(d.path().join("fictional-appdata")).unwrap();
+            let legacy = Store::open(d.path().join("legacy.db")).unwrap();
+            let (project, _) = legacy
+                .create_jam("Legacy", None, None, None, "UTC", "Owner")
+                .unwrap();
+            let handle = if folder {
+                Some(
+                    manager
+                        .create(&d.path().join("Board"), "Folder", false)
+                        .unwrap(),
+                )
+            } else {
+                manager.select_legacy_project(&legacy, &project.id).unwrap();
+                None
+            };
+            let store = handle.as_ref().map(|h| &*h.store).unwrap_or(&legacy);
+            let actor = store.current_member().unwrap().id;
+            let source = d.path().join("old.txt");
+            let replacement = d.path().join("new.txt");
+            std::fs::write(&source, b"retained bytes").unwrap();
+            std::fs::write(&replacement, b"current bytes").unwrap();
+            let input:RegisterFile=serde_json::from_value(serde_json::json!({"storageType":"board_file","sourcePath":source,"requestId":"register"})).unwrap();
+            let asset = store
+                .register_file(&actor, input)
+                .unwrap()
+                .asset
+                .unwrap()
+                .asset
+                .id;
+            store.replace_asset(&actor,serde_json::from_value(serde_json::json!({"assetId":asset,"sourcePath":replacement,"requestId":"replace"})).unwrap()).unwrap();
+            let context = manager.selection_context(&legacy).unwrap();
+            let opener = FakeOpener::default();
+            launch_revision(&manager, &legacy, &context, &asset, 1, false, &opener).unwrap();
+            launch_revision(&manager, &legacy, &context, &asset, 1, true, &opener).unwrap();
+            let retained = opener.0.borrow()[0].1.clone();
+            assert_eq!(std::fs::read(&retained).unwrap(), b"retained bytes");
+            assert_eq!(opener.0.borrow()[1].0, "reveal");
+            opener.0.borrow_mut().clear();
+            assert!(matches!(
+                launch_revision(&manager, &legacy, &context, &asset, 99, false, &opener)
+                    .unwrap_err()
+                    .code,
+                crate::commands::ApiErrorCode::NotFound
+            ));
+            std::fs::remove_file(retained).unwrap();
+            assert!(matches!(
+                launch_revision(&manager, &legacy, &context, &asset, 1, true, &opener)
+                    .unwrap_err()
+                    .code,
+                crate::commands::ApiErrorCode::NotFound
+            ));
+            assert!(opener.0.borrow().is_empty());
+            manager
+                .create(&d.path().join("Other"), "Other", false)
+                .unwrap();
+            assert!(
+                launch_revision(&manager, &legacy, &context, &asset, 1, false, &opener).is_err()
+            );
+            assert!(opener.0.borrow().is_empty());
         }
     }
     #[test]

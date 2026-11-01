@@ -6,6 +6,7 @@ test("RF01/RF02 frame-only canvas has no empty art and a visible movable grip at
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Load demo jam" }).click();
+  await page.evaluate(() => window.__jamMock.seedBulkReferences(0, 0, 0));
   await page.goto("/references");
   await page.getByRole("button", { name: "Frame", exact: true }).click();
   await page

@@ -201,8 +201,9 @@ fn questions_references_and_waits_are_bound_even_when_human_switches() {
         .ask_user(
             &agent.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "project".into(),
+                    kind: "project".parse::<jam_core::ScopeKind>().unwrap(),
                     id: String::new(),
                 },
                 title: "Question A".into(),
@@ -218,7 +219,7 @@ fn questions_references_and_waits_are_bound_even_when_human_switches() {
         .add_reference(
             &agent.id,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("A note".into()),
                 ..Default::default()
             },
@@ -350,19 +351,25 @@ fn version_four_backfill_retains_data_selection_and_reusable_members() {
         "Legacy status"
     );
     assert_eq!(s.list_projects(false).unwrap().len(), 1);
-    assert_eq!(
-        s.create_task(
+    let retry = s
+        .create_task(
             &human.id,
             CreateTask {
                 title: "Ignored retry".into(),
-                idempotency_key: Some("legacy-token".into()),
+                request_id: "legacy-token".into(),
                 ..Default::default()
-            }
+            },
         )
-        .unwrap()
-        .task
-        .key,
-        legacy.task.key
+        .unwrap();
+    assert!(retry.replayed);
+    assert_eq!(retry.task.key, legacy.task.key);
+    assert_eq!(
+        s.get_task(&legacy.task.key)
+            .unwrap()
+            .task
+            .idempotency_key
+            .as_deref(),
+        Some("legacy-token")
     );
     let seq = s.latest_seq().unwrap();
     drop(s);
@@ -429,7 +436,7 @@ fn attachments_canvas_activity_and_member_ids_cannot_cross_a_bound_project() {
         .add_reference(
             &ha.id,
             AddReference {
-                kind: "asset".into(),
+                kind: "asset".parse::<jam_core::ReferenceKind>().unwrap(),
                 file_path: Some(image.to_string_lossy().into_owned()),
                 ..Default::default()
             },
@@ -439,7 +446,7 @@ fn attachments_canvas_activity_and_member_ids_cannot_cross_a_bound_project() {
         .add_reference(
             &ha.id,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Note A".into()),
                 ..Default::default()
             },
@@ -449,6 +456,8 @@ fn attachments_canvas_activity_and_member_ids_cannot_cross_a_bound_project() {
         .create_ref_frame(
             &ha.id,
             RefFrame {
+                replayed: false,
+                updated_at: String::new(),
                 id: String::new(),
                 jam_id: String::new(),
                 epic_id: None,
@@ -461,6 +470,7 @@ fn attachments_canvas_activity_and_member_ids_cannot_cross_a_bound_project() {
                 archived_at: None,
                 collapsed: false,
                 links: vec![],
+                review: None,
             },
         )
         .unwrap();
@@ -606,7 +616,7 @@ fn agent_idempotency_tokens_are_project_local_and_atomic() {
     let input_a = CreateTask {
         story_key: Some(story_a.key),
         title: "A retry".into(),
-        idempotency_key: Some("plan-1".into()),
+        request_id: "plan-1".into(),
         ..Default::default()
     };
     let first = pa.create_task(&agent.id, input_a.clone()).unwrap();
@@ -628,7 +638,7 @@ fn agent_idempotency_tokens_are_project_local_and_atomic() {
     assert_eq!(second.task.idempotency_key.as_deref(), Some("plan-1"));
     let seq = s.latest_seq().unwrap();
     assert_eq!(
-        pa.create_task(&agent.id, input_a).unwrap().task.key,
+        pa.create_task(&agent.id, input_a.clone()).unwrap().task.key,
         first.task.key
     );
     assert_eq!(
@@ -641,14 +651,7 @@ fn agent_idempotency_tokens_are_project_local_and_atomic() {
         restarted
             .for_project(&a.id)
             .unwrap()
-            .create_task(
-                &agent.id,
-                CreateTask {
-                    title: "Ignored".into(),
-                    idempotency_key: Some("plan-1".into()),
-                    ..Default::default()
-                }
-            )
+            .create_task(&agent.id, input_a)
             .unwrap()
             .task
             .key,

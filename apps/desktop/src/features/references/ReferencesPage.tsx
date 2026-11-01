@@ -50,6 +50,7 @@ import {
 import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
+import { moodboardApi } from "../../lib/moodboard-api";
 import { epicsQuery } from "../../lib/planning-queries";
 import { appQuery, tasksQuery } from "../../lib/queries";
 import type { ReferenceInput } from "../../lib/references-api";
@@ -67,7 +68,7 @@ import {
   EditReferenceDialog,
   FrameDialog,
 } from "./dialogs";
-import { ReferenceEdge } from "./Edge";
+import { DerivedEdge, ReferenceEdge } from "./Edge";
 import { EdgeLabelDialog } from "./EdgeLabelDialog";
 import { referenceFitViewport } from "./frame-layout";
 import { LinkTargetDialog } from "./LinkTargetDialog";
@@ -81,6 +82,7 @@ import {
   type ReferenceChoice,
 } from "./linking";
 import { stopReferenceAudio } from "./Media";
+import { CollectKeepDialog, ReviewBar } from "./MoodboardReview";
 import { referenceMiniMapColor } from "./minimap-color";
 import type { UndoAction } from "./model";
 import {
@@ -111,6 +113,7 @@ import {
 } from "./ReferenceDragPreview";
 import { CanvasContext, type CanvasRuntime } from "./runtime";
 import { editedNoteTarget, retainNoteEditors } from "./sticky-node-ownership";
+import { useMoodboard } from "./use-moodboard";
 import { useViewportGesture } from "./use-viewport-gesture";
 import "@xyflow/react/dist/style.css";
 import "./references.css";
@@ -127,7 +130,7 @@ declare global {
   }
 }
 const nodeTypes = { reference: ReferenceNode, frame: ReferenceFrame },
-  edgeTypes = { reference: ReferenceEdge };
+  edgeTypes = { reference: ReferenceEdge, derived: DerivedEdge };
 export const referencesQuery = {
   queryKey: ["references"],
   queryFn: () => api.referenceCanvas(),
@@ -338,7 +341,13 @@ function Canvas() {
     [noteOwnsTarget],
   );
   const selectedReference = useRouterState({
-      select: (s) => (s.location.search as { section?: string }).section,
+      select: (s) => {
+        const search = s.location.search as {
+          section?: string;
+          frame?: string;
+        };
+        return search.frame ?? search.section;
+      },
     }),
     centered = useRef<string | undefined>(undefined);
   const read = useExplicitRead(
@@ -389,8 +398,8 @@ function Canvas() {
     .concat(noteDraft?.createdId ?? [], [...editingNotes])
     .join(",");
   const edges = useMemo(
-    () =>
-      (data?.edges ?? []).map((e) => ({
+    () => [
+      ...(data?.edges ?? []).map((e) => ({
         id: e.id,
         source: e.fromItem,
         target: e.toItem,
@@ -399,7 +408,40 @@ function Canvas() {
         data: { connect },
         selected: selectedEdges.includes(e.id),
       })),
-    [data?.edges, connect, selectedEdges],
+      ...(data?.items ?? []).flatMap((i) => {
+        const original = data?.items.find(
+          (row) => row.id === i.derivedFrom && !row.archivedAt,
+        );
+        if (
+          !i.derivedFrom ||
+          i.archivedAt ||
+          !original ||
+          [i, original].some((row) =>
+            data?.frames.some(
+              (frame) =>
+                frame.id === row.frameId &&
+                frame.collapsed &&
+                !frame.archivedAt,
+            ),
+          )
+        )
+          return [];
+        return [
+          {
+            id: `derived-${i.id}`,
+            source: i.derivedFrom,
+            target: i.id,
+            type: "derived",
+            selectable: false,
+            deletable: false,
+            data: { connect: false },
+            selected: false,
+            label: "variation",
+          },
+        ];
+      }),
+    ],
+    [data?.edges, data?.items, data?.frames, connect, selectedEdges],
   );
   const history = useMemo(() => {
     const id = app.data?.jam?.id ?? "empty";
@@ -499,7 +541,9 @@ function Canvas() {
         .getNodes()
         .filter(
           (node): node is ItemNode =>
-            node.type === "reference" && !!node.selected,
+            node.type === "reference" &&
+            node.data.item.kind !== "note" &&
+            !!node.selected,
         );
       const items = selected.some((node) => node.id === item.id)
         ? selected.map((node) => node.data.item)
@@ -533,6 +577,19 @@ function Canvas() {
   );
   const announce = useCallback((text: string) => setNotice(text), []);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const moodboard = useMoodboard(
+    data,
+    flow,
+    setNodes,
+    refresh,
+    error,
+    announce,
+    setLightbox,
+  );
+  useEffect(() => {
+    if (moodboard.reviewId && moodboard.current?.id && !moodboard.reasonId)
+      container.current?.focus({ preventScroll: true });
+  }, [moodboard.reviewId, moodboard.current?.id, moodboard.reasonId]);
   const fitCanvas = useCallback(
     (duration: number) => {
       const bounds = container.current?.getBoundingClientRect();
@@ -549,6 +606,7 @@ function Canvas() {
                 ? {
                     collapsed: !!node.data.frame.collapsed,
                     linked: frameTargets(node.data.frame).length > 0,
+                    review: !!node.data.frame.review,
                   }
                 : undefined,
           })),
@@ -776,6 +834,21 @@ function Canvas() {
       },
       archive,
       verdict: setVerdict,
+      reasonItemId: moodboard.reasonId,
+      reason: (item) => moodboard.setReasonId(item?.id ?? null),
+      feedback: moodboard.feedback,
+      review: moodboard.start,
+      sendReview: (frame) => {
+        void moodboard.send(frame);
+      },
+      collectKept: moodboard.setCollectFrames,
+      variation: (item) => moodboard.setVariationId(item.id),
+      clearVariation: (item) => {
+        void moodboardApi
+          .update(item.id, { derivedFrom: null })
+          .then(refresh)
+          .catch(error);
+      },
       open,
       lightbox: (url, title, kind) => setLightbox({ url, title, kind }),
       edgeLabel: (id, label) => setEdgeEdit({ id, label }),
@@ -861,6 +934,7 @@ function Canvas() {
       requireFinishedNote,
       compose,
       client,
+      moodboard,
     ],
   );
   useEffect(() => {
@@ -881,7 +955,9 @@ function Canvas() {
             links: frameTargets(f, targets),
             color: epics.data?.find((e) => e.id === f.epicId)?.color ?? f.color,
           },
-          dim: !!filter.length && !matched(f.epicId ?? "unlinked"),
+          dim:
+            (!!moodboard.reviewId && f.id !== moodboard.reviewId) ||
+            (!!filter.length && !matched(f.epicId ?? "unlinked")),
         },
         position: { x: f.x ?? 0, y: f.y ?? 0 },
         style: {
@@ -935,12 +1011,16 @@ function Canvas() {
             links,
             color: palette(epic?.color ?? "var(--butter)"),
             dim:
-              !!filter.length &&
-              !(filter.includes("unlinked") && !links.length) &&
-              !links.some(
-                (l) => filter.includes(l.id) || filter.includes(l.epicId ?? ""),
-              ),
+              moodboard.dim(item) ||
+              (!!filter.length &&
+                !(filter.includes("unlinked") && !links.length) &&
+                !links.some(
+                  (l) =>
+                    filter.includes(l.id) || filter.includes(l.epicId ?? ""),
+                )),
             highlight: highlight?.color,
+            reviewCurrent:
+              moodboard.reviewId != null && item.id === moodboard.current?.id,
             connect,
             fitContent: contentSized,
             expanded:
@@ -1018,6 +1098,9 @@ function Canvas() {
     selectedItems,
     overview,
     noteDraft?.createdId,
+    moodboard.reviewId,
+    moodboard.dim,
+    moodboard.current?.id,
   ]);
   const hasRequestedNode =
     !!selectedReference && nodes.some((n) => n.id === selectedReference);
@@ -1042,6 +1125,36 @@ function Canvas() {
     );
     const timer = setTimeout(() => {
       centered.current = selectedReference;
+      const requestedFrame = data.frames.find(
+          (frame) => frame.id === selectedReference,
+        ),
+        bounds = container.current?.getBoundingClientRect();
+      if (requestedFrame && bounds) {
+        const viewport = referenceFitViewport(
+          [
+            {
+              ...flow.getNodesBounds([selectedReference]),
+              frame: {
+                collapsed: requestedFrame.collapsed ?? false,
+                linked: !!requestedFrame.links?.length,
+                review: !!requestedFrame.review,
+              },
+            },
+          ],
+          {
+            width: bounds.width,
+            height: bounds.height,
+            toolsBottom: referenceControlsBottom(container.current),
+          },
+        );
+        if (viewport) {
+          void flow.setViewport(
+            { ...viewport, zoom: Math.min(1, viewport.zoom) },
+            { duration: reduced ? 0 : 220 },
+          );
+          return;
+        }
+      }
       void flow.fitView({
         nodes: [{ id: selectedReference }],
         maxZoom: 1,
@@ -1445,6 +1558,7 @@ function Canvas() {
             )
           )
             return;
+          if (moodboard.key(e)) return;
           if (
             e.key.toLowerCase() === "n" &&
             !e.ctrlKey &&
@@ -1640,6 +1754,7 @@ function Canvas() {
       >
         <ReactFlow<CanvasNode>
           nodes={nodes}
+          nodesDraggable={!moodboard.reviewId && !moodboard.variationId}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -1778,16 +1893,25 @@ function Canvas() {
           }}
           onEdgeContextMenu={(e, edge) => {
             e.preventDefault();
+            if (edge.type === "derived") return;
             archive("edge", edge.id);
           }}
           onEdgeClick={(_, edge) => {
+            if (edge.type === "derived") return;
             setSelectedEdges([edge.id]);
             setNodes((ns) => ns.map((n) => ({ ...n, selected: false })));
             container.current?.focus({ preventScroll: true });
           }}
-          onNodeClick={() => setSelectedEdges([])}
+          onNodeClick={(_, node) => {
+            setSelectedEdges([]);
+            moodboard.clicked(node.id);
+          }}
           onEdgesDelete={(edges) => {
-            archiveGroup(edges.map((edge) => ({ kind: "edge", id: edge.id })));
+            const mutable = edges.filter((edge) => edge.type !== "derived");
+            if (mutable.length)
+              archiveGroup(
+                mutable.map((edge) => ({ kind: "edge", id: edge.id })),
+              );
           }}
           onMoveStart={viewportGesture.start}
           onMoveEnd={(_, v) => {
@@ -1999,6 +2123,20 @@ function Canvas() {
               <Frame size={16} />
               Frame
             </Button>
+            {!!selectedFrames && (
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  moodboard.setCollectFrames(
+                    data?.frames.filter((f) =>
+                      selectedFrames.split(",").includes(f.id),
+                    ) ?? [],
+                  )
+                }
+              >
+                Collect Keep into new frame…
+              </Button>
+            )}
             <Tooltip
               text={
                 selectedItems || selectedFrames
@@ -2167,6 +2305,36 @@ function Canvas() {
               )}
           </div>
         </div>
+        <ReviewBar review={moodboard} />
+        {moodboard.variationId && (
+          <div className="moodboard-pick-banner">
+            Click the original · Esc to cancel{" "}
+            <button
+              type="button"
+              onClick={() => moodboard.setVariationId(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        {moodboard.collectFrames && (
+          <CollectKeepDialog
+            frames={moodboard.collectFrames}
+            targets={targets}
+            close={() => moodboard.setCollectFrames(null)}
+            saved={async (frame) => {
+              await refresh();
+              setNodes((nodes) =>
+                nodes.map((n) => ({ ...n, selected: n.id === frame.id })),
+              );
+              await flow.fitView({
+                nodes: [{ id: frame.id }],
+                maxZoom: 1,
+                duration: reduced ? 0 : 180,
+              });
+            }}
+          />
+        )}
         {linkSelection && (
           <LinkTargetDialog
             choices={linkSelection}

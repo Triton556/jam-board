@@ -134,7 +134,7 @@ fn check_fixture(f: &Fixture) {
         let result = paginate(
             &p.store,
             TaskFilter {
-                status: Some(vec!["ready".into()]),
+                status: Some(vec!["ready".parse::<jam_core::TaskStatus>().unwrap()]),
                 query: Some("needle".into()),
                 limit: Some(200),
                 ..Default::default()

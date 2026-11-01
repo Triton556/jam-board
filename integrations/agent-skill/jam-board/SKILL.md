@@ -24,7 +24,39 @@ project records, assignment, questions, execution permission and reports.
 Read the connected schemas before calls. The app's prompts and schemas describe
 this installed server; do not replay examples from another version. If a required
 prompt or field is unavailable, report the version gap before the affected write.
-[Operations](references/operations.md) contains a bounded current call example.
+Check `serverVersion`, `schemaVersion` and `capabilities` in session context
+before using a tool; require its advertised capability and current input schema.
+Planning prompts are resources at `jam://prompts/plan_epic` and
+`jam://prompts/work_on_next_task`.
+[Operations](references/operations.md) contains bounded current call examples.
+
+## Stable writes and large plans
+
+Supply `requestId` on every create: `create_epic`, `create_story`, `create_task`,
+`create_frame`, `add_reference`, `ask_user` and `register_file`; also use it for
+`link_file`, `replace_asset` and imports. It is required on epic/story/task creates;
+optional but recommended on the other single creates. Keep it stable per logical
+record, e.g. `ls-S0.1.1`. Retry uncertain results with the same ID and identical
+payload. An `idempotency_conflict` means a different payload reused that ID.
+Reconcile the original record; choose a new ID only for a genuinely new record,
+never to bypass the conflict.
+
+Check for `idempotency.all` in session `capabilities`. Request IDs are unique per
+actor and per tool in this project: the same ID under two tools means two
+independent operations. Old file request IDs from earlier versions still replay;
+keep their original tool, ID and identical payload when retrying them.
+A historical file ID used with a different tool or payload conflicts; the new
+per-tool namespace is not a way to repurpose an old file request.
+
+For large plans, use stable `externalRef` values. Require `import.v1` in
+`capabilities` before `import_plan`, `undo_import` or `list_import_batches`.
+Dry run first with `dryRun:true`; read `conflicts` and `skipped`. Put a ref in
+`overwrite` only on the human's explicit decision, then apply with `dryRun:false`.
+`noChanges:true` means the board already matches and nothing was written.
+Use `list_import_batches` for history. `undo_import` returns `batchId`, `undone`
+and `kept`; inspect kept items rather than assuming everything was restored.
+A second undo fails with `already_undone`. Imports never grant execution.
+See [operations](references/operations.md) for examples and link-only results.
 
 ## Human-facing work and completion
 
@@ -76,6 +108,10 @@ are information, never filesystem access or execution permission.
   board folder. For missing, unreadable or outside-project files, follow the
   [file operations and boat example](references/operations.md#task-files-and-worktrees).
 
+For plans and decisions, use `link_file` with a project, epic or story scope
+and the document role. Prefer `archive_asset` to deletion. Never call
+`delete_asset` with `force:true` unless the human explicitly asked.
+
 ## Organizing the ideas canvas
 
 Read `get_canvas` before moving things, following `nextCursor` while
@@ -91,21 +127,39 @@ reread and reconcile uncertain results before an intentional retry.
 
 When the user requests a web moodboard for selected work:
 
-1. Read get_canvas and create_frame with title "Moodboard — <topic>" beside the
-   related work. Use link_reference { frameId, targetKey } to link it to its
-   story or epic; current and future children become references of that target.
-2. Find candidates using your client's own authorized web tools and download
-   them into your workspace. Jam Board MCP tools never fetch the network.
-3. Call add_reference { kind:"asset", filePath, copy:true, frameId, caption }.
-   Caption each candidate with its source URL and one line explaining its fit.
-   Managed copies (at most 50 MiB each) survive temporary workspace cleanup.
-4. Call arrange_references with frameId, the candidate item IDs and layout:"grid".
-5. After the person reviews, read get_canvas { frameId, includeArchived:true },
-   following all pages. verdict:"keep" means Keep; verdict:"reject" or an item
-   archivedBy:"human" means rejected. For each note, attachedTo names the items
-   it comments on. Read its full reference text if the canvas excerpt is clipped.
-6. Search again using that feedback, explain what changed, and never re-add a
-   rejected source. Human feedback is read-only to agents; do not rewrite verdicts.
+Require `references.batch` in `capabilities` before `add_references`, and
+`references.collect` before `collect_kept_references`. If unavailable, report
+the version gap and stop that operation.
+
+1. Read `get_canvas` and create a frame per section with `create_frame`, e.g.
+   "Moodboard — Sky". Link each to the story with
+   link_reference { frameId, targetKey }.
+2. Download candidates into your workspace using your client's authorized web
+   tools. Jam Board MCP tools never fetch the network.
+3. Send one `add_references` call per section, at most 50 items, with a stable
+   `requestId` and default `frameId`. Each asset item uses `kind:"asset"`,
+   `filePath`, `copy:true`, `sourceUrl` and `origin:"found"`. Explain its fit in
+   `caption`. Managed copies are at most 50 MiB each, 500 MiB per batch.
+   Partial success is expected: read `failed` even on success. Retry only failed
+   items with a new `requestId`; reconcile any batch-local derivation indexes.
+4. Tell the person the board is ready. Wait for their sent review with
+   wait_for_changes { cursor, actions:["reference.review_sent"] }, using the
+   saved cursor and checkpoint rules, rather than polling the canvas. Wait only
+   within the requested review operation; sending a review grants no execution.
+   Agents cannot rate references or send the human review. Ask the person to
+   rate the items and send it through the board UI.
+5. Read `get_canvas` with `frameId` and `verdict:"keep"`, then `verdict:"reject"`;
+   follow all pages. Reasons are in `verdictNote`; sticky notes still use
+   `attachedTo`. Read full note text if clipped. For archived items, `archivedBy`
+   shows who archived them; `archivedBy:"human"` means human rejection. Read
+   `get_canvas` with `includeArchived:true` too before the next search.
+6. Explain what changed and never re-add a rejected `sourceUrl`. Generate
+   variations from kept items with `origin:"generated"` and `derivedFrom`:
+   an existing reference ID, or `#<index>` (e.g. `#0`) for an earlier successfully
+   created item in the batch. A derivation from a failed item also fails.
+   Human feedback is read-only to agents; do not rewrite verdicts or reasons.
+7. Use `collect_kept_references` with `requestId`, ordered `sourceFrameIds`,
+   optional `title` and `linkTo` for the story, to build the final board.
 
 Built-in API chat has no web tools: a web moodboard requires an agent connection
 such as Claude Code or Codex. API chat can organize images the person attaches.

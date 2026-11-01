@@ -222,7 +222,7 @@ export function useStickyNote({
           )
       : () => {
           const input = {
-            kind: "note",
+            kind: "note" as const,
             text: submitted.body,
             ...(storedTitle ? { title: storedTitle } : {}),
             x: position?.x ?? 0,

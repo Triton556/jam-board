@@ -3,9 +3,15 @@ import type {
   CanvasGeometry,
   FramePatch_Serialize,
   ReferenceCanvas,
+  ReferenceCanvas_Deserialize,
   ReferencePatch_Serialize,
   RefFrame,
 } from "../bindings";
+import {
+  attachMockMoodboard,
+  summarizeMockCanvas,
+  validateMoodboardFields,
+} from "./mock-moodboard";
 import type { Epic } from "./planning-api";
 import type {
   ReferenceContentExpectation,
@@ -14,8 +20,8 @@ import type {
 import type { Asset, Member } from "./types";
 import { JamError } from "./types";
 
-type Context = {
-  data(): ReferenceCanvas;
+export type MockReferencesContext = {
+  data(): ReferenceCanvas_Deserialize;
   epics(): Epic[];
   targets(): { id: string; key: string; kind: string }[];
   assets(): Asset[];
@@ -24,11 +30,15 @@ type Context = {
   changed(
     action: string,
     actor: Member,
-    payload: Record<string, string>,
+    payload: Record<string, string | number | string[]>,
     epic?: string,
   ): void;
   call(command: string, input?: unknown): Promise<void>;
   save(): void;
+  receipts?(): Map<
+    string,
+    { payload: string; result: import("../bindings").CollectKeptResult }
+  >;
 };
 const clone = <T>(v: T): T => structuredClone(v);
 export const emptyCanvas = (): ReferenceCanvas => ({
@@ -39,7 +49,9 @@ export const emptyCanvas = (): ReferenceCanvas => ({
 });
 export class MockReferences {
   viewport: string | null = null;
-  constructor(private c: Context) {}
+  constructor(private c: MockReferencesContext) {
+    attachMockMoodboard(c);
+  }
   item(id: string) {
     const item = this.c.data().items.find((i) => i.id === id);
     if (!item) throw new JamError("not_found", "Reference not found");
@@ -48,16 +60,27 @@ export class MockReferences {
   async snapshot() {
     await this.c.call("reference_canvas");
     const d = this.c.data();
-    return clone({
-      ...d,
-      items: d.items.filter((i) => !i.archivedAt),
-      edges: d.edges.filter(
-        (e) =>
-          !e.archivedAt &&
-          d.items.some((i) => i.id === e.fromItem && !i.archivedAt) &&
-          d.items.some((i) => i.id === e.toItem && !i.archivedAt),
-      ),
-    });
+    return clone(
+      await summarizeMockCanvas({
+        ...d,
+        items: d.items
+          .filter((i) => !i.archivedAt)
+          .map((i) => ({
+            verdictNote: null,
+            sourceUrl: null,
+            origin: null,
+            derivedFrom: null,
+            copiedFrom: null,
+            ...i,
+          })),
+        edges: d.edges.filter(
+          (e) =>
+            !e.archivedAt &&
+            d.items.some((i) => i.id === e.fromItem && !i.archivedAt) &&
+            d.items.some((i) => i.id === e.toItem && !i.archivedAt),
+        ),
+      }),
+    );
   }
   change(action: string, id: string, actor = this.c.human(), epic?: string) {
     this.c.changed(
@@ -79,6 +102,7 @@ export class MockReferences {
         "validation",
         "Untitled mode requires a note without a heading",
       );
+    validateMoodboardFields(null, input);
     const d = this.c.data(),
       now = new Date().toISOString();
     if (!["asset", "note", "link"].includes(input.kind))
@@ -134,6 +158,11 @@ export class MockReferences {
     const index = d.items.filter((i) => i.frameId === frame?.id).length;
     const item = {
       verdict: null,
+      verdictNote: null,
+      sourceUrl: input.sourceUrl ?? null,
+      origin: input.origin ?? null,
+      derivedFrom: input.derivedFrom ?? null,
+      copiedFrom: null,
       archivedBy: null,
       id: crypto.randomUUID(),
       jamId: this.c.jam(),
@@ -156,15 +185,16 @@ export class MockReferences {
               "Reference"))),
       captionMd: [input.text, input.caption].filter(Boolean).join("\n\n"),
       tags: input.tags ?? [],
-      x: input.x ?? (frame ? 24 + (index % 3) * 280 : 0),
-      y: input.y ?? (frame ? 60 + Math.floor(index / 3) * 240 : 0),
-      w: input.kind === "note" ? 240 : 260,
-      h: input.kind === "note" ? 180 : 200,
+      x: input.x ?? (frame ? 24 + (index % 3) * 260 : 0),
+      y: input.y ?? (frame ? 56 + Math.floor(index / 3) * 230 : 0),
+      w: 240,
+      h: 180,
       z: 0,
       frameId: frame?.id ?? null,
       linkPreview: null,
       metadata: null,
     };
+    if (frame) frame.h = Math.max(frame.h ?? 600, (item.y ?? 0) + 230);
     d.items.push(item);
     if (input.linkTo) await this.link(item.id, input.linkTo, false);
     this.change("reference.added", item.id, actor, epic?.id);
@@ -180,6 +210,9 @@ export class MockReferences {
       ...(expected ? { itemId: id, expected } : {}),
     });
     const i = this.item(id);
+    validateMoodboardFields(id, p);
+    for (const field of ["sourceUrl", "origin", "derivedFrom"] as const)
+      if (Object.hasOwn(p, field)) Object.assign(i, { [field]: p[field] });
     if (expected && i.archivedAt)
       throw new JamError("validation", "Archived notes cannot be edited");
     if (
@@ -240,6 +273,7 @@ export class MockReferences {
     await this.c.call("create_ref_frame", input);
     const f = {
       links: [],
+      review: null,
       id: crypto.randomUUID(),
       jamId: this.c.jam(),
       epicId: null,

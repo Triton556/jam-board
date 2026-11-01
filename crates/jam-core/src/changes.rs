@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 /// Persisted activity vocabulary accepted by the long-poll filter.
 pub const ACTIVITY_ACTIONS: &[&str] = &[
+    "import_applied",
     "agent.status",
     "asset.created",
     "asset.linked",
@@ -28,6 +29,7 @@ pub const ACTIVITY_ACTIONS: &[&str] = &[
     "question.asked",
     "question.withdrawn",
     "reference.added",
+    "reference.review_sent",
     "reference.linked",
     "reference.updated",
     "report.submitted",
@@ -35,6 +37,7 @@ pub const ACTIVITY_ACTIONS: &[&str] = &[
     "story.created",
     "story.status",
     "story.updated",
+    "story_moved",
     "task.archived",
     "task.brief_updated",
     "task.claimed",
@@ -43,6 +46,7 @@ pub const ACTIVITY_ACTIONS: &[&str] = &[
     "task.ready_override",
     "task.released",
     "task.updated",
+    "task_moved_to_story",
 ];
 
 impl Store {
@@ -105,7 +109,7 @@ impl Store {
                     ));
                 }
                 let mut stmt = snapshot.prepare(
-                    "SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id,a.jam_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>? ORDER BY a.seq ASC"
+                    "SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id,a.jam_id,a.client FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>? ORDER BY a.seq ASC"
                 )?;
                 let mut rows = stmt.query([feed.last_seq])?;
                 while let Some(row) = rows.next()? {
@@ -123,11 +127,11 @@ impl Store {
                         && input
                             .actions
                             .as_ref()
-                            .is_none_or(|a| a.contains(&event.action))
+                            .is_none_or(|a| a.iter().any(|a| a.as_str() == event.action))
                         && input
                             .actor_kind
                             .as_ref()
-                            .is_none_or(|k| k == &event.actor.kind)
+                            .is_none_or(|k| k.as_str() == event.actor.kind)
                         && (!input.exclude_self || event.actor.id != actor)
                     {
                         events.push(event);

@@ -130,8 +130,10 @@ fn move_preview_is_read_only_and_counts_scoped_inventory_policy_and_ownership() 
         .register_file(&owner.id, register(&missing, "linked_file", "missing"))
         .unwrap();
     std::fs::remove_file(&missing).unwrap();
-    let task: CreateTask =
-        serde_json::from_value(serde_json::json!({"title":"Scoped task"})).unwrap();
+    let task: CreateTask = serde_json::from_value(
+        serde_json::json!({"title":"Scoped task","requestId":"scoped-task"}),
+    )
+    .unwrap();
     legacy.create_current_task(task).unwrap();
     legacy
         .create_jam("Other", None, None, None, "UTC", "Other")
@@ -296,7 +298,7 @@ fn init(name: &str) -> NewJamInput {
         ends_at: "".into(),
         timezone: "Asia/Vladivostok".into(),
         your_name: "Fictional owner".into(),
-        template: Some("webapp".into()),
+        template: Some("webapp".parse::<jam_core::ProjectTemplate>().unwrap()),
         milestone_at: Some("2026-12-01T00:00:00Z".into()),
     }
 }
@@ -308,8 +310,10 @@ fn registered_unselected_preview_reads_live_wal_without_selecting_or_writing() {
     let legacy = Store::open(d.path().join("legacy.db")).unwrap();
     let a = m.create(&d.path().join("A"), "A", false).unwrap();
     let b = m.create(&d.path().join("B"), "B", false).unwrap();
-    let task: CreateTask =
-        serde_json::from_value(serde_json::json!({"title":"Unpublished WAL task"})).unwrap();
+    let task: CreateTask = serde_json::from_value(
+        serde_json::json!({"title":"Unpublished WAL task","requestId":"wal-task"}),
+    )
+    .unwrap();
     a.store.create_current_task(task).unwrap();
     let before = tree(&a.folder);
     assert_eq!(

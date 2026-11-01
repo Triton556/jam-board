@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
+import type { Story } from "../../bindings";
 import { Button, Drawer, Stamp } from "../../components/ui";
 import {
   PaperSkeleton,
@@ -14,10 +15,17 @@ import {
   questionsQuery,
 } from "../../lib/planning-queries";
 import { ExecutionControls } from "../execution/ExecutionControls";
+import { ScopeDocuments } from "../files/ScopeDocuments";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { AcceptanceEditor } from "../task/BriefEditor";
 import { AgentPlan } from "./AgentPlan";
 import { BrainHandoff } from "./BrainHandoff";
+import {
+  MovePlanDialog,
+  type PlanMoveResult,
+  StoryMoveNotice,
+  storyMoveBlockedReason,
+} from "./MovePlanDialog";
 import { NewPlanningDialog } from "./NewPlanningDialog";
 import {
   type PlanningSaveState,
@@ -53,6 +61,10 @@ export function StoryDrawer({
   const client = useQueryClient(),
     navigate = useNavigate();
   const [newTask, setNewTask] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveNotice, setMoveNotice] = useState<
+    PlanMoveResult & { story: Story }
+  >();
   const [planSaves, setPlanSaves] = useState<Record<string, PlanningSaveState>>(
     {},
   );
@@ -108,6 +120,58 @@ export function StoryDrawer({
             >
               {epic?.key} · {epic?.title}
             </Button>
+            <details className="plan-actions">
+              <summary aria-label="Story menu">⋯</summary>
+              <div className="menu-popup">
+                <Button
+                  disabled={
+                    !["draft", "active"].includes(story.status) ||
+                    query.data?.tasks.some((t) =>
+                      ["in_progress", "review"].includes(t.task.status),
+                    )
+                  }
+                  title={
+                    query.data?.tasks.some((t) =>
+                      ["in_progress", "review"].includes(t.task.status),
+                    )
+                      ? storyMoveBlockedReason
+                      : undefined
+                  }
+                  onClick={(event) => {
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                    setMoving(true);
+                  }}
+                >
+                  Move to epic…
+                </Button>
+                {query.data?.tasks.some((t) =>
+                  ["in_progress", "review"].includes(t.task.status),
+                ) && <p>{storyMoveBlockedReason}</p>}
+                {!["draft", "active"].includes(story.status) && (
+                  <p>Only Draft or Active stories can move.</p>
+                )}
+              </div>
+            </details>
+            {moving && (
+              <MovePlanDialog
+                target={{ type: "story", story }}
+                close={() => setMoving(false)}
+                moved={(result) => {
+                  setMoving(false);
+                  if (result.story)
+                    setMoveNotice({ ...result, story: result.story });
+                }}
+              />
+            )}
+            {moveNotice?.story.key === story.key && (
+              <StoryMoveNotice
+                key={`${moveNotice.story.key}:${moveNotice.story.updatedAt}`}
+                notice={moveNotice}
+              />
+            )}
+            <ScopeDocuments scope={{ type: "story", key: story.key }} />
             <div className="field">
               Story title
               <PlanningInput

@@ -201,6 +201,11 @@ import { validateTableSearch } from "./features/table/search";
 const TaskTable = lazy(() =>
   import("./features/table/TaskTable").then((m) => ({ default: m.TaskTable })),
 );
+const FileViewer = lazy(() =>
+  import("./features/files/FileViewer").then((m) => ({
+    default: m.FileViewer,
+  })),
+);
 const TaskDrawerSurface = lazy(() =>
   import("./features/task/TaskDrawer").then((m) => ({ default: m.TaskDrawer })),
 );
@@ -211,7 +216,7 @@ function TaskDrawer(props: {
 }) {
   const search = useRouterState({
     select: (state) => state.location.search,
-  }) as { taskView?: string };
+  }) as { taskView?: string; taskSection?: "review" };
   const navigate = useNavigate();
   return (
     <LazyDrawerBoundary
@@ -223,6 +228,7 @@ function TaskDrawer(props: {
     >
       <TaskDrawerSurface
         {...props}
+        focusSection={search.taskSection}
         presentation={taskPresentation(search.taskView)}
         onPresentationChange={(presentation) =>
           void navigate({
@@ -667,7 +673,9 @@ function Shell() {
             renderTrigger={(searchTrigger, openSearch) => (
               <TopbarActions
                 newTask={newTask}
-                openInbox={() => void navigate({ to: "/inbox" })}
+                openInbox={() =>
+                  void navigate({ to: "/inbox", search: { tab: "events" } })
+                }
                 openSearch={openSearch}
                 inboxCount={questionCount}
                 agents={
@@ -684,7 +692,9 @@ function Shell() {
                 <IconButton
                   className="icon-button top-inbox"
                   label="Open inbox"
-                  onClick={() => void navigate({ to: "/inbox" })}
+                  onClick={() =>
+                    void navigate({ to: "/inbox", search: { tab: "events" } })
+                  }
                 >
                   <Inbox size={18} />
                   <InboxBadge count={questionCount} />
@@ -730,14 +740,22 @@ function BoardRoute() {
   const navigate = useNavigate();
   const open = useCallback(
     (task: string) => {
-      void navigate({ to: "/board", search: { ...search, task } });
+      void navigate({
+        to: "/board",
+        search: { ...search, task, taskSection: undefined },
+      });
     },
     [navigate, search],
   );
   const close = useCallback(() => {
     void navigate({
       to: "/board",
-      search: { ...search, task: undefined, taskView: undefined },
+      search: {
+        ...search,
+        task: undefined,
+        taskView: undefined,
+        taskSection: undefined,
+      },
     });
   }, [navigate, search]);
   return (
@@ -785,7 +803,12 @@ function TableRoute() {
           close={() => {
             void navigate({
               to: "/table",
-              search: { ...search, task: undefined, taskView: undefined },
+              search: {
+                ...search,
+                task: undefined,
+                taskView: undefined,
+                taskSection: undefined,
+              },
             });
           }}
         />
@@ -938,7 +961,7 @@ function Toasts() {
               variant="ghost"
               onClick={() =>
                 toast.href
-                  ? void navigate({ to: "/inbox" })
+                  ? void navigate({ to: "/inbox", search: { tab: "events" } })
                   : void navigate({
                       to: "/board",
                       search: { task: toast.taskKey },
@@ -988,10 +1011,61 @@ const projectsRoute = createRoute({
   path: "/projects",
   component: ProjectsRoute,
 });
+function FileRouteOverlay() {
+  const search = useRouterState({ select: (s) => s.location.search }) as {
+    file?: string;
+  };
+  const navigate = useNavigate();
+  const close = () =>
+    void navigate({
+      to: ".",
+      search: (previous) => ({ ...previous, file: undefined }),
+      resetScroll: false,
+    });
+  if (!search.file) return null;
+  return (
+    <Suspense fallback={null}>
+      <FileViewer
+        assetId={search.file}
+        onClose={close}
+        openTarget={(target) => {
+          if (target.type === "task" && target.key)
+            void navigate({ to: "/board", search: { task: target.key } });
+          else if (target.type === "epic" && target.key)
+            void navigate({
+              to: "/plan/$epicKey",
+              params: { epicKey: target.key },
+            });
+          else if (target.type === "story" && target.key)
+            void navigate({ to: "/plan", search: { story: target.key } });
+          else if (target.type === "canvas")
+            void navigate({ to: "/references", search: { frame: target.id } });
+          else if (target.type === "asset")
+            void navigate({ to: "/assets", search: { file: target.id } });
+          else void navigate({ to: "/plan" });
+        }}
+      />
+    </Suspense>
+  );
+}
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
-  component: Shell,
+  component: () => (
+    <>
+      <Shell />
+      <FileRouteOverlay />
+    </>
+  ),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { file?: string; taskSection?: "review" } => ({
+    file:
+      typeof search.file === "string" && search.file.length <= 200
+        ? search.file
+        : undefined,
+    taskSection: search.taskSection === "review" ? "review" : undefined,
+  }),
 });
 const boardRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -1028,7 +1102,26 @@ const placeholders = navigation
         section?: string;
         question?: string;
         status?: string;
+        tab?: string;
+        frame?: string;
+        linkedTo?: string;
       } => ({
+        tab:
+          item.path === "/inbox" &&
+          (search.tab === "questions" || search.tab === "events")
+            ? search.tab
+            : undefined,
+        frame:
+          item.path === "/references" &&
+          typeof search.frame === "string" &&
+          search.frame.length <= 200
+            ? search.frame
+            : undefined,
+        linkedTo: ["project", "epic", "story", "task", "nothing"].includes(
+          String(search.linkedTo),
+        )
+          ? String(search.linkedTo)
+          : undefined,
         question:
           typeof search.question === "string" ? search.question : undefined,
         status: typeof search.status === "string" ? search.status : undefined,
@@ -1099,7 +1192,12 @@ function PlanRoute() {
             void navigate({
               to: epicKey ? "/plan/$epicKey" : "/plan",
               params: { epicKey: epicKey ?? "" },
-              search: { ...search, task: undefined, taskView: undefined },
+              search: {
+                ...search,
+                task: undefined,
+                taskView: undefined,
+                taskSection: undefined,
+              },
             });
           }}
         />

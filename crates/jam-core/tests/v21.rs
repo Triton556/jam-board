@@ -74,7 +74,7 @@ fn create(s: &Store, h: &Member, story: &Story, status: &str) -> TaskDetail {
         CreateTask {
             title: "Lantern tile cue".into(),
             story_key: Some(story.key.clone()),
-            status: Some(status.into()),
+            status: Some(status.parse::<jam_core::TaskStatus>().unwrap()),
             brief: brief(),
             ..Default::default()
         },
@@ -136,7 +136,7 @@ fn v01_fixture_migrates_without_losing_tasks_and_only_once() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        9
+        10
     );
     assert!(
         db.prepare("PRAGMA foreign_key_check")
@@ -227,7 +227,7 @@ fn each_readiness_field_and_story_active_are_independent() {
     let t = create(&s, &h, &draft, "backlog");
     assert_eq!(
         s.check_ready(&t.task.key).unwrap().missing[0].code,
-        "story_active"
+        "story_inactive"
     );
     let t = create(&s, &h, &story, "backlog");
     assert!(s.check_ready(&t.task.key).unwrap().ready);
@@ -300,7 +300,7 @@ fn report(key: &str) -> SubmitReport {
             command: "godot --headless --script tests/lantern.test.gd".into(),
             expected: "Only the adjacent tile lights up".into(),
             actual: "Two tiles lit up".into(),
-            result: "FAIL".into(),
+            result: "FAIL".parse::<jam_core::ReportResult>().unwrap(),
         }],
         ..Default::default()
     }
@@ -332,7 +332,7 @@ fn report_review_loop_permissions_and_rounds() {
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
-                verdict: "accept".into(),
+                verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
                 ..Default::default()
             }
         ),
@@ -346,7 +346,7 @@ fn report_review_loop_permissions_and_rounds() {
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: t.task.key.clone(),
-                verdict: "accept".into(),
+                verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
                 ..Default::default()
             }
         ),
@@ -358,7 +358,9 @@ fn report_review_loop_permissions_and_rounds() {
             expected_report_id: String::new(),
             expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
-            verdict: "changes_requested".into(),
+            verdict: "changes_requested"
+                .parse::<jam_core::ReviewVerdict>()
+                .unwrap(),
             comments_md: "Only the adjacent tile should light up.".into(),
             failed_tests: Some(vec!["2".into()]),
         },
@@ -372,7 +374,7 @@ fn report_review_loop_permissions_and_rounds() {
     assert!(matches!(s.review_task_fresh(&brain.id,ReviewTask {
         expected_report_id: String::new(),
         expected_review_context_revision: String::new(),
-        key:t.task.key.clone(),verdict:"accept".into(),..Default::default()}),Err(Error::Validation{reason,..}) if reason=="No report for round 1"));
+        key:t.task.key.clone(),verdict:"accept".parse::<jam_core::ReviewVerdict>().unwrap(),..Default::default()}),Err(Error::Validation{reason,..}) if reason=="No report for round 1"));
     s.claim_task_fresh(&worker.id, &t.task.key).unwrap();
     s.submit_report_fresh(&worker.id, report(&t.task.key))
         .unwrap();
@@ -382,7 +384,7 @@ fn report_review_loop_permissions_and_rounds() {
             expected_report_id: String::new(),
             expected_review_context_revision: String::new(),
             key: t.task.key.clone(),
-            verdict: "accept".into(),
+            verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
             ..Default::default()
         },
     )
@@ -454,8 +456,9 @@ fn questions_wait_on_feed_without_writer_lock_and_timeout() {
         .ask_user(
             &worker.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "task".into(),
+                    kind: "task".parse::<jam_core::ScopeKind>().unwrap(),
                     id: t.task.key.clone(),
                 },
                 title: "Should the cue pulse?".into(),
@@ -507,8 +510,9 @@ fn questions_wait_on_feed_without_writer_lock_and_timeout() {
         .ask_user(
             &worker.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "story".into(),
+                    kind: "story".parse::<jam_core::ScopeKind>().unwrap(),
                     id: story.key,
                 },
                 title: "Which cue?".into(),
@@ -546,7 +550,7 @@ fn references_are_local_atomic_archived_and_never_fetch_urls() {
         .add_reference(
             &worker.id,
             AddReference {
-                kind: "asset".into(),
+                kind: "asset".parse::<jam_core::ReferenceKind>().unwrap(),
                 file_path: Some(file.to_string_lossy().into()),
                 link_to: Some(t.task.key.clone()),
                 tags: Some(vec![" Art ".into()]),
@@ -572,7 +576,7 @@ fn references_are_local_atomic_archived_and_never_fetch_urls() {
     s.add_reference(
         &worker.id,
         AddReference {
-            kind: "link".into(),
+            kind: "link".parse::<jam_core::ReferenceKind>().unwrap(),
             url: Some(url.clone()),
             title: Some("Palette".into()),
             ..Default::default()
@@ -609,7 +613,7 @@ fn project_templates_and_agent_status() {
         &brain.id,
         "reviewing the bridge cue",
         Some(Scope {
-            kind: "epic".into(),
+            kind: "epic".parse::<jam_core::ScopeKind>().unwrap(),
             id: e.key,
         }),
     )
@@ -682,7 +686,7 @@ fn v2_demo_and_full_snapshot_roundtrip() {
     s.add_reference(
         &h.id,
         AddReference {
-            kind: "asset".into(),
+            kind: "asset".parse::<jam_core::ReferenceKind>().unwrap(),
             file_path: Some(path.to_string_lossy().into()),
             link_to: Some(review.key.clone()),
             ..Default::default()
@@ -777,7 +781,7 @@ fn active_intents_nullable_model_restoration_and_invalid_import_are_checked() {
         .add_reference(
             &h.id,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Lantern study".into()),
                 caption: Some("Keep the glow warm".into()),
                 link_to: Some(t.task.key),
@@ -859,7 +863,7 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: key.clone(),
-                verdict: verdict.into(),
+                verdict: verdict.parse::<jam_core::ReviewVerdict>().unwrap(),
                 comments_md: "Verified".into(),
                 ..Default::default()
             };
@@ -892,7 +896,7 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                     key: key.clone(),
                     expected_updated_at: s.get_task(key).unwrap().task.updated_at,
                     patch: TaskPatch {
-                        status: Some("ready".into()),
+                        status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
                         ..Default::default()
                     }
                 }),
@@ -930,7 +934,7 @@ fn accepted_work_can_reopen_without_losing_rounds_or_weakening_guards() {
                     key: key.clone(),
                     expected_updated_at: s.get_task(key).unwrap().task.updated_at,
                     patch: TaskPatch {
-                        status: Some("ready".into()),
+                        status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
                         ..Default::default()
                     },
                 })

@@ -421,3 +421,16 @@ install/upgrade, live providers and OS-specific usability remain unrun.
 - Move preview gives owner categories, not individual names; never invent identities. Existing empty destination refused even when nonEmpty is false.
 
 Owner recheck: disposable profile/registry/fictional folders only, never production AppData; follow FQ33–FQ36 and package steps. This task publishes no package.
+
+## Round 12 integration boundary
+
+The revised G Fix 1 requires owner live approval before tests: do not add,
+change or run tests, investigate flakes, or run whole Vitest/Playwright or
+CI-local until that approval. The stopped fix's test edits have been reverted;
+accepted earlier tests are retained. Current evidence is limited to frontend
+typechecking, Biome on changed files, source comparison with alpha.47 and eight
+capture-only Plan/Board PNGs. Notification timing and CI-local are postponed.
+Earlier automated results in the G report are historical, not owner approval
+or acceptance of the revised picker. Native acceptance remains unrun.
+
+The R12-G candidate integrates shared file/import/moodboard/inbox state and URL validators. Read [the current verification](../verification/round12.md) for observed counts and limits; earlier handoffs are superseded only where that record supplies fresh evidence. Imports, seen cursors and feedback remain planning/bookkeeping. Native package/OS pickers/openers, owner data, real agents/adapters and actual-human usability remain unrun. The original ten v2 capabilities plus two moodboard capabilities make twelve. Revised G Fix 1 replaces the earlier CI/install plan: no CI-local or installs were run by the fix, and those checks await owner approval.

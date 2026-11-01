@@ -6,8 +6,11 @@ use serde_json::Value;
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CanvasReferenceLink {
+    /// Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations.
     item_id: Option<String>,
+    /// Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported.
     frame_id: Option<String>,
+    /// Target epic/story/task key in this project, e.g. JB-S3; required for associations.
     target_key: String,
 }
 
@@ -34,11 +37,43 @@ pub(crate) fn execute(
                 parse::<crate::server::Empty>(args)?;
                 value(store.get_project()?)?
             }
-            "list_epics" => {
-                parse::<crate::server::Empty>(args)?;
-                value(store.list_epics()?)?
+            "list_epics" => value(store.list_epics_with_ref(parse::<EpicListInput>(args)?)?)?,
+            "find" => value(store.find(parse::<FindInput>(args)?)?)?,
+            "import_plan" => value(store.import_plan(
+                &actor.id,
+                parse::<ImportPlanInput>(args)?,
+                ImportSource::Mcp,
+            )?)?,
+            "undo_import" => value(store.undo_import(&actor.id, parse::<UndoImportInput>(args)?)?)?,
+            "list_import_batches" => {
+                value(store.list_import_batches(parse::<ImportBatchListInput>(args)?)?)?
             }
-            "get_epic" => value(store.get_epic(&parse::<crate::server::Key>(args)?.key)?)?,
+            "move_story" => value(store.move_story(&actor.id, parse::<MoveStoryInput>(args)?)?)?,
+            "move_task_to_story" => {
+                value(store.move_task_to_story(&actor.id, parse::<MoveTaskToStoryInput>(args)?)?)?
+            }
+            "link_file" => value(store.link_file(&actor.id, parse::<LinkFileInput>(args)?)?)?,
+            "unlink_file" => value(store.unlink_file(&actor.id, parse::<UnlinkFileInput>(args)?)?)?,
+            "asset_usage" => value(store.asset_usage(&parse::<AssetReadInput>(args)?.asset_id)?)?,
+            "archive_asset" => {
+                value(store.archive_asset(&actor.id, parse::<AssetRequestInput>(args)?)?)?
+            }
+            "unarchive_asset" => {
+                value(store.unarchive_asset(&actor.id, parse::<AssetRequestInput>(args)?)?)?
+            }
+            "rename_asset" => {
+                value(store.rename_asset(&actor.id, parse::<RenameAssetInput>(args)?)?)?
+            }
+            "delete_asset" => {
+                value(store.delete_asset(&actor.id, parse::<DeleteAssetInput>(args)?)?)?
+            }
+            "replace_asset" => {
+                value(store.replace_asset(&actor.id, parse::<ReplaceAssetInput>(args)?)?)?
+            }
+            "list_asset_revisions" => {
+                value(store.list_asset_revisions(&parse::<AssetReadInput>(args)?.asset_id)?)?
+            }
+            "get_epic" => store.get_epic_compact(parse::<GetEpicInput>(args)?)?,
             "create_epic" => value(store.create_epic(&actor.id, parse(args)?)?)?,
             "update_epic" => {
                 let a: EpicEditInput = parse(args)?;
@@ -113,6 +148,10 @@ pub(crate) fn execute(
             }
             "wait_for_changes" => value(store.wait_for_changes(&actor.id, parse(args)?)?)?,
             "add_reference" => value(store.add_reference(&actor.id, parse(args)?)?)?,
+            "add_references" => value(store.add_references(&actor.id, parse(args)?)?)?,
+            "collect_kept_references" => {
+                value(store.collect_kept_references(&actor.id, parse(args)?)?)?
+            }
             "list_references" => {
                 let a: ReferenceListInput = parse(args)?;
                 value(store.list_references(
@@ -191,20 +230,26 @@ pub(crate) fn execute(
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct IdInput {
+    /// Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations.
     id: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ConnectInput {
+    /// Source reference ID, e.g. 01JFROM; required in this project.
     from: String,
+    /// Destination reference ID, e.g. 01JTO; required and different from the source.
     to: String,
+    /// Human-readable option or connection label, e.g. Keep existing; required for options, optional for connections.
     label: Option<String>,
 }
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ConnectionUpdate {
+    /// Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations.
     id: String,
+    /// Human-readable option or connection label, e.g. Keep existing; required for options, optional for connections.
     label: String,
 }
 
@@ -212,7 +257,7 @@ pub(crate) fn tools() -> Vec<Tool> {
     vec![
         tool::<CanvasQuery>(
             "get_canvas",
-            "Read the pinned project's ideas canvas: frames, references with world x/y, 200-character text, linked keys and human verdict (keep/reject/null), and directed edges. Frames expose explicit links. Notes expose attachedTo item IDs (centre inside or >=30% note-area overlap in world units). epicKey/frameId filters intersect; archived excluded by default; includeArchived returns archivedAt and archivedBy (human or agent display name; unknown historical actor is null). limit defaults to 100 (1..200), cursor is an offset across frames then references then edges. Follow nextCursor while truncated; pages are not an atomic snapshot. linkedKeys capped at 50 with linkedKeysTruncated.",
+            "Read the pinned project's ideas canvas: frames, references with world x/y, 200-character text, linked keys and human verdict (keep/reject/null), and directed edges. References include verdictNote, sourceUrl, origin, derivedFrom and copiedFrom. Frames expose review counts/sent state and explicit links. verdict filters keep/reject/unrated references and keeps notes attached to a shown reference. Notes expose attachedTo item IDs (centre inside or >=30% note-area overlap in world units). epicKey/frameId filters intersect; archived excluded by default; includeArchived returns archivedAt and archivedBy (human or agent display name; unknown historical actor is null). limit defaults to 100 (1..200), cursor is an offset across frames then references then edges. Follow nextCursor while truncated; pages are not an atomic snapshot. linkedKeys capped at 50 with linkedKeysTruncated.",
             true,
         ),
         tool::<CanvasFrameCreate>(
@@ -270,14 +315,89 @@ pub(crate) fn tools() -> Vec<Tool> {
             "Read the active project's template, dates, suggested tags and hierarchy counts. Non-jam projects use milestoneAt rather than a countdown.",
             true,
         ),
-        tool::<crate::server::Empty>(
+        tool::<EpicListInput>(
             "list_epics",
             "List non-archived epics in project order, including their brain and worker model.",
             true,
         ),
-        tool::<crate::server::Key>(
+        tool::<FindInput>(
+            "find",
+            "Read compact versions by stable board keys or externalRefs; no record content. At most 500 keys and 500 references per call.",
+            true,
+        ),
+        tool::<ImportPlanInput>(
+            "import_plan",
+            "Preview or atomically apply an ordered plan by externalRef, up to 1000 records. Never starts work. Dry run first; overwrite human conflicts only with their agreement. A true no-op writes nothing.",
+            false,
+        ),
+        tool::<UndoImportInput>(
+            "undo_import",
+            "Undo untouched items from an import batch; preserve items edited after it. A second undo returns already_undone. Never starts work.",
+            false,
+        ),
+        tool::<ImportBatchListInput>(
+            "list_import_batches",
+            "Read newest import batches in this project, including actor, counts and undo status; default 5, maximum 20.",
+            true,
+        ),
+        tool::<MoveStoryInput>(
+            "move_story",
+            "Move a draft or active story to another epic while retaining its key. Tasks in progress or review block the move. Does not start work.",
+            false,
+        ),
+        tool::<MoveTaskToStoryInput>(
+            "move_task_to_story",
+            "Move a Backlog or Ready task to another story while retaining its key and state. Requires captured task validators. Readiness is re-evaluated; this does not start work.",
+            false,
+        ),
+        tool::<LinkFileInput>(
+            "link_file",
+            "Link an existing asset to project, epic, story or task scope. Task links require captured validators; linking never starts work. requestId is optional and recommended.",
+            false,
+        ),
+        tool::<UnlinkFileInput>(
+            "unlink_file",
+            "Remove only a file association. The file bytes remain untouched. Task scope requires captured task validators; requestId is optional and recommended.",
+            false,
+        ),
+        tool::<AssetReadInput>(
+            "asset_usage",
+            "Read every task, planning scope, canvas item, cover and component that uses this project asset.",
+            true,
+        ),
+        tool::<AssetRequestInput>(
+            "archive_asset",
+            "Hide an asset from default lists while retaining its associations and bytes. Prefer archive over delete; requestId is optional and recommended.",
+            false,
+        ),
+        tool::<AssetRequestInput>(
+            "unarchive_asset",
+            "Show an archived asset again, preserving its associations and bytes. requestId is optional and recommended.",
+            false,
+        ),
+        tool::<RenameAssetInput>(
+            "rename_asset",
+            "Change only the display name. The disk name and stored path stay unchanged; requestId is optional and recommended.",
+            false,
+        ),
+        tool::<DeleteAssetInput>(
+            "delete_asset",
+            "Delete an asset after inspecting usage. Without force, in-use assets return usage and remain unchanged. Force removes links and archives canvas items. Board bytes move to trash; linked-file bytes are never touched. Never use force unless the human requested it.",
+            false,
+        ),
+        tool::<ReplaceAssetInput>(
+            "replace_asset",
+            "Replace board bytes while retaining their previous revision; linked files change path and URLs change their URL. requestId is optional and recommended.",
+            false,
+        ),
+        tool::<AssetReadInput>(
+            "list_asset_revisions",
+            "Read retained board-file revisions newest first, including their checked local paths. Restoring revisions is outside this contract.",
+            true,
+        ),
+        tool::<GetEpicInput>(
             "get_epic",
-            "Read an epic tree, task readiness, the last 30 journal rows and open questions. Example: key=JB-E1.",
+            "Read compact epic intent and counts. depth defaults to stories; tasks adds compact task rows. Readiness, journal, questions and files are opt-in. Example: key=JB-E1.",
             true,
         ),
         tool::<NewEpic>(
@@ -385,6 +505,16 @@ pub(crate) fn tools() -> Vec<Tool> {
             "Add a readable local asset, URL or note without fetching links. copy:true copies an asset (at most 50 MiB) to managed references storage; otherwise its original path is retained. Optionally place it in a frame and link it to work.",
             false,
         ),
+        tool::<AddReferencesInput>(
+            "add_references",
+            "Add 1–50 references in one call. Valid items are created; invalid ones are listed in `failed` and can be retried with a new requestId. Placement is automatic. Use `#<index>` in derivedFrom to point at an earlier item of the same batch.",
+            false,
+        ),
+        tool::<CollectKeptInput>(
+            "collect_kept_references",
+            "Collect active Keep references from 1–20 frames into a new sectioned frame, sharing assets and clearing feedback. sourceFrameIds order is section order; requestId is required for safe retries. Optional title and linkTo.",
+            false,
+        ),
         tool::<ReferenceListInput>(
             "list_references",
             "List active references, optionally filtered by epicKey, storyKey or taskKey (union). Includes items through explicitly linked frames and legacy epic frames without duplicates; inherited items have via:frame, frameId and frameTitle, while direct links take precedence. Returns human verdict; archived items are hidden.",
@@ -430,6 +560,10 @@ pub(crate) fn epic_markdown(tree: &EpicTree) -> String {
         ("Open questions", &e.open_questions_md),
     ] {
         md.push_str(&format!("## {heading}\n\n{text}\n\n"));
+    }
+    md.push_str("## Files\n\n");
+    for file in &tree.scope_files {
+        md.push_str(&format!("- {} · {}\n", file.asset_id, file.role));
     }
     md.push_str("## Work tree\n\n");
     for story in &tree.stories {
@@ -486,6 +620,10 @@ pub(crate) fn story_markdown(tree: &StoryTree) -> String {
         ("Open decisions", &s.open_decisions_md),
     ] {
         md.push_str(&format!("## {heading}\n\n{text}\n\n"));
+    }
+    md.push_str("## Files\n\n");
+    for file in &tree.scope_files {
+        md.push_str(&format!("- {} · {}\n", file.asset_id, file.role));
     }
     md.push_str("## Acceptance\n\n");
     for a in &s.acceptance {
@@ -581,13 +719,30 @@ pub(crate) fn task_markdown(t: &TaskDetail) -> String {
 }
 pub(crate) fn prompt(name: &str) -> Option<String> {
     let mut text: String = match name{
-    "plan_epic"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Inspect the requested existing epic, its stories/tasks, questions, comments and linked sources before proposing changes; reconcile human edits without duplicating existing work. Create a draft epic only when a new one is intended. Use become_brain only for an unassigned epic after explicit appointment, never to replace another brain. Record the agreed participation/reviewer/workerModel, create or refine stories with intent cards and mandatory acceptance, and tasks with complete Goal, Context, Where, Changes, Tests, Boundaries and Result briefs. Fill an EMPTY task description with a concise human-readable outcome in the language of the original human notes or latest human request; if unclear, ask which language. Preserve existing human descriptions and wishes without automatic translation or rewriting; use the story outcome for its human description and the structured brief for implementation detail. Activate complete epics/stories, check_ready and mark_ready for actionable tasks using expectedClaimGeneration and expectedUpdatedAt from get_task. Use those captured validators for every task edit/brief edit/status/archive intent; on conflict reread and reconcile instead of replaying, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Planning stays planning even when a scope is already running. Only a later, separately requested execution phase may coordinate workers within the human-started scope without requesting approval for each worker. Keep unresolved decisions visible as questions. Never invent the user's worker model.".into(),
-    "work_on_next_task"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task, including the story acceptance and epic scope/model. Call get_execution for the story and confirm effectiveState=running before claim_task. Supply expectedClaimGeneration and expectedUpdatedAt from the task you inspected; retain the returned claimGeneration for this work attempt. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. submit_report with expectedClaimGeneration from that claim, summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. A stale_claim/conflict means the context changed: reread and reconcile, never fetch a new token merely to replay old evidence. Task edits, brief edits, moves, Ready and archive require both expectedClaimGeneration and expectedUpdatedAt from the context you decided against. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
-    "review_task"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. As the appointed brain, read get_task and its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Retain the exact report ID and TaskDetail.reviewContextRevision while assessing it. Call review_task with expectedReportId and expectedReviewContextRevision from that inspected snapshot, never an auto-refreshed latest token; on conflict inspect the new context and reconsider. Use accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and follow the shared observation policy below for human corrections and recovery.".into(),
+    "plan_epic"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. Interview the human in rounds using ask_user and wait_for_answer; a recommendation is not permission for an irreversible action. Play back Goal, Done when, Not included and Decided and obtain confirmation. Inspect the requested existing epic with depth=tasks and include=[readiness,journal,questions,files], and read task comments and linked sources explicitly before proposing changes; reconcile human edits without duplicating existing work. Create a draft epic only when a new one is intended. Use become_brain only for an unassigned epic after explicit appointment, never to replace another brain. Record the agreed participation/reviewer/workerModel, create or refine stories with intent cards and mandatory acceptance, and tasks with complete Goal, Context, Where, Changes, Tests, Boundaries and Result briefs. Fill an EMPTY task description with a concise human-readable outcome in the language of the original human notes or latest human request; if unclear, ask which language. Preserve existing human descriptions and wishes without automatic translation or rewriting; use the story outcome for its human description and the structured brief for implementation detail. Activate complete epics/stories, check_ready and mark_ready for actionable tasks using expectedClaimGeneration and expectedUpdatedAt from get_task. Use those captured validators for every task edit/brief edit/status/archive intent; on conflict reread and reconcile instead of replaying, then set_status scoped to the epic. Planning and Ready do not authorize execution. If the human asks to start, request_execution for that exact story or epic and wait for typed Inbox approval; do not treat generic question answers or chat text as a grant. Planning stays planning even when a scope is already running. Only a later, separately requested execution phase may coordinate workers within the human-started scope without requesting approval for each worker. Keep unresolved decisions visible as questions. Never invent the user's worker model.".into(),
+    "work_on_next_task"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. Prefer changesRequested tasks already assigned to you; otherwise choose the highest-priority unassigned ready task. Read get_task with include=[story,epic,references,reports,reviews,comments] to inspect story acceptance, epic scope/model and preserved evidence. Call get_execution for the story and confirm effectiveState=running before claim_task. Supply expectedClaimGeneration and expectedUpdatedAt from the task you inspected; retain the returned claimGeneration for this work attempt. If paused, wait for the human to start the scope; do not work or request a grant as a worker. Work within the brief; ask_user and wait_for_answer if a material decision is missing, and publish set_status. submit_report with expectedClaimGeneration from that claim, summaryMd, changedFiles, named tests (command, expected, actual, PASS/FAIL/NOT_RUN), deviationsMd and notVerifiedMd. A stale_claim/conflict means the context changed: reread and reconcile, never fetch a new token merely to replay old evidence. Task edits, brief edits, moves, Ready and archive require both expectedClaimGeneration and expectedUpdatedAt from the context you decided against. Do not mark your work done or review your own task; the brain/human reviews it.".into(),
+    "review_task"=>"Read the connected tool schemas first. The board-owned jam://guide and jam://guide/operations resources provide the current workflow. No external playbook or universal brain skill is required; do not install anything automatically. As the appointed brain, read get_task with include=[story,epic,references,reports,reviews,comments,activity] and inspect its current report. Compare actual results with the brief's tests, the story's mandatory acceptance and the epic's goal/done-when/not-included. Check preserved behavior and distinguish observed evidence from assumptions. Retain the exact report ID and TaskDetail.reviewContextRevision while assessing it. Call review_task with expectedReportId and expectedReviewContextRevision from that inspected snapshot, never an auto-refreshed latest token; on conflict inspect the new context and reconsider. Use accept only when mandatory evidence is sufficient; otherwise use changes_requested, explain corrections and name failed report tests. Never review your own worker submission. Publish set_status and follow the shared observation policy below for human corrections and recovery.".into(),
     _=>return None,
 };
     text.push_str("\n\n");
     text.push_str(OBSERVATION_GUIDANCE);
+    Some(text)
+}
+pub(crate) fn prompt_with_args(
+    name: &str,
+    epic_key: Option<&str>,
+    tag: Option<&str>,
+) -> Option<String> {
+    let mut text = prompt(name)?;
+    if let Some(epic_key) = epic_key {
+        text.push_str(&format!(
+            " Work within epicKey={}",
+            serde_json::json!(epic_key)
+        ));
+    }
+    if let Some(tag) = tag.filter(|_| name == "work_on_next_task") {
+        text.push_str(&format!(" Filter tasks by tag={}", serde_json::json!(tag)));
+    }
     Some(text)
 }
 
@@ -685,18 +840,26 @@ mod tests {
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AgentBriefEdit {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
     #[serde(flatten)]
+    /// Update fields; omitted fields keep their values. Example: {"title":"Revised title"}.
     patch: BriefPatch,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     expected_updated_at: String,
 }
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AgentReady {
+    /// Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations.
     key: String,
+    /// Reason for a permitted human override; omitted uses normal validation. Example: Review manually accepted this evidence.
     override_reason: Option<String>,
+    /// Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3.
     expected_claim_generation: String,
+    /// Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection.
     expected_updated_at: String,
 }
 impl AgentBriefEdit {

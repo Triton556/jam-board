@@ -10,6 +10,12 @@ import {
   type MockExecutionData,
 } from "./mock-execution";
 import {
+  MockImport,
+  type MockImportRecord,
+  seededImportRecords,
+} from "./mock-import";
+import { attachMockMoodboard, mockMoodboardApi } from "./mock-moodboard";
+import {
   MockPlanning,
   mockReadiness,
   type PlanData,
@@ -47,7 +53,7 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
-import { emptyBoard, JamError, statuses } from "./types";
+import { emptyBoard, JamError, stablePayload, statuses } from "./types";
 export type AgentSimulation = {
   action:
     | "task.created"
@@ -76,6 +82,7 @@ export type AgentSimulation = {
 };
 const clone = <T>(value: T): T => structuredClone(value);
 type MockProjectSnapshot = {
+  round12: Round12State;
   state: AppState;
   tasks: TaskDetail[];
   planData: PlanData;
@@ -87,7 +94,491 @@ type MockProjectSnapshot = {
   canvasViewportValue: string | null;
   archived: boolean;
 };
+type Round12State = {
+  files: unknown;
+  imports: ReturnType<MockImport["exportState"]> | null;
+  inboxSeen: Record<string, number>;
+  receipts: Record<string, { payload: string; result: unknown }>;
+  moodboardReceipts?: Map<
+    string,
+    { payload: string; result: import("../bindings").CollectKeptResult }
+  >;
+};
+const emptyRound12 = (): Round12State => ({
+  files: null,
+  imports: null,
+  inboxSeen: {},
+  receipts: {},
+});
 export class MockBridge implements JamApi {
+  round12 = emptyRound12();
+  fileViewer: JamApi["fileViewer"] = async () =>
+    (await import("./mock-files-v2")).mockFilesFor(this);
+  moodboard: JamApi["moodboard"] = async () => {
+    const module = await import("./mock-moodboard");
+    const project = this.currentProjectId,
+      epoch = this.folders.epoch,
+      data = this.canvasData;
+    const check = () => {
+      if (project !== this.currentProjectId || epoch !== this.folders.epoch)
+        throw new JamError(
+          "conflict",
+          "The project changed. Reopen the review.",
+        );
+    };
+    const captured = {
+      ...this.canvasContext,
+      data: () => {
+        check();
+        return data;
+      },
+      human: () => {
+        check();
+        return this.human();
+      },
+      jam: () => {
+        check();
+        return project ?? "";
+      },
+      save: () => {
+        check();
+        this.checkpoint();
+      },
+      changed: (...args: Parameters<typeof this.canvasContext.changed>) => {
+        check();
+        this.canvasContext.changed(...args);
+      },
+    };
+    const invoke = <T>(run: () => Promise<T>) => {
+      check();
+      module.attachMockMoodboard(captured);
+      return run();
+    };
+    return {
+      feedback: (input) =>
+        invoke(() => module.mockMoodboardApi.feedback(input)),
+      update: (id, patch) =>
+        invoke(() => module.mockMoodboardApi.update(id, patch)),
+      send: (id) => invoke(() => module.mockMoodboardApi.send(id)),
+      collect: (input) => invoke(() => module.mockMoodboardApi.collect(input)),
+    };
+  };
+  async markInboxEventsSeen(seq: number) {
+    if (!Number.isSafeInteger(seq) || seq < 0)
+      throw new JamError("validation", "seq must be a non-negative integer");
+    const id = this.human().id;
+    this.round12.inboxSeen[id] = Math.max(this.round12.inboxSeen[id] ?? 0, seq);
+    this.checkpoint();
+    return this.round12.inboxSeen[id];
+  }
+  resetInboxActivity(rows: import("./mock-inbox-events").MockInboxActivity[]) {
+    const human = this.human(),
+      agents = this.members.filter((m) => m.kind === "agent");
+    this.activity = rows.map((row) => ({
+      ...row,
+      epicId:
+        this.planData.epics.find((epic) => epic.key === row.epicKey)?.id ??
+        null,
+      actor:
+        row.actor.kind === "human"
+          ? human
+          : (agents.find((m) => m.name === row.actor.name) ??
+            agents[0] ??
+            human),
+      taskKey: row.taskKey,
+      payload: {
+        frameId: row.frameId ?? null,
+        frameTitle: row.frameTitle ?? null,
+        requestId: row.requestId ?? null,
+        storyKey: row.storyKey ?? null,
+      },
+    }));
+    this.round12.inboxSeen = {};
+    this.checkpoint();
+  }
+  listInboxEvents: JamApi["listInboxEvents"] = async (query) => {
+    const { listMockInboxEvents } = await import("./mock-inbox-events");
+    const viewer = this.human();
+    return listMockInboxEvents(query, {
+      viewer,
+      seenSeq: this.round12.inboxSeen[viewer.id] ?? 0,
+      activity: this.activity.map((event) => {
+        const p = (event.payload ?? {}) as Record<string, string>;
+        const task = this.tasks.find((t) => t.key === event.taskKey);
+        const epic = this.planData.epics.find((e) => e.id === event.epicId);
+        return {
+          ...event,
+          epicId: event.epicId ?? null,
+          taskKey: event.taskKey ?? undefined,
+          epicKey: epic?.key,
+          storyKey: task?.storyKey ?? p.storyKey,
+          frameId: p.frameId,
+          frameTitle: p.frameTitle,
+          requestId: p.requestId,
+          sentence:
+            event.sentence ||
+            `${event.actor.name} ${event.action.replaceAll(".", " ")}${event.taskKey ? ` ${event.taskKey}` : ""}`,
+        };
+      }),
+    });
+  };
+  applyFileState(state: {
+    overrides: Map<string, import("../bindings").FileAsset>;
+    deleted: Set<string>;
+    removedCanvas: Set<string>;
+  }) {
+    for (const [id, asset] of state.overrides) {
+      const index = this.assets.findIndex((a) => a.id === id);
+      if (index >= 0) this.assets[index] = clone(asset);
+    }
+    this.assets = this.assets.filter((a) => !state.deleted.has(a.id));
+    for (const task of this.tasks) {
+      task.assets = task.assets
+        .filter((a) => !state.deleted.has(a.id))
+        .map((a) => clone(this.assets.find((row) => row.id === a.id) ?? a));
+      task.files = task.files
+        ?.filter((f) => !state.deleted.has(f.asset.id))
+        .map((f) => ({
+          ...f,
+          asset: clone(state.overrides.get(f.asset.id) ?? f.asset),
+        }));
+    }
+    for (const item of this.canvasData.items)
+      if (state.removedCanvas.has(item.id)) {
+        item.archivedAt = new Date().toISOString();
+        item.assetId = null;
+      }
+    this.filesChanged();
+  }
+  private importModel() {
+    const model = new MockImport([], this.state.jam?.keyPrefix ?? "JB");
+    if (this.round12.imports) model.restoreState(clone(this.round12.imports));
+    const all = [
+      ...this.planData.epics.map((e) => ({
+        kind: "epic" as const,
+        entity: e,
+        parent: null,
+      })),
+      ...this.planData.stories.map((s) => ({
+        kind: "story" as const,
+        entity: s,
+        parent:
+          this.planData.epics.find((e) => e.id === s.epicId)?.externalRef ??
+          null,
+      })),
+      ...this.tasks.map((t) => ({
+        kind: "task" as const,
+        entity: t,
+        parent:
+          this.planData.stories.find((s) => s.id === t.storyId)?.externalRef ??
+          null,
+      })),
+    ];
+    for (const { kind, entity, parent } of all) {
+      if (!entity.externalRef) continue;
+      let record = model.records.find(
+        (r) => r.kind === kind && r.key === entity.key,
+      );
+      if (!record) {
+        record = {
+          kind,
+          key: entity.key,
+          externalRef: entity.externalRef,
+          parent,
+          fields: {},
+          status: entity.status,
+          updatedAt: entity.updatedAt,
+          position: entity.position ?? 0,
+        };
+        model.records.push(record);
+      }
+      const keys = new Set(["title", ...Object.keys(record.fields)]);
+      for (const key of keys)
+        if (key in entity)
+          record.fields[key] =
+            (
+              entity as unknown as Record<
+                string,
+                import("../bindings").JsonPayload
+              >
+            )[key] ?? null;
+      record.parent = parent;
+      record.status = entity.status;
+      record.updatedAt = entity.updatedAt;
+      record.archived = !!entity.archivedAt;
+    }
+    model.keyFloor = Object.fromEntries(
+      ["epic", "story", "task"].map((kind) => [
+        kind,
+        Math.max(
+          0,
+          ...all
+            .filter((r) => r.kind === kind)
+            .map((r) => Number(r.entity.key.match(/\d+$/)?.[0] ?? 0)),
+        ),
+      ]),
+    );
+    return model;
+  }
+  private async applyImportRecords(records: MockImportRecord[]) {
+    const retained = this.snapshot(),
+      listeners = this.listeners,
+      persist = this.persist;
+    this.listeners = new Set();
+    this.persist = false;
+    const activityCount = this.activity.length;
+    try {
+      for (const r of records) {
+        let entity:
+          | import("../bindings").Epic
+          | import("../bindings").Story
+          | TaskDetail
+          | undefined;
+        if (r.kind === "epic") {
+          entity = this.planData.epics.find((e) => e.key === r.key);
+          if (!entity) {
+            entity = await this.planning.createEpic({
+              title: String(r.fields.title),
+            });
+            entity = this.planData.epics.find((e) => e.id === entity?.id);
+          }
+        } else if (r.kind === "story") {
+          const parent = this.planData.epics.find(
+            (e) => e.externalRef === r.parent,
+          );
+          if (!parent) continue;
+          entity = this.planData.stories.find((s) => s.key === r.key);
+          if (!entity) {
+            entity = await this.planning.createStory({
+              epicKey: parent.key,
+              title: String(r.fields.title),
+            });
+            entity = this.planData.stories.find((s) => s.id === entity?.id);
+          }
+          if (entity)
+            (entity as import("../bindings").Story).epicId = parent.id;
+        } else {
+          const parent = this.planData.stories.find(
+            (s) => s.externalRef === r.parent,
+          );
+          if (!parent) continue;
+          entity = this.tasks.find((t) => t.key === r.key);
+          if (!entity) {
+            const created = this.create(
+              {
+                title: String(r.fields.title),
+                status: "backlog",
+                storyKey: parent.key,
+              },
+              this.human(),
+              true,
+            );
+            entity = this.tasks.find((t) => t.id === created.id);
+          }
+          if (entity) {
+            const task = entity as TaskDetail;
+            task.storyId = parent.id;
+            task.storyKey = parent.key;
+            task.epicId = parent.epicId;
+          }
+        }
+        if (!entity) continue;
+        Object.assign(entity, r.fields, {
+          key: r.key,
+          externalRef: r.externalRef,
+          position: r.position,
+          updatedAt: r.updatedAt,
+          archivedAt: r.archived ? r.updatedAt : null,
+        });
+        if (r.kind === "task") {
+          const task = entity as TaskDetail;
+          if (typeof r.fields.description === "string")
+            task.descriptionMd = r.fields.description;
+          for (const key of Object.keys(task.brief))
+            if (key in r.fields)
+              Object.assign(task.brief, { [key]: r.fields[key] });
+        }
+      }
+      this.planning.sync();
+      this.activity.length = activityCount;
+    } catch (error) {
+      const { archived: _archived, ...state } = retained;
+      Object.assign(this, state);
+      throw error;
+    } finally {
+      this.listeners = listeners;
+      this.persist = persist;
+    }
+  }
+  importPlan: JamApi["importPlan"] = async (context, input) => {
+    await this.call("import_plan", input);
+    if (context.projectId !== this.currentProjectId)
+      throw new JamError("conflict", "The project changed");
+    const model = this.importModel();
+    const result = await model.importPlan(input);
+    for (const move of result.moved.filter((row) => row.kind === "story")) {
+      const story = this.planData.stories.find((row) => row.key === move.key);
+      if (!story) continue;
+      const blocking = this.tasks.filter(
+        (task) =>
+          task.storyId === story.id &&
+          !task.archivedAt &&
+          ["in_progress", "review"].includes(task.status),
+      );
+      if (!["draft", "active"].includes(story.status) || blocking.length)
+        throw new JamError(
+          "wrong_status",
+          `Stories with tasks in progress or review can't move. ${blocking.map((task) => task.key).join(", ")}`,
+        );
+    }
+    if (!input.dryRun && !result.noChanges) {
+      await this.applyImportRecords(model.records);
+      this.round12.imports = clone(model.exportState());
+      if (result.batchId)
+        this.event("import_applied", this.human(), undefined, {
+          batchId: result.batchId,
+        });
+      else this.checkpoint();
+    }
+    return result;
+  };
+  undoImport: JamApi["undoImport"] = async (context, batchId, requestId) => {
+    if (context.projectId !== this.currentProjectId)
+      throw new JamError("conflict", "The project changed");
+    return this.receipted("undo_import", requestId, { batchId }, async () => {
+      const model = this.importModel();
+      const result = await model.undoImport(batchId);
+      await this.applyImportRecords(model.records);
+      this.round12.imports = clone(model.exportState());
+      this.event("import_undone", this.human(), undefined, { batchId });
+      return result;
+    });
+  };
+  listImportBatches: JamApi["listImportBatches"] = async (context) => {
+    if (context.projectId !== this.currentProjectId)
+      throw new JamError("conflict", "The project changed");
+    return this.importModel().listImportBatches();
+  };
+  private async receipted<T>(
+    tool: string,
+    id: string,
+    input: unknown,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    if (!id.trim() || id.length > 100)
+      throw new JamError("validation", "Use a requestId of 1–100 characters");
+    const state = this.round12;
+    const key = `${this.human().id}:${tool}:${id}`,
+      payload = stablePayload(input);
+    const receipt = state.receipts[key];
+    if (receipt) {
+      if (receipt.payload !== payload)
+        throw new JamError("idempotency_conflict", "Use a new requestId");
+      return clone(receipt.result as T);
+    }
+    const result = await run();
+    state.receipts[key] = { payload, result: clone(result) };
+    this.checkpoint();
+    return result;
+  }
+  moveStory: JamApi["moveStory"] = async (context, input) => {
+    await this.call("move_story", input);
+    if (context.projectId !== this.currentProjectId)
+      throw new JamError("conflict", "The project changed");
+    return this.receipted("move_story", input.requestId, input, async () => {
+      const story = this.planning.story(input.key),
+        epic = this.planning.epic(input.toEpicKey);
+      if (
+        input.expectedUpdatedAt &&
+        story.updatedAt !== input.expectedUpdatedAt
+      )
+        throw new JamError("conflict", "Story changed after the move");
+      const blocking = this.tasks.filter(
+        (t) =>
+          t.storyId === story.id &&
+          !t.archivedAt &&
+          ["in_progress", "review"].includes(t.status),
+      );
+      if (!["draft", "active"].includes(story.status) || blocking.length)
+        throw new JamError(
+          "wrong_status",
+          `Stories with tasks in progress or review can't move. ${blocking.map((t) => t.key).join(", ")}`,
+        );
+      const from = this.planning.epic(story.epicId);
+      story.epicId = epic.id;
+      story.updatedAt = new Date(
+        Math.max(Date.now(), Date.parse(story.updatedAt) + 1),
+      ).toISOString();
+      const siblings = this.planData.stories
+        .filter((s) => s.epicId === epic.id && s.id !== story.id)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const before = siblings.findIndex((s) => s.key === input.beforeKey),
+        after = siblings.findIndex((s) => s.key === input.afterKey);
+      siblings.splice(
+        before >= 0 ? before : after >= 0 ? after + 1 : siblings.length,
+        0,
+        story,
+      );
+      siblings.forEach((s, i) => {
+        s.position = (i + 1) * 1024;
+      });
+      for (const task of this.tasks.filter((t) => t.storyId === story.id))
+        task.epicId = epic.id;
+      this.planning.sync();
+      for (const id of new Set([from.id, epic.id]))
+        this.event(
+          "story_moved",
+          this.human(),
+          undefined,
+          { fromKey: from.key, toKey: epic.key, storyKey: story.key },
+          id,
+        );
+      return clone(story) as import("../bindings").Story_Serialize;
+    });
+  };
+  moveTaskToStory: JamApi["moveTaskToStory"] = async (context, input) => {
+    await this.call("move_task_to_story", input);
+    if (context.projectId !== this.currentProjectId)
+      throw new JamError("conflict", "The project changed");
+    return this.receipted(
+      "move_task_to_story",
+      input.requestId,
+      input,
+      async () => {
+        const task = this.find(input.key),
+          story = this.planning.story(input.toStoryKey);
+        if (!["backlog", "ready"].includes(task.status))
+          throw new JamError(
+            "wrong_status",
+            "Only Backlog and Ready tasks can move",
+          );
+        if (
+          task.updatedAt !== input.expectedUpdatedAt ||
+          (task.claimGeneration ?? "0") !== input.expectedClaimGeneration
+        )
+          throw new JamError("conflict", "Task changed — reload");
+        const fromKey = task.story.key;
+        task.storyId = story.id;
+        task.epicId = story.epicId;
+        task.position =
+          Math.max(
+            0,
+            ...this.tasks
+              .filter((t) => t.storyId === story.id)
+              .map((t) => t.position ?? 0),
+          ) + 1024;
+        task.updatedAt = new Date(
+          Math.max(Date.now(), Date.parse(task.updatedAt) + 1),
+        ).toISOString();
+        this.planning.sync(task);
+        this.event("task_moved_to_story", this.human(), task, {
+          fromKey,
+          toKey: story.key,
+        });
+        return clone(task) as import("../bindings").TaskDetail_Serialize;
+      },
+    );
+  };
   readonly folders = new MockProjectFolders(this);
   readonly taskFiles = new MockTaskFiles(this);
   folderSnapshots: Record<string, MockProjectSnapshot> = {};
@@ -226,6 +717,7 @@ export class MockBridge implements JamApi {
   private projects: Record<string, MockProjectSnapshot> = {};
   private snapshot(archived = false): MockProjectSnapshot {
     return clone({
+      round12: this.round12,
       state: this.state,
       tasks: this.tasks,
       planData: this.planData,
@@ -246,6 +738,7 @@ export class MockBridge implements JamApi {
     const theme = this.state.theme;
     const { archived: _archived, ...data } = clone(project);
     Object.assign(this, data);
+    this.round12 = data.round12 ?? emptyRound12();
     this.executionData = data.executionData ?? emptyExecution();
     this.state.theme = theme;
     this.state.hasJam = true;
@@ -325,7 +818,7 @@ export class MockBridge implements JamApi {
     return this.loadDemoJam();
   }
   private canvasData = emptyCanvas();
-  private canvas = new MockReferences({
+  private canvasContext = {
     data: () => this.canvasData,
     epics: () => this.planData.epics,
     targets: () => [
@@ -339,7 +832,9 @@ export class MockBridge implements JamApi {
     changed: (a, actor, p, e) => this.event(a, actor, undefined, p, e),
     call: (c, i) => this.call(c, i),
     save: () => this.checkpoint(),
-  });
+    receipts: () => (this.round12.moodboardReceipts ??= new Map()),
+  } satisfies import("./mock-references").MockReferencesContext;
+  private canvas = new MockReferences(this.canvasContext);
   referenceCanvas: JamApi["referenceCanvas"] = async () => {
     const data = await this.canvas.snapshot();
     return {
@@ -353,11 +848,7 @@ export class MockBridge implements JamApi {
     };
   };
   async setReferenceVerdict(itemId: string, verdict: ReferenceVerdict) {
-    await this.call("set_reference_verdict", { input: { itemId, verdict } });
-    const item: VerdictItem = this.canvas.item(itemId);
-    item.verdict = verdict;
-    this.canvas.change("reference.updated", itemId);
-    return clone(item);
+    return (await this.moodboard()).feedback({ itemId, verdict });
   }
   openReferenceFile = async (path: string) => {
     await this.call("open_reference_file", { path });
@@ -469,6 +960,8 @@ export class MockBridge implements JamApi {
         color: `m${(n % 6) + 1}`,
         archivedAt: null,
         collapsed: false,
+        links: [],
+        review: null,
       });
     for (let n = 0; n < count; n++) {
       const f = this.canvasData.frames[n % frameCount],
@@ -489,6 +982,11 @@ export class MockBridge implements JamApi {
         });
       this.canvasData.items.push({
         verdict: null,
+        verdictNote: null,
+        sourceUrl: null,
+        origin: null,
+        derivedFrom: null,
+        copiedFrom: null,
         archivedBy: null,
         id: `perf-item-${n}`,
         jamId,
@@ -602,14 +1100,37 @@ export class MockBridge implements JamApi {
     journal: await this.epicJournal(key),
   });
   getStory = (key: string) => this.planning.getStory(key);
-  createEpic: JamApi["createEpic"] = (input) => this.planning.createEpic(input);
+  createEpic: JamApi["createEpic"] = (input) =>
+    this.receipted(
+      "create_epic",
+      input.requestId ?? crypto.randomUUID(),
+      input,
+      async () => {
+        const row = await this.planning.createEpic(input);
+        Object.assign(this.planning.epic(row.key), {
+          externalRef: input.externalRef ?? null,
+        });
+        return { ...row, externalRef: input.externalRef ?? null };
+      },
+    );
   updateEpic: JamApi["updateEpic"] = (key, patch) =>
     this.planning.updateEpic(key, patch);
   setEpicStatus: JamApi["setEpicStatus"] = (...a) =>
     this.planning.setEpicStatus(...a);
   setBrain: JamApi["setBrain"] = (...a) => this.planning.setBrain(...a);
-  createStory: JamApi["createStory"] = (...a) =>
-    this.planning.createStory(...a);
+  createStory: JamApi["createStory"] = (input) =>
+    this.receipted(
+      "create_story",
+      input.requestId ?? crypto.randomUUID(),
+      input,
+      async () => {
+        const row = await this.planning.createStory(input);
+        Object.assign(this.planning.story(row.key), {
+          externalRef: input.externalRef ?? null,
+        });
+        return { ...row, externalRef: input.externalRef ?? null };
+      },
+    );
   updateStory: JamApi["updateStory"] = (...a) =>
     this.planning.updateStory(...a);
   setStoryStatus: JamApi["setStoryStatus"] = (...a) =>
@@ -692,7 +1213,13 @@ export class MockBridge implements JamApi {
       try {
         const raw = sessionStorage.getItem("jam.mock");
         if (raw) {
-          const { contexts, ...stored } = JSON.parse(raw);
+          const { contexts, ...stored } = JSON.parse(raw, (_key, value) =>
+            value?.__r12Map
+              ? new Map(value.__r12Map)
+              : value?.__r12Set
+                ? new Set(value.__r12Set)
+                : value,
+          );
           if (contexts)
             stored.tasks = stored.tasks.map(
               ({ context, ...task }: TaskDetail & { context: number }) => ({
@@ -727,27 +1254,36 @@ export class MockBridge implements JamApi {
         });
         sessionStorage.setItem(
           "jam.mock",
-          JSON.stringify({
-            projects: this.projects,
-            folderSnapshots: this.folderSnapshots,
-            skillPath: this.skillPath,
-            canvasData: this.canvasData,
-            canvasViewportValue: this.canvasViewportValue,
-            planData: this.planData,
-            executionData: this.executionData,
-            state: this.state,
-            tasks,
-            contexts,
-            members: this.members,
-            activity: this.activity,
-            assets: this.assets,
-            soundEnabled: this.soundEnabled,
-            boardSettings: this.boardSettings,
-            assetsView: this.assetsView,
-            collapsedAssetKinds: this.collapsedAssetKinds,
-            httpEnabled: this.httpEnabled,
-            mockToken: this.mockToken,
-          }),
+          JSON.stringify(
+            {
+              round12: this.round12,
+              projects: this.projects,
+              folderSnapshots: this.folderSnapshots,
+              skillPath: this.skillPath,
+              canvasData: this.canvasData,
+              canvasViewportValue: this.canvasViewportValue,
+              planData: this.planData,
+              executionData: this.executionData,
+              state: this.state,
+              tasks,
+              contexts,
+              members: this.members,
+              activity: this.activity,
+              assets: this.assets,
+              soundEnabled: this.soundEnabled,
+              boardSettings: this.boardSettings,
+              assetsView: this.assetsView,
+              collapsedAssetKinds: this.collapsedAssetKinds,
+              httpEnabled: this.httpEnabled,
+              mockToken: this.mockToken,
+            },
+            (_key, value) =>
+              value instanceof Map
+                ? { __r12Map: [...value] }
+                : value instanceof Set
+                  ? { __r12Set: [...value] }
+                  : value,
+          ),
         );
       } catch {
         /* Storage is optional. */
@@ -1013,6 +1549,7 @@ export class MockBridge implements JamApi {
     this.members = [human];
     this.tasks = [];
     this.planData = { epics: [], stories: [], questions: [] };
+    this.round12 = emptyRound12();
     this.executionData = emptyExecution();
     this.activity = [];
     this.state = {
@@ -1080,6 +1617,7 @@ export class MockBridge implements JamApi {
     const now = new Date().toISOString();
     const jamId = crypto.randomUUID();
     this.canvasData = emptyCanvas();
+    this.round12 = emptyRound12();
     this.state = {
       ...data.app,
       theme: this.state.theme,
@@ -1114,6 +1652,100 @@ export class MockBridge implements JamApi {
     for (const q of this.planData.questions) q.jamId = jamId;
     this.planning.sync();
     this.activity = data.activity;
+    this.round12 = emptyRound12();
+    const epic = this.planData.epics[0],
+      story = this.planData.stories.find((row) => row.epicId === epic?.id);
+    const candidate = this.tasks.find(
+      (t) => t.storyId === story?.id && t.status === "backlog",
+    );
+    const records: MockImportRecord[] = [];
+    if (epic && story && candidate) {
+      epic.externalRef = "demo";
+      story.externalRef = "demo/story";
+      candidate.externalRef = "demo/conflict";
+      const record = (
+        kind: MockImportRecord["kind"],
+        entity: typeof epic | typeof story | TaskDetail,
+        externalRef: string,
+        parent: string | null,
+        fields: MockImportRecord["fields"],
+      ): MockImportRecord => ({
+        kind,
+        key: entity.key,
+        externalRef,
+        parent,
+        fields,
+        status: entity.status,
+        position: entity.position ?? 0,
+        updatedAt: entity.updatedAt,
+      });
+      records.push(
+        record("epic", epic, "demo", null, {
+          title: epic.title,
+          goalMd: epic.goalMd,
+        }),
+        record("story", story, "demo/story", "demo", {
+          title: story.title,
+          outcomeMd: story.outcomeMd,
+        }),
+        record("task", candidate, "demo/conflict", "demo/story", {
+          title: candidate.title,
+        }),
+      );
+      this.planning.sync();
+    }
+    this.round12.imports = new MockImport(records, prefix).exportState();
+    const { seedMockInboxActivity } = await import("./mock-inbox-events");
+    const human = this.human(),
+      agents = this.members.filter((m) => m.kind === "agent");
+    const frame: import("../bindings").RefFrame_Serialize = {
+      id: crypto.randomUUID(),
+      jamId,
+      epicId: null,
+      title: "Moodboard — Sky",
+      x: 0,
+      y: 0,
+      w: 880,
+      h: 600,
+      color: "m4",
+      archivedAt: null,
+      collapsed: false,
+      links: [],
+      review: null,
+    };
+    this.canvasData.frames.push(frame);
+    for (const row of seedMockInboxActivity()) {
+      const actor =
+        row.actor.kind === "human"
+          ? human
+          : (agents.find((m) => m.name === row.actor.name) ??
+            agents[0] ??
+            human);
+      const task = this.tasks.find(
+        (t) => t.key === row.taskKey?.replace(/^JB/, prefix),
+      );
+      const epic = this.planData.epics.find(
+        (e) => e.key === row.epicKey?.replace(/^JB/, prefix),
+      );
+      this.activity.push({
+        seq: (this.activity.at(-1)?.seq ?? 0) + 1,
+        action: row.action,
+        actor,
+        taskKey: task?.key,
+        epicId: epic?.id ?? null,
+        createdAt: row.createdAt,
+        sentence: row.sentence.replaceAll("JB-", `${prefix}-`),
+        payload: {
+          ...(row.frameId
+            ? { frameId: frame.id, frameTitle: frame.title }
+            : {}),
+          ...(row.requestId ? { requestId: row.requestId } : {}),
+          ...(row.storyKey
+            ? { storyKey: row.storyKey.replace(/^JB/, prefix) }
+            : {}),
+        },
+      });
+    }
     this.executionData = emptyExecution();
     this.checkpoint();
     this.folders.selectedProject(this.currentProjectId);
@@ -1222,10 +1854,10 @@ export class MockBridge implements JamApi {
   }
   async getTask(key: string) {
     await this.call("get_task", key);
-    const task = this.tasks.find((t) => t.key === key);
-    if (!task) throw new JamError("not_found", `Task ${key} was not found`);
-    this.planning.sync(task);
-    task.files = this.taskFiles.projectTaskFiles(task);
+    const stored = this.tasks.find((t) => t.key === key);
+    if (!stored) throw new JamError("not_found", `Task ${key} was not found`);
+    this.planning.sync(stored);
+    const task = { ...stored, files: this.taskFiles.projectTaskFiles(stored) };
     task.assets = task.files.map((row) => row.asset);
     const targetIds = new Set([task.id, task.epic.id, task.story.id]);
     const targetKeys = new Set([task.key, task.epic.key, task.story.key]);
@@ -1372,6 +2004,7 @@ export class MockBridge implements JamApi {
       updatedAt: now,
       archivedAt: null,
       idempotencyKey: null,
+      externalRef: input.externalRef ?? null,
       commentCount: 0,
       assets: [],
       comments: [],
@@ -1413,7 +2046,12 @@ export class MockBridge implements JamApi {
   }
   async createTask(input: CreateInput) {
     await this.call("create_task", input);
-    return this.create(input, this.human());
+    return this.receipted(
+      "create_task",
+      input.requestId ?? crypto.randomUUID(),
+      input,
+      async () => this.create(input, this.human()),
+    );
   }
 
   private guardReady(task: TaskDetail, actor: Member, reason?: string) {
@@ -1651,7 +2289,9 @@ export class MockBridge implements JamApi {
   async seed_bulk_assets(n: number) {
     for (let i = 0; i < Math.min(n, 5000); i++)
       await this.createAsset({
-        kind: ["sprite", "audio", "level", "font", "other"][i % 5] ?? "other",
+        kind:
+          (["sprite", "audio", "level", "font", "other"] as const)[i % 5] ??
+          "other",
         name: `Asset ${i + 1}`,
         location: `assets/bulk/item-${i + 1}.png`,
         notes: "Bulk fixture",
@@ -1685,7 +2325,10 @@ export class MockBridge implements JamApi {
       kind: input.kind ?? asset.kind,
       notes: input.notes ?? asset.notes,
     };
-    this.validateAsset(next);
+    this.validateAsset({
+      ...next,
+      kind: next.kind as import("../bindings").FileKind,
+    });
     Object.assign(asset, next);
     for (const t of this.tasks)
       t.assets = t.assets.map((a) => (a.id === asset.id ? clone(asset) : a));
@@ -2606,7 +3249,10 @@ export class MockBridge implements JamApi {
           t.changesRequested === input.changesRequested) &&
         (input.needsInfo == null || t.needsInfo === input.needsInfo) &&
         (input.includeArchived || !t.archivedAt) &&
-        (!input.status?.length || input.status.includes(t.status)) &&
+        (!input.status?.length ||
+          input.status.includes(
+            t.status as import("../bindings").TaskStatus,
+          )) &&
         (!selectedTags.length ||
           selectedTags.some((tag) => t.tags.includes(tag))) &&
         (!input.text ||
@@ -2773,7 +3419,7 @@ export class MockBridge implements JamApi {
             tags: ["gameplay", i % 2 ? "polish" : "ui"],
             estimate: [1, 2, 3, 5, 8][i % 5],
             status: "backlog",
-            priority: ["low", "medium", "high", "critical"][i % 4],
+            priority: (["low", "medium", "high", "critical"] as const)[i % 4],
           },
           this.human(),
           true,

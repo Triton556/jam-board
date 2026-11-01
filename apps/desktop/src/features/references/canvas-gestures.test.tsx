@@ -13,6 +13,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps, ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mockApi } from "../../lib/mock-bridge";
+import { mockMoodboardApi } from "../../lib/mock-moodboard";
 import { tauriApi } from "../../lib/tauri-bridge";
 import { canvasPick } from "./linking";
 import type { FrameNode, ItemNode } from "./Nodes";
@@ -144,7 +145,7 @@ afterEach(() => {
     value: 1,
   });
 });
-async function mount(picking = false) {
+async function mount(picking = false, rateable = false) {
   const app = await mockApi.appState();
   const frame = await mockApi.createRefFrame({
     title: "Moodboard",
@@ -152,7 +153,8 @@ async function mount(picking = false) {
     y: 0,
   });
   const item = await mockApi.addReference({
-    kind: "note",
+    kind: rateable ? "link" : "note",
+    ...(rateable ? { url: "https://example.test/image" } : {}),
     title: "Candidate",
     text: "Candidate",
     x: 40,
@@ -195,6 +197,59 @@ function body(id: string) {
   if (!element) throw Error("Missing body");
   return element;
 }
+it("M6 variations cannot be selected, context-archived or edge-deleted and disappear with hidden endpoints", async () => {
+  const f = await mount();
+  const original = await mockApi.addReference({
+    kind: "link",
+    url: "https://example.test/original",
+    frameId: f.frame.id,
+  });
+  const variation = await mockApi.addReference({
+    kind: "link",
+    url: "https://example.test/variation",
+    frameId: f.frame.id,
+  });
+  await mockMoodboardApi.update(variation.id, { derivedFrom: original.id });
+  await f.client.invalidateQueries({ queryKey: ["references"] });
+  await waitFor(() =>
+    expect(
+      props().edges?.find((edge) => edge.id === `derived-${variation.id}`),
+    ).toBeTruthy(),
+  );
+  const edge = props().edges?.find(
+    (edge) => edge.id === `derived-${variation.id}`,
+  );
+  if (!edge) throw Error("Missing variation edge");
+  expect(edge).toMatchObject({
+    type: "derived",
+    source: original.id,
+    target: variation.id,
+    selectable: false,
+    deletable: false,
+  });
+  const before = mockApi.calls.filter(
+    (call) => call.command === "canvas_archive",
+  ).length;
+  act(() => {
+    props().onEdgeContextMenu?.(
+      new MouseEvent("contextmenu") as unknown as React.MouseEvent,
+      edge,
+    );
+    props().onEdgeClick?.(
+      new MouseEvent("click") as unknown as React.MouseEvent,
+      edge,
+    );
+    props().onEdgesDelete?.([edge]);
+  });
+  expect(
+    mockApi.calls.filter((call) => call.command === "canvas_archive"),
+  ).toHaveLength(before);
+  await mockApi.updateRefFrame(f.frame.id, { collapsed: true });
+  await f.client.invalidateQueries({ queryKey: ["references"] });
+  await waitFor(() =>
+    expect(props().edges?.find((row) => row.id === edge.id)).toBeUndefined(),
+  );
+});
 function dragStart(id: string) {
   fireEvent.pointerDown(body(id), { button: 0, clientX: 40, clientY: 80 });
   act(() =>
@@ -578,9 +633,10 @@ it("Shift body/title click is handled once and does not reach ReactFlow's second
 it.each(["move", "delete", "verdict", "link"] as const)(
   "MODEL one Undo and Redo cover the two-item %s action including a culled item",
   async (kind) => {
-    const f = await mount();
+    const f = await mount(false, kind === "verdict");
     const second = await mockApi.addReference({
-      kind: "note",
+      kind: kind === "verdict" ? "link" : "note",
+      ...(kind === "verdict" ? { url: "https://example.test/second" } : {}),
       title: "Second",
       text: "Second",
       x: 6000,

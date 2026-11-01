@@ -17,6 +17,7 @@ import { PageHeading } from "../../components/ui/m5";
 import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { useDismissible } from "../../components/ui/useDismissible";
 import { api } from "../../lib/api";
+import { inboxSummaryQuery } from "../../lib/inbox-events-api";
 import {
   epicsQuery,
   invalidatePlanning,
@@ -27,6 +28,7 @@ import { appQuery, membersQuery, tasksQuery } from "../../lib/queries";
 import { useExplicitRead } from "../../lib/use-explicit-read";
 import { ExecutionRequests } from "../execution/ExecutionRequests";
 import { AnswerContinuation } from "./AnswerContinuation";
+import { InboxEvents } from "./InboxEvents";
 import "./inbox.css";
 export function QuestionCard({
   question: q,
@@ -351,13 +353,20 @@ function QuestionListContent({
 export function InboxPage() {
   const search = useRouterState({
     select: (state) => state.location.search,
-  }) as { question?: string; status?: string };
+  }) as { question?: string; status?: string; tab?: string };
+  const navigate = useNavigate();
+  const tab = search.tab === "events" ? "events" : "questions";
+  const summary = useQuery(inboxSummaryQuery);
   const [status, setStatus] = useState(
     ["open", "answered", "withdrawn"].includes(search.status ?? "")
       ? (search.status ?? "open")
       : "open",
   );
   const questions = useQuery(questionsQuery);
+  const openQuestions =
+    questions.data?.filter((question) => question.status === "open").length ??
+    0;
+  const unread = summary.data?.unread ?? 0;
   const appliedQuestion = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!search.question) {
@@ -373,6 +382,7 @@ export function InboxPage() {
   }, [search.question, questions.data]);
   const focusedQuestion = useRef<string | undefined>(undefined);
   useEffect(() => {
+    if (tab !== "questions") return;
     if (!search.question) {
       focusedQuestion.current = undefined;
       return;
@@ -390,22 +400,48 @@ export function InboxPage() {
     card?.scrollIntoView({ block: "center" });
     card?.focus();
     if (card) focusedQuestion.current = search.question;
-  }, [search.question, questions.data, status]);
+  }, [search.question, questions.data, status, tab]);
   return (
     <main className="feature-page inbox-page">
       <PageHeading title="Inbox" note="a good question is a useful next step">
+        {tab === "questions" && (
+          <SegmentedControl
+            label="Inbox status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: "open", label: "Open" },
+              { value: "answered", label: "Answered" },
+              { value: "withdrawn", label: "Withdrawn" },
+            ]}
+          />
+        )}
+      </PageHeading>
+      <div className="inbox-tabs">
         <SegmentedControl
-          label="Inbox status"
-          value={status}
-          onChange={setStatus}
+          label="Inbox tabs"
+          value={tab}
+          onChange={(next) =>
+            void navigate({
+              to: "/inbox",
+              search: (previous) => ({ ...previous, tab: next }),
+              replace: true,
+            })
+          }
           options={[
-            { value: "open", label: "Open" },
-            { value: "answered", label: "Answered" },
-            { value: "withdrawn", label: "Withdrawn" },
+            {
+              value: "questions",
+              label: `Questions${openQuestions ? ` ${openQuestions}` : ""}`,
+            },
+            {
+              value: "events",
+              label: `Events${unread ? ` ${unread >= 99 ? "99+" : unread}` : ""}`,
+            },
           ]}
         />
-      </PageHeading>
-      {search.question &&
+      </div>
+      {tab === "questions" &&
+        search.question &&
         questions.isSuccess &&
         !questions.data.some((q) => q.id === search.question) && (
           <p role="alert">
@@ -414,8 +450,11 @@ export function InboxPage() {
           </p>
         )}
       <div className="inbox-scroll">
-        <ExecutionRequests status={status} />
-        <QuestionList status={status} />
+        {tab === "events" && <InboxEvents />}
+        <div className="inbox-questions" hidden={tab !== "questions"}>
+          <ExecutionRequests status={status} />
+          <QuestionList status={status} />
+        </div>
       </div>
     </main>
   );

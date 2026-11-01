@@ -130,13 +130,13 @@ Agent identity profiles (name, handle and color) remain shared for compatibility
 
 ## Identity and presence
 
-The initialized `clientInfo.name` determines the client kind: names containing `codex` map to `codex`, containing `claude` to `claude-code`, otherwise `other` (case-insensitive). Stdio `JAM_AGENT_NAME` or HTTP `X-Jam-Agent` supplies the name used to resolve the board identity. Defaults are `Codex`, `Claude`, or `clientInfo.name`; both Codex HTTP configuration builders now explicitly send `X-Jam-Agent: Codex`.
+The initialized `clientInfo.name` determines the client kind: names starting with `codex` map to `codex`, the exact name `claude-code` maps to `claude-code`, otherwise `other` (case-insensitive). Stdio `JAM_AGENT_NAME` or HTTP `X-Jam-Agent` supplies the name used to resolve the board identity. Defaults are `Codex`, `Claude`, or `clientInfo.name`; both Codex HTTP configuration builders now explicitly send `X-Jam-Agent: Codex`.
 
 Choose distinct stable names for independently configured brains and workers (for example `Planner` and `Worker-1`), replace the example name before applying the configuration, and reconnect. Names are normalized to lowercase, non-alphanumeric characters become hyphens, and leading/trailing hyphens are removed. Different capitalization or punctuation can therefore resolve to the same handle. The handle is global across projects, sessions and client kinds: it is not a per-process identifier or a new authentication credential.
 
 Connections sharing that handle share one member. Their tasks/presence/status are not independent worker sessions; `excludeSelf=true` filters events from that member, including peers sharing it. Use the documented `excludeSelf=false` coordination policy. A brain cannot independently review a report authored under its own identity. Native subagents that inherit one MCP connection also inherit its identity; separate tracking needs independently configured connections with distinct names, not merely a new chat. Explicit dock New/start can launch its selected profile and wire its session; board/MCP actions do not launch independent worker sessions or install external-client configuration. `get_session_context` reports project binding and cursor, not a caller-identity field; do not invent such a field when checking the connection.
 
-The command palette's **Set up agent connection (MCP)…** opens Settings → Agents rather than emitting a second unpinned configuration. The existing guarded setup flow captures the displayed project; switching boards still does not retarget an initialized session. Claude CLI snippets are PowerShell-quoted, as labelled in the UI; adapt deliberately for another shell instead of treating apostrophe doubling as portable shell syntax.
+The command palette's **Set up agent connection (MCP)…** opens Settings → Agents rather than emitting a second unpinned configuration. The existing guarded setup flow captures the displayed project; switching boards still does not retarget an initialized session. Settings provides distinct PowerShell, Command Prompt and bash quoting plus token-free `.mcp.json`; select the shell you actually use. Restart the Claude Code session in the project folder, then verify `get_session_context`. The connection line reflects member presence, never task execution.
 
 An unknown agent handle is registered with `member.joined`, taking the first unused member color. Each call refreshes `lastSeenAt`. Agents are online for 120 seconds after their latest call. Handles are stable across sessions; a human handle cannot be impersonated by registering an agent with the same name. See [architecture](architecture.md#local-security-and-retained-data) for the local security model.
 
@@ -150,71 +150,88 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 - V2.2 refines needsInfo: a task flag and the list_tasks needsInfo filter cover only open questions scoped to that task. Story and epic questions stay at their own level. get_task adds ancestorQuestions (open story/epic questions); jam://task/{key} renders them under "Open questions above this task". Project questions remain Inbox items. This prevents an epic interview from flagging every card.
 - JSON exports use version 2 to retain hierarchy, briefs, reports, reviews, questions and references. Version-1 imports remain supported.
 
-## Tool contract (57 tools)
+## Tool contract (74 tools)
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means this session’s pinned project, not the board currently displayed in the UI. Reference items/questions use their returned IDs.
 
-Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, stale_claim, forbidden, archived, conflict. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
+Success contains structuredContent plus a one-line content summary. Failures are tool results with isError: true, readable content and structuredContent { code, message, field? }, never a protocol error or a process exit. Codes: not_found, validation, not_ready, execution_required, wrong_status, claim_conflict, stale_claim, forbidden, archived, conflict, idempotency_conflict, in_use, already_undone. Infrastructure failures are reported as validation failures with their diagnostic text; HTTP authentication still uses HTTP 401/403.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
-| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor, projectInstanceId, databaseGeneration, boardRevision, projectFolder, repositoryRoot, workingDirectory, folderRules, manifestRevision, fileCapabilities } |
-| get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
-| list_execution | {} | ExecutionState[] for the pinned project |
-| request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
-| list_execution_requests | status? (pending/approved/declined/superseded) | ExecutionRequest[] for the pinned project |
-| get_project | {} | { jam, template, templateLabel, milestoneAt, tagSuggestions, epics, stories, tasks, openQuestions } |
-| get_board | {} | { jam, columns, inProgress, myTasks, onlineAgents, tagSuggestions, openQuestionCount } |
-| list_epics | {} | Epic[] in position order, excluding archived |
-| get_epic | key | { epic, stories: [{ story, tasks: [{ task, readiness }] }], journal, openQuestions } |
-| create_epic | title; color?, goalMd?, doneWhenMd?, notIncludedMd?, decidedMd?, openQuestionsMd?, participation?, reviewer?, workerModel? | Epic (draft) |
-| update_epic | key; any create field except title may be omitted, title? | Epic |
-| set_epic_status | key, status; overrideReason? | Epic |
-| become_brain | epicKey | Epic; claims an unappointed brain slot |
-| set_brain | epicKey, memberHandle | Epic; human/current brain only |
-| create_story | epicKey, title; outcomeMd?, basisMd?, preserveMd?, scaleMd?, rejectionRisksMd?, openDecisionsMd?, acceptance? | Story (draft) |
-| update_story | key; title?, any intent field?, acceptance? | Story |
-| set_story_status | key, status; overrideReason? | Story |
-| create_task | storyKey, title; description?, status?=backlog, priority?=medium, tags?, estimate?, dueAt?, idempotencyKey?, all brief fields? | TaskDetail |
-| update_task | key, expectedClaimGeneration, expectedUpdatedAt; title?, description?, priority?, tags?, estimate?, dueAt? | TaskDetail; non-brief fields |
-| update_task_brief | key, expectedClaimGeneration, expectedUpdatedAt; goalMd?, contextMd?, whereMd?, changes?, tests?, boundariesMd?, resultMd?, userQuotesMd? | TaskDetail |
-| check_ready | key | { ready, missing: [{ code, message }] } |
-| mark_ready | key, expectedClaimGeneration, expectedUpdatedAt; overrideReason? | TaskSummary |
-| list_tasks | status?: string[], assignee?, tag?, query?, includeArchived?=false, limit?=50, cursor?, epic?, story?, ready?, changesRequested?, needsInfo? | { tasks, nextCursor? } |
-| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, files, all reports/reviews, comments/history |
-| claim_task | key, expectedClaimGeneration, expectedUpdatedAt | TaskDetail; assigns caller and moves Ready > In progress |
-| release_task | key, expectedClaimGeneration; status?=backlog | TaskSummary; current holder/human only |
-| move_task | key, status, expectedClaimGeneration, expectedUpdatedAt; beforeKey?, afterKey?, overrideReason? | TaskSummary |
-| submit_report | key, expectedClaimGeneration, summaryMd, changedFiles, tests; deviationsMd?, notVerifiedMd? | Report |
-| add_comment | key, body | Comment |
-| review_task | key, expectedReportId, expectedReviewContextRevision, verdict, commentsMd; failedTests? | Review |
-| archive_task | key, expectedClaimGeneration, expectedUpdatedAt; reason? | TaskSummary; reason is an atomic comment |
-| ask_user | scope, title; bodyMd?, options?, recommendedIndex?, allowFreeText?=true, roundLabel? | Question |
-| wait_for_answer | questionIds, timeoutSeconds (0..60) | { answered: Question[], pending: Question[] } |
-| list_questions | status? (open/answered/withdrawn), scope? | Question[] |
-| withdraw_question | id | Question; asker or human only |
-| set_status | text (0..120), scope? | Member; empty text clears the status/scope |
-| list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
-| wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | storageType?, fileKind?, requestId?, fileRole?, expectedClaimGeneration?, expectedUpdatedAt?; kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
-| list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
-| link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
-| unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
-| update_reference | itemId; caption?, tags?, title? | RefItem |
-| get_canvas | epicKey?, frameId?, includeArchived?=false, limit?=100 (1..200), cursor? (nonnegative offset) | { frames, references, edges, total, truncated, nextCursor }; world x/y, text capped at 200 characters, linkedKeys capped at 50 with linkedKeysTruncated |
-| create_frame | title; epicKey?, x?, y?, w?=900, h?=600 | RefFrame; omitted x is placed right of content with 80 units clearance, omitted y=0 |
-| update_frame | id; title?, epicKey? (null unlinks), x?, y?, w?, h? | RefFrame; omitted fields unchanged |
-| connect_references | from, to (item IDs); label? | RefEdge; directed duplicates/self-edges refused, label max 240 characters |
-| update_connection | id, label | RefEdge; empty label clears it, max 240 characters |
-| remove_connection | id | { archived: true }; retains the connection record |
-| arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
-| list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
-| list_assets | kind?, query?, storageType?, taskKey?, role?, limit?, cursor? | Legacy array without limit/cursor; paging {assets,nextCursor} |
-| register_file | storageType, requestId; companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, role?, sourcePath?, taskKey?, url?, workingDirectory? | FileMutationResult; task version/request identity |
-| link_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
-| set_task_file_role | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
-| unlink_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId; position?, role? | FileMutationResult; task version/request identity |
-| resolve_file | assetId; workingDirectory? | FileResolution; read-only, no launch |
+| get_session_context | {} | SessionContext |
+| get_board | {} | Generated result; see v2 details below |
+| list_tasks | assignee?, changesRequested?, cursor?, epic?, externalRef?, fields?, includeArchived?, limit?, needsInfo?, query?, ready?, status?, story?, tag? | ProjectedTaskPage |
+| get_task | activityLimit?, include?, key | CompactTask |
+| create_task | boundariesMd?, changes?, contextMd?, description?, dueAt?, estimate?, externalRef?, goalMd?, priority?, requestId, resultMd?, status?, storyKey, tags?, tests?, title, userQuotesMd?, whereMd? | CompactMutation |
+| update_task | description?, dueAt?, estimate?, expectedClaimGeneration, expectedUpdatedAt, externalRef?, key, priority?, tags?, title? | CompactMutation |
+| move_task | afterKey?, beforeKey?, expectedClaimGeneration, expectedUpdatedAt, key, overrideReason?, status | CompactMutation |
+| claim_task | expectedClaimGeneration, expectedUpdatedAt, key | CompactMutation |
+| release_task | expectedClaimGeneration, key, status? | CompactMutation |
+| add_comment | body, key | Comment |
+| archive_task | expectedClaimGeneration, expectedUpdatedAt, key, reason? | CompactMutation |
+| list_members | {} | Generated result; see v2 details below |
+| list_assets | cursor?, includeArchived?, kind?, limit?, query?, role?, scope?, storageType?, taskKey?, workingDirectory? | Array_of_FileAsset |
+| register_file | companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, requestId?, role?, sourcePath?, storageType, taskKey?, url?, workingDirectory? | CompactMutation |
+| link_task_file | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role, taskKey | CompactMutation |
+| set_task_file_role | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role, taskKey | CompactMutation |
+| unlink_task_file | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role?, taskKey | CompactMutation |
+| resolve_file | assetId, workingDirectory? | FileResolution |
+| get_canvas | cursor?, epicKey?, frameId?, includeArchived?, limit?, verdict? | CanvasPage |
+| create_frame | epicKey?, h?, requestId?, title, w?, x?, y? | CompactMutation |
+| update_frame | epicKey?, h?, id, title?, w?, x?, y? | CompactMutation |
+| connect_references | from, label?, to | RefEdge |
+| update_connection | id, label | CompactMutation |
+| remove_connection | id | Generated result; see v2 details below |
+| arrange_references | frameId?, items, layout? | Generated result; see v2 details below |
+| get_execution | scope | ExecutionState |
+| list_execution | {} | Generated result; see v2 details below |
+| list_execution_requests | status? | Generated result; see v2 details below |
+| request_execution | reason, scope | ExecutionRequest |
+| get_project | {} | Project |
+| list_epics | externalRef? | Generated result; see v2 details below |
+| find | externalRefs?, keys?, kind? | Array_of_RecordVersion |
+| import_plan | dryRun?, epics, overwrite?, requestId | ImportPlanReport |
+| undo_import | batchId, requestId | UndoImportReport |
+| list_import_batches | limit? | Array_of_ImportBatchSummary |
+| move_story | afterKey?, beforeKey?, expectedUpdatedAt?, key, requestId, toEpicKey | CompactMutation |
+| move_task_to_story | expectedClaimGeneration, expectedUpdatedAt, key, requestId, toStoryKey | CompactMutation |
+| link_file | assetId, expectedClaimGeneration?, expectedUpdatedAt?, requestId?, role?, scope | CompactMutation |
+| unlink_file | assetId, expectedClaimGeneration?, expectedUpdatedAt?, requestId?, scope | CompactMutation |
+| asset_usage | assetId | AssetUsage |
+| archive_asset | assetId, requestId? | CompactMutation |
+| unarchive_asset | assetId, requestId? | CompactMutation |
+| rename_asset | assetId, name, requestId? | CompactMutation |
+| delete_asset | assetId, force?, requestId? | CompactMutation |
+| replace_asset | assetId, requestId?, sourcePath?, url? | CompactMutation |
+| list_asset_revisions | assetId | Array_of_AssetRevision |
+| get_epic | depth?, include?, journalLimit?, key | CompactEpic |
+| create_epic | color?, decidedMd?, doneWhenMd?, externalRef?, goalMd?, notIncludedMd?, openQuestionsMd?, participation?, requestId, reviewer?, title, workerModel? | CompactMutation |
+| update_epic | color?, decidedMd?, doneWhenMd?, externalRef?, goalMd?, key, notIncludedMd?, openQuestionsMd?, participation?, reviewer?, title?, workerModel? | CompactMutation |
+| set_epic_status | key, overrideReason?, status | CompactMutation |
+| become_brain | epicKey | CompactMutation |
+| set_brain | epicKey, memberHandle | CompactMutation |
+| create_story | acceptance?, basisMd?, epicKey, externalRef?, openDecisionsMd?, outcomeMd?, preserveMd?, rejectionRisksMd?, requestId, scaleMd?, title | CompactMutation |
+| update_story | acceptance?, basisMd?, externalRef?, key, openDecisionsMd?, outcomeMd?, preserveMd?, rejectionRisksMd?, scaleMd?, title? | CompactMutation |
+| set_story_status | key, overrideReason?, status | CompactMutation |
+| update_task_brief | boundariesMd?, changes?, contextMd?, expectedClaimGeneration, expectedUpdatedAt, goalMd?, key, resultMd?, tests?, userQuotesMd?, whereMd? | CompactMutation |
+| check_ready | key | Readiness |
+| mark_ready | expectedClaimGeneration, expectedUpdatedAt, key, overrideReason? | CompactMutation |
+| submit_report | changedFiles, deviationsMd?, expectedClaimGeneration, key, notVerifiedMd?, summaryMd, tests | Report |
+| review_task | commentsMd, expectedReportId, expectedReviewContextRevision, failedTests?, key, verdict | Review |
+| ask_user | allowFreeText?, bodyMd?, options?, recommendedIndex?, requestId?, roundLabel?, scope, title | CompactMutation |
+| wait_for_answer | questionIds, timeoutSeconds | AnswerWait |
+| list_questions | scope?, status? | Generated result; see v2 details below |
+| withdraw_question | id | CompactMutation |
+| set_status | scope?, text | Member |
+| list_changes_since | cursor, epicKey? | Generated result; see v2 details below |
+| wait_for_changes | actions?, actorKind?, cursor, epicKey?, excludeSelf?, includeProject?, timeoutSeconds? | ChangesWait |
+| add_reference | caption?, copy?, derivedFrom?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, filePath?, fileRole?, frameEpicKey?, frameId?, kind, linkTo?, origin?, requestId?, sourceUrl?, storageType?, tags?, text?, title?, url?, x?, y? | CompactMutation |
+| add_references | frameId?, items, requestId | AddReferencesResult |
+| collect_kept_references | linkTo?, requestId, sourceFrameIds, title? | CollectKeptResult |
+| list_references | epicKey?, storyKey?, taskKey? | Generated result; see v2 details below |
+| link_reference | frameId?, itemId?, targetKey | CompactMutation |
+| unlink_reference | frameId?, itemId?, targetKey | CompactMutation |
+| update_reference | caption?, derivedFrom?, itemId, origin?, sourceUrl?, tags?, title? | CompactMutation |
 
 ## Human-authorized execution
 
@@ -356,7 +373,7 @@ submit_report requires the current assignee and In progress. It inserts one repo
 
 Titles: 1–140 Unicode characters. Comments: 1–4000. Priorities: low/medium/high/critical; estimates 1/2/3/5/8 or null. Tags are trimmed, lowercased, deduplicated/sorted, at most 24 characters. Dates use RFC 3339 UTC. update_task omission preserves estimate/dueAt; null clears them. Description input remains description; output descriptionMd. Existing activity contains the latest 20 task rows and history the last 50, chronological. updatedAt is an opaque optimistic version for native and MCP task overwrites.
 
-list_tasks.assignee accepts a handle, me or unassigned; query matches literal title/Notes substrings. epic/story accept keys or IDs. ready means the readiness check passes, independently of the status; combine with status=["ready"] for workers. Limit is 1..200; cursors are offsets and can shift during concurrent ordering. afterKey immediately precedes a moved task and beforeKey follows it; neighbors must be adjacent within the destination column. No neighbors appends. Tiny gaps trigger atomic renumbering. Retrying create_task with the same actor/idempotencyKey returns the original, without another event.
+list_tasks.assignee accepts a handle, me or unassigned; query matches literal title/Notes substrings. epic/story accept keys or IDs. ready means the readiness check passes, independently of the status; combine with status=["ready"] for workers. Limit is 1..200; cursors are offsets and can shift during concurrent ordering. afterKey immediately precedes a moved task and beforeKey follows it; neighbors must be adjacent within the destination column. No neighbors appends. Tiny gaps trigger atomic renumbering. Retrying create_task with the same project/actor/tool/requestId and canonical payload replays the original result; a changed payload returns idempotency_conflict. Historical task tokens retain replay behavior.
 
 ### Questions, status and journal
 
@@ -544,9 +561,9 @@ Legacy projects with no location keep their isolated workspace. History uses
 original cwd/source; moved/generation-invalid source needs reconnect. Running
 sessions never follow UI selection.
 
-Five new tools bring the inventory from 52 to 57:
+Round 11 added the following five Files tools (historically 52 → 57); the current round-12 catalog has 74:
 
-- register_file requires storageType and requestId. board_file copies into
+- register_file requires storageType; requestId is optional and recommended. board_file copies into
   manifest rules; linked_file retains external bytes; url never fetches.
   Supply sourcePath or url for that storage; optional taskKey/role linking
   needs inspected expectedClaimGeneration and expectedUpdatedAt.
@@ -578,3 +595,73 @@ No previews/renderers or git badges this phase. [Round 11 evidence](verification
 records G1 integration and G3 DOM/browser verification, including configured-cwd
 connection prompts. Linux clippy, native pickers/DPI, packaging and real-agent
 checks remain NOT RUN; ci-local failed the Node 22 environment prerequisite.
+
+## Round 12 contract v2 (unreleased)
+
+The current generated catalog contains **74 MCP tools** ([catalog](../test-visuals/round12/R12-M/mcp-tools.json)); the earlier round-11 tables are historical where superseded below. Database schema is 10; board snapshot format is 4. The package version remains alpha.47 until a separate release is authorized.
+
+### Retry identity and external references
+
+Every create accepts a stable `requestId` of 1–100 nonblank characters. It is required for `create_epic`, `create_story`, `create_task`, `add_references`, `collect_kept_references` and `import_plan`; other create/file mutations accept an optional ID and callers should supply one. Moves and `undo_import` require one. `create_task.idempotencyKey` is replaced by `requestId`.
+
+Identity is per **project + actor + tool + requestId**. Equal canonical payloads replay the original result with `replayed:true`; a different payload under that identity returns `idempotency_conflict`. Preserve the ID and original payload after an uncertain response. A confirmed new intent gets a new ID. The same ID under two tools denotes two independent operations. Legacy task tokens replay their historical compact result. Completed v9 file receipts are retained under `file_legacy`: retry with the original tool/input and old tuple hash; a mismatch conflicts. Non-final historical file operations retain their recovery path; no new rows are written to that journal.
+
+`externalRef` is nullable, 1–120 characters and unique per project and entity kind on epics, stories and tasks. Create accepts it; update can replace/clear it; reads return it. `find {kind?,externalRefs?,keys?}` reads up to 500 refs/keys without full content and returns kind/key/id/externalRef/title/status/updatedAt (plus task claimGeneration). Read validators before making an edit.
+
+### Import, history and moves
+
+`import_plan` accepts requestId, dryRun (default false), overwrite refs and nested epics → stories → tasks, up to 1000 total records. Source order is board order. Match within kind by externalRef; changed parents become moves with stable keys. Dry run writes nothing. Review conflicts before a human explicitly selects overwrite. Human board edits win when the file is unchanged (board_newer); tasks in progress/review/done are protected even with overwrite (task_in_work). Records missing from the file are left alone and reported as notInFile.
+
+The report contains batchId, dryRun, **noChanges**, counts and created/updated/moved/conflicts/skipped/notInFile arrays. A real create/update/move writes one atomic batch, sync data, one import_applied activity row and receipt. First equal matches write only sync links plus receipt, with batchId:null/noChanges:false. A true no-op returns batchId:null/noChanges:true and writes nothing, including no receipt or board revision change. `list_import_batches {limit?}` defaults to 5 (1–20) and returns newest actor/source/counts/undoneAt summaries. `undo_import {batchId,requestId}` returns {batchId,undone,kept}: archive untouched creates, restore untouched updates/parents, preserve changed_after_import items. A second undo is already_undone. Imports and Inbox events are planning/bookkeeping; neither authorizes execution or launches a process.
+
+`move_story {key,toEpicKey,beforeKey?,afterKey?,requestId,expectedUpdatedAt?}` accepts draft/active stories without in-progress/review children; blocked errors name the tasks. Optional expectedUpdatedAt guards Undo. `move_task_to_story {key,toStoryKey,expectedUpdatedAt,expectedClaimGeneration,requestId}` accepts Backlog/Ready and recomputes readiness. Ready under an inactive story stays Ready with story_inactive reported. Both preserve keys and record fromKey/toKey history. Keep captured validators for retries/Undo; stale data requires a new human decision.
+
+### Compact reads, enums and session context
+
+Writes return compact kind/id/key/updatedAt/claimGeneration/externalRef/status/replayed fields as applicable. `get_epic` supports depth summary/stories (default)/tasks and include readiness/journal/questions/files, journalLimit 1–50 (default 10). Default four-story/fifteen-task response is bounded to 6 KiB. `get_task` always returns core validators, brief/files and short story/epic; opt into story/epic/references/reports/reviews/comments/activity with include and activityLimit. `list_tasks.fields` projects named top-level fields; key is always present. Human/debug resources jam://task/{key} and jam://epic/{key} retain full evidence. Compact defaults are not a substitute for reading report/review history before acting.
+
+Enums come from core schemas: EpicColor m1–m6 (neutral labels), participation each_iteration/first_sketch/autonomous, reviewer none/final/stages, existing task/planning statuses and priorities, estimates 1/2/3/5/8. Tags are lowercase, retain input order and allow 1–24 characters. JSON assets remain kind **other**; video is distinct. Validation errors name the field and allowed values once. Windows display paths strip verbatim prefixes; internal comparisons keep canonical paths. Activity records raw client name/version; only exact claude-code maps to Claude, codex-prefixed names to Codex, explicit agent identity wins.
+
+`get_session_context` adds serverVersion, schemaVersion and capabilities. The ten contract-v2 capabilities are idempotency.all, externalRef, import.v1, compact.v1, files.scopes, files.archive, files.revisions, files.preview, moves.v1, prompts.resources. Moodboard adds **references.batch** and **references.collect**: **12 current capabilities**. Check the live list. Read jam://prompts/plan_epic and jam://prompts/work_on_next_task; they match get_prompt and document placeholder arguments.
+
+### File operations
+
+`link_file` / `unlink_file` associate registered assets with project/epic/story documents (task links retain roles and task validators). `asset_usage` returns task/scoped/canvas/cover/component uses. Archive/unarchive is visibility only. `delete_asset` rejects in-use files unless explicit human-approved force removes the listed links; board bytes move to trash, linked external bytes stay intact. `rename_asset` changes the display name. `replace_asset` retains board revisions, updates linked paths or URL and invalidates review evidence. `list_asset_revisions` reads retained versions. Native preview/history openers are desktop commands, not extra MCP tools. Never substitute the current file for a missing revision. `resolve_file` never launches an opener.
+
+### Moodboard and Inbox
+
+`add_reference` and nullable `update_reference` accept sourceUrl (http(s), no credentials/whitespace, ≤2048), origin found/generated/own and derivedFrom (same-project active original, no self/cycle, depth ≤100). `add_references {requestId,frameId?,items}` accepts 1–50 ordered items, automatic placement and earlier successful batch indexes such as #0. Valid items are created; inspect failed[index,field,message], retry only failures with a **new** ID and rewrite batch-local derivations. Call-level invalid IDs/frame/copy cap reject the call. Per-file copy cap is 50 MiB; total 500 MiB. Receipts replay both created and failed results.
+
+Only humans set verdict/verdictNote (≤500 plain-text characters; omitted keeps, null/empty clears); notes cannot be rated. Only the desktop human sends a frame review. Agents wait with cursor and actions:["reference.review_sent"], then read `get_canvas {frameId,verdict:"keep"|"reject"|"unrated"}`. Items include verdictNote/sourceUrl/origin/derivedFrom/copiedFrom; attached notes survive filtering only for matching items. Frames include review total/keep/reject/unrated/comments/sentAt/sentBy/changedSinceSent. `collect_kept_references {requestId,sourceFrameIds,title?,linkTo?}` makes ordered section headers and copies sharing assets; copiedFrom identifies originals and feedback starts clear.
+
+Inbox Questions/Events and per-human/project seen cursors are desktop bookkeeping, not MCP tools. Needs-action sources open Events; Review opens the task review section, Open request focuses its story without approving anything. See [review workflow](canvas-references.md#8-moodboard-review-round-12) and [verification](verification/round12.md).
+
+### Exact request-ID requirements
+
+The current generated catalog requires or accepts requestId on these tools; omitted IDs on optional tools sacrifice retry identity.
+
+| Tool | requestId |
+|---|---|
+| create_task | Required |
+| register_file | Optional; recommended |
+| link_task_file | Required |
+| set_task_file_role | Required |
+| unlink_task_file | Required |
+| create_frame | Optional; recommended |
+| import_plan | Required |
+| undo_import | Required |
+| move_story | Required |
+| move_task_to_story | Required |
+| link_file | Optional; recommended |
+| unlink_file | Optional; recommended |
+| archive_asset | Optional; recommended |
+| unarchive_asset | Optional; recommended |
+| rename_asset | Optional; recommended |
+| delete_asset | Optional; recommended |
+| replace_asset | Optional; recommended |
+| create_epic | Required |
+| create_story | Required |
+| ask_user | Optional; recommended |
+| add_reference | Optional; recommended |
+| add_references | Required |
+| collect_kept_references | Required |

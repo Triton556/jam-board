@@ -23,7 +23,9 @@ export function BoardHeader() {
         <SegmentedControl
           label="Color by"
           value={settings?.colorBy ?? "epic"}
-          onChange={(v) => update({ colorBy: v })}
+          onChange={(v) =>
+            update({ colorBy: v as import("../../bindings").BoardColorBy })
+          }
           options={[
             { value: "epic", label: "Epic" },
             { value: "none", label: "None" },

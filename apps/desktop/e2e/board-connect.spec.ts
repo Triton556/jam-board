@@ -33,9 +33,9 @@ test("board connection prompt stays neutral, remembers its code folder and repor
   await section
     .getByRole("button", { name: "Copy agent connection prompt" })
     .click();
-  await expect(section.getByRole("status")).toContainText(
-    "nothing has connected yet",
-  );
+  await expect(
+    section.getByRole("status", { name: "Connection setup feedback" }),
+  ).toContainText("nothing has connected yet");
   let prompt = await page.evaluate(
     () => document.documentElement.dataset.copiedPrompt ?? "",
   );
@@ -70,9 +70,9 @@ test("board connection prompt stays neutral, remembers its code folder and repor
   await section
     .getByRole("button", { name: "Copy agent connection prompt" })
     .click();
-  await expect(section.getByRole("status")).toContainText(
-    "Clipboard is unavailable",
-  );
+  await expect(
+    section.getByRole("status", { name: "Connection setup feedback" }),
+  ).toContainText("Clipboard is unavailable");
   await expect(
     section.getByRole("button", { name: "Copy agent connection prompt" }),
   ).toBeEnabled();

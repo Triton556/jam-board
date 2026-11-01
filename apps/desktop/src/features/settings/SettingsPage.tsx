@@ -24,7 +24,7 @@ import { projectFolders } from "../../lib/project-folder-api";
 import { acceptProjectSelection } from "../../lib/project-selection";
 import { appQuery } from "../../lib/queries";
 import { paperRustle } from "../../lib/sound";
-import type { ConfigSnippets, Theme } from "../../lib/types";
+import type { Theme } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { BrainConnections } from "../brain/BrainConnections";
 import { BrainVoiceSettings } from "../brain/BrainVoiceSettings";
@@ -39,12 +39,6 @@ const tabs = [
   "Codex · HTTP",
   "Claude Code · stdio",
   "Claude Code · HTTP",
-];
-const keys: (keyof ConfigSnippets)[] = [
-  "codexStdio",
-  "codexHttp",
-  "claudeStdio",
-  "claudeHttp",
 ];
 export const tryPrompt = connectionPrompt;
 export function archiveConfirmed(name: string, typed: string) {
@@ -196,7 +190,7 @@ export function SettingsPage({
     data?.projectId === project.id &&
     data?.projectKeyPrefix === project.keyPrefix;
   const checkPrompt = project ? projectConnectionPrompt(project) : tryPrompt;
-  const snippetKey = keys[tabs.indexOf(tab)] ?? "codexStdio";
+  const snippetKey = tab.includes("HTTP") ? "http" : "stdio";
   const masked = data ? makeSnippets(data, `••••${data.tokenTail}`) : null;
   const activate = async (
     state: Awaited<ReturnType<typeof api.appState>>,
@@ -491,7 +485,7 @@ export function SettingsPage({
                     </details>
                   </SettingsRow>
                   <SettingsRow
-                    label="Configuration"
+                    label="Client and transport"
                     hint={
                       tab.startsWith("Codex")
                         ? "Paste into ~/.codex/config.toml. HTTP uses JAM_BOARD_TOKEN."
@@ -537,9 +531,9 @@ export function SettingsPage({
                             </Button>
                           </>
                         )}
-                      {masked && connectionReady && (
+                      {masked && connectionReady && tab.startsWith("Codex") && (
                         <CodeBlock
-                          code={masked[snippetKey]}
+                          code={masked.codex[snippetKey]}
                           disabled={busy}
                           pending={copyPending}
                           onCopy={() =>
@@ -553,7 +547,7 @@ export function SettingsPage({
                                   const token = http
                                     ? await api.revealMcpToken()
                                     : "";
-                                  return makeSnippets(captured, token)[
+                                  return makeSnippets(captured, token).codex[
                                     snippetKey
                                   ];
                                 },
@@ -726,7 +720,10 @@ export function SettingsPage({
                     void run(async () => {
                       client.setQueryData(
                         ["settings"],
-                        await api.setSettings({ colorBy: e.target.value }),
+                        await api.setSettings({
+                          colorBy: e.target
+                            .value as import("../../bindings").BoardColorBy,
+                        }),
                       );
                     })
                   }
@@ -880,7 +877,11 @@ export function SettingsPage({
           )}
           {status.error && <p role="alert">{status.error.message}</p>}
           {notice && (
-            <p role="status" className="settings-notice">
+            <p
+              role="status"
+              aria-label="Settings feedback"
+              className="settings-notice"
+            >
               {notice}
             </p>
           )}

@@ -10,7 +10,10 @@ import { AssetsPage } from "./assets/AssetsPage";
 import { TaskCard } from "./board/TaskCard";
 import { TaskTable } from "./table/TaskTable";
 
-vi.mock("@tanstack/react-router", () => ({ useBlocker: () => undefined }));
+vi.mock("@tanstack/react-router", () => ({
+  useBlocker: () => undefined,
+  useNavigate: () => vi.fn(),
+}));
 
 beforeEach(async () => {
   await mockApi.resetDemo();

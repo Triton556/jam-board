@@ -4,7 +4,7 @@ use crate::references::{create_edge_record, create_frame_record, free_frame_x};
 use crate::service::jam;
 use crate::*;
 
-fn attached_to(
+pub(crate) fn attached_to(
     note: &RefItem,
     items: &[RefItem],
     frames: &[RefFrame],
@@ -60,44 +60,91 @@ fn frame_in_epic(c: &rusqlite::Connection, frame: &RefFrame, epic_id: &str) -> R
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CanvasQuery {
+    /// Filter active non-note references by keep, reject or unrated; attached notes follow matching references.
+    pub verdict: Option<VerdictFilter>,
+    /// Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters.
     pub epic_key: Option<String>,
+    /// Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported.
     pub frame_id: Option<String>,
     #[serde(default)]
+    /// Include archived records; default false. Example: true.
     pub include_archived: bool,
     #[schemars(range(min = 1, max = 200))]
+    /// Maximum rows per page. Canvas allows 1–200; files allow 1–500. Omitted uses the operation default; example 50.
     pub limit: Option<usize>,
+    /// Captured activity cursor or paging offset; starts at 0. Follow nextCursor; pages are not an atomic snapshot.
     pub cursor: Option<usize>,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+/// Human feedback filter for a moodboard canvas read.
+#[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum VerdictFilter {
+    /// References explicitly kept by a human.
+    Keep,
+    /// References explicitly rejected by a human.
+    Reject,
+    /// References without a human verdict.
+    Unrated,
+}
+impl VerdictFilter {
+    fn matches(self, item: &RefItem) -> bool {
+        match self {
+            Self::Keep => item.verdict == Some(ReferenceVerdict::Keep),
+            Self::Reject => item.verdict == Some(ReferenceVerdict::Reject),
+            Self::Unrated => item.verdict.is_none(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CanvasFrameCreate {
+    /// Optional stable retry ID, 1–100 characters, e.g. design-frame-1; recommended to avoid duplicate frames.
+    #[schemars(length(min = 1, max = 100))]
+    pub request_id: Option<String>,
+    /// Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it.
     pub title: String,
+    /// Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters.
     pub epic_key: Option<String>,
+    /// Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement.
     pub x: Option<f64>,
+    /// Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement.
     pub y: Option<f64>,
+    /// Positive canvas width, e.g. 900 world units; omitted preserves updates or uses create size.
     pub w: Option<f64>,
+    /// Positive canvas height, e.g. 600 world units; omitted preserves updates or uses create size.
     pub h: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CanvasFrameUpdate {
+    /// Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations.
     pub id: String,
+    /// Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it.
     pub title: Option<String>,
+    /// Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement.
     pub x: Option<f64>,
+    /// Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement.
     pub y: Option<f64>,
+    /// Positive canvas width, e.g. 900 world units; omitted preserves updates or uses create size.
     pub w: Option<f64>,
+    /// Positive canvas height, e.g. 600 world units; omitted preserves updates or uses create size.
     pub h: Option<f64>,
     #[serde(default, deserialize_with = "crate::model::nullable")]
+    /// Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters.
     pub epic_key: Option<Option<String>>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CanvasPlacement {
+    /// Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations.
     pub item_id: String,
+    /// Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement.
     pub x: Option<f64>,
+    /// Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement.
     pub y: Option<f64>,
 }
 
@@ -105,9 +152,12 @@ pub struct CanvasPlacement {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CanvasArrange {
     #[schemars(length(min = 1, max = 100))]
+    /// References to arrange atomically, 1–100 items. Example: [{"itemId":"01JITEM","x":120,"y":80}].
     pub items: Vec<CanvasPlacement>,
     #[serde(default, deserialize_with = "crate::model::nullable")]
+    /// Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported.
     pub frame_id: Option<Option<String>>,
+    /// Optional automatic layout: grid. Requires a frameId and no explicit coordinates; omission uses explicit placement.
     pub layout: Option<CanvasLayout>,
 }
 
@@ -151,11 +201,13 @@ impl Store {
                     && input.frame_id.as_ref().is_none_or(|id| id == &f.id)
                     && match &epic_id { None=>true,Some(id)=>frame_in_epic(c,f,id)? } {
                     let epic_key = f.epic_id.as_deref().map(|id| epic(c, id).map(|e| e.key)).transpose()?;
-                    rows.push((0, json!({"id":f.id,"title":f.title,"epicKey":epic_key,"x":f.x,"y":f.y,"w":f.w,"h":f.h,"collapsed":f.collapsed,"archivedAt":f.archived_at,"links":f.links})));
+                    rows.push((0, json!({"id":f.id,"title":f.title,"epicKey":epic_key,"x":f.x,"y":f.y,"w":f.w,"h":f.h,"collapsed":f.collapsed,"archivedAt":f.archived_at,"links":f.links,"review":f.review})));
                 }
             }
             let mut visible = HashSet::new();
+            let matches_verdict = items.iter().filter(|i| i.kind != "note" && (input.include_archived || i.audit.archived_at.is_none()) && input.verdict.is_none_or(|filter| filter.matches(i))).map(|i|i.audit.id.clone()).collect::<HashSet<_>>();
             for item in &items {
+                if input.verdict.is_some() && item.kind != "note" && !matches_verdict.contains(&item.audit.id) { continue; }
                 if !input.include_archived && item.audit.archived_at.is_some() { continue; }
                 if input.frame_id.as_ref().is_some_and(|id| item.frame_id.as_ref() != Some(id)) { continue; }
                 let frame = frames.iter().find(|f| Some(&f.id) == item.frame_id.as_ref());
@@ -186,11 +238,16 @@ impl Store {
                 let keys_truncated = keys.len() > 50;
                 keys.truncate(50);
                 visible.insert(item.audit.id.clone());
-                let mut row=json!({"id":item.audit.id,"kind":item.kind,"title":item.title,"text":item.caption_md.chars().take(200).collect::<String>(),"x":item.x+frame.map_or(0.,|f|f.x),"y":item.y+frame.map_or(0.,|f|f.y),"w":item.w,"h":item.h,"frameId":item.frame_id,"linkedKeys":keys,"linkedKeysTruncated":keys_truncated,"verdict":item.verdict,"archivedAt":item.audit.archived_at,"archivedBy":item.archived_by});
+                let mut row=json!({"id":item.audit.id,"kind":item.kind,"title":item.title,"text":item.caption_md.chars().take(200).collect::<String>(),"x":item.x+frame.map_or(0.,|f|f.x),"y":item.y+frame.map_or(0.,|f|f.y),"w":item.w,"h":item.h,"frameId":item.frame_id,"linkedKeys":keys,"linkedKeysTruncated":keys_truncated,"verdict":item.verdict,"verdictNote":item.verdict_note,"sourceUrl":item.source_url,"origin":item.origin,"derivedFrom":item.derived_from,"copiedFrom":item.copied_from,"archivedAt":item.audit.archived_at,"archivedBy":item.archived_by});
                 if item.kind=="note" {
                     row["attachedTo"]=json!(attached_to(item,&items,&frames,input.include_archived));
                 }
                 rows.push((1,row));
+            }
+            if input.verdict.is_some() {
+                let shown_items=rows.iter().filter(|(kind,row)|*kind==1 && row["kind"]!="note").filter_map(|(_,row)|row["id"].as_str().map(str::to_owned)).collect::<HashSet<_>>();
+                rows.retain(|(kind,row)|*kind!=1 || row["kind"]!="note" || row["attachedTo"].as_array().is_some_and(|ids|ids.iter().filter_map(serde_json::Value::as_str).any(|id|shown_items.contains(id))));
+                visible=rows.iter().filter(|(kind,_)|*kind==1).filter_map(|(_,row)|row["id"].as_str().map(str::to_owned)).collect();
             }
             for e in edges {
                 if (input.include_archived || e.archived_at.is_none()) && visible.contains(&e.from_item) && visible.contains(&e.to_item) {
@@ -210,31 +267,57 @@ impl Store {
     }
 
     pub fn create_canvas_frame(&self, actor: &str, input: CanvasFrameCreate) -> Result<RefFrame> {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
         self.write(|c| {
-            let project = jam(c)?;
-            let epic_id = input
-                .epic_key
-                .as_deref()
-                .map(|key| epic(c, key).map(|e| e.audit.id))
-                .transpose()?;
-            create_frame_record(
+            Ok(crate::receipts::with_receipt(
                 c,
                 actor,
-                RefFrame {
-                    id: String::new(),
-                    jam_id: project.id.clone(),
-                    epic_id,
-                    title: input.title,
-                    x: input.x.unwrap_or(free_frame_x(c, &project.id)?),
-                    y: input.y.unwrap_or(0.),
-                    w: input.w.unwrap_or(900.),
-                    h: input.h.unwrap_or(600.),
-                    color: "m4".into(),
-                    archived_at: None,
-                    collapsed: false,
-                    links: vec![],
+                request.as_deref(),
+                "create_frame",
+                "frame",
+                &payload,
+                || {
+                    let project = jam(c)?;
+                    let epic_id = input
+                        .epic_key
+                        .as_deref()
+                        .map(|key| epic(c, key).map(|e| e.audit.id))
+                        .transpose()?;
+                    create_frame_record(
+                        c,
+                        actor,
+                        RefFrame {
+                            replayed: false,
+                            updated_at: String::new(),
+                            id: String::new(),
+                            jam_id: project.id.clone(),
+                            epic_id,
+                            title: input.title,
+                            x: input.x.unwrap_or(free_frame_x(c, &project.id)?),
+                            y: input.y.unwrap_or(0.),
+                            w: input.w.unwrap_or(900.),
+                            h: input.h.unwrap_or(600.),
+                            color: "m4".into(),
+                            archived_at: None,
+                            collapsed: false,
+                            links: vec![],
+                            review: None,
+                        },
+                    )
                 },
-            )
+                |receipt| {
+                    crate::planning::fetch(
+                        c,
+                        "ref_frames",
+                        "id",
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing ID"))?,
+                    )
+                },
+            )?
+            .value)
         })
     }
 

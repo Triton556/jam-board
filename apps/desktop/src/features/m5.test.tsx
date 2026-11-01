@@ -104,12 +104,12 @@ it("display masks token while explicitly requested snippets contain it", async (
   const status = await mockApi.mcpStatus();
   const display = makeSnippets(status, `••••${status.tokenTail}`);
   const token = await mockApi.revealMcpToken();
-  expect(display.claudeHttp).not.toContain(token);
-  expect(display.codexHttp).not.toContain(token);
+  expect(display.claude.http.powershell).not.toContain(token);
+  expect(display.codex.http).not.toContain(token);
   const copy = await mockApi.mcpConfigSnippets();
-  expect(copy.claudeHttp).toContain(token);
-  expect(copy.codexHttp).toContain(token);
-  expect(JSON.parse(copy.codexStdio.split("\n")[1]?.slice(10) ?? "null")).toBe(
+  expect(copy.claude.http.powershell).toContain(token);
+  expect(copy.codex.http).toContain(token);
+  expect(JSON.parse(copy.codex.stdio.split("\n")[1]?.slice(10) ?? "null")).toBe(
     status.sidecarPath,
   );
 });

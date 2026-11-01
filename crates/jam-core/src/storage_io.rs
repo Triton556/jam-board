@@ -46,6 +46,33 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     }
     result
 }
+/// Verified streaming copy followed by an atomic replacement on the same volume.
+pub(crate) fn atomic_copy(source: &Path, destination: &Path) -> Result<(String, u64)> {
+    use std::io::Seek;
+    let mut from = File::open(source)?;
+    let before = hash_reader(&mut from)?;
+    from.rewind()?;
+    let stage = destination.with_extension(format!("{}.part", crate::id()));
+    let result = (|| {
+        let mut to = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&stage)?;
+        std::io::copy(&mut from, &mut to)?;
+        to.sync_all()?;
+        drop(to);
+        let after = hash_reader(File::open(&stage)?)?;
+        if before != after {
+            return Err(invalid("sourcePath", "Source changed during copy"));
+        }
+        replace(&stage, destination)?;
+        Ok(after)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&stage);
+    }
+    result
+}
 #[cfg(not(windows))]
 fn replace(source: &Path, dest: &Path) -> std::io::Result<()> {
     std::fs::rename(source, dest)

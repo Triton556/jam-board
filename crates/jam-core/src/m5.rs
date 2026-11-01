@@ -29,55 +29,58 @@ pub struct MemberWithStats {
     pub working_on: Vec<LinkedTask>,
     pub status_stale: bool,
 }
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AssetQuery {
-    pub kind: Option<String>,
+    pub kind: Option<crate::FileKind>,
     pub text: Option<String>,
+    pub scope: Option<crate::FileScope>,
+    #[serde(default)]
+    pub include_archived: bool,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NewAsset {
-    pub kind: String,
+    pub kind: crate::FileKind,
     pub name: String,
     pub location: String,
     pub notes: Option<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AssetEdit {
     pub id: String,
     pub name: Option<String>,
     pub notes: Option<String>,
-    pub kind: Option<String>,
+    pub kind: Option<crate::FileKind>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AssetLink {
     pub asset_id: String,
     pub task_key: String,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NewMember {
     pub name: String,
-    pub color: String,
+    pub color: crate::MemberColor,
     pub avatar: Option<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MemberEdit {
     pub id: String,
     pub name: Option<String>,
-    pub color: Option<String>,
+    pub color: Option<crate::MemberColor>,
     pub avatar: Option<String>,
 }
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivityQuery {
     pub before_seq: Option<i64>,
     pub limit: Option<i64>,
-    pub actor_kind: Option<String>,
+    pub actor_kind: Option<crate::ActorKind>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -101,7 +104,7 @@ pub struct Settings {
     pub theme: String,
     pub sound_enabled: bool,
 }
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
     #[specta(optional)]
@@ -112,12 +115,12 @@ pub struct SettingsPatch {
     pub working_directory: Option<String>,
     pub project_folder: Option<String>,
     pub expected_project_id: Option<String>,
-    pub color_by: Option<String>,
+    pub color_by: Option<crate::BoardColorBy>,
     pub estimates_enabled: Option<bool>,
     pub wip_limit: Option<u32>,
-    pub assets_view: Option<String>,
-    pub collapsed_asset_kinds: Option<Vec<String>>,
-    pub theme: Option<String>,
+    pub assets_view: Option<crate::AssetsView>,
+    pub collapsed_asset_kinds: Option<Vec<crate::FileKind>>,
+    pub theme: Option<crate::ThemePreference>,
     pub sound_enabled: Option<bool>,
 }
 
@@ -141,6 +144,8 @@ impl Store {
                 return Err(invalid("key", "Choose a task in the active jam"));
             }
             let a = Asset {
+                archived_at: None,
+                archived_by: None,
                 id: id(),
                 jam_id: t.jam_id.clone(),
                 kind: kind.into(),
@@ -179,10 +184,12 @@ impl Store {
 
     pub fn assets_with_tasks(&self, query: AssetQuery) -> Result<Vec<AssetWithTasks>> {
         let assets = self.list_assets(query.kind.as_deref(), query.text.as_deref())?;
-        self.read(|c| assets.into_iter().map(|asset| {
+        self.read(|c| {let mut result=vec![];for asset in assets {
+            if !query.include_archived && asset.archived_at.is_some(){continue;}
+            if let Some(scope)=&query.scope && !crate::files_v2::matches_scope(c,&asset.id,scope)?{continue;}
             let tasks=c.prepare("SELECT t.key,t.title,t.status FROM tasks t JOIN task_assets l ON l.task_id=t.id WHERE l.asset_id=? ORDER BY t.position,t.key")?.query_map([&asset.id],|r|Ok(LinkedTask{key:r.get(0)?,title:r.get(1)?,status:r.get(2)?}))?.collect::<std::result::Result<Vec<_>,_>>()?;
-            Ok(AssetWithTasks{asset,tasks})
-        }).collect())
+            result.push(AssetWithTasks{asset,tasks});
+        }Ok(result)})
     }
     pub fn update_asset_fields(&self, actor: &str, input: AssetEdit) -> Result<()> {
         if let Some(name) = &input.name {
@@ -377,7 +384,7 @@ impl Store {
         }
         self.read(|c|{
             let jid=jam(c)?.id;
-            let mut stmt=c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.jam_id=?1 AND (?2 IS NULL OR a.seq<?2) AND (?3 IS NULL OR m.kind=?3) ORDER BY a.seq DESC LIMIT ?4")?;
+            let mut stmt=c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id,a.client FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.jam_id=?1 AND (?2 IS NULL OR a.seq<?2) AND (?3 IS NULL OR m.kind=?3) ORDER BY a.seq DESC LIMIT ?4")?;
             Ok(stmt.query_map(params![jid,input.before_seq,input.actor_kind,limit],crate::db::activity_row)?.collect::<std::result::Result<Vec<_>,_>>()?)
         })
     }
@@ -519,7 +526,7 @@ impl Store {
                     return Err(Error::Conflict);
                 }
             }
-            for (key,value) in [("backup_recent_count".into(),input.backup_recent_count.map(|v|v.to_string())),("backup_daily_count".into(),input.backup_daily_count.map(|v|v.to_string())),(format!("{prefix}working_directory"),input.working_directory.map(|v|v.trim().to_string())),(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
+            for (key,value) in [("backup_recent_count".into(),input.backup_recent_count.map(|v|v.to_string())),("backup_daily_count".into(),input.backup_daily_count.map(|v|v.to_string())),(format!("{prefix}working_directory"),input.working_directory.map(|v|v.trim().to_string())),(format!("{prefix}project_folder"),input.project_folder.map(|v| v.trim().to_string())),(format!("{prefix}color_by"),input.color_by.map(String::from)),(format!("{prefix}estimates_enabled"),input.estimates_enabled.map(|v|v.to_string())),(format!("{prefix}wip_limit"),input.wip_limit.map(|v|v.to_string())),("theme".into(),input.theme.map(String::from)),("sound_enabled".into(),input.sound_enabled.map(|v|v.to_string())),("assets_view".into(),input.assets_view.map(String::from)),("collapsed_asset_kinds".into(), input.collapsed_asset_kinds.map(|v|serde_json::to_string(&v)).transpose()?)] {
                 if let Some(v)=value { c.execute("INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,v])?; }
             }
             Ok(())

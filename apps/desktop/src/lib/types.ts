@@ -14,6 +14,7 @@ import type {
   TaskQuery as WireTaskQuery,
 } from "../bindings";
 
+export type { ConnectSnippets } from "./mcp-config";
 export type {
   ActivityEvent,
   AppState,
@@ -27,6 +28,15 @@ export type {
   TaskListPage,
   TaskSummary,
 };
+export function stablePayload(value: unknown): string {
+  return JSON.stringify(value, (_key, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : item,
+  );
+}
 export type UpdateInput = TaskEditInput_Deserialize;
 export type TaskQuery = Partial<WireTaskQuery>;
 export const statuses = [
@@ -47,10 +57,12 @@ export const labels: Record<Status, string> = {
 export type BoardTasks = Record<Status, TaskSummary[]>;
 export type Theme = "system" | "light" | "dark";
 export type CreateInput = {
+  requestId?: string;
+  externalRef?: string | null;
   title: string;
   status: Status;
   description?: string;
-  priority?: string;
+  priority?: import("../bindings").Priority;
   tags?: string[];
   estimate?: number;
   dueAt?: string;
@@ -87,7 +99,6 @@ export type {
   Asset,
   AssetLink,
   AssetWithTasks,
-  ConfigSnippets,
   McpStatus,
   MemberWithStats,
   Settings,

@@ -29,6 +29,7 @@ beforeEach(async () => {
 });
 async function question() {
   return mockApi.askUser({
+    requestId: "inbox-answer-continuation",
     scope: { type: "task", id: "JB-7" },
     title: "Choose path",
     bodyMd: "Private body must not be copied",

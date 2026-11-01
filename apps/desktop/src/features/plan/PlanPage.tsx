@@ -32,7 +32,7 @@ import {
   QueryRefreshNotice,
 } from "../../components/ui/AsyncState";
 import { CustomSelect } from "../../components/ui/CustomSelect";
-import { memberColors, WorkloadBar } from "../../components/ui/m5";
+import { WorkloadBar } from "../../components/ui/m5";
 import { useDismissible } from "../../components/ui/useDismissible";
 import { api } from "../../lib/api";
 import { brainHandoff } from "../../lib/brain-handoff";
@@ -45,9 +45,12 @@ import { membersQuery, tasksQuery } from "../../lib/queries";
 import { statuses } from "../../lib/types";
 import { useUiStore } from "../../lib/ui-store";
 import { ExecutionControls } from "../execution/ExecutionControls";
+import { ScopeDocuments } from "../files/ScopeDocuments";
 import { QuestionList } from "../inbox/InboxPage";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BrainHandoff, WorkflowGuide } from "./BrainHandoff";
+import { EpicPalette } from "./EpicPalette";
+import { ImportPlanDialog } from "./ImportPlanDialog";
 import { Journal } from "./Journal";
 import { epicProgress } from "./journal-model";
 import { NewPlanningDialog } from "./NewPlanningDialog";
@@ -57,6 +60,7 @@ import {
   SavedMarkdown,
 } from "./PlanningControls";
 import { PlanningInput } from "./PlanningInput";
+import { ProjectDocuments } from "./ProjectDocuments";
 import { intentFields } from "./StoryDrawer";
 import { TaskRows } from "./TaskRows";
 export const brainPrompt = brainHandoff({ type: "project" });
@@ -91,6 +95,9 @@ export function PlanPage({
   const navigate = useNavigate();
   const [filter, setFilter] = useState("active"),
     [creating, setCreating] = useState(false);
+  const [importDialog, setImportDialog] = useState<"import" | "history" | null>(
+    null,
+  );
   const selected = useQuery({
     queryKey: ["epic", epicKey],
     queryFn: () => api.getEpic(epicKey ?? ""),
@@ -137,6 +144,33 @@ export function PlanPage({
       <aside className="epic-rail">
         <div className="epic-rail-heading">
           <h1>Plan</h1>
+          <details className="plan-actions">
+            <summary aria-label="Plan menu">
+              <MoreHorizontal size={18} />
+            </summary>
+            <div className="menu-popup">
+              <Button
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest("details")
+                    ?.removeAttribute("open");
+                  setImportDialog("import");
+                }}
+              >
+                Import plan…
+              </Button>
+              <Button
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest("details")
+                    ?.removeAttribute("open");
+                  setImportDialog("history");
+                }}
+              >
+                Import history
+              </Button>
+            </div>
+          </details>
           <Button
             aria-label="New epic"
             variant="primary"
@@ -267,6 +301,7 @@ export function PlanPage({
             retry={() => void selected.refetch()}
           />
         )}
+        <ProjectDocuments />
         <WorkflowGuide />
         {!epics.data?.length ? (
           <EmptyState image={duo} size={180} text="No epics yet">
@@ -308,6 +343,12 @@ export function PlanPage({
           />
         ) : null}
       </div>
+      {importDialog && (
+        <ImportPlanDialog
+          history={importDialog === "history"}
+          close={() => setImportDialog(null)}
+        />
+      )}
       {creating && (
         <NewPlanningDialog
           target={{ kind: "epic" }}
@@ -476,20 +517,11 @@ function EpicDetail({
         />
         <div className="epic-header-controls">
           <PlanningStatus level="Epic" entityKey={e.key} value={e.status} />
-          <fieldset className="epic-swatches" aria-label="Epic color">
-            {memberColors.map((color, i) => (
-              <Tooltip key={color} text={`Epic color ${i + 1}`}>
-                <button
-                  type="button"
-                  aria-label={`Epic color ${i + 1}`}
-                  aria-pressed={e.color === `m${i + 1}`}
-                  disabled={archived}
-                  style={{ background: color }}
-                  onClick={() => patch.mutate({ color: `m${i + 1}` })}
-                />
-              </Tooltip>
-            ))}
-          </fieldset>
+          <EpicPalette
+            value={e.color}
+            disabled={archived || patch.isPending}
+            choose={(color) => patch.mutate({ color })}
+          />
           <div className="epic-brain-control">
             <label className="small muted" htmlFor="epic-brain">
               Brain
@@ -550,6 +582,7 @@ function EpicDetail({
           <p role="alert">{(patch.error ?? brain.error)?.message}</p>
         )}
       </header>
+      <ScopeDocuments scope={{ type: "epic", key: e.key }} />
       <SegmentedControl
         label="Epic tabs"
         value={tab}
@@ -587,7 +620,10 @@ function EpicDetail({
                   value={e.participation}
                   disabled={archived}
                   onChange={(v) =>
-                    patch.mutate({ participation: v.target.value })
+                    patch.mutate({
+                      participation: v.target
+                        .value as import("../../bindings").Participation,
+                    })
                   }
                 >
                   {Object.keys(participationText).map((v) => (
@@ -611,7 +647,12 @@ function EpicDetail({
                   aria-label="Separate reviewer"
                   value={e.reviewer}
                   disabled={archived}
-                  onChange={(v) => patch.mutate({ reviewer: v.target.value })}
+                  onChange={(v) =>
+                    patch.mutate({
+                      reviewer: v.target
+                        .value as import("../../bindings").Reviewer,
+                    })
+                  }
                 >
                   {["none", "final", "stages"].map((v) => (
                     <option key={v} value={v}>

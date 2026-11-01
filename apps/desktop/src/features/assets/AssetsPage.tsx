@@ -10,19 +10,18 @@ import {
   LayoutGrid,
   List,
   Map as MapIcon,
-  MoreHorizontal,
   Package,
   Type,
+  Video,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
-import type { FileAsset } from "../../bindings";
+import type { AssetUsage, FileAsset } from "../../bindings";
 import {
   Button,
   Dialog,
   EmptyState,
-  IconButton,
   SegmentedControl,
   Select,
   Stamp,
@@ -35,27 +34,29 @@ import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { ReadReceipt } from "../../components/ui/ReadReceipt";
 import { api } from "../../lib/api";
 import { FileDropProgress, useFileDropBatch } from "../../lib/file-drop-batch";
+import { fileViewerApi } from "../../lib/file-viewer-api";
 import { appQuery, useBoardSettings } from "../../lib/queries";
 import {
   type FileRole,
   fileRoleLabels,
-  fileStatus,
-  fileUnavailable,
   storageLabel,
   taskFilesApi,
 } from "../../lib/task-files-api";
 import type { Asset, AssetWithTasks } from "../../lib/types";
-import { useUiStore } from "../../lib/ui-store";
 import { useExplicitRead } from "../../lib/use-explicit-read";
 import { useProjectWrite } from "../../lib/use-project-write";
+import { useOpenFileViewer } from "../files/file-hooks";
 import { useTableVirtualizer } from "../table/use-table-virtualizer";
 import { FileAvailability } from "../task/TaskFiles";
+import { AssetActions } from "./AssetActions";
 import { AssetLinkDialog } from "./AssetLinkDialog";
 import { assetKind, assetKinds, assetName, assetSchema } from "./model";
+import "../files/files.css";
 
 const icons = {
   sprite: Image,
   audio: AudioLines,
+  video: Video,
   level: MapIcon,
   font: Type,
   model: Box,
@@ -65,6 +66,7 @@ const icons = {
 export const assetColors = {
   sprite: "rose",
   audio: "sky",
+  video: "lilac",
   level: "mint",
   font: "lilac",
   model: "mint",
@@ -248,16 +250,14 @@ function AssetCard({
   asset,
   file,
   openTask,
-  edit,
   link,
 }: {
   asset: AssetWithTasks;
   file?: FileAsset;
   openTask(key: string): void;
-  edit(): void;
   link(): void;
 }) {
-  const [menu, setMenu] = useState(false);
+  const openFile = useOpenFileViewer();
   const card = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -279,78 +279,65 @@ function AssetCard({
     enabled: visible,
   });
   const Icon = icons[asset.kind as keyof typeof icons] ?? Package;
-  const url = /^https?:\/\//i.test(asset.location);
   return (
-    <article className="asset-card" ref={card}>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: The card's name and preview are native keyboard buttons for the same action.
+    <article
+      className={`asset-card${asset.archivedAt ? " is-archived" : ""}`}
+      ref={card}
+      onClick={(event) => {
+        if (
+          !(event.target as Element).closest(
+            'button, a, input, [role="menu"], [role="combobox"]',
+          )
+        )
+          openFile(asset.id);
+      }}
+    >
       <div className="asset-card-top">
-        {preview.data ? (
-          <img
-            className="asset-preview"
-            src={preview.data}
-            alt={asset.name}
-            onLoad={(e) => {
-              const image = e.currentTarget;
-              image.style.imageRendering =
-                Math.max(image.naturalWidth, image.naturalHeight) <= 128
-                  ? "pixelated"
-                  : "auto";
-            }}
-          />
-        ) : null}
-        <span
-          className={preview.data ? "asset-icon preview-badge" : "asset-icon"}
-          style={{
-            background: `var(--${assetColors[asset.kind as keyof typeof assetColors]})`,
-          }}
+        <button
+          type="button"
+          className="asset-card-preview-open"
+          aria-label={`View ${asset.name}`}
+          onClick={() => openFile(asset.id)}
         >
-          <Icon size={40} />
-        </span>
-        <div className="asset-menu">
-          <IconButton
-            label={`Menu for ${asset.name}`}
-            onClick={() => setMenu(!menu)}
+          {preview.data ? (
+            <img
+              className="asset-preview"
+              src={preview.data}
+              alt={asset.name}
+              onLoad={(e) => {
+                const image = e.currentTarget;
+                image.style.imageRendering =
+                  Math.max(image.naturalWidth, image.naturalHeight) <= 128
+                    ? "pixelated"
+                    : "auto";
+              }}
+            />
+          ) : null}
+          <span
+            className={preview.data ? "asset-icon preview-badge" : "asset-icon"}
+            style={{
+              background: `var(--${assetColors[asset.kind as keyof typeof assetColors]})`,
+            }}
           >
-            <MoreHorizontal size={18} />
-          </IconButton>
-          {menu && (
-            <div className="popover-menu">
-              <Button
-                onClick={() => {
-                  setMenu(false);
-                  edit();
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                onClick={() => {
-                  setMenu(false);
-                  link();
-                }}
-              >
-                Link to task…
-              </Button>
-              <Button
-                disabled={!!file && fileUnavailable(file)}
-                title={
-                  file && fileUnavailable(file) ? fileStatus(file) : undefined
-                }
-                onClick={() => {
-                  setMenu(false);
-                  void (
-                    url
-                      ? api.openUrl(asset.location)
-                      : api.showInFolder(asset.location)
-                  ).catch((e) => useUiStore.getState().error(String(e)));
-                }}
-              >
-                {url ? "Open URL" : "Show in folder"}
-              </Button>
-            </div>
-          )}
-        </div>
+            <Icon size={40} />
+          </span>
+        </button>
+        <AssetActions assetId={asset.id} name={asset.name} link={link} />
       </div>
-      <h2 title={asset.name}>{asset.name}</h2>
+      <h2 title={asset.name}>
+        <button
+          type="button"
+          className="asset-viewer-name"
+          onClick={() => openFile(asset.id)}
+        >
+          {asset.name}
+        </button>
+      </h2>
+      {asset.archivedAt && <Stamp>Archived</Stamp>}
+      <p className="small muted">
+        {file?.usageCount ? `Used in ${file.usageCount}` : "Not used"}
+      </p>
       <p className="asset-location mono" title={asset.location}>
         {asset.location.length > 32
           ? `…${asset.location.slice(-31)}`
@@ -379,20 +366,37 @@ function AssetCard({
 export function AssetsPage({ openTask }: { openTask(key: string): void }) {
   const { settings, update } = useBoardSettings();
   const app = useQuery(appQuery);
+  const linkedToId = useId();
+  const [showArchived, setShowArchived] = useState(false);
+  const [linkedTo, setLinkedTo] = useState(
+    new URLSearchParams(window.location.search).get("linkedTo") ?? "any",
+  );
+  const openFile = useOpenFileViewer();
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: () => api.listAssets(),
   });
   const files = useQuery({
-    queryKey: ["file-assets", app.data?.jam?.id],
+    queryKey: [
+      "file-assets",
+      "assets-page-v2",
+      app.data?.jam?.id,
+      showArchived,
+    ],
     enabled: !!app.data?.jam,
     queryFn: async () => {
       const context = await taskFilesApi.capture(app.data?.jam?.id ?? "");
       const [catalog, usages] = await Promise.all([
-        taskFilesApi.list(context),
+        fileViewerApi.list(context, { includeArchived: showArchived }),
         taskFilesApi.usages(context),
       ]);
-      return { catalog, usages };
+      const scopeUsages: Record<string, AssetUsage> = {};
+      await Promise.all(
+        catalog.map(async (a) => {
+          scopeUsages[a.id] = await fileViewerApi.usage(context, a.id);
+        }),
+      );
+      return { catalog, usages, scopeUsages };
     },
   });
   const combined: AssetWithTasks[] = [...(assets.data ?? [])];
@@ -484,6 +488,18 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
       })
       .filter(
         (a) =>
+          (!a.archivedAt || showArchived) &&
+          (linkedTo === "any" ||
+            (linkedTo === "nothing"
+              ? !(
+                  files.data?.catalog.find((f) => f.id === a.id)?.usageCount ??
+                  a.tasks.length
+                )
+              : linkedTo === "task"
+                ? !!files.data?.scopeUsages[a.id]?.tasks.length
+                : files.data?.scopeUsages[a.id]?.scopes.some(
+                    (s) => s.type === linkedTo,
+                  ))) &&
           (kind === "all" || a.kind === kind) &&
           (storage === "all" ||
             ("storageType" in a
@@ -505,7 +521,9 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           <SegmentedControl
             label="Assets view"
             value={settings?.assetsView ?? "grid"}
-            onChange={(assetsView) => update({ assetsView })}
+            onChange={(assetsView) =>
+              update({ assetsView: assetsView as "grid" | "list" })
+            }
             options={[
               {
                 value: "grid",
@@ -579,6 +597,32 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           onChange={(e) => setText(e.target.value)}
         />
       </div>
+      <div className="assets-v2-filter">
+        <div className="asset-file-filter">
+          <label htmlFor={linkedToId}>Linked to</label>
+          <Select
+            id={linkedToId}
+            aria-label="Linked to"
+            value={linkedTo}
+            onChange={(e) => setLinkedTo(e.target.value)}
+          >
+            <option value="any">Any</option>
+            <option value="project">Project</option>
+            <option value="epic">Epics</option>
+            <option value="story">Stories</option>
+            <option value="task">Tasks</option>
+            <option value="nothing">Nothing</option>
+          </Select>
+        </div>
+        <label>
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />{" "}
+          Show archived
+        </label>
+      </div>
       <ReadReceipt
         checkedAt={read.checkedAt}
         phase={read.phase}
@@ -648,7 +692,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
               sort={sort}
               setSort={setSort}
               openTask={openTask}
-              edit={setEdit}
+              openFile={openFile}
             />
           ) : (
             <div className="asset-groups">
@@ -667,11 +711,14 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
                       onClick={() =>
                         update({
                           collapsedAssetKinds:
-                            settings?.collapsedAssetKinds.includes(k)
+                            (settings?.collapsedAssetKinds.includes(k)
                               ? settings.collapsedAssetKinds.filter(
                                   (v) => v !== k,
                                 )
-                              : [...(settings?.collapsedAssetKinds ?? []), k],
+                              : [
+                                  ...(settings?.collapsedAssetKinds ?? []),
+                                  k,
+                                ]) as (typeof assetKinds)[number][],
                         })
                       }
                     >
@@ -686,6 +733,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
                             {
                               sprite: "Sprites",
                               audio: "Audio",
+                              video: "Videos",
                               level: "Levels",
                               font: "Fonts",
                               model: "Models",
@@ -713,7 +761,6 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
                               (file) => file.id === a.id,
                             )}
                             openTask={openTask}
-                            edit={() => setEdit(a)}
                             link={() => setLink(a.id)}
                           />
                         ))}
@@ -727,6 +774,7 @@ export function AssetsPage({ openTask }: { openTask(key: string): void }) {
           <EmptyState text="No assets match these filters">
             <Button
               onClick={() => {
+                setLinkedTo("any");
                 setKind("all");
                 setLinked("all");
                 setStorage("all");
@@ -760,13 +808,13 @@ function AssetList({
   sort,
   setSort,
   openTask,
-  edit,
+  openFile,
 }: {
   assets: AssetWithTasks[];
   sort: string;
   setSort(v: string): void;
   openTask(key: string): void;
-  edit(asset: Asset): void;
+  openFile(assetId: string): void;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
   const itemKey = useCallback((i: number) => assets[i]?.id ?? i, [assets]);
@@ -815,14 +863,37 @@ function AssetList({
             const a = assets[item.index];
             if (!a) return null;
             return (
-              <tr key={a.id} data-testid="asset-list-row">
+              <tr
+                key={a.id}
+                className={a.archivedAt ? "asset-list-row-archived" : ""}
+                data-testid="asset-list-row"
+                onClick={(event) => {
+                  if (
+                    !(event.target as Element).closest(
+                      'button, a, input, [role="menu"], [role="combobox"]',
+                    )
+                  )
+                    openFile(a.id);
+                }}
+              >
                 <td>
                   <AssetThumb asset={a} />
                 </td>
                 <td>
-                  <button type="button" title={a.name} onClick={() => edit(a)}>
+                  <button
+                    type="button"
+                    title={a.name}
+                    onClick={() => openFile(a.id)}
+                  >
                     {a.name}
                   </button>
+                  {a.archivedAt && <Stamp>Archived</Stamp>}
+                  <small>
+                    {(a as AssetWithTasks & { usageCount?: number }).usageCount
+                      ? `Used in ${(a as AssetWithTasks & { usageCount?: number }).usageCount}`
+                      : "Not used"}
+                  </small>
+                  <AssetActions assetId={a.id} name={a.name} />
                 </td>
                 <td>
                   <span className="capitalize">{a.kind}</span>

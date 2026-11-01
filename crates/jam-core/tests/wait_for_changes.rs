@@ -31,7 +31,7 @@ fn input(value: serde_json::Value) -> ChangesWaitInput {
 }
 fn scope(epic: &Epic) -> Option<Scope> {
     Some(Scope {
-        kind: "epic".into(),
+        kind: "epic".parse::<jam_core::ScopeKind>().unwrap(),
         id: epic.key.clone(),
     })
 }
@@ -206,13 +206,17 @@ fn invalid_wait_filters_return_validation() {
         json!({"cursor":0,"timeoutSeconds":0}),
         json!({"cursor":0,"timeoutSeconds":61}),
         json!({"cursor":-1}),
-        json!({"cursor":0,"actions":["report.unknown"]}),
-        json!({"cursor":0,"actorKind":"robot"}),
     ] {
         assert!(matches!(
             s.wait_for_changes(&brain.id, input(args)),
             Err(Error::Validation { .. })
         ));
+    }
+    for args in [
+        json!({"cursor":0,"actions":["report.unknown"]}),
+        json!({"cursor":0,"actorKind":"robot"}),
+    ] {
+        assert!(serde_json::from_value::<ChangesWaitInput>(args).is_err());
     }
     assert!(serde_json::from_value::<ChangesWaitInput>(json!({})).is_err());
 }

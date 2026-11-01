@@ -62,7 +62,7 @@ async fn http_inline_uses_project_and_agent_headers() {
     .serve(transport)
     .await
     .unwrap();
-    assert_eq!(client.list_all_tools().await.unwrap().len(), 57);
+    assert_eq!(client.list_all_tools().await.unwrap().len(), 74);
     assert!(
         client
             .list_all_resources()
@@ -86,7 +86,7 @@ async fn http_inline_uses_project_and_agent_headers() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("create_epic").with_arguments(
-                json!({"title":"HTTP inline write"})
+                json!({"title":"HTTP inline write","requestId":"http-inline"})
                     .as_object()
                     .unwrap()
                     .clone(),
@@ -110,7 +110,7 @@ async fn http_inline_uses_project_and_agent_headers() {
         .find(|m| m.member.name == "HTTP inline profile")
         .unwrap();
     assert!(member.online && member.member.last_seen_at.is_some());
-    assert_eq!(member.member.client.as_deref(), Some("claude-code"));
+    assert_eq!(member.member.client.as_deref(), Some("other"));
     assert!(
         store
             .for_project(&other.id)
@@ -204,7 +204,7 @@ async fn http_bound_session_rejects_project_change_and_keeps_identity() {
             .unwrap(),
     )
     .await;
-    assert_eq!(result["result"]["tools"].as_array().unwrap().len(), 57);
+    assert_eq!(result["result"]["tools"].as_array().unwrap().len(), 74);
     let members = store.for_project(&project).unwrap().list_members().unwrap();
     assert!(
         members

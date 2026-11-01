@@ -43,6 +43,7 @@ fn recursive_json_event_exports_without_changing_the_wire_shape() {
     let event = BoardChanged {
         project_context: None,
         events: vec![ActivityEvent {
+            client: None,
             seq: 1,
             action: "jam.updated".into(),
             actor: MemberRef {

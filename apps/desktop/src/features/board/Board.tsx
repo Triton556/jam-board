@@ -106,6 +106,7 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
   );
   const canAdd = !!title.trim() && (!filtered || !!selectedStory);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const form = useRef<HTMLDivElement>(null);
   const opener = useRef(
     document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -113,6 +114,7 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
   );
   useEffect(() => {
     ref.current?.focus();
+    form.current?.scrollIntoView({ block: "nearest" });
     return () => {
       if (opener.current?.isConnected && opener.current !== document.body)
         opener.current.focus();
@@ -151,7 +153,7 @@ function QuickCreate({ epicKeys }: { epicKeys: string[] }) {
     }
   }
   return (
-    <div className="quick-create">
+    <div ref={form} className="quick-create">
       <textarea
         aria-label="New task in Backlog"
         disabled={create.isPending}

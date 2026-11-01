@@ -13,7 +13,7 @@ const task = {
 const worker = {
   id: "worker",
   name: "Worker",
-  kind: "agent",
+  kind: "agent" as const,
   color: "red",
   lastSeenAt: stamp,
   statusAt: stamp,
@@ -85,7 +85,7 @@ describe("H-B01 / AG10: truthful card presence", () => {
   it("rejects unrelated, stale and future generic reports", () => {
     const review = { ...task, status: "review" };
     for (const patch of [
-      { statusScope: { type: "task", id: "other" } },
+      { statusScope: { type: "task" as const, id: "other" } },
       { statusAt: new Date(now - 1800001).toISOString() },
       { statusAt: new Date(now + 1).toISOString() },
       { lastSeenAt: new Date(now - 120001).toISOString() },

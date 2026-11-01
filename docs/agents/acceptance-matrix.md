@@ -80,7 +80,7 @@ release browser failures stay recorded in the version verification record.
 | AC11 | AG11 replacement brain read-only recovery | Includes relevant Done/archive reports, rejected rounds and answered questions; tails/resource omissions disclosed; no appointment/claim mutation |
 | AC12 | AG12 references across project/frame/file cases | Same-project binding enforced; no implicit preview network fetch/file copy; unreadable input produces useful failure |
 | AC13 | AG02 new/refined task → human reads Description | Concise user-language outcome in an empty description; existing wishes preserved, technical detail secondary; prompt strings alone do not establish model compliance |
-| AC14 | AG14 read canvas -> create epic frame -> connect notes -> arrange grid -> reread/archive -> foreign-ID and failed-batch recovery | Seven tools use pinned project/actor/activity. Directed duplicates/self-edges fail. Grid fits without overlaps or touching unselected occupants; insufficient space or invalid/foreign IDs roll back the entire batch. World/frame-local conversion, archive defaults, filters and explicit paging markers match the contract. `crates/jam-mcp/src/canvas_tests.rs` exercises dispatcher/core behavior; stdio smoke verifies transport. Desktop visual/live-human acceptance remains unrun. |
+| AC14 | AG14 read canvas -> create epic frame -> connect notes -> arrange grid -> reread/archive -> foreign-ID and failed-batch recovery | Seven tools use pinned project/actor/activity. Directed duplicates/self-edges fail. Grid fits without overlaps or touching unselected occupants; insufficient space or invalid/foreign IDs roll back the entire batch. World/frame-local conversion, archive defaults, filters and explicit paging markers match the contract. `crates/jam-mcp/src/canvas_tests.rs` exercises dispatcher/core behavior; stdio smoke verifies transport. Desktop visual/live-human acceptance remains unrun.  Round 12 human reason/keys/filters/Send, changed-since hash, ancestry and Collect Keep; partial batches and human-only guards. See R12-M/fix1 and R12-G. |
 
 ## Test mapping and evidence levels
 
@@ -360,7 +360,7 @@ not turn these rows into browser/native or live-provider passes.
 
 | ID | Sequence / human paths | Required functional assertions | Required visual states | Result |
 |---|---|---|---|---|
-| UX01 | H-I01/I02: open/resolved Questions -> Refresh/answer -> Start request | Questions heading, Refresh and receipt share one row; Start requests remain in the same content column; pending/stale/failure retains correct scope and input; receipt is not process launch | Narrow/wide, long heading/receipt, empty/loading/error and pending approval; aligned content and no overlapping actions | Not yet run (browser/native). |
+| UX01 | H-I01/I02: open/resolved Questions -> Refresh/answer -> Start request | Questions heading, Refresh and receipt share one row; Start requests remain in the same content column; pending/stale/failure retains correct scope and input; receipt is not process launch | Narrow/wide, long heading/receipt, empty/loading/error and pending approval; aligned content and no overlapping actions | Not yet run (browser/native).  Round 12 Questions/Events alignment, preserved drafts and one-second visible mark-seen; shared ?file route and Review section focus. See R12-I and R12-G. |
 | UX02 | H-D01/D08: task drawer -> compact permission/claim -> Why? -> Release | Breadcrumb/title precede controls; one Why? reveals both original explanations; pending/stale/dirty release keeps its original version/claim semantics and never stops a process | Long title/breadcrumb, both explanations open, dock visible, narrow width, pending/error; no controls displace the title | Not yet run (browser/native). |
 | UX03 | H-P07: heading Refine with brain -> dialog -> Open in brain chat / Copy prompt | Primary action stages captured scoped prompt and scope chip in composer, then closes dialog; does not send, start session, appoint or grant Start; secondary copy and failure recovery preserved | Heading action bounds, selectable long prompt, setup/continue modes, unsaved warning, compose/copy error; keyboard focus after close | Not yet run (browser/native). |
 | UX04 | H-R01/G02: Note · N / Add / N / empty New note / empty-pane double-click | Primary Note and ghost Add (File/Link/Note) are distinct; N ignores editable/dialog targets; placement preserves pointer coordinates; double-click focuses local paper at pointer and blank paper creates no record | Toolbar hierarchy/chevron, open Add menu, placement cursor, empty and filtered board, focused blank paper at readable/overview zoom | Not yet run (browser/native). |
@@ -515,3 +515,18 @@ PASS in G3 ci26: `drawer-motion.test.tsx` controlled-idle regression (14/14 file
 `e2e/m4.spec.ts` archive-close regression (9/9 file), and final 156-case functional
 Chromium/mock sweep. Initial failing reproduction is retained in the G3 report.
 No native or human acceptance is inferred.
+
+## Round 12 integration acceptance (unreleased)
+
+Results and actual counts belong to [round12 verification](../verification/round12.md), not this checklist. Package reports retain their scoped evidence. Native/package/human checks are NOT RUN.
+
+| ID | Paths | Required behavior | Evidence |
+|---|---|---|---|
+| RQ01 | H-B01 | 192 Backlog cards, independent wheel/drag/keyboard scrollers, pinned controls, stable live anchor, ≤2s entry | column-scroll.test.tsx; board-scroll.spec.ts; R12-B/fix1 |
+| RQ02 | H-A01/H-D10/H-TF01–TF08; AF03/AF05 | ?file across routes and Back/Forward, Markdown/media, usage, scopes, explicit delete, retained revision identity; project isolation/reload | FileViewer.test.tsx; files-viewer.spec.ts; R12-G/integration.spec.ts |
+| RQ03 | H-P01/P02/P04; AG03 | English Choose file… button and filename status with keyboard activation and retained drop zone; import dry-run → conflicts → explicit overwrite → shared board → guarded Undo/history; noChanges writes nothing | Existing round12-plan.test.tsx / round12_import.rs / import-plan.spec.ts evidence is historical. Revised G Fix 1: capture-fix1.mjs supplies Step 1 visuals only; functionality awaits owner approval before new tests. |
+| RQ04 | H-P04/H-D08; AG03/AG05 | Story/task parent moves preserve keys, block work statuses and stale versions; result-version Undo | round12_moves.rs; MovePlanDialog tests; import-plan.spec.ts |
+| RQ05 | H-I01/I02; AG04/AG08/AG10 | URL tabs, drafts, grouping/filter/paging/resolution, 1s visible mark-seen, project cursor isolation; Review focuses report rounds | inbox-events tests/spec; round12_m_inbox.rs; R12-G/integration.spec.ts |
+| RQ06 | H-R01/R02; AG12/AG14 | 40-image/six-frame core scenario; 20 keys/3 reasons, Send event, filtered reads, partial retry, variations and Collect | round12_m_scenario.rs; moodboard-review.spec.ts; R12-G/integration.spec.ts |
+| RQ07 | H-S01; AG01 | Four shell/JSON variants, no duplicate Claude Configuration code, Codex retained, safe copy error/project/unmount fencing | mcp-config/BoardConnectSetup/settings-copy-safety tests; R12-G Settings PNGs |
+| RQ08 | AG01/03/04/05/07/08/10/11/12/14; AF03/05 | 74-tool schema, per-tool receipts/file_legacy replay, compact includes, prompt resources; no inferred execution grants | round12_schema/compact/receipts core/MCP fixtures; Node guide checks |

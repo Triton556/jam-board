@@ -28,7 +28,7 @@ impl Store {
         if let Some(data_dir) = &self.app_data_dir {
             let project = self.active_jam()?;
             let registry = ProjectRegistry::open(data_dir)?;
-            for mut entry in registry.entries()? {
+            for mut entry in registry.canonical_entries()? {
                 if entry.project_id == project.id {
                     entry.project_name = project.name.clone();
                     registry.register(&entry)?;
@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS local_settings(key TEXT PRIMARY KEY,value TEXT NOT NU
         })
     }
     pub fn entries(&self) -> Result<Vec<RegistryEntry>> {
+        Ok(self
+            .canonical_entries()?
+            .into_iter()
+            .map(|mut entry| {
+                entry.canonical_folder = display_path(Path::new(&entry.canonical_folder));
+                entry.display_folder = display_path(Path::new(&entry.display_folder));
+                entry.repo_common_dir = entry.repo_common_dir.map(|p| display_path(Path::new(&p)));
+                entry
+            })
+            .collect())
+    }
+    pub(crate) fn canonical_entries(&self) -> Result<Vec<RegistryEntry>> {
         let c = self
             .connection
             .lock()
@@ -93,7 +105,7 @@ CREATE TABLE IF NOT EXISTS local_settings(key TEXT PRIMARY KEY,value TEXT NOT NU
     pub fn resolve(&self, project: &str, folder: Option<&Path>) -> Result<RegistryEntry> {
         let canonical = folder.map(Path::canonicalize).transpose()?;
         let entries: Vec<_> = self
-            .entries()?
+            .canonical_entries()?
             .into_iter()
             .filter(|e| {
                 e.project_id == project

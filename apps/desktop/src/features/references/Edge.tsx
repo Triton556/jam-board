@@ -8,6 +8,29 @@ import {
 import { memo } from "react";
 import { roughPaths } from "./rough";
 import { useCanvas } from "./runtime";
+export function DerivedEdge(props: EdgeProps) {
+  const [path, x, y] = getBezierPath(props);
+  return (
+    <g className="moodboard-derived-edge">
+      <path
+        d={path}
+        fill="none"
+        stroke="var(--line)"
+        strokeDasharray="6 5"
+        markerEnd="url(#reference-arrow)"
+      />
+      <path d={path} fill="none" stroke="transparent" strokeWidth={16} />
+      <text
+        x={x}
+        y={y - 8}
+        textAnchor="middle"
+        className="moodboard-variation-label"
+      >
+        variation
+      </text>
+    </g>
+  );
+}
 export const ReferenceEdge = memo(function ReferenceEdge(props: EdgeProps) {
   const [path, x, y] = getBezierPath(props),
     runtime = useCanvas();

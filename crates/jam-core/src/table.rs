@@ -51,7 +51,7 @@ impl Store {
                     "t.status IN ({})",
                     vec!["?"; statuses.len()].join(",")
                 ));
-                values.extend(statuses.iter().cloned().map(Value::Text));
+                values.extend(statuses.iter().map(|s| Value::Text(s.to_string())));
             }
         }
         if let Some(assignee) = input.assignee.as_deref().filter(|s| !s.is_empty()) {

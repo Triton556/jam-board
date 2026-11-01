@@ -145,6 +145,74 @@ it.each(
     }
   },
 );
+it.each([
+  [880, 1],
+  [280, 0.2],
+])(
+  "Fix 1 %spx frame at zoom %s has one actions menu with review and edit commands",
+  (width, zoom) => {
+    camera.zoom = zoom;
+    const value: RefFrame = {
+      ...frame,
+      w: width,
+      review: {
+        total: 3,
+        keep: 1,
+        reject: 1,
+        unrated: 1,
+        comments: 1,
+        sentAt: "2026-11-01T00:00:00Z",
+        sentBy: "Human",
+        changedSinceSent: false,
+      },
+    };
+    const actions = {
+      ...runtime(),
+      review: vi.fn(),
+      sendReview: vi.fn(),
+      collectKept: vi.fn(),
+    };
+    const { container } = render(
+      <ReactFlowProvider>
+        <CanvasContext.Provider value={actions}>
+          <Frame value={value} />
+        </CanvasContext.Provider>
+      </ReactFlowProvider>,
+    );
+    expect(
+      container.querySelectorAll(
+        ".reference-frame-actions [aria-haspopup='menu']",
+      ),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: `Review ${value.title}` }),
+    ).toBeVisible();
+    expect(
+      container.querySelector(".moodboard-frame-counter"),
+    ).toHaveTextContent("2/3");
+    expect(container.querySelector(".moodboard-sent-chip")).toHaveTextContent(
+      "Sent",
+    );
+    const menu = screen.getByRole("button", {
+      name: `Frame actions for ${value.title}`,
+    });
+    for (const name of [
+      "Review items",
+      "Send review to brain",
+      "Collect Keep into new frame…",
+      `Edit frame ${value.title}`,
+    ]) {
+      fireEvent.click(menu);
+      fireEvent.click(screen.getByRole("menuitem", { name }));
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(menu).toHaveFocus();
+    }
+    expect(actions.review).toHaveBeenCalledExactlyOnceWith(value);
+    expect(actions.sendReview).toHaveBeenCalledExactlyOnceWith(value);
+    expect(actions.collectKept).toHaveBeenCalledExactlyOnceWith([value]);
+    expect(actions.editFrame).toHaveBeenCalledExactlyOnceWith(value);
+  },
+);
 it.each([1, 0.75, 0.4, 0.39])(
   "RF02 frame title and full grip remain present at zoom %s; actions retain their exact target",
   (zoom) => {

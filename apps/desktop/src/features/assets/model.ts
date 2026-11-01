@@ -2,6 +2,7 @@ import { z } from "zod";
 export const assetKinds = [
   "sprite",
   "audio",
+  "video",
   "level",
   "font",
   "model",
@@ -14,40 +15,42 @@ export function assetKind(location: string) {
     ? "sprite"
     : ["wav", "ogg", "mp3"].includes(ext ?? "")
       ? "audio"
-      : ["ttf", "otf", "woff2"].includes(ext ?? "")
-        ? "font"
-        : ["tmx", "ldtk"].includes(ext ?? "")
-          ? "level"
-          : [
-                "glb",
-                "gltf",
-                "obj",
-                "fbx",
-                "blend",
-                "stl",
-                "ply",
-                "dae",
-                "3mf",
-                "usd",
-                "usda",
-                "usdc",
-                "usdz",
-              ].includes(ext ?? "")
-            ? "model"
+      : ["mp4", "webm", "mov", "mkv", "avi", "m4v"].includes(ext ?? "")
+        ? "video"
+        : ["ttf", "otf", "woff2"].includes(ext ?? "")
+          ? "font"
+          : ["tmx", "ldtk"].includes(ext ?? "")
+            ? "level"
             : [
-                  "md",
-                  "txt",
-                  "pdf",
-                  "doc",
-                  "docx",
-                  "rtf",
-                  "odt",
-                  "csv",
-                  "yaml",
-                  "yml",
+                  "glb",
+                  "gltf",
+                  "obj",
+                  "fbx",
+                  "blend",
+                  "stl",
+                  "ply",
+                  "dae",
+                  "3mf",
+                  "usd",
+                  "usda",
+                  "usdc",
+                  "usdz",
                 ].includes(ext ?? "")
-              ? "document"
-              : "other";
+              ? "model"
+              : [
+                    "md",
+                    "txt",
+                    "pdf",
+                    "doc",
+                    "docx",
+                    "rtf",
+                    "odt",
+                    "csv",
+                    "yaml",
+                    "yml",
+                  ].includes(ext ?? "")
+                ? "document"
+                : "other";
 }
 export function assetName(location: string) {
   return (

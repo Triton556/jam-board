@@ -26,7 +26,7 @@ fn clipboard_is_confined_registered_and_rejects_non_images() {
         .unwrap();
     let path = std::path::Path::new(&asset.location);
     assert_eq!(
-        path.parent().unwrap(),
+        path.parent().unwrap().canonicalize().unwrap(),
         d.path().canonicalize().unwrap().join("references")
     );
     assert_eq!(std::fs::read(path).unwrap(), bytes);
@@ -50,7 +50,7 @@ fn frames_parent_geometry_inheritance_and_reversible_archive() {
         s.add_reference(
             &actor.member.id,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Warm snow under amber light".into()),
                 frame_epic_key: Some(epic.key.clone()),
                 ..Default::default()
@@ -91,7 +91,7 @@ fn frames_parent_geometry_inheritance_and_reversible_archive() {
         .add_reference(
             &h,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("Human caption".into()),
                 frame_id: Some(f.id.clone()),
                 x: Some(40.),
@@ -136,7 +136,7 @@ fn frames_parent_geometry_inheritance_and_reversible_archive() {
     s.canvas_archive(
         &h,
         CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: first.audit.id.clone(),
             archived: true,
         },
@@ -152,7 +152,7 @@ fn frames_parent_geometry_inheritance_and_reversible_archive() {
     s.canvas_archive(
         &h,
         CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: first.audit.id.clone(),
             archived: false,
         },
@@ -183,7 +183,7 @@ fn link_add_is_offline_and_explicit_preview_stores_only_two_fields() {
         .add_reference(
             &h,
             AddReference {
-                kind: "link".into(),
+                kind: "link".parse::<jam_core::ReferenceKind>().unwrap(),
                 url: Some(format!("http://{}/palette", listener.local_addr().unwrap())),
                 frame_epic_key: Some(epic.key.clone()),
                 ..Default::default()
@@ -230,7 +230,7 @@ fn preview_cancels_a_stalled_transfer_after_five_seconds() {
         .add_reference(
             &h,
             AddReference {
-                kind: "link".into(),
+                kind: "link".parse::<jam_core::ReferenceKind>().unwrap(),
                 url: Some(format!("http://{}/slow", listener.local_addr().unwrap())),
                 ..Default::default()
             },

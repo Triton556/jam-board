@@ -44,7 +44,9 @@ export function ActivityPage({ openTask }: { openTask(key: string): void }) {
       api.listActivity({
         beforeSeq: pageParam,
         limit: 30,
-        actorKind: kind || undefined,
+        actorKind: (kind || undefined) as
+          | import("../../bindings").ActorKind
+          | undefined,
       }),
     getNextPageParam: (last) =>
       last.length === 30 ? last.at(-1)?.seq : undefined,

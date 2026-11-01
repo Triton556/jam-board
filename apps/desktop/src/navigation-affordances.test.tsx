@@ -34,7 +34,8 @@ it("on-demand Welcome opens for an empty app, then the visible project switcher 
   await act(async () => {
     await api.updateProject({
       name: longName,
-      template: app.jam?.template ?? "game_jam",
+      template: (app.jam?.template ??
+        "game_jam") as import("./bindings").ProjectTemplate,
     });
   });
   await waitFor(() =>

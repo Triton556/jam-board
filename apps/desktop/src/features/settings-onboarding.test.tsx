@@ -97,7 +97,9 @@ it("copies an exact project ID check without a claim, role mutation or token acc
   expect(await navigator.clipboard.readText()).toBe(
     projectConnectionPrompt(app.jam),
   );
-  expect(await screen.findByRole("status")).toHaveTextContent(
+  expect(
+    await screen.findByRole("status", { name: "Settings feedback" }),
+  ).toHaveTextContent(
     `Connection check copied for ${app.jam.name} · ${app.jam.keyPrefix}`,
   );
   expect(
@@ -166,10 +168,12 @@ it("an HTTP copy keeps its captured target label across a project rename", async
     `"X-Jam-Project" = "${original.jam?.id}"`,
   );
   expect(await navigator.clipboard.readText()).not.toContain("OTHER");
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    `Configuration copied for ${original.jam?.name} · JB`,
-  );
-  expect(screen.getByRole("status")).toHaveTextContent("keep it private");
+  expect(
+    await screen.findByRole("status", { name: "Settings feedback" }),
+  ).toHaveTextContent(`Configuration copied for ${original.jam?.name} · JB`);
+  expect(
+    screen.getByRole("status", { name: "Settings feedback" }),
+  ).toHaveTextContent("keep it private");
 });
 it("unmatched project settings do not offer a configuration or a misleading connection check", async () => {
   const status = await mockApi.mcpStatus();

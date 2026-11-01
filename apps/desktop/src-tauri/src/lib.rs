@@ -9,6 +9,7 @@ pub mod commands;
 mod execution_commands;
 mod m5_commands;
 mod project_folder_commands;
+mod round12_commands;
 mod skill_commands;
 mod skill_runner;
 mod startup_probe;
@@ -60,11 +61,15 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
             agent_commands::agent_model_catalog,agent_commands::add_agent_attachment,agent_commands::remove_agent_attachment,agent_commands::agent_profiles,agent_commands::save_agent_profile,agent_commands::delete_agent_profile,agent_commands::set_agent_secret,agent_commands::clear_agent_secret,agent_commands::agent_sessions,agent_commands::start_agent_session,agent_commands::send_agent_prompt,agent_commands::retry_agent_turn,agent_commands::cancel_agent_turn,agent_commands::resolve_agent_permission,agent_commands::set_agent_config_option,agent_commands::stop_agent_session,agent_commands::agent_session_history,agent_commands::terminal_write,agent_commands::terminal_resize,agent_commands::terminal_snapshot,
             skill_commands::pick_folder,skill_commands::skill_saved_path,skill_commands::skill_check,skill_commands::cancel_skill,skill_commands::run_skill,
             canvas_commands::reference_canvas,canvas_commands::canvas_geometry,canvas_commands::canvas_archive,canvas_commands::reference_metadata,canvas_commands::update_ref_edge,canvas_commands::clipboard_reference,canvas_commands::fetch_reference_preview,canvas_commands::clear_reference_preview,canvas_commands::canvas_viewport,canvas_commands::reference_media,
-            v2_commands::set_reference_verdict,v2_commands::link_ref_frame,v2_commands::unlink_ref_frame,v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
+            v2_commands::set_reference_verdict,v2_commands::send_reference_review,v2_commands::collect_kept_references,v2_commands::list_inbox_events,v2_commands::mark_inbox_events_seen,v2_commands::link_ref_frame,v2_commands::unlink_ref_frame,v2_commands::list_plan_epics,v2_commands::list_plan_stories,v2_commands::clear_brain,v2_commands::reorder_story,
             v2_commands::get_project,v2_commands::update_project,v2_commands::list_epics,v2_commands::get_epic,v2_commands::get_story,v2_commands::create_epic,v2_commands::update_epic,v2_commands::set_epic_status,v2_commands::create_story,v2_commands::update_story,v2_commands::set_story_status,v2_commands::update_task_brief,v2_commands::check_ready,v2_commands::mark_ready,v2_commands::answer_question,v2_commands::ask_user,v2_commands::withdraw_question,v2_commands::list_questions,v2_commands::review_task,v2_commands::submit_report,v2_commands::set_brain,v2_commands::list_changes_since,v2_commands::epic_journal,v2_commands::add_reference,v2_commands::list_references,v2_commands::update_reference,v2_commands::link_reference,v2_commands::unlink_reference,v2_commands::archive_reference,v2_commands::list_ref_frames,v2_commands::create_ref_frame,v2_commands::update_ref_frame,v2_commands::archive_ref_frame,v2_commands::list_ref_edges,v2_commands::create_ref_edge,v2_commands::archive_ref_edge,v2_commands::update_ref_geometry,
             execution_commands::get_execution,execution_commands::list_execution,execution_commands::set_execution,execution_commands::list_execution_requests,execution_commands::resolve_execution_request,
-            project_folder_commands::remove_recent_project_folder,project_folder_commands::locate_project_folder,project_folder_commands::preview_project_move,project_folder_commands::project_selection_context,project_folder_commands::open_file_asset,project_folder_commands::reveal_file_asset,project_folder_commands::create_project_folder,project_folder_commands::open_project_folder,project_folder_commands::close_project_folder,project_folder_commands::project_folder_info,project_folder_commands::list_project_folders,project_folder_commands::set_project_folder_rules,project_folder_commands::move_project_to_folder,project_folder_commands::project_operation_status,project_folder_commands::rollback_project_move,project_folder_commands::recover_project_folder,project_folder_commands::save_board_snapshot,project_folder_commands::register_file,project_folder_commands::link_task_file,project_folder_commands::set_task_file_role,project_folder_commands::unlink_task_file,project_folder_commands::resolve_file,project_folder_commands::file_operation_status,project_folder_commands::cancel_file_operation,project_folder_commands::list_file_assets,project_folder_commands::compare_board_snapshot,project_folder_commands::keep_live_board,
+            project_folder_commands::remove_recent_project_folder,project_folder_commands::locate_project_folder,project_folder_commands::preview_project_move,project_folder_commands::project_selection_context,project_folder_commands::open_asset_revision,project_folder_commands::reveal_asset_revision,project_folder_commands::open_file_asset,project_folder_commands::reveal_file_asset,project_folder_commands::create_project_folder,project_folder_commands::open_project_folder,project_folder_commands::close_project_folder,project_folder_commands::project_folder_info,project_folder_commands::list_project_folders,project_folder_commands::set_project_folder_rules,project_folder_commands::move_project_to_folder,project_folder_commands::project_operation_status,project_folder_commands::rollback_project_move,project_folder_commands::recover_project_folder,project_folder_commands::save_board_snapshot,project_folder_commands::register_file,project_folder_commands::link_task_file,project_folder_commands::set_task_file_role,project_folder_commands::unlink_task_file,project_folder_commands::resolve_file,project_folder_commands::file_operation_status,project_folder_commands::cancel_file_operation,project_folder_commands::list_file_assets,project_folder_commands::compare_board_snapshot,project_folder_commands::keep_live_board,
             commands::list_projects, commands::select_project, commands::restore_project,
+            round12_commands::move_story,round12_commands::move_task_to_story,
+            round12_commands::import_plan,round12_commands::undo_import,round12_commands::list_import_batches,
+            round12_commands::link_file,round12_commands::unlink_file,round12_commands::archive_asset,round12_commands::unarchive_asset,round12_commands::rename_asset,round12_commands::delete_asset,round12_commands::replace_asset,round12_commands::asset_usage,round12_commands::list_asset_revisions,
+            round12_commands::preview_file_asset,
             commands::app_ready, commands::app_state, commands::create_jam, commands::load_demo_jam,
             commands::set_current_member, commands::add_self, commands::get_board,
             commands::list_board_tasks, commands::get_task, commands::create_task,
@@ -94,7 +99,12 @@ pub fn event_bridge() -> tauri_specta::Builder<tauri::Wry> {
 pub fn export_event_bindings(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     event_bridge().export(specta_typescript::Typescript::default(), path)?;
     let generated = std::fs::read_to_string(path)?;
-    std::fs::write(path, format!("{}\n", generated.trim_end()))?;
+    let normalized = generated
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(path, format!("{}\n", normalized.trim_end()))?;
     Ok(())
 }
 

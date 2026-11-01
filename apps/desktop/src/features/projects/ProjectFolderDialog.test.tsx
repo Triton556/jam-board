@@ -232,7 +232,7 @@ it("rejects a late A→B→A picker receipt and preserves the scoped name draft"
   const b = await mockApi.createJam({
     name: "Project B",
     yourName: "Human",
-    template: "custom",
+    template: "custom" as const,
     theme: null,
     startsAt: "",
     endsAt: "",
@@ -773,7 +773,7 @@ it.each(["rules", "move", "settings"] as const)(
   },
 );
 
-it.each(["game_jam", "gamedev", "webapp", "custom"])(
+it.each(["game_jam", "gamedev", "webapp", "custom"] as const)(
   "applies full %s onboarding initialization before returning folder info",
   async (template) => {
     const initialization = {
@@ -829,7 +829,7 @@ it("forwards the onboarding form to folder create, including a renamed dialog dr
       false,
       expect.objectContaining({
         name: "Renamed product",
-        template: "webapp",
+        template: "webapp" as const,
         theme: "Small lights",
         yourName: "Alex",
         startsAt: "",
@@ -865,7 +865,7 @@ it("forwards C2 expected contexts, recent IDs, preview and initialization throug
   const initialization = {
     name: "C2",
     yourName: "Alex",
-    template: "custom",
+    template: "custom" as const,
     theme: null,
     startsAt: "",
     endsAt: "",

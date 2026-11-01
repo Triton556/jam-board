@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 57);
+    assert_eq!(actual.len(), 74);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -109,7 +109,7 @@ async fn http_auth_origin_identity_port_and_tools() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("create_task").with_arguments(
-                serde_json::json!({"storyKey":story.key,"title":"HTTP task"})
+                serde_json::json!({"storyKey":story.key,"title":"HTTP task","requestId":"http-task"})
                     .as_object()
                     .unwrap()
                     .clone(),
@@ -263,7 +263,7 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
     let created = client
         .call_tool(
             CallToolRequestParams::new("create_epic").with_arguments(
-                serde_json::json!({"title":"Pinned epic"})
+                serde_json::json!({"title":"Pinned epic","requestId":"pinned-epic"})
                     .as_object()
                     .unwrap()
                     .clone(),
@@ -271,7 +271,17 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
         )
         .await
         .unwrap();
-    assert_eq!(created.structured_content.unwrap()["jamId"], first.id);
+    let created = created.structured_content.unwrap();
+    assert_eq!(
+        s.for_project(&first.id)
+            .unwrap()
+            .get_epic(created["key"].as_str().unwrap())
+            .unwrap()
+            .epic
+            .audit
+            .jam_id,
+        first.id
+    );
     assert_eq!(s.get_project().unwrap().epics, 1);
     let pinned = s.for_project(&first.id).unwrap();
     assert_eq!(pinned.get_project().unwrap().epics, 1);
@@ -376,7 +386,7 @@ async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence
             CreateTask {
                 story_key: Some(story.key.clone()),
                 title: "Ready is not permission".into(),
-                status: Some("ready".into()),
+                status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
                 brief: TaskBrief {
                     goal_md: "Goal".into(),
                     where_md: "src/feature".into(),
@@ -528,7 +538,9 @@ async fn http_start_approval_is_typed_pinned_and_pause_preserves_worker_evidence
                     .review_context_revision
                     .unwrap(),
                 key: task.task.key.clone(),
-                verdict: "changes_requested".into(),
+                verdict: "changes_requested"
+                    .parse::<jam_core::ReviewVerdict>()
+                    .unwrap(),
                 comments_md: "Another round".into(),
                 failed_tests: None,
             },
@@ -604,7 +616,7 @@ async fn http_rejects_old_generation_after_same_identity_reclaim_and_never_fills
             CreateTask {
                 title: "Task".into(),
                 story_key: Some(story.key),
-                status: Some("ready".into()),
+                status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
                 brief: TaskBrief {
                     goal_md: "Goal".into(),
                     where_md: "src/feature".into(),
@@ -746,6 +758,9 @@ fn assert_session_context_compatibility(context: &serde_json::Value) {
     assert!(serde_json::from_value::<StrictOldContext>(context.clone()).is_err());
     let mut older_server = context.clone();
     for field in [
+        "serverVersion",
+        "schemaVersion",
+        "capabilities",
         "projectInstanceId",
         "databaseGeneration",
         "boardRevision",

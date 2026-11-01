@@ -46,6 +46,7 @@ pub(crate) fn member_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Member> {
 }
 pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
     Ok(TaskSummary {
+        external_ref: r.get(21)?,
         id: r.get(0)?,
         jam_id: r.get(1)?,
         key: r.get(2)?,
@@ -77,7 +78,7 @@ pub(crate) fn task_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<TaskSummary> {
         needs_info: false,
     })
 }
-pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round,claim_generation";
+pub(crate) const TASK_COLUMNS: &str = "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,changes_requested,review_round,claim_generation,external_ref";
 pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
     let mut t = c
         .query_row(
@@ -95,7 +96,7 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
     t.claim_generation = format!("{generation}:{}", t.claim_generation);
     t.idempotency_key = c
         .query_row(
-            "SELECT token FROM task_idempotency WHERE task_id=?",
+            "SELECT request_id FROM write_receipts WHERE tool='create_task' AND json_extract(result_json,'$.id')=?",
             [&t.id],
             |r| r.get(0),
         )
@@ -119,13 +120,13 @@ pub(crate) fn task(c: &Connection, key: &str) -> Result<TaskSummary> {
 }
 fn tags(c: &Connection, id: &str) -> Result<Vec<String>> {
     Ok(
-        c.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY tag")?
+        c.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY position,rowid")?
             .query_map([id], |r| r.get(0))?
             .collect::<std::result::Result<_, _>>()?,
     )
 }
 pub(crate) fn normalize_tags(tags: &[String]) -> Result<Vec<String>> {
-    let mut out = BTreeSet::new();
+    let mut out = Vec::new();
     for tag in tags {
         let tag = tag.trim().to_lowercase();
         if tag.is_empty() {
@@ -137,15 +138,20 @@ pub(crate) fn normalize_tags(tags: &[String]) -> Result<Vec<String>> {
                 "each tag must contain at most 24 characters",
             ));
         }
-        out.insert(tag);
+        if !out.contains(&tag) {
+            out.push(tag);
+        }
     }
-    Ok(out.into_iter().collect())
+    Ok(out)
 }
-fn set_tags(c: &Connection, id: &str, tags: &[String]) -> Result<()> {
+pub(crate) fn set_tags(c: &Connection, id: &str, tags: &[String]) -> Result<()> {
     let tags = normalize_tags(tags)?;
     c.execute("DELETE FROM task_tags WHERE task_id=?", [id])?;
-    for tag in tags {
-        c.execute("INSERT INTO task_tags VALUES (?,?)", [id, &tag])?;
+    for (position, tag) in tags.iter().enumerate() {
+        c.execute(
+            "INSERT INTO task_tags(task_id,tag,position) VALUES (?,?,?)",
+            params![id, tag, position as i64],
+        )?;
     }
     Ok(())
 }
@@ -174,7 +180,7 @@ pub(crate) fn event(
     };
     c.execute(
         "INSERT INTO activity(id, jam_id, actor_id, action, task_id, payload,
-created_at,epic_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+created_at,epic_id,client) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT client FROM temp.jam_project_context))",
         params![
             id(),
             jam_id,
@@ -436,7 +442,7 @@ created_at,template,milestone_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",params!
             crate::MemberEdit {
                 id: target.into(),
                 name: Some(name.into()),
-                color: Some(color.into()),
+                color: Some(color.parse()?),
                 avatar: avatar.map(str::to_string),
             },
         )
@@ -510,26 +516,18 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
         })
     }
     pub fn create_task(&self, actor: &str, input: CreateTask) -> Result<TaskDetail> {
-        let key = self.write(|c| {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
+        self.write(|c| {let mut result=crate::receipts::with_receipt(c,actor,Some(&request),"create_task","task",&payload,|| {
             member(c, actor)?;
             let j = jam(c)?;
-            if let Some(token) = &input.idempotency_key
-                && let Some(key) = c
-                    .query_row(
-                        "SELECT t.key FROM task_idempotency i JOIN tasks t ON t.id=i.task_id WHERE i.jam_id=? AND i.actor_id=? AND i.token=?",
-                        params![j.id, actor, token],
-                        |r| r.get::<_, String>(0),
-                    )
-                    .optional()?
-            {
-                return Ok(key);
-            }
+            crate::external_refs::unique_external_ref(c,RecordKind::Task,&j.id,None,input.external_ref.as_deref())?;
             title(&input.title)?;
             let s = input.status.as_deref().unwrap_or("backlog");
             let p = input.priority.as_deref().unwrap_or("medium");
             status(s)?;
             priority(p)?;
-            estimate(input.estimate)?;
+            estimate(input.estimate.map(i64::from))?;
             let due_at = utc_date(input.due_at.as_deref())?;
             let parent = crate::planning::story(
                 c,
@@ -571,7 +569,7 @@ created_at) VALUES (?, 'agent', ?, ?, ?, ?, ?, ?)",
             c.execute(
                 "INSERT INTO tasks(id, jam_id, key, title, description_md, status, priority,
 estimate, due_at, position, created_by, updated_by, created_at, updated_at,
-idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+idempotency_key,story_id,external_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 params![
                     tid,
                     j.id,
@@ -588,12 +586,10 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     stamp,
                     stamp,
                     Option::<String>::None,
-                    parent.audit.id
+                    parent.audit.id,
+                    input.external_ref
                 ],
             )?;
-            if let Some(token) = &input.idempotency_key {
-                c.execute("INSERT INTO task_idempotency(jam_id,actor_id,token,task_id) VALUES (?,?,?,?)", params![j.id, actor, token, tid])?;
-            }
             crate::planning::patch_record(c, "tasks", &tid, &serde_json::to_value(&input.brief)?)?;
             if s == "ready" {
                 let r = crate::workflow::readiness(c, &key)?;
@@ -619,9 +615,8 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 "title":input.title,"status":s}
                 ),
             )?;
-            Ok(key)
-        })?;
-        self.get_task(&key)
+            detail(c,&key)
+        },|receipt| detail(c,receipt["key"].as_str().ok_or_else(||invalid("receipt","Missing key"))?))?.value;result.task.idempotency_key=Some(request.clone());Ok(result)})
     }
     pub fn get_task(&self, key: &str) -> Result<TaskDetail> {
         self.read(|c| detail(c, key))
@@ -636,6 +631,7 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 expected_updated_at: input.expected_updated_at,
             }),
             TaskPatch {
+                external_ref: input.external_ref,
                 title: input.title,
                 description_md: input.description,
                 priority: input.priority,
@@ -667,6 +663,7 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
      Some(fields)
  } else { None };
  let mut new=old.clone();
+ if let Some(value)=input.external_ref { crate::external_refs::unique_external_ref(c,RecordKind::Task,&old.jam_id,Some(&old.id),value.as_deref())?; c.execute("UPDATE tasks SET external_ref=? WHERE id=?",params![value,old.id])?; new.external_ref=value; }
             if let Some(v)=input.title {
  title(&v)?;
  new.title=v;
@@ -674,18 +671,18 @@ idempotency_key,story_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             if let Some(v)=input.description_md {
  new.description_md=v;
  }
-            if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v; } }
+            if let Some(v)=input.status { status(&v)?; crate::workflow::transition(c,actor,&old,&v,None)?; if v.as_str() != old.status { new.position=end_position(c,&old.jam_id,&v)?; new.status=v.into(); } }
             if let Some(v)=input.assignee_id {
  if new.status=="in_progress" && v.is_some() && v!=old.assignee_id { crate::execution::require_execution(c,&old.story_id)?; }
  if let Some(id)=&v { member(c,id)?; crate::projects::join_member(c,&old.jam_id,id)?; } new.assignee_id=v;
  }
             if let Some(v)=input.priority {
  priority(&v)?;
- new.priority=v;
+ new.priority=v.into();
  }
             if let Some(v)=input.estimate {
- estimate(v)?;
- new.estimate=v;
+ estimate(v.map(i64::from))?;
+ new.estimate=v.map(i64::from);
  }
             if let Some(v)=input.due_at {
  new.due_at=utc_date(v.as_deref())?;
@@ -1107,6 +1104,8 @@ NULL AND key<>? ORDER BY position, key",
         self.write(|c| {
             member(c, actor)?;
             let a = Asset {
+                archived_at: None,
+                archived_by: None,
                 id: id(),
                 jam_id: jam(c)?.id,
                 kind: kind.into(),
@@ -1246,7 +1245,8 @@ NULL AND key<>? ORDER BY position, key",
                     || filter.changes_requested.is_some_and(|v| t.changes_requested != v)
                     || filter.needs_info.is_some_and(|v| needs_info.contains(&t.id) != v)
                     || (!filter.include_archived.unwrap_or(false) && t.archived_at.is_some())
-                    || filter.status.as_ref().is_some_and(|ss| !ss.contains(&t.status))
+                    || filter.external_ref.as_ref().is_some_and(|r| t.external_ref.as_ref()!=Some(r))
+                    || filter.status.as_ref().is_some_and(|ss| !ss.iter().any(|s|s.as_str()==t.status))
                 {
                     continue;
                 }
@@ -1434,6 +1434,8 @@ fn diff(old: &TaskSummary, new: &TaskSummary) -> Result<Value> {
 }
 pub(crate) fn asset_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Asset> {
     Ok(Asset {
+        archived_at: r.get(9)?,
+        archived_by: r.get(10)?,
         id: r.get(0)?,
         jam_id: r.get(1)?,
         kind: r.get(2)?,
@@ -1448,7 +1450,7 @@ pub(crate) fn asset_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Asset> {
 pub(crate) fn all_assets(c: &Connection, jid: &str) -> Result<Vec<Asset>> {
     let rows: Vec<Asset> = c
         .prepare(
-            "SELECT id, jam_id, kind, name, location, notes, created_by, created_at,role FROM
+            "SELECT id, jam_id, kind, name, location, notes, created_by, created_at,role,archived_at,archived_by FROM
 assets WHERE jam_id=? ORDER BY created_at, id",
         )?
         .query_map([jid], asset_row)?
@@ -1462,7 +1464,7 @@ pub(crate) fn detail(c: &Connection, key: &str) -> Result<TaskDetail> {
     let assets: Vec<Asset> = c
         .prepare(
             "SELECT a.id, a.jam_id, a.kind, a.name, a.location, a.notes, a.created_by,
-a.created_at,a.role FROM assets a JOIN task_assets ta ON ta.asset_id=a.id WHERE
+a.created_at,a.role,a.archived_at,a.archived_by FROM assets a JOIN task_assets ta ON ta.asset_id=a.id WHERE
 ta.task_id=?",
         )?
         .query_map([&t.id], asset_row)?
@@ -1489,6 +1491,7 @@ task_id=? ORDER BY created_at, id",
     let activity = crate::db::activity(c, 0, Some(&t.id), Some(20))?;
     let history = crate::db::activity(c, 0, Some(&t.id), Some(50))?;
     Ok(TaskDetail {
+        replayed: false,
         files: crate::file_model::task_files(c, &t.id)?,
         review_context_revision: crate::context::review_revision(c, &t)?,
         ancestor_questions: crate::planning::records(

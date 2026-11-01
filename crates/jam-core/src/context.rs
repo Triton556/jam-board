@@ -69,9 +69,14 @@ pub(crate) fn review_revision(c: &Connection, task: &TaskSummary) -> Result<Opti
     };
     let story = crate::planning::story(c, &task.story_id)?;
     let epic = crate::planning::task_epic(c, task)?;
+    // File associations and content revisions are review evidence too. Replacing
+    // a scoped file does not edit the task/story/epic timestamps.
+    let files=c.prepare("SELECT json_object('scope',l.scope,'target',l.target,'id',a.id,'role',l.role,'position',l.position,'name',a.name,'kind',a.kind,'location',a.location,'path',a.stored_path,'revision',a.content_revision,'hash',a.content_hash,'archivedAt',a.archived_at) FROM (SELECT target_type AS scope,target_id AS target,asset_id,role,position FROM scope_files WHERE jam_id=?1 AND ((target_type='project' AND target_id=?1) OR (target_type='epic' AND target_id=?2) OR (target_type='story' AND target_id=?3)) UNION ALL SELECT 'task',task_id,asset_id,role,position FROM task_assets WHERE task_id=?4 UNION ALL SELECT 'cover',task_id,cover_asset_id,'cover',0 FROM task_presentation WHERE task_id=?4 AND cover_asset_id IS NOT NULL) l JOIN assets a ON a.id=l.asset_id ORDER BY l.scope,l.target,l.asset_id,l.role")?
+        .query_map(rusqlite::params![task.jam_id,epic.audit.id,story.audit.id,task.id],|row|row.get::<_,String>(0))?
+        .collect::<std::result::Result<Vec<_>,_>>()?;
     // JSON array gives unambiguous framing without hashing dependencies. Opaque to clients.
     Ok(Some(serde_json::to_string(&(
-        "review-v1",
+        "review-v2",
         &task.id,
         report_id,
         &task.updated_at,
@@ -79,6 +84,7 @@ pub(crate) fn review_revision(c: &Connection, task: &TaskSummary) -> Result<Opti
         &story.audit.updated_at,
         &epic.audit.id,
         &epic.audit.updated_at,
+        files,
     ))?))
 }
 

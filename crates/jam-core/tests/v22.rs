@@ -14,8 +14,9 @@ fn questions_are_scoped_flags_but_ancestor_context_is_preserved() {
     let t = s.get_task("JB-1").unwrap();
     let before = s.get_epic(&t.epic.key).unwrap().open_questions.len();
     let ask = |kind: &str, id: String| AskUser {
+        request_id: None,
         scope: Scope {
-            kind: kind.into(),
+            kind: kind.parse::<jam_core::ScopeKind>().unwrap(),
             id,
         },
         title: "Choose the cue contrast".into(),

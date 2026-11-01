@@ -66,48 +66,54 @@ export const commands = {
 	clearReferencePreview: (id: string) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("clear_reference_preview", { id })),
 	canvasViewport: (value: string | null) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("canvas_viewport", { value })),
 	referenceMedia: (id: string) => typedError<string | null, ApiError_Serialize>(__TAURI_INVOKE("reference_media", { id })),
-	setReferenceVerdict: (input: ReferenceVerdictInput) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_reference_verdict", { input })),
-	linkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("link_ref_frame", { input })),
-	unlinkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("unlink_ref_frame", { input })),
-	listPlanEpics: () => typedError<Epic[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_epics")),
-	listPlanStories: () => typedError<Story[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_stories")),
-	clearBrain: (key: string) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("clear_brain", { key })),
-	reorderStory: (key: string, beforeKey: string | null) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("reorder_story", { key, beforeKey })),
+	setReferenceVerdict: (input: ReferenceVerdictInput_Deserialize) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_reference_verdict", { input })),
+	sendReferenceReview: (input: SendReferenceReviewInput) => typedError<RefFrame_Serialize, ApiError_Serialize>(__TAURI_INVOKE("send_reference_review", { input })),
+	collectKeptReferences: (input: CollectKeptInput) => typedError<CollectKeptResult_Serialize, ApiError_Serialize>(__TAURI_INVOKE("collect_kept_references", { input })),
+	listInboxEvents: (input: InboxEventsQuery) => typedError<InboxEventsPage, ApiError_Serialize>(__TAURI_INVOKE("list_inbox_events", { input })),
+	markInboxEventsSeen: (seq: number) => typedError<number, ApiError_Serialize>(__TAURI_INVOKE("mark_inbox_events_seen", { seq })),
+	linkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame_Serialize, ApiError_Serialize>(__TAURI_INVOKE("link_ref_frame", { input })),
+	unlinkRefFrame: (input: RefFrameLinkInput) => typedError<RefFrame_Serialize, ApiError_Serialize>(__TAURI_INVOKE("unlink_ref_frame", { input })),
+	listPlanEpics: () => typedError<Epic_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_epics")),
+	listPlanStories: () => typedError<Story_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_plan_stories")),
+	clearBrain: (key: string) => typedError<Epic_Serialize, ApiError_Serialize>(__TAURI_INVOKE("clear_brain", { key })),
+	reorderStory: (key: string, beforeKey: string | null) => typedError<Story_Serialize, ApiError_Serialize>(__TAURI_INVOKE("reorder_story", { key, beforeKey })),
 	getProject: () => typedError<Project, ApiError_Serialize>(__TAURI_INVOKE("get_project")),
 	updateProject: (input: ProjectEditInput) => typedError<Project, ApiError_Serialize>(__TAURI_INVOKE("update_project", { input })),
-	listEpics: () => typedError<Epic[], ApiError_Serialize>(__TAURI_INVOKE("list_epics")),
+	listEpics: () => typedError<Epic_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_epics")),
 	getEpic: (key: string) => typedError<EpicTree_Serialize, ApiError_Serialize>(__TAURI_INVOKE("get_epic", { key })),
-	getStory: (key: string) => typedError<StoryTree, ApiError_Serialize>(__TAURI_INVOKE("get_story", { key })),
-	createEpic: (input: NewEpic) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("create_epic", { input })),
-	updateEpic: (input: EpicEditInput_Deserialize) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("update_epic", { input })),
-	setEpicStatus: (input: PlanningStatusInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_epic_status", { input })),
-	createStory: (input: NewStory) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("create_story", { input })),
-	updateStory: (input: StoryEditInput_Deserialize) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("update_story", { input })),
-	setStoryStatus: (input: PlanningStatusInput) => typedError<Story, ApiError_Serialize>(__TAURI_INVOKE("set_story_status", { input })),
+	getStory: (key: string) => typedError<StoryTree_Serialize, ApiError_Serialize>(__TAURI_INVOKE("get_story", { key })),
+	createEpic: (input: NewEpic) => typedError<Epic_Serialize, ApiError_Serialize>(__TAURI_INVOKE("create_epic", { input })),
+	updateEpic: (input: EpicEditInput_Deserialize) => typedError<Epic_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_epic", { input })),
+	setEpicStatus: (input: PlanningStatusInput) => typedError<Epic_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_epic_status", { input })),
+	createStory: (input: NewStory) => typedError<Story_Serialize, ApiError_Serialize>(__TAURI_INVOKE("create_story", { input })),
+	updateStory: (input: StoryEditInput_Deserialize) => typedError<Story_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_story", { input })),
+	setStoryStatus: (input: PlanningStatusInput) => typedError<Story_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_story_status", { input })),
 	updateTaskBrief: (input: BriefEditInput_Deserialize) => typedError<TaskDetail_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_task_brief", { input })),
 	checkReady: (key: string) => typedError<Readiness, ApiError_Serialize>(__TAURI_INVOKE("check_ready", { key })),
 	markReady: (input: ReadyInput) => typedError<TaskSummary, ApiError_Serialize>(__TAURI_INVOKE("mark_ready", { input })),
-	answerQuestion: (input: AnswerQuestion) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("answer_question", { input })),
-	askUser: (input: AskUser) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("ask_user", { input })),
-	withdrawQuestion: (id: string) => typedError<Question, ApiError_Serialize>(__TAURI_INVOKE("withdraw_question", { id })),
-	listQuestions: (input: QuestionListInput) => typedError<Question[], ApiError_Serialize>(__TAURI_INVOKE("list_questions", { input })),
+	answerQuestion: (input: AnswerQuestion) => typedError<Question_Serialize, ApiError_Serialize>(__TAURI_INVOKE("answer_question", { input })),
+	askUser: (input: AskUser) => typedError<Question_Serialize, ApiError_Serialize>(__TAURI_INVOKE("ask_user", { input })),
+	withdrawQuestion: (id: string) => typedError<Question_Serialize, ApiError_Serialize>(__TAURI_INVOKE("withdraw_question", { id })),
+	listQuestions: (input: QuestionListInput) => typedError<Question_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_questions", { input })),
 	reviewTask: (input: ReviewTask) => typedError<Review, ApiError_Serialize>(__TAURI_INVOKE("review_task", { input })),
 	submitReport: (input: SubmitReport) => typedError<Report, ApiError_Serialize>(__TAURI_INVOKE("submit_report", { input })),
-	setBrain: (input: BrainInput) => typedError<Epic, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
+	setBrain: (input: BrainInput) => typedError<Epic_Serialize, ApiError_Serialize>(__TAURI_INVOKE("set_brain", { input })),
 	listChangesSince: (input: ChangesInput) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_changes_since", { input })),
 	epicJournal: (epicKey: string, after: number) => typedError<ActivityEvent_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("epic_journal", { epicKey, after })),
-	addReference: (input: AddReference, untitled: boolean | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
+	addReference: (input: AddReference_Deserialize, untitled: boolean | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("add_reference", { input, untitled })),
 	listReferences: (input: ReferenceListInput) => typedError<RefItem_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_references", { input })),
 	updateReference: (input: ReferenceEditInput_Deserialize, expected: {
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
 	caption: string,
 } | null) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_reference", { input, expected })),
 	linkReference: (input: ReferenceLinkInput) => typedError<RefItem_Serialize, ApiError_Serialize>(__TAURI_INVOKE("link_reference", { input })),
 	unlinkReference: (input: ReferenceLinkInput) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("unlink_reference", { input })),
 	archiveReference: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_reference", { id })),
-	listRefFrames: () => typedError<RefFrame[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_frames")),
-	createRefFrame: (input: RefFrame) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("create_ref_frame", { input })),
-	updateRefFrame: (input: FrameEditInput_Deserialize) => typedError<RefFrame, ApiError_Serialize>(__TAURI_INVOKE("update_ref_frame", { input })),
+	listRefFrames: () => typedError<RefFrame_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_frames")),
+	createRefFrame: (input: RefFrame_Deserialize) => typedError<RefFrame_Serialize, ApiError_Serialize>(__TAURI_INVOKE("create_ref_frame", { input })),
+	updateRefFrame: (input: FrameEditInput_Deserialize) => typedError<RefFrame_Serialize, ApiError_Serialize>(__TAURI_INVOKE("update_ref_frame", { input })),
 	archiveRefFrame: (id: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("archive_ref_frame", { id })),
 	listRefEdges: () => typedError<RefEdge[], ApiError_Serialize>(__TAURI_INVOKE("list_ref_edges")),
 	createRefEdge: (input: EdgeInput) => typedError<RefEdge, ApiError_Serialize>(__TAURI_INVOKE("create_ref_edge", { input })),
@@ -122,6 +128,8 @@ export const commands = {
 	locateProjectFolder: (instanceId: string, expectedProjectId: string, folder: string, cloudAcknowledged: boolean) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("locate_project_folder", { instanceId, expectedProjectId, folder, cloudAcknowledged })),
 	previewProjectMove: (projectId: string, destination: string) => typedError<ProjectMovePreview, ApiError_Serialize>(__TAURI_INVOKE("preview_project_move", { projectId, destination })),
 	projectSelectionContext: () => typedError<FolderCommandContext, ApiError_Serialize>(__TAURI_INVOKE("project_selection_context")),
+	openAssetRevision: (context: FolderCommandContext, assetId: string, revision: number) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("open_asset_revision", { context, assetId, revision })),
+	revealAssetRevision: (context: FolderCommandContext, assetId: string, revision: number) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("reveal_asset_revision", { context, assetId, revision })),
 	openFileAsset: (context: FolderCommandContext, assetId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("open_file_asset", { context, assetId })),
 	revealFileAsset: (context: FolderCommandContext, assetId: string) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("reveal_file_asset", { context, assetId })),
 	createProjectFolder: (folder: string, name: string, cloudAcknowledged: boolean, initialization: {
@@ -131,7 +139,7 @@ export const commands = {
 	endsAt: string,
 	timezone: string,
 	yourName: string,
-	template?: string | null,
+	template?: ProjectTemplate | null,
 	milestoneAt?: string | null,
 } | null) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("create_project_folder", { folder, name, cloudAcknowledged, initialization })),
 	openProjectFolder: (folder: string, cloudAcknowledged: boolean, separateCopy: boolean) => typedError<ProjectFolderInfo, ApiError_Serialize>(__TAURI_INVOKE("open_project_folder", { folder, cloudAcknowledged, separateCopy })),
@@ -163,6 +171,21 @@ export const commands = {
 	listProjects: (includeArchived: boolean | null) => typedError<ProjectSummary_Serialize[], ApiError_Serialize>(__TAURI_INVOKE("list_projects", { includeArchived })),
 	selectProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("select_project", { projectId })),
 	restoreProject: (projectId: string) => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("restore_project", { projectId })),
+	moveStory: (context: FolderCommandContext, input: MoveStoryInput) => typedError<Story_Serialize, ApiError_Serialize>(__TAURI_INVOKE("move_story", { context, input })),
+	moveTaskToStory: (context: FolderCommandContext, input: MoveTaskToStoryInput) => typedError<TaskDetail_Serialize, ApiError_Serialize>(__TAURI_INVOKE("move_task_to_story", { context, input })),
+	importPlan: (context: FolderCommandContext, input: ImportPlanInput_Deserialize) => typedError<ImportPlanReport_Serialize, ApiError_Serialize>(__TAURI_INVOKE("import_plan", { context, input })),
+	undoImport: (context: FolderCommandContext, input: UndoImportInput) => typedError<UndoImportReport, ApiError_Serialize>(__TAURI_INVOKE("undo_import", { context, input })),
+	listImportBatches: (context: FolderCommandContext, limit: number | null) => typedError<ImportBatchSummary[], ApiError_Serialize>(__TAURI_INVOKE("list_import_batches", { context, limit })),
+	linkFile: (context: FolderCommandContext, input: LinkFileInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("link_file", { context, input })),
+	unlinkFile: (context: FolderCommandContext, input: UnlinkFileInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("unlink_file", { context, input })),
+	archiveAsset: (context: FolderCommandContext, input: AssetRequestInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("archive_asset", { context, input })),
+	unarchiveAsset: (context: FolderCommandContext, input: AssetRequestInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("unarchive_asset", { context, input })),
+	renameAsset: (context: FolderCommandContext, input: RenameAssetInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("rename_asset", { context, input })),
+	deleteAsset: (context: FolderCommandContext, input: DeleteAssetInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("delete_asset", { context, input })),
+	replaceAsset: (context: FolderCommandContext, input: ReplaceAssetInput) => typedError<CompactMutation_Serialize, ApiError_Serialize>(__TAURI_INVOKE("replace_asset", { context, input })),
+	assetUsage: (context: FolderCommandContext, assetId: string) => typedError<AssetUsage, ApiError_Serialize>(__TAURI_INVOKE("asset_usage", { context, assetId })),
+	listAssetRevisions: (context: FolderCommandContext, assetId: string) => typedError<AssetRevision[], ApiError_Serialize>(__TAURI_INVOKE("list_asset_revisions", { context, assetId })),
+	previewFileAsset: (context: FolderCommandContext, assetId: string) => typedError<FilePreview, ApiError_Serialize>(__TAURI_INVOKE("preview_file_asset", { context, assetId })),
 	/**  A local first-content-frame receipt for reproducible release measurements. */
 	appReady: () => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("app_ready")),
 	appState: () => typedError<AppState, ApiError_Serialize>(__TAURI_INVOKE("app_state")),
@@ -186,7 +209,7 @@ export const commands = {
 	addComment: (input: CommentInput) => typedError<Comment, ApiError_Serialize>(__TAURI_INVOKE("add_comment", { input })),
 	attachFile: (key: string, path: string) => typedError<Asset, ApiError_Serialize>(__TAURI_INVOKE("attach_file", { key, path })),
 	pickFiles: () => typedError<string[], ApiError_Serialize>(__TAURI_INVOKE("pick_files")),
-	listAssets: (input: AssetQuery) => typedError<AssetWithTasks[], ApiError_Serialize>(__TAURI_INVOKE("list_assets", { input })),
+	listAssets: (context: FolderCommandContext, input: AssetQuery) => typedError<AssetWithTasks[], ApiError_Serialize>(__TAURI_INVOKE("list_assets", { context, input })),
 	createAsset: (input: NewAsset) => typedError<Asset, ApiError_Serialize>(__TAURI_INVOKE("create_asset", { input })),
 	updateAsset: (input: AssetEdit) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("update_asset", { input })),
 	linkAsset: (input: AssetLink) => typedError<null, ApiError_Serialize>(__TAURI_INVOKE("link_asset", { input })),
@@ -225,15 +248,21 @@ export const events = {
 
 /* Types */
 export type Acceptance = {
+	/**  Stable criterion ID within this story, e.g. movement; required. */
 	id: string,
+	/**  Observable acceptance condition, e.g. One interaction collects the lantern; required. */
 	criterion: string,
+	/**  Whether this criterion must pass; explicit boolean, e.g. true. */
 	mandatory: boolean,
+	/**  Reproducible acceptance check, e.g. Press Interact once at the cabin; required. */
 	check: string,
 };
 
 export type ActivityEvent = ActivityEvent_Serialize | ActivityEvent_Deserialize;
 
 export type ActivityEvent_Deserialize = {
+	/**  Raw MCP client name/version; absent for human or historical events. */
+	client?: string | null,
 	seq: number,
 	action: string,
 	actor: MemberRef,
@@ -245,6 +274,8 @@ export type ActivityEvent_Deserialize = {
 };
 
 export type ActivityEvent_Serialize = {
+	/**  Raw MCP client name/version; absent for human or historical events. */
+	client: string | null,
 	seq: number,
 	action: string,
 	actor: MemberRef,
@@ -258,33 +289,114 @@ export type ActivityEvent_Serialize = {
 export type ActivityQuery = {
 	beforeSeq: number | null,
 	limit: number | null,
-	actorKind: string | null,
+	actorKind: ActorKind | null,
 };
+
+/**  Member kind for activity filters; omission includes both kinds. */
+export type ActorKind =
+/**  Human board member. */
+"human" |
+/**  Connected agent board member. */
+"agent";
 
 export type AddAgentAttachmentInput = {
 	sessionId: string,
 	source: AttachmentSource,
 };
 
-export type AddReference = {
-	storageType?: string | null,
-	fileKind?: string | null,
+export type AddReference = AddReference_Serialize | AddReference_Deserialize;
+
+export type AddReference_Deserialize = {
+	/**  Original HTTP(S) source without credentials or whitespace, at most 2048 characters; optional. */
+	sourceUrl?: string | null,
+	/**  Where this reference came from: found, generated or own; optional. */
+	origin?: ReferenceOrigin | null,
+	/**  Existing active reference in this project that this variation derives from; optional, no cycles. */
+	derivedFrom?: string | null,
+	/**  File authority: board_file, linked_file or url. Required for registration; references may infer it from copy/filePath. */
+	storageType?: FileStorageType | null,
+	/**  Optional classifier override, e.g. document. Omitted detects kind from the extension. */
+	fileKind?: FileKind | null,
+	/**  Stable retry ID for this logical operation; 1–100 characters, e.g. ls-S0.1.1. Reuse only for the same payload. */
 	requestId?: string | null,
-	fileRole?: string | null,
+	/**  Task file purpose; default reference. Example: to_edit. Task associations require captured validators. */
+	fileRole?: TaskFileRole | null,
+	/**  Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3. */
 	expectedClaimGeneration?: string | null,
+	/**  Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection. */
 	expectedUpdatedAt?: string | null,
-	kind: string,
+	/**  Operation-specific enumerated kind, e.g. note for a text reference or story for a question scope; required unless stated otherwise. */
+	kind: ReferenceKind,
+	/**  Readable source file, e.g. C:/game/docs/plan.md; required for file references. Never a directory or wildcard. */
 	filePath: string | null,
+	/**  Whether to create a managed board copy; inferred from storageType when omitted. Example: true. Linked files remain project-owned. */
 	copy?: boolean | null,
+	/**  HTTP(S) URL without credentials or whitespace, e.g. https://example.test/design; required for URL assets. */
 	url: string | null,
+	/**  Text or search substring, e.g. lantern. Omitted filters match all text. */
 	text: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string | null,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
 	caption: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags: string[] | null,
+	/**  Epic key for the reference frame, e.g. JB-E2; omitted means no added frame association. */
 	frameEpicKey: string | null,
+	/**  Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported. */
 	frameId: string | null,
+	/**  Board key to associate, e.g. JB-S3; omitted means no additional link. */
 	linkTo: string | null,
+	/**  Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement. */
 	x: number | null,
+	/**  Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement. */
+	y: number | null,
+};
+
+export type AddReference_Serialize = {
+	/**  Original HTTP(S) source without credentials or whitespace, at most 2048 characters; optional. */
+	sourceUrl?: string | null,
+	/**  Where this reference came from: found, generated or own; optional. */
+	origin?: ReferenceOrigin | null,
+	/**  Existing active reference in this project that this variation derives from; optional, no cycles. */
+	derivedFrom?: string | null,
+	/**  File authority: board_file, linked_file or url. Required for registration; references may infer it from copy/filePath. */
+	storageType?: FileStorageType | null,
+	/**  Optional classifier override, e.g. document. Omitted detects kind from the extension. */
+	fileKind?: FileKind | null,
+	/**  Stable retry ID for this logical operation; 1–100 characters, e.g. ls-S0.1.1. Reuse only for the same payload. */
+	requestId?: string | null,
+	/**  Task file purpose; default reference. Example: to_edit. Task associations require captured validators. */
+	fileRole?: TaskFileRole | null,
+	/**  Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3. */
+	expectedClaimGeneration?: string | null,
+	/**  Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection. */
+	expectedUpdatedAt?: string | null,
+	/**  Operation-specific enumerated kind, e.g. note for a text reference or story for a question scope; required unless stated otherwise. */
+	kind: ReferenceKind,
+	/**  Readable source file, e.g. C:/game/docs/plan.md; required for file references. Never a directory or wildcard. */
+	filePath: string | null,
+	/**  Whether to create a managed board copy; inferred from storageType when omitted. Example: true. Linked files remain project-owned. */
+	copy: boolean | null,
+	/**  HTTP(S) URL without credentials or whitespace, e.g. https://example.test/design; required for URL assets. */
+	url: string | null,
+	/**  Text or search substring, e.g. lantern. Omitted filters match all text. */
+	text: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string | null,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
+	caption: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
+	tags: string[] | null,
+	/**  Epic key for the reference frame, e.g. JB-E2; omitted means no added frame association. */
+	frameEpicKey: string | null,
+	/**  Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported. */
+	frameId: string | null,
+	/**  Board key to associate, e.g. JB-S3; omitted means no additional link. */
+	linkTo: string | null,
+	/**  Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement. */
+	x: number | null,
+	/**  Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement. */
 	y: number | null,
 };
 
@@ -454,25 +566,30 @@ export type AgentTerminalOutput = {
 };
 
 export type AnswerQuestion = {
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
+	/**  Zero-based selected answer index; omitted means no choice. Example: 0. Supply this or answerText. */
 	answerIndex: number | null,
+	/**  Human-authored answer; optional if a choice is selected. Example: Keep the original image. */
 	answerText: string | null,
 };
 
 export type ApiError = ApiError_Serialize | ApiError_Deserialize;
 
-export type ApiErrorCode = "not_found" | "claim_conflict" | "stale_claim" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
+export type ApiErrorCode = "already_undone" | "in_use" | "idempotency_conflict" | "not_found" | "claim_conflict" | "stale_claim" | "validation" | "archived" | "conflict" | "not_ready" | "execution_required" | "wrong_status" | "forbidden" | "internal";
 
 export type ApiError_Deserialize = {
 	code: ApiErrorCode,
 	message: string,
 	field: string | null,
+	data?: JsonPayload | null,
 };
 
 export type ApiError_Serialize = {
 	code: ApiErrorCode,
 	message: string,
 	field?: string | null,
+	data?: JsonPayload | null,
 };
 
 export type AppState = {
@@ -483,16 +600,27 @@ export type AppState = {
 };
 
 export type AskUser = {
+	/**  Optional stable retry ID, 1–100 characters, e.g. interview-scope-1; recommended to avoid duplicate questions. */
+	requestId?: string | null,
+	/**  Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution. */
 	scope: Scope,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Question details in Markdown; omitted means empty. Example: Keep the existing title image? */
 	bodyMd: string | null,
+	/**  Suggested choices, at most 6 for a question. Omitted means free text only. Example: [{"label":"Keep","description":"Preserve the image"}]. */
 	options: QuestionOption[] | null,
+	/**  Zero-based option index; omitted means no recommendation. Example: 0. A recommendation is not approval. */
 	recommendedIndex: number | null,
+	/**  Whether a human may answer in free text; default true. Example: true. */
 	allowFreeText: boolean | null,
+	/**  Optional interview round label, e.g. Scope; omitted means none. */
 	roundLabel: string | null,
 };
 
 export type Asset = {
+	archivedAt?: string | null,
+	archivedBy?: string | null,
 	id: string,
 	jamId: string,
 	kind: string,
@@ -504,11 +632,16 @@ export type Asset = {
 	role?: string,
 };
 
+export type AssetCanvasUsage = {
+	itemId: string,
+	frameTitle: string | null,
+};
+
 export type AssetEdit = {
 	id: string,
 	name: string | null,
 	notes: string | null,
-	kind: string | null,
+	kind: FileKind | null,
 };
 
 export type AssetLink = {
@@ -517,13 +650,61 @@ export type AssetLink = {
 };
 
 export type AssetQuery = {
-	kind: string | null,
+	kind: FileKind | null,
 	text: string | null,
+	scope: FileScope | null,
+	includeArchived?: boolean,
+};
+
+export type AssetRequestInput = {
+	/**  Existing asset ID in the connected project, e.g. 01JASSET; required. */
+	assetId: string,
+	/**  Optional stable retry ID, 1–100 chars, e.g. archive-design; recommended. */
+	requestId: string | null,
+};
+
+export type AssetRevision = {
+	assetId: string,
+	revision: number,
+	storedPath: string,
+	byteSize: number | null,
+	contentHash: string | null,
+	mimeType: string | null,
+	createdBy: string,
+	createdAt: string,
+};
+
+export type AssetScopeUsage = {
+	type: ScopeKind,
+	key: string | null,
+	title: string,
+	role: string,
+};
+
+export type AssetTaskUsage = {
+	key: string,
+	title: string,
+	role: string,
+};
+
+export type AssetUsage = {
+	tasks: AssetTaskUsage[],
+	scopes: AssetScopeUsage[],
+	canvas: AssetCanvasUsage[],
+	covers: string[],
+	components: string[],
 };
 
 export type AssetWithTasks = {
 	tasks: LinkedTask[],
 } & Asset;
+
+/**  Asset collection presentation; default grid. */
+export type AssetsView =
+/**  Cards in a grid. */
+"grid" |
+/**  Compact rows. */
+"list";
 
 export type AttachmentSource = { kind: "path"; path: string } | { kind: "bytes"; name: string; mimeType: string; data: string };
 
@@ -568,6 +749,15 @@ export type BoardChanged_Serialize = {
 	projectContext?: ProjectEventContext | null,
 };
 
+/**  Optional board-card color grouping; default none. */
+export type BoardColorBy =
+/**  No grouping color. */
+"none" |
+/**  Color by assigned member. */
+"assignee" |
+/**  Color by epic palette slot. */
+"epic";
+
 export type BoardColumn = {
 	status: string,
 	count: number,
@@ -604,54 +794,85 @@ export type BoardTask = {
 };
 
 export type BrainInput = {
+	/**  Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters. */
 	epicKey: string,
+	/**  Existing member handle, e.g. claude; required for appointment. Does not launch an agent. */
 	memberHandle: string,
 };
 
 export type BriefEditInput = BriefEditInput_Serialize | BriefEditInput_Deserialize;
 
 export type BriefEditInput_Deserialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
 } & BriefPatch_Deserialize;
 
 export type BriefEditInput_Serialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
 } & BriefPatch_Serialize;
 
 export type BriefPatch = BriefPatch_Serialize | BriefPatch_Deserialize;
 
 export type BriefPatch_Deserialize = {
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
 	goalMd?: string | null,
+	/**  Task context in Markdown, e.g. Existing lantern shader. Defaults to empty; omitted updates preserve it. */
 	contextMd?: string | null,
+	/**  Files and locations in Markdown, e.g. game/player.gd. Defaults to empty; omitted updates preserve it. */
 	whereMd?: string | null,
+	/**  Concrete requested changes recording current and required behavior. Defaults to empty; omitted updates preserve them. */
 	changes?: Change[] | null,
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
 	tests?: BriefTest[] | null,
+	/**  Task boundaries in Markdown, e.g. No scene rewrite. Defaults to empty; omitted updates preserve it. */
 	boundariesMd?: string | null,
+	/**  Required deliverable in Markdown, e.g. Patch and check results. Defaults to empty; omitted updates preserve it. */
 	resultMd?: string | null,
+	/**  Relevant exact human quotations in Markdown; preserve their language. Defaults to empty; omitted updates preserve it. */
 	userQuotesMd?: string | null,
 };
 
 export type BriefPatch_Serialize = {
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
 	goalMd?: string | null,
+	/**  Task context in Markdown, e.g. Existing lantern shader. Defaults to empty; omitted updates preserve it. */
 	contextMd?: string | null,
+	/**  Files and locations in Markdown, e.g. game/player.gd. Defaults to empty; omitted updates preserve it. */
 	whereMd?: string | null,
+	/**  Concrete requested changes recording current and required behavior. Defaults to empty; omitted updates preserve them. */
 	changes?: Change[] | null,
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
 	tests?: BriefTest[] | null,
+	/**  Task boundaries in Markdown, e.g. No scene rewrite. Defaults to empty; omitted updates preserve it. */
 	boundariesMd?: string | null,
+	/**  Required deliverable in Markdown, e.g. Patch and check results. Defaults to empty; omitted updates preserve it. */
 	resultMd?: string | null,
+	/**  Relevant exact human quotations in Markdown; preserve their language. Defaults to empty; omitted updates preserve it. */
 	userQuotesMd?: string | null,
 };
 
 export type BriefTest = {
+	/**  Reproducible test setup, e.g. Start at the cabin and hold Interact; required for a brief test. */
 	setup: string,
+	/**  Observable expected result, e.g. Exactly one pickup; required in a test. */
 	expected: string,
 };
 
 export type CanvasArchive = {
-	kind: string,
+	kind: CanvasEntityKind,
 	id: string,
 	archived: boolean,
 };
+
+/**  Canvas entity addressed by an archive operation. */
+export type CanvasEntityKind =
+/**  One canvas reference or note. */
+"item" |
+/**  One canvas frame. */
+"frame" |
+/**  One directed connection. */
+"edge";
 
 export type CanvasGeometry = {
 	id: string,
@@ -673,17 +894,26 @@ export type Capabilities = {
 export type CatalogSource = "provider" | "static" | "profile";
 
 export type Change = {
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Current behavior in a requested change, e.g. Pickup fires twice. Defaults to empty. */
 	now?: string,
+	/**  Known cause, e.g. Input is polled each frame. Defaults to empty; do not invent an unverified cause. */
 	cause?: string,
+	/**  Required behavior in a requested change, e.g. One pickup per press; required for each change. */
 	required: string,
+	/**  Location for this change, e.g. game/lantern.gd. Defaults to empty. */
 	where?: string,
+	/**  Existing pattern to follow, e.g. the checkpoint input handler. Defaults to empty. */
 	follow?: string,
+	/**  Behavior to preserve, e.g. the first burst. Defaults to empty. */
 	keep?: string,
 };
 
 export type ChangesInput = {
+	/**  Captured activity cursor or paging offset; starts at 0. Follow nextCursor; pages are not an atomic snapshot. */
 	cursor: number,
+	/**  Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters. */
 	epicKey: string | null,
 };
 
@@ -699,6 +929,31 @@ export type CloudStatus = {
 	keySet: boolean,
 } & CloudSettings;
 
+export type CollectKeptInput = {
+	/**  Required stable retry ID, 1–100 characters. Reuse only for the same collection intent. */
+	requestId: string,
+	/**  1–20 active source frames in this project, in section order. */
+	sourceFrameIds: string[],
+	/**  New frame heading, 1–140 characters; default Moodboard — kept. */
+	title: string | null,
+	/**  Optional epic, story or task key to link the new frame to. */
+	linkTo: string | null,
+};
+
+export type CollectKeptResult = CollectKeptResult_Serialize | CollectKeptResult_Deserialize;
+
+export type CollectKeptResult_Deserialize = {
+	frame: RefFrame_Deserialize,
+	sections: KeptSection[],
+	itemIds: string[],
+};
+
+export type CollectKeptResult_Serialize = {
+	frame: RefFrame_Serialize,
+	sections: KeptSection[],
+	itemIds: string[],
+};
+
 export type Comment = {
 	id: string,
 	taskId: string,
@@ -710,6 +965,30 @@ export type Comment = {
 export type CommentInput = {
 	key: string,
 	bodyMd: string,
+};
+
+export type CompactMutation = CompactMutation_Serialize | CompactMutation_Deserialize;
+
+export type CompactMutation_Deserialize = {
+	kind: string,
+	id: string,
+	updatedAt: string,
+	key: string | null,
+	claimGeneration: string | null,
+	externalRef: string | null,
+	status: string | null,
+	replayed: boolean | null,
+};
+
+export type CompactMutation_Serialize = {
+	kind: string,
+	id: string,
+	updatedAt: string,
+	key?: string | null,
+	claimGeneration?: string | null,
+	externalRef?: string | null,
+	status?: string | null,
+	replayed?: boolean | null,
 };
 
 export type ConfigOption = ConfigOption_Serialize | ConfigOption_Deserialize;
@@ -754,16 +1033,36 @@ export type ConfigValue_Serialize = {
 };
 
 export type CreateTask = {
+	/**  Source reference, 1–120 characters, unique per project and entity kind. Example: ls/S0.1; omitted creates have no external reference. */
+	externalRef?: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions. */
 	description: string | null,
-	status: string | null,
-	priority: string | null,
+	/**  Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it. */
+	status: TaskStatus | null,
+	/**  Scheduling priority; default medium on create. Example: high. Omitted updates preserve it. */
+	priority: Priority | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags: string[] | null,
-	estimate: number | null,
+	/**  Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates. */
+	estimate: Estimate | null,
+	/**  Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted means no due date. */
 	dueAt: string | null,
-	idempotencyKey: string | null,
+	/**  Stable retry ID, 1–100 characters, e.g. ls-S0.1.1; required. Reuse only for the same task payload. */
+	requestId: string,
+	/**  Parent story key in this project, e.g. JB-S3. Every task belongs to a story. */
 	storyKey: string | null,
 } & TaskBrief;
+
+export type DeleteAssetInput = {
+	/**  Asset ID in this project, e.g. 01JASSET; required. Linked-file bytes are never removed. */
+	assetId: string,
+	/**  Optional stable retry ID, 1–100 chars, e.g. delete-design; recommended. */
+	requestId: string | null,
+	/**  Remove all associations after explicit human intent; default false. In-use assets otherwise return their usage. */
+	force?: boolean,
+};
 
 export type DockEvent = DockEvent_Serialize | DockEvent_Deserialize;
 
@@ -772,8 +1071,11 @@ export type DockEvent_Deserialize = AgentDockEvent_Deserialize;
 export type DockEvent_Serialize = AgentDockEvent_Serialize;
 
 export type EdgeInput = {
+	/**  Source reference ID, e.g. 01JFROM; required. Self-connections are refused. */
 	fromItem: string,
+	/**  Destination reference ID, e.g. 01JTO; required and different from fromItem. */
 	toItem: string,
+	/**  Human-readable option or connection label, e.g. Keep existing; required for options, optional for connections. */
 	label: string,
 };
 
@@ -784,7 +1086,108 @@ export type Env = {
 	value: string,
 };
 
-export type Epic = {
+export type Epic = Epic_Serialize | Epic_Deserialize;
+
+/**  Palette slot used only to tell epics apart; it carries no meaning. If omitted, the board picks the next slot in rotation. */
+export type EpicColor =
+/**  Palette color 1; no semantic meaning. */
+"m1" |
+/**  Palette color 2; no semantic meaning. */
+"m2" |
+/**  Palette color 3; no semantic meaning. */
+"m3" |
+/**  Palette color 4; no semantic meaning. */
+"m4" |
+/**  Palette color 5; no semantic meaning. */
+"m5" |
+/**  Palette color 6; no semantic meaning. */
+"m6";
+
+export type EpicEditInput = EpicEditInput_Serialize | EpicEditInput_Deserialize;
+
+export type EpicEditInput_Deserialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
+	key: string,
+} & EpicPatch_Deserialize;
+
+export type EpicEditInput_Serialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
+	key: string,
+} & EpicPatch_Serialize;
+
+export type EpicPatch = EpicPatch_Serialize | EpicPatch_Deserialize;
+
+export type EpicPatch_Deserialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string | null,
+	/**  Palette slot m1–m6; only tells epics apart and carries no meaning. Omitted creates rotate slots; omitted updates preserve it. */
+	color: EpicColor | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd: string | null,
+	/**  Observable completion conditions in Markdown, e.g. The player reaches the cabin. Defaults to empty; omitted updates preserve it. */
+	doneWhenMd: string | null,
+	/**  Excluded scope in Markdown, e.g. No new combat system. Defaults to empty; omitted updates preserve it. */
+	notIncludedMd: string | null,
+	/**  Agreed decisions and reasons in Markdown, e.g. Preserve the existing palette. Defaults to empty; omitted updates preserve it. */
+	decidedMd: string | null,
+	/**  Unresolved planning questions in Markdown, e.g. Which controller layout? Defaults to empty; omitted updates preserve it. */
+	openQuestionsMd: string | null,
+	/**  Human iteration review schedule; default first_sketch on create. Example: each_iteration. Omitted updates preserve it. */
+	participation: Participation | null,
+	/**  Human review schedule; default none on create. Example: final. Omitted updates preserve it. */
+	reviewer: Reviewer | null,
+	/**  Model id preferred for workers, e.g. gpt-6.1-sol; informational. Omitted creates use no preference; null clears an update. */
+	workerModel?: string | null,
+};
+
+export type EpicPatch_Serialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title?: string | null,
+	/**  Palette slot m1–m6; only tells epics apart and carries no meaning. Omitted creates rotate slots; omitted updates preserve it. */
+	color?: EpicColor | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd?: string | null,
+	/**  Observable completion conditions in Markdown, e.g. The player reaches the cabin. Defaults to empty; omitted updates preserve it. */
+	doneWhenMd?: string | null,
+	/**  Excluded scope in Markdown, e.g. No new combat system. Defaults to empty; omitted updates preserve it. */
+	notIncludedMd?: string | null,
+	/**  Agreed decisions and reasons in Markdown, e.g. Preserve the existing palette. Defaults to empty; omitted updates preserve it. */
+	decidedMd?: string | null,
+	/**  Unresolved planning questions in Markdown, e.g. Which controller layout? Defaults to empty; omitted updates preserve it. */
+	openQuestionsMd?: string | null,
+	/**  Human iteration review schedule; default first_sketch on create. Example: each_iteration. Omitted updates preserve it. */
+	participation?: Participation | null,
+	/**  Human review schedule; default none on create. Example: final. Omitted updates preserve it. */
+	reviewer?: Reviewer | null,
+	/**  Model id preferred for workers, e.g. gpt-6.1-sol; informational. Omitted creates use no preference; null clears an update. */
+	workerModel?: string | null,
+};
+
+export type EpicTree = EpicTree_Serialize | EpicTree_Deserialize;
+
+export type EpicTree_Deserialize = {
+	epic: Epic_Deserialize,
+	stories: StoryTree_Deserialize[],
+	journal: ActivityEvent_Deserialize[],
+	openQuestions: Question_Deserialize[],
+	scopeFiles?: ScopeFile[],
+};
+
+export type EpicTree_Serialize = {
+	epic: Epic_Serialize,
+	stories: StoryTree_Serialize[],
+	journal: ActivityEvent_Serialize[],
+	openQuestions: Question_Serialize[],
+	scopeFiles: ScopeFile[],
+};
+
+export type Epic_Deserialize = {
+	replayed?: boolean,
+	externalRef?: string | null,
 	key: string,
 	title: string,
 	color: string,
@@ -800,59 +1203,26 @@ export type Epic = {
 	brainMemberId: string | null,
 } & Audit;
 
-export type EpicEditInput = EpicEditInput_Serialize | EpicEditInput_Deserialize;
-
-export type EpicEditInput_Deserialize = {
+export type Epic_Serialize = {
+	replayed?: boolean,
+	externalRef: string | null,
 	key: string,
-} & EpicPatch_Deserialize;
+	title: string,
+	color: string,
+	status: string,
+	goalMd: string,
+	doneWhenMd: string,
+	notIncludedMd: string,
+	decidedMd: string,
+	openQuestionsMd: string,
+	participation: string,
+	reviewer: string,
+	workerModel: string | null,
+	brainMemberId: string | null,
+} & Audit;
 
-export type EpicEditInput_Serialize = {
-	key: string,
-} & EpicPatch_Serialize;
-
-export type EpicPatch = EpicPatch_Serialize | EpicPatch_Deserialize;
-
-export type EpicPatch_Deserialize = {
-	title: string | null,
-	color: string | null,
-	goalMd: string | null,
-	doneWhenMd: string | null,
-	notIncludedMd: string | null,
-	decidedMd: string | null,
-	openQuestionsMd: string | null,
-	participation: string | null,
-	reviewer: string | null,
-	workerModel?: string | null,
-};
-
-export type EpicPatch_Serialize = {
-	title?: string | null,
-	color?: string | null,
-	goalMd?: string | null,
-	doneWhenMd?: string | null,
-	notIncludedMd?: string | null,
-	decidedMd?: string | null,
-	openQuestionsMd?: string | null,
-	participation?: string | null,
-	reviewer?: string | null,
-	workerModel?: string | null,
-};
-
-export type EpicTree = EpicTree_Serialize | EpicTree_Deserialize;
-
-export type EpicTree_Deserialize = {
-	epic: Epic,
-	stories: StoryTree[],
-	journal: ActivityEvent_Deserialize[],
-	openQuestions: Question[],
-};
-
-export type EpicTree_Serialize = {
-	epic: Epic,
-	stories: StoryTree[],
-	journal: ActivityEvent_Serialize[],
-	openQuestions: Question[],
-};
+/**  Story points (relative effort), not hours; use 1, 2, 3, 5 or 8. */
+export type Estimate = number;
 
 export type ExecutionAction = "start" | "pause";
 
@@ -880,7 +1250,9 @@ export type ExecutionRequest = {
 export type ExecutionRequestStatus = "pending" | "approved" | "declined" | "superseded";
 
 export type ExecutionScope = {
+	/**  Operation-specific enumerated kind, e.g. note for a text reference or story for a question scope; required unless stated otherwise. */
 	type: ExecutionScopeType,
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
 };
 
@@ -911,6 +1283,8 @@ export type ExportPath = {
 };
 
 export type FileAsset = {
+	modifiedAt?: string | null,
+	usageCount?: number,
 	storageType: string,
 	pathBase: string,
 	storedPath: string,
@@ -924,24 +1298,69 @@ export type FileAsset = {
 } & Asset;
 
 export type FileAssetQuery = {
-	kind: string | null,
+	/**  Optional association filter, e.g. {"type":"epic","key":"JB-E2"}; omit key to match any target of that kind. Omitted matches all assets. */
+	scope?: FileScope | null,
+	/**  Include archived assets; default false. Existing associations remain readable regardless of this filter. */
+	includeArchived?: boolean | null,
+	/**  Optional exact file kind, e.g. document or video; omitted includes every kind. */
+	kind: FileKind | null,
+	/**  Optional case-insensitive search substring, e.g. design; omission includes all matches. */
 	query: string | null,
-	storageType: string | null,
+	/**  File authority: board_file, linked_file or url. Required for registration; references may infer it from copy/filePath. */
+	storageType: FileStorageType | null,
+	/**  Task key for a file association, e.g. JB-12. Omitted registration is unlinked; task links require captured validators. */
 	taskKey: string | null,
-	role: string | null,
+	/**  File association purpose; task roles are to_edit, reference or result. Defaults to reference for task files. */
+	role: TaskFileRole | null,
+	/**  Maximum rows per page. Canvas allows 1–200; files allow 1–500. Omitted uses the operation default; example 50. */
 	limit: number | null,
+	/**  Captured activity cursor or paging offset; starts at 0. Follow nextCursor; pages are not an atomic snapshot. */
 	cursor: string | null,
+	/**  Optional verified worktree directory, e.g. C:/game; must belong to the board repository. */
 	workingDirectory: string | null,
 };
 
 export type FileCompanion = {
+	/**  Readable source file, e.g. C:/game/docs/plan.md; required for files. Never a directory. */
 	sourcePath: string,
+	/**  Model companion URI, e.g. textures/stone.png; must remain in the validated companion set. */
 	relativeUri: string,
 };
+
+/**  File classifier category; default is detected from the source extension. */
+export type FileKind =
+/**  Raster or vector image. */
+"sprite" |
+/**  Audio recording. */
+"audio" |
+/**  Video recording. */
+"video" |
+/**  Three-dimensional model or scene. */
+"model" |
+/**  Text, PDF or office document. */
+"document" |
+/**  Level or map data. */
+"level" |
+/**  Font file. */
+"font" |
+/**  Other file format. */
+"other";
+
+/**  Purpose of a file on its scope; task roles and document roles are checked separately. */
+export type FileLinkRole =
+/**  Default on project, epic and story scopes. */
+"document" |
+/**  Reference on any scope; default on tasks. */
+"reference" |
+/**  Task input to edit. */
+"to_edit" |
+/**  Task output. */
+"result";
 
 export type FileMutationResult = FileMutationResult_Serialize | FileMutationResult_Deserialize;
 
 export type FileMutationResult_Deserialize = {
+	replayed?: boolean,
 	reference: RefItem_Deserialize | null,
 	asset: FileAsset | null,
 	taskFile: TaskFile | null,
@@ -952,6 +1371,7 @@ export type FileMutationResult_Deserialize = {
 };
 
 export type FileMutationResult_Serialize = {
+	replayed?: boolean,
 	reference: RefItem_Serialize | null,
 	asset: FileAsset | null,
 	taskFile: TaskFile | null,
@@ -967,6 +1387,23 @@ export type FileOperationStatus = {
 	canCancel: boolean,
 };
 
+/**  File path authority; internal path comparisons remain canonical. */
+export type FilePathBase =
+/**  Portable path under the board folder. */
+"board" |
+/**  Portable path relative to a verified repository. */
+"repo" |
+/**  Absolute linked file path. */
+"absolute" |
+/**  Validated HTTP(S) URL. */
+"url";
+
+/**
+ *  Media returns a checked path; the frontend must call Tauri convertFileSrc(path).
+ *  The command grants only this exact file before returning; it opens nothing.
+ */
+export type FilePreview = { type: "text"; text: string; mime: string; truncated: boolean } | { type: "media"; mediaKind: MediaKind; path: string; mime: string } | { type: "metadata"; name: string; kind: string; byteSize: number | null; modifiedAt: string | null; path: string; storageType: string } | { type: "url"; url: string };
+
 export type FileResolution = {
 	storageType: string,
 	pathBase: string,
@@ -978,7 +1415,22 @@ export type FileResolution = {
 	checkedAt: string,
 };
 
-export type FileStorageType = "board_file" | "linked_file" | "url";
+/**  Target of a file association; project scope needs no key. */
+export type FileScope = {
+	/**  Target kind: project, epic, story or task; required. Example: story. */
+	type: ScopeKind,
+	/**  Target board key, e.g. JB-S3; required for entity links. Omit for project scope or when filtering all targets of one kind. */
+	key: string | null,
+};
+
+/**  Storage authority; copying belongs to the board, linking leaves project bytes in place. */
+export type FileStorageType =
+/**  Managed copy in the board's files folder. */
+"board_file" |
+/**  Existing file owned by the project; never removed by deleting its asset. */
+"linked_file" |
+/**  Validated HTTP(S) URL; no file bytes. */
+"url";
 
 export type FileTaskVersion = {
 	updatedAt: string,
@@ -993,42 +1445,72 @@ export type FolderCommandContext = {
 export type FrameEditInput = FrameEditInput_Serialize | FrameEditInput_Deserialize;
 
 export type FrameEditInput_Deserialize = {
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
 } & FramePatch_Deserialize;
 
 export type FrameEditInput_Serialize = {
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
 } & FramePatch_Serialize;
 
 export type FramePatch = FramePatch_Serialize | FramePatch_Deserialize;
 
 export type FramePatch_Deserialize = {
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
+	/**  Canvas frame color string, e.g. m4; omitted preserves the existing color. */
 	color?: string | null,
+	/**  Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement. */
 	x?: number | null,
+	/**  Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement. */
 	y?: number | null,
+	/**  Positive canvas width, e.g. 900 world units; omitted preserves updates or uses create size. */
 	w?: number | null,
+	/**  Positive canvas height, e.g. 600 world units; omitted preserves updates or uses create size. */
 	h?: number | null,
 	collapsed?: boolean | null,
 	epicId?: string | null,
 };
 
 export type FramePatch_Serialize = {
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
+	/**  Canvas frame color string, e.g. m4; omitted preserves the existing color. */
 	color?: string | null,
+	/**  Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement. */
 	x?: number | null,
+	/**  Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement. */
 	y?: number | null,
+	/**  Positive canvas width, e.g. 900 world units; omitted preserves updates or uses create size. */
 	w?: number | null,
+	/**  Positive canvas height, e.g. 600 world units; omitted preserves updates or uses create size. */
 	h?: number | null,
 	collapsed?: boolean | null,
 	epicId?: string | null,
 };
 
+export type FrameReview = {
+	total: number,
+	keep: number,
+	reject: number,
+	unrated: number,
+	comments: number,
+	sentAt: string | null,
+	sentBy: string | null,
+	changedSinceSent: boolean,
+};
+
 export type GeometryInput = {
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
+	/**  Horizontal canvas/world coordinate, e.g. 120; omitted preserves updates or uses create placement. */
 	x: number | null,
+	/**  Vertical canvas/world coordinate, e.g. 80; omitted preserves updates or uses create placement. */
 	y: number | null,
+	/**  Positive canvas width, e.g. 900 world units; omitted preserves updates or uses create size. */
 	w: number | null,
+	/**  Positive canvas height, e.g. 600 world units; omitted preserves updates or uses create size. */
 	h: number | null,
 };
 
@@ -1085,6 +1567,337 @@ export type HistorySettings = {
 	keepHistory: boolean,
 };
 
+export type ImportActor = {
+	name: string,
+	kind: ActorKind,
+};
+
+export type ImportBatchSummary = {
+	batchId: string,
+	createdAt: string,
+	actor: ImportActor,
+	source: ImportSource,
+	counts: ImportCounts,
+	undoneAt: string | null,
+};
+
+export type ImportConflict = {
+	fields: ImportConflictField[],
+	boardUpdatedBy: string,
+	boardUpdatedAt: string,
+} & ImportRecord;
+
+export type ImportConflictField = {
+	field: string,
+	board: JsonPayload,
+	file: JsonPayload,
+};
+
+export type ImportCounts = {
+	created: number,
+	updated: number,
+	moved: number,
+	unchanged: number,
+	conflicts: number,
+	skipped: number,
+	notInFile: number,
+};
+
+export type ImportEpic = ImportEpic_Serialize | ImportEpic_Deserialize;
+
+export type ImportEpic_Deserialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Palette slot m1–m6; only tells epics apart and carries no meaning. Omitted creates rotate slots; omitted updates preserve it. */
+	color?: EpicColor | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd?: string | null,
+	/**  Observable completion conditions in Markdown, e.g. The player reaches the cabin. Defaults to empty; omitted updates preserve it. */
+	doneWhenMd?: string | null,
+	/**  Excluded scope in Markdown, e.g. No new combat system. Defaults to empty; omitted updates preserve it. */
+	notIncludedMd?: string | null,
+	/**  Agreed decisions and reasons in Markdown, e.g. Preserve the existing palette. Defaults to empty; omitted updates preserve it. */
+	decidedMd?: string | null,
+	/**  Unresolved planning questions in Markdown, e.g. Which controller layout? Defaults to empty; omitted updates preserve it. */
+	openQuestionsMd?: string | null,
+	/**  Human iteration review schedule; default first_sketch on create. Example: each_iteration. Omitted updates preserve it. */
+	participation?: Participation | null,
+	/**  Human review schedule; default none on create. Example: final. Omitted updates preserve it. */
+	reviewer?: Reviewer | null,
+	/**  Model id preferred for workers, e.g. gpt-6.1-sol; informational. Omitted creates use no preference; null clears an update. */
+	workerModel?: string | null,
+	/**  Ordered nested records; omitted means no children in this file, and never deletes board records. */
+	stories?: ImportStory_Deserialize[],
+};
+
+export type ImportEpic_Serialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Palette slot m1–m6; only tells epics apart and carries no meaning. Omitted creates rotate slots; omitted updates preserve it. */
+	color?: EpicColor | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd?: string | null,
+	/**  Observable completion conditions in Markdown, e.g. The player reaches the cabin. Defaults to empty; omitted updates preserve it. */
+	doneWhenMd?: string | null,
+	/**  Excluded scope in Markdown, e.g. No new combat system. Defaults to empty; omitted updates preserve it. */
+	notIncludedMd?: string | null,
+	/**  Agreed decisions and reasons in Markdown, e.g. Preserve the existing palette. Defaults to empty; omitted updates preserve it. */
+	decidedMd?: string | null,
+	/**  Unresolved planning questions in Markdown, e.g. Which controller layout? Defaults to empty; omitted updates preserve it. */
+	openQuestionsMd?: string | null,
+	/**  Human iteration review schedule; default first_sketch on create. Example: each_iteration. Omitted updates preserve it. */
+	participation?: Participation | null,
+	/**  Human review schedule; default none on create. Example: final. Omitted updates preserve it. */
+	reviewer?: Reviewer | null,
+	/**  Model id preferred for workers, e.g. gpt-6.1-sol; informational. Omitted creates use no preference; null clears an update. */
+	workerModel?: string | null,
+	/**  Ordered nested records; omitted means no children in this file, and never deletes board records. */
+	stories: ImportStory_Serialize[],
+};
+
+export type ImportKept = {
+	kind: RecordKind,
+	key: string,
+	reason: string,
+};
+
+export type ImportMoved = {
+	from: string,
+	to: string,
+} & ImportRecord;
+
+export type ImportPlanInput = ImportPlanInput_Serialize | ImportPlanInput_Deserialize;
+
+export type ImportPlanInput_Deserialize = {
+	/**  Stable request ID, 1–100 nonblank characters, e.g. ls-import-1; required. Reuse only for the same file and choices. */
+	requestId: string,
+	/**  Preview without persisting any changes; defaults to false. Example: true before applying a file. */
+	dryRun?: boolean,
+	/**  Conflict externalRefs explicitly chosen to use the file; defaults to empty. Tasks in work are never overwritten. */
+	overwrite?: string[],
+	/**  Ordered plan hierarchy; at most 1000 total epics, stories and tasks. Example: [{externalRef:"ls/E1",title:"Lanterns"}]. */
+	epics: ImportEpic_Deserialize[],
+};
+
+export type ImportPlanInput_Serialize = {
+	/**  Stable request ID, 1–100 nonblank characters, e.g. ls-import-1; required. Reuse only for the same file and choices. */
+	requestId: string,
+	/**  Preview without persisting any changes; defaults to false. Example: true before applying a file. */
+	dryRun: boolean,
+	/**  Conflict externalRefs explicitly chosen to use the file; defaults to empty. Tasks in work are never overwritten. */
+	overwrite: string[],
+	/**  Ordered plan hierarchy; at most 1000 total epics, stories and tasks. Example: [{externalRef:"ls/E1",title:"Lanterns"}]. */
+	epics: ImportEpic_Serialize[],
+};
+
+export type ImportPlanReport = ImportPlanReport_Serialize | ImportPlanReport_Deserialize;
+
+export type ImportPlanReport_Deserialize = {
+	batchId: string | null,
+	dryRun: boolean,
+	noChanges: boolean,
+	counts: ImportCounts,
+	created: ImportRecord[],
+	updated: ImportUpdated[],
+	moved: ImportMoved[],
+	conflicts: ImportConflict[],
+	skipped: ImportSkipped[],
+	notInFile: ImportRecord[],
+	replayed?: boolean,
+};
+
+export type ImportPlanReport_Serialize = {
+	batchId: string | null,
+	dryRun: boolean,
+	noChanges: boolean,
+	counts: ImportCounts,
+	created: ImportRecord[],
+	updated: ImportUpdated[],
+	moved: ImportMoved[],
+	conflicts: ImportConflict[],
+	skipped: ImportSkipped[],
+	notInFile: ImportRecord[],
+	replayed?: boolean,
+};
+
+export type ImportRecord = {
+	kind: RecordKind,
+	externalRef: string,
+	key: string,
+};
+
+export type ImportSkipped = {
+	reason: string,
+} & ImportRecord;
+
+/**  Where a planning import was submitted. */
+export type ImportSource =
+/**  Submitted by an MCP client; no work is started. */
+"mcp" |
+/**  Submitted by the desktop import dialog. */
+"ui";
+
+export type ImportStory = ImportStory_Serialize | ImportStory_Deserialize;
+
+export type ImportStory_Deserialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Human-readable story outcome in Markdown, e.g. Players can cross the bridge. Defaults to empty; omitted updates preserve it. */
+	outcomeMd?: string | null,
+	/**  Story sources and rationale in Markdown, e.g. The current Godot prototype. Defaults to empty; omitted updates preserve it. */
+	basisMd?: string | null,
+	/**  Behavior to preserve in Markdown, e.g. Keep the jump arc. Defaults to empty; omitted updates preserve it. */
+	preserveMd?: string | null,
+	/**  Expected scale in Markdown, e.g. Extend one scene. Defaults to empty; omitted updates preserve it. */
+	scaleMd?: string | null,
+	/**  Concrete rejection risks in Markdown, e.g. Cues rely only on color. Defaults to empty; omitted updates preserve it. */
+	rejectionRisksMd?: string | null,
+	/**  Unresolved story decisions in Markdown, e.g. Ask before replacing the title image. Defaults to empty; omitted updates preserve it. */
+	openDecisionsMd?: string | null,
+	/**  Story acceptance criteria with stable IDs and observable checks. Defaults to empty on create; omitted updates preserve it. */
+	acceptance?: Acceptance[] | null,
+	/**  Ordered nested records; omitted means no children in this file, and never deletes board records. */
+	tasks?: ImportTask_Deserialize[],
+};
+
+export type ImportStory_Serialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Human-readable story outcome in Markdown, e.g. Players can cross the bridge. Defaults to empty; omitted updates preserve it. */
+	outcomeMd?: string | null,
+	/**  Story sources and rationale in Markdown, e.g. The current Godot prototype. Defaults to empty; omitted updates preserve it. */
+	basisMd?: string | null,
+	/**  Behavior to preserve in Markdown, e.g. Keep the jump arc. Defaults to empty; omitted updates preserve it. */
+	preserveMd?: string | null,
+	/**  Expected scale in Markdown, e.g. Extend one scene. Defaults to empty; omitted updates preserve it. */
+	scaleMd?: string | null,
+	/**  Concrete rejection risks in Markdown, e.g. Cues rely only on color. Defaults to empty; omitted updates preserve it. */
+	rejectionRisksMd?: string | null,
+	/**  Unresolved story decisions in Markdown, e.g. Ask before replacing the title image. Defaults to empty; omitted updates preserve it. */
+	openDecisionsMd?: string | null,
+	/**  Story acceptance criteria with stable IDs and observable checks. Defaults to empty on create; omitted updates preserve it. */
+	acceptance?: Acceptance[] | null,
+	/**  Ordered nested records; omitted means no children in this file, and never deletes board records. */
+	tasks: ImportTask_Serialize[],
+};
+
+export type ImportTask = ImportTask_Serialize | ImportTask_Deserialize;
+
+export type ImportTask_Deserialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions. */
+	description?: string | null,
+	/**  Scheduling priority; default medium on create. Example: high. Omitted updates preserve it. */
+	priority?: Priority | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
+	tags?: string[] | null,
+	/**  Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates. */
+	estimate?: Estimate | null,
+	/**  Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted means no due date. */
+	dueAt?: string | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd?: string | null,
+	/**  Task context in Markdown, e.g. Existing lantern shader. Defaults to empty; omitted updates preserve it. */
+	contextMd?: string | null,
+	/**  Files and locations in Markdown, e.g. game/player.gd. Defaults to empty; omitted updates preserve it. */
+	whereMd?: string | null,
+	/**  Concrete requested changes recording current and required behavior. Defaults to empty; omitted updates preserve them. */
+	changes?: Change[] | null,
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
+	tests?: BriefTest[] | null,
+	/**  Task boundaries in Markdown, e.g. No scene rewrite. Defaults to empty; omitted updates preserve it. */
+	boundariesMd?: string | null,
+	/**  Required deliverable in Markdown, e.g. Patch and check results. Defaults to empty; omitted updates preserve it. */
+	resultMd?: string | null,
+	/**  Relevant exact human quotations in Markdown; preserve their language. Defaults to empty; omitted updates preserve it. */
+	userQuotesMd?: string | null,
+};
+
+export type ImportTask_Serialize = {
+	/**  Required source reference, 1 to 120 nonblank characters, unique per entity kind. Example: ls/S0.1. */
+	externalRef: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title: string,
+	/**  Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions. */
+	description?: string | null,
+	/**  Scheduling priority; default medium on create. Example: high. Omitted updates preserve it. */
+	priority?: Priority | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
+	tags?: string[] | null,
+	/**  Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates. */
+	estimate?: Estimate | null,
+	/**  Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted means no due date. */
+	dueAt?: string | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
+	goalMd?: string | null,
+	/**  Task context in Markdown, e.g. Existing lantern shader. Defaults to empty; omitted updates preserve it. */
+	contextMd?: string | null,
+	/**  Files and locations in Markdown, e.g. game/player.gd. Defaults to empty; omitted updates preserve it. */
+	whereMd?: string | null,
+	/**  Concrete requested changes recording current and required behavior. Defaults to empty; omitted updates preserve them. */
+	changes?: Change[] | null,
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
+	tests?: BriefTest[] | null,
+	/**  Task boundaries in Markdown, e.g. No scene rewrite. Defaults to empty; omitted updates preserve it. */
+	boundariesMd?: string | null,
+	/**  Required deliverable in Markdown, e.g. Patch and check results. Defaults to empty; omitted updates preserve it. */
+	resultMd?: string | null,
+	/**  Relevant exact human quotations in Markdown; preserve their language. Defaults to empty; omitted updates preserve it. */
+	userQuotesMd?: string | null,
+};
+
+export type ImportUpdated = {
+	fields: string[],
+} & ImportRecord;
+
+export type InboxEvent = {
+	seq: number,
+	firstSeq: number,
+	action: string,
+	group: InboxEventGroup,
+	actor: MemberRef,
+	sentence: string,
+	count: number,
+	taskKey: string | null,
+	epicKey: string | null,
+	storyKey: string | null,
+	frameId: string | null,
+	frameTitle: string | null,
+	requestId: string | null,
+	resolved: boolean,
+	unread: boolean,
+	createdAt: string,
+};
+
+export type InboxEventFilter = "all" | "needs_action" | "updates";
+
+export type InboxEventGroup = "needs_action" | "updates";
+
+export type InboxEventsPage = {
+	events: InboxEvent[],
+	unread: number,
+	openActions: number,
+	seenSeq: number,
+	nextBeforeSeq: number | null,
+};
+
+export type InboxEventsQuery = {
+	beforeSeq: number | null,
+	limit: number | null,
+	filter: InboxEventFilter | null,
+};
+
 export type InstallPhase = "runtime" | "model";
 
 export type Jam = {
@@ -1107,7 +1920,28 @@ export type Jam = {
  */
 export type JsonPayload = null | boolean | number | null | string | JsonPayload[] | { [key in string]: JsonPayload };
 
+export type KeptSection = {
+	sourceFrameId: string,
+	title: string,
+	count: number,
+};
+
 export type LaunchStepState = "running" | "ok" | "failed" | "skipped";
+
+export type LinkFileInput = {
+	/**  Exact association scope, e.g. {"type":"story","key":"JB-S3"}; required. */
+	scope: FileScope,
+	/**  Existing asset in this project, e.g. 01JASSET; required. */
+	assetId: string,
+	/**  Optional role; defaults to document for project/epic/story, reference for tasks. */
+	role: FileLinkRole | null,
+	/**  Optional stable retry ID, 1–100 chars, e.g. link-design-S3; recommended. */
+	requestId: string | null,
+	/**  Exact task updatedAt captured before deciding; required only for task scope. */
+	expectedUpdatedAt: string | null,
+	/**  Exact task claimGeneration captured before deciding; required only for task scope. */
+	expectedClaimGeneration: string | null,
+};
 
 export type LinkedTask = {
 	key: string,
@@ -1167,6 +2001,15 @@ export type McpStatus = {
 	recentCalls: RecentCall[],
 };
 
+/**  Browser media category; models and office documents use metadata in this round. */
+export type MediaKind =
+/**  Browser image preview. */
+"image" |
+/**  Native HTML audio controls. */
+"audio" |
+/**  Native HTML video controls. */
+"video";
+
 export type Member = {
 	id: string,
 	kind: string,
@@ -1182,10 +2025,25 @@ export type Member = {
 	statusAt?: string | null,
 };
 
+/**  Member palette color; only distinguishes people and agents. */
+export type MemberColor =
+/**  Blue palette slot. */
+"#5B8DEF" |
+/**  Pink palette slot. */
+"#E0679A" |
+/**  Green palette slot. */
+"#3FA37A" |
+/**  Purple palette slot. */
+"#9B7BE0" |
+/**  Orange palette slot. */
+"#F07E5F" |
+/**  Gold palette slot. */
+"#D8A630";
+
 export type MemberEdit = {
 	id: string,
 	name: string | null,
-	color: string | null,
+	color: MemberColor | null,
 	avatar: string | null,
 };
 
@@ -1296,23 +2154,65 @@ export type MoveReceipt = {
 	error: string | null,
 };
 
+export type MoveStoryInput = {
+	/**  Stable story key, e.g. JB-S3; required and retained after the move. */
+	key: string,
+	/**  Destination epic key in this project, e.g. JB-E2; required. */
+	toEpicKey: string,
+	/**  Optional destination sibling to place before, e.g. JB-S7; cannot combine with afterKey. */
+	beforeKey: string | null,
+	/**  Optional destination sibling to place after, e.g. JB-S7; omitted appends unless beforeKey is supplied. */
+	afterKey: string | null,
+	/**  Exact updatedAt inspected before deciding the move; optional. Never refresh merely to replay a rejection. */
+	expectedUpdatedAt?: string | null,
+	/**  Stable request ID, 1–100 chars, e.g. move-ls-S3; required. Reuse only for the same move intent. */
+	requestId: string,
+};
+
+export type MoveTaskToStoryInput = {
+	/**  Stable task key, e.g. JB-12; required and retained after the move. */
+	key: string,
+	/**  Destination story key in this project, e.g. JB-S7; required. */
+	toStoryKey: string,
+	/**  Exact updatedAt inspected before deciding the move; required. Never refresh merely to replay a rejection. */
+	expectedUpdatedAt: string,
+	/**  Exact claimGeneration inspected before deciding the move; required. Example: generation:task:3. */
+	expectedClaimGeneration: string,
+	/**  Stable request ID, 1–100 chars, e.g. move-ls-task-12; required. Reuse only for the same payload. */
+	requestId: string,
+};
+
 export type NewAsset = {
-	kind: string,
+	kind: FileKind,
 	name: string,
 	location: string,
 	notes: string | null,
 };
 
 export type NewEpic = {
+	/**  Source reference, 1–120 characters, unique per project and entity kind. Example: ls/S0.1; omitted creates have no external reference. */
+	externalRef?: string | null,
+	/**  Stable request ID, 1–100 characters, e.g. ls-E0; required for retry-safe creation. */
+	requestId: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
-	color: string | null,
+	/**  Palette slot m1–m6; only tells epics apart and carries no meaning. Omitted creates rotate slots; omitted updates preserve it. */
+	color: EpicColor | null,
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
 	goalMd: string | null,
+	/**  Observable completion conditions in Markdown, e.g. The player reaches the cabin. Defaults to empty; omitted updates preserve it. */
 	doneWhenMd: string | null,
+	/**  Excluded scope in Markdown, e.g. No new combat system. Defaults to empty; omitted updates preserve it. */
 	notIncludedMd: string | null,
+	/**  Agreed decisions and reasons in Markdown, e.g. Preserve the existing palette. Defaults to empty; omitted updates preserve it. */
 	decidedMd: string | null,
+	/**  Unresolved planning questions in Markdown, e.g. Which controller layout? Defaults to empty; omitted updates preserve it. */
 	openQuestionsMd: string | null,
-	participation: string | null,
-	reviewer: string | null,
+	/**  Human iteration review schedule; default first_sketch on create. Example: each_iteration. Omitted updates preserve it. */
+	participation: Participation | null,
+	/**  Human review schedule; default none on create. Example: final. Omitted updates preserve it. */
+	reviewer: Reviewer | null,
+	/**  Model id preferred for workers, e.g. gpt-6.1-sol; informational. Omitted creates use no preference; null clears an update. */
 	workerModel: string | null,
 };
 
@@ -1323,27 +2223,49 @@ export type NewJamInput = {
 	endsAt: string,
 	timezone: string,
 	yourName: string,
-	template?: string | null,
+	template?: ProjectTemplate | null,
 	milestoneAt?: string | null,
 };
 
 export type NewMember = {
 	name: string,
-	color: string,
+	color: MemberColor,
 	avatar: string | null,
 };
 
 export type NewStory = {
+	/**  Source reference, 1–120 characters, unique per project and entity kind. Example: ls/S0.1; omitted creates have no external reference. */
+	externalRef?: string | null,
+	/**  Stable request ID, 1–100 characters, e.g. ls-E0; required for retry-safe creation. */
+	requestId: string,
+	/**  Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters. */
 	epicKey: string,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Human-readable story outcome in Markdown, e.g. Players can cross the bridge. Defaults to empty; omitted updates preserve it. */
 	outcomeMd: string | null,
+	/**  Story sources and rationale in Markdown, e.g. The current Godot prototype. Defaults to empty; omitted updates preserve it. */
 	basisMd: string | null,
+	/**  Behavior to preserve in Markdown, e.g. Keep the jump arc. Defaults to empty; omitted updates preserve it. */
 	preserveMd: string | null,
+	/**  Expected scale in Markdown, e.g. Extend one scene. Defaults to empty; omitted updates preserve it. */
 	scaleMd: string | null,
+	/**  Concrete rejection risks in Markdown, e.g. Cues rely only on color. Defaults to empty; omitted updates preserve it. */
 	rejectionRisksMd: string | null,
+	/**  Unresolved story decisions in Markdown, e.g. Ask before replacing the title image. Defaults to empty; omitted updates preserve it. */
 	openDecisionsMd: string | null,
+	/**  Story acceptance criteria with stable IDs and observable checks. Defaults to empty on create; omitted updates preserve it. */
 	acceptance: Acceptance[] | null,
 };
+
+/**  How often the human reviews planned iterations; default first_sketch. */
+export type Participation =
+/**  Human reviews every iteration. */
+"each_iteration" |
+/**  Default; human sees the first sketch, then the agents continue. */
+"first_sketch" |
+/**  Agents run without check-ins. */
+"autonomous";
 
 export type PermissionKind = "allow_once" | "allow_always" | "reject_once" | "reject_always";
 
@@ -1374,11 +2296,36 @@ export type PlanUsageWindow = {
 	resets_at: number | null,
 };
 
+/**  Epic or story planning status. Activation is separate from execution permission. */
+export type PlanningStatus =
+/**  Draft intent; default on create. */
+"draft" |
+/**  Active planning scope. */
+"active" |
+/**  Completed planning scope. */
+"done" |
+/**  Archived planning scope. */
+"archived";
+
 export type PlanningStatusInput = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
-	status: string,
+	/**  Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it. */
+	status: PlanningStatus,
+	/**  Reason for a permitted human override; omitted uses normal validation. Example: Review manually accepted this evidence. */
 	overrideReason: string | null,
 };
+
+/**  Relative scheduling priority; default medium. */
+export type Priority =
+/**  Lower scheduling priority. */
+"low" |
+/**  Default scheduling priority. */
+"medium" |
+/**  Higher scheduling priority. */
+"high" |
+/**  Critical scheduling priority. */
+"critical";
 
 export type Project = {
 	jam: Jam,
@@ -1393,11 +2340,17 @@ export type Project = {
 };
 
 export type ProjectEditInput = {
-	template: string,
+	/**  Planning template: game_jam, gamedev, webapp or custom; required when changing it. Example: gamedev. */
+	template: ProjectTemplate,
+	/**  Optional ISO-8601 milestone, e.g. 2026-11-01T12:00:00Z; null clears it. */
 	milestoneAt: string | null,
+	/**  Display name, e.g. Bridge design; optional when inferred from a file. Renaming assets does not rename disk files. */
 	name: string | null,
+	/**  ISO-8601 project start, e.g. 2026-11-01T00:00:00Z; omitted updates preserve it. */
 	startsAt: string | null,
+	/**  ISO-8601 project end, e.g. 2026-11-03T00:00:00Z; omitted updates preserve it. */
 	endsAt: string | null,
+	/**  IANA timezone, e.g. UTC; omitted updates preserve it. */
 	timezone: string | null,
 };
 
@@ -1458,11 +2411,49 @@ export type ProjectSummary_Serialize = {
 	inProgressCount: number,
 } & Jam;
 
+/**  Project planning template; default game_jam. */
+export type ProjectTemplate =
+/**  Short game jam project. */
+"game_jam" |
+/**  Ongoing game development project. */
+"gamedev" |
+/**  Web application project. */
+"webapp" |
+/**  Custom project vocabulary. */
+"custom";
+
 export type PromptPart = { type: "attachment"; attachmentId: string } | { type: "text"; text: string } | { type: "board_ref"; uri: string; label: string; text: string } | { type: "image"; mimeType: string; data: string };
 
 export type Provider = "brave" | "tavily";
 
-export type Question = {
+export type Question = Question_Serialize | Question_Deserialize;
+
+export type QuestionListInput = {
+	/**  Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it. */
+	status: QuestionStatus | null,
+	/**  Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution. */
+	scope: Scope | null,
+};
+
+export type QuestionOption = {
+	/**  Human-readable option or connection label, e.g. Keep existing; required for options, optional for connections. */
+	label: string,
+	/**  Human-readable description, e.g. Preserve the existing image. Omitted task descriptions default to empty; updates preserve omissions. */
+	description: string,
+};
+
+/**  Question lifecycle filter; omission includes all states. */
+export type QuestionStatus =
+/**  Waiting for an explicit human answer. */
+"open" |
+/**  Answered by a human. */
+"answered" |
+/**  Withdrawn without an answer. */
+"withdrawn";
+
+export type Question_Deserialize = {
+	replayed?: boolean,
+	updatedAt?: string,
 	id: string,
 	jamId: string,
 	epicId: string | null,
@@ -1483,14 +2474,27 @@ export type Question = {
 	createdAt: string,
 };
 
-export type QuestionListInput = {
-	status: string | null,
-	scope: Scope | null,
-};
-
-export type QuestionOption = {
-	label: string,
-	description: string,
+export type Question_Serialize = {
+	replayed?: boolean,
+	updatedAt?: string,
+	id: string,
+	jamId: string,
+	epicId: string | null,
+	scopeType: string,
+	scopeId: string,
+	askedBy: string,
+	roundLabel: string | null,
+	title: string,
+	bodyMd: string,
+	options: QuestionOption[],
+	recommendedIndex: number | null,
+	allowFreeText: boolean,
+	status: string,
+	answerIndex: number | null,
+	answerText: string | null,
+	answeredBy: string | null,
+	answeredAt: string | null,
+	createdAt: string,
 };
 
 export type Readiness = {
@@ -1504,8 +2508,11 @@ export type ReadinessIssue = {
 };
 
 export type ReadyInput = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
+	/**  Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection. */
 	expectedUpdatedAt: string,
+	/**  Reason for a permitted human override; omitted uses normal validation. Example: Review manually accepted this evidence. */
 	overrideReason: string | null,
 };
 
@@ -1520,6 +2527,15 @@ export type RecentCall = {
 
 export type RecommendedModel = "fast" | "balanced";
 
+/**  Kind of planning record matched within the connected project. */
+export type RecordKind =
+/**  Epic intent and planning scope. */
+"epic" |
+/**  Story outcome and acceptance. */
+"story" |
+/**  Individual task and its brief. */
+"task";
+
 export type RefEdge = {
 	id: string,
 	jamId: string,
@@ -1529,7 +2545,24 @@ export type RefEdge = {
 	archivedAt: string | null,
 };
 
-export type RefFrame = {
+export type RefFrame = RefFrame_Serialize | RefFrame_Deserialize;
+
+export type RefFrameLinkInput = {
+	/**  Existing frame ID, e.g. 01JFRAME. Omitted updates preserve the parent; null detaches where supported. */
+	frameId: string,
+	/**  Target epic/story/task key in this project, e.g. JB-S3; required for associations. */
+	targetKey: string,
+};
+
+export type RefFrameTarget = {
+	targetKey: string,
+	kind: ReferenceTargetKind,
+	title: string,
+};
+
+export type RefFrame_Deserialize = {
+	replayed?: boolean,
+	updatedAt?: string,
 	id: string,
 	jamId: string,
 	epicId: string | null,
@@ -1542,22 +2575,31 @@ export type RefFrame = {
 	archivedAt: string | null,
 	collapsed?: boolean,
 	links?: RefFrameTarget[],
+	review?: FrameReview | null,
 };
 
-export type RefFrameLinkInput = {
-	frameId: string,
-	targetKey: string,
-};
-
-export type RefFrameTarget = {
-	targetKey: string,
-	kind: ReferenceTargetKind,
+export type RefFrame_Serialize = {
+	replayed?: boolean,
+	updatedAt?: string,
+	id: string,
+	jamId: string,
+	epicId: string | null,
 	title: string,
+	x: number | null,
+	y: number | null,
+	w: number | null,
+	h: number | null,
+	color: string,
+	archivedAt: string | null,
+	collapsed: boolean,
+	links: RefFrameTarget[],
+	review: FrameReview | null,
 };
 
 export type RefItem = RefItem_Serialize | RefItem_Deserialize;
 
 export type RefItem_Deserialize = {
+	replayed?: boolean,
 	file?: FileAsset | null,
 	kind: string,
 	assetId: string | null,
@@ -1574,12 +2616,18 @@ export type RefItem_Deserialize = {
 	linkPreview: string | null,
 	metadata?: string | null,
 	verdict?: ReferenceVerdict | null,
+	verdictNote?: string | null,
+	sourceUrl?: string | null,
+	origin?: ReferenceOrigin | null,
+	derivedFrom?: string | null,
+	copiedFrom?: string | null,
 	archivedBy?: string | null,
 	via?: string | null,
 	frameTitle?: string | null,
 } & Audit;
 
 export type RefItem_Serialize = {
+	replayed?: boolean,
 	file?: FileAsset | null,
 	kind: string,
 	assetId: string | null,
@@ -1596,6 +2644,11 @@ export type RefItem_Serialize = {
 	linkPreview: string | null,
 	metadata: string | null,
 	verdict: ReferenceVerdict | null,
+	verdictNote: string | null,
+	sourceUrl: string | null,
+	origin: ReferenceOrigin | null,
+	derivedFrom: string | null,
+	copiedFrom: string | null,
 	archivedBy: string | null,
 	via?: string | null,
 	frameTitle?: string | null,
@@ -1612,14 +2665,14 @@ export type ReferenceCanvas = ReferenceCanvas_Serialize | ReferenceCanvas_Deseri
 
 export type ReferenceCanvas_Deserialize = {
 	items: RefItem_Deserialize[],
-	frames: RefFrame[],
+	frames: RefFrame_Deserialize[],
 	edges: RefEdge[],
 	links: RefLink[],
 };
 
 export type ReferenceCanvas_Serialize = {
 	items: RefItem_Serialize[],
-	frames: RefFrame[],
+	frames: RefFrame_Serialize[],
 	edges: RefEdge[],
 	links: RefLink[],
 };
@@ -1629,68 +2682,154 @@ export type ReferenceCanvas_Serialize = {
  *  ReferenceEditInput contract so existing agent clients remain unchanged.
  */
 export type ReferenceContentExpectation = {
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title: string,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
 	caption: string,
 };
 
 export type ReferenceEditInput = ReferenceEditInput_Serialize | ReferenceEditInput_Deserialize;
 
 export type ReferenceEditInput_Deserialize = {
+	/**  Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations. */
 	itemId: string,
 } & ReferencePatch_Deserialize;
 
 export type ReferenceEditInput_Serialize = {
+	/**  Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations. */
 	itemId: string,
 } & ReferencePatch_Serialize;
 
+/**  Reference content kind; this does not launch a native application. */
+export type ReferenceKind =
+/**  A registered file reference. */
+"asset" |
+/**  An HTTP(S) link. */
+"link" |
+/**  A note with Markdown text. */
+"note";
+
 export type ReferenceLinkInput = {
+	/**  Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations. */
 	itemId: string,
+	/**  Target epic/story/task key in this project, e.g. JB-S3; required for associations. */
 	targetKey: string,
 };
 
 export type ReferenceListInput = {
+	/**  Epic key in the connected project, e.g. JB-E2; required for epic-specific operations, optional for filters. */
 	epicKey: string | null,
+	/**  Parent story key in this project, e.g. JB-S3. Every task belongs to a story. */
 	storyKey: string | null,
+	/**  Task key for a file association, e.g. JB-12. Omitted registration is unlinked; task links require captured validators. */
 	taskKey: string | null,
 };
+
+/**  Where a reference came from. */
+export type ReferenceOrigin =
+/**  Found on the web or in an existing work; sourceUrl should point to it. */
+"found" |
+/**  Generated by an AI tool; may be refined further in the art pipeline. */
+"generated" |
+/**  Made by the team (sketch, photo, own style test). */
+"own";
 
 export type ReferencePatch = ReferencePatch_Serialize | ReferencePatch_Deserialize;
 
 export type ReferencePatch_Deserialize = {
+	/**  Original HTTP(S) source without credentials or whitespace, at most 2048 characters; omitted preserves, null clears. */
+	sourceUrl?: string | null,
+	/**  Where this reference came from: found, generated or own; omitted preserves, null clears. */
+	origin?: ReferenceOrigin | null,
+	/**  Active original reference in this project; omitted preserves, null clears. Cycles are forbidden. */
+	derivedFrom?: string | null,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
 	caption?: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags?: string[] | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
 };
 
 export type ReferencePatch_Serialize = {
+	/**  Original HTTP(S) source without credentials or whitespace, at most 2048 characters; omitted preserves, null clears. */
+	sourceUrl?: string | null,
+	/**  Where this reference came from: found, generated or own; omitted preserves, null clears. */
+	origin?: ReferenceOrigin | null,
+	/**  Active original reference in this project; omitted preserves, null clears. Cycles are forbidden. */
+	derivedFrom?: string | null,
+	/**  Reference caption in Markdown, e.g. Approved palette. Omitted creates use empty text; omitted updates preserve it. */
 	caption?: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags?: string[] | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
 };
 
-export type ReferenceTargetKind = "epic" | "story" | "task";
+/**  Kind of entity linked to a reference frame. */
+export type ReferenceTargetKind =
+/**  An epic in the connected project. */
+"epic" |
+/**  A story in the connected project. */
+"story" |
+/**  A task in the connected project. */
+"task";
 
-export type ReferenceVerdict = "keep" | "reject";
+/**  Human verdict on a reference; null clears it. */
+export type ReferenceVerdict =
+/**  Keep as a useful reference. */
+"keep" |
+/**  Reject this reference. */
+"reject";
 
-export type ReferenceVerdictInput = {
+export type ReferenceVerdictInput = ReferenceVerdictInput_Serialize | ReferenceVerdictInput_Deserialize;
+
+export type ReferenceVerdictInput_Deserialize = {
+	/**  Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations. */
 	itemId: string,
-	verdict: ReferenceVerdict | null,
+	/**  Human decision: keep or reject. Omitted preserves it; null clears it. */
+	verdict?: ReferenceVerdict | null,
+	/**  Short reason in plain text, at most 500 characters. Omitted preserves it; null or empty clears it. */
+	verdictNote?: string | null,
+};
+
+export type ReferenceVerdictInput_Serialize = {
+	/**  Existing reference ID in this project, e.g. 01JITEM; required for item-specific operations. */
+	itemId: string,
+	/**  Human decision: keep or reject. Omitted preserves it; null clears it. */
+	verdict?: ReferenceVerdict | null,
+	/**  Short reason in plain text, at most 500 characters. Omitted preserves it; null or empty clears it. */
+	verdictNote?: string | null,
 };
 
 export type RegisterFile = {
+	/**  File authority: board_file, linked_file or url. Required for registration; references may infer it from copy/filePath. */
 	storageType: FileStorageType,
+	/**  Readable source file, e.g. C:/game/docs/plan.md; required for files. Never a directory. */
 	sourcePath: string | null,
+	/**  HTTP(S) URL without credentials or whitespace, e.g. https://example.test/design; required for URL assets. */
 	url: string | null,
-	pathBase: string | null,
-	fileKind: string | null,
+	/**  Path authority, inferred when omitted. Example: repo for portable repository-relative links. */
+	pathBase: FilePathBase | null,
+	/**  Optional classifier override, e.g. document. Omitted detects kind from the extension. */
+	fileKind: FileKind | null,
+	/**  Display name, e.g. Bridge design; optional when inferred from a file. Renaming assets does not rename disk files. */
 	name: string | null,
+	/**  Optional asset notes, e.g. Approved design reference; omitted means none. */
 	notes: string | null,
+	/**  Optional model companion files, e.g. textures used by a glTF; omitted means none. */
 	companions: FileCompanion[] | null,
-	requestId: string,
+	/**  Stable retry ID for this logical operation; 1–100 characters, e.g. ls-S0.1.1. Reuse only for the same payload. */
+	requestId?: string | null,
+	/**  Task key for a file association, e.g. JB-12. Omitted registration is unlinked; task links require captured validators. */
 	taskKey: string | null,
-	role: string | null,
+	/**  File association purpose; task roles are to_edit, reference or result. Defaults to reference for task files. */
+	role: TaskFileRole | null,
+	/**  Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3. */
 	expectedClaimGeneration: string | null,
+	/**  Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection. */
 	expectedUpdatedAt: string | null,
+	/**  Optional verified worktree directory, e.g. C:/game; must belong to the board repository. */
 	workingDirectory: string | null,
 };
 
@@ -1717,6 +2856,26 @@ export type RemoveAgentAttachmentInput = {
 	attachmentId: string,
 };
 
+export type RenameAssetInput = {
+	/**  Existing asset ID in this project, e.g. 01JASSET; required. */
+	assetId: string,
+	/**  Display name, 1–140 chars, e.g. Bridge design; required. The disk name stays unchanged. */
+	name: string,
+	/**  Optional stable retry ID, 1–100 chars, e.g. rename-design; recommended. */
+	requestId: string | null,
+};
+
+export type ReplaceAssetInput = {
+	/**  Existing asset ID in this project, e.g. 01JASSET; required. */
+	assetId: string,
+	/**  New readable source path, e.g. C:/game/docs/new-plan.md; required for board or linked files, exclusive with url. */
+	sourcePath: string | null,
+	/**  New HTTP(S) URL without credentials or whitespace; required for URL assets, exclusive with sourcePath. */
+	url: string | null,
+	/**  Optional stable retry ID, 1–100 chars, e.g. replace-design-v2; recommended. Old board bytes are retained. */
+	requestId: string | null,
+};
+
 export type Report = {
 	id: string,
 	taskId: string,
@@ -1730,12 +2889,26 @@ export type Report = {
 	createdAt: string,
 };
 
+/**  Recorded check outcome; NOT_RUN is never a pass. */
+export type ReportResult =
+/**  The named check ran and passed. */
+"PASS" |
+/**  The named check ran and failed. */
+"FAIL" |
+/**  The named check was not run. */
+"NOT_RUN";
+
 export type ReportTest = {
+	/**  Display name, e.g. Bridge design; optional when inferred from a file. Renaming assets does not rename disk files. */
 	name: string,
+	/**  Executed check command, e.g. cargo test; required in report evidence. Mark unrun checks honestly. */
 	command: string,
+	/**  Observable expected result, e.g. Exactly one pickup; required in a test. */
 	expected: string,
+	/**  Observed outcome, e.g. One pickup event recorded; required in report evidence. */
 	actual: string,
-	result: string,
+	/**  Reported test result: PASS, FAIL or NOT_RUN. Required; use NOT_RUN for an unrun check. */
+	result: ReportResult,
 };
 
 export type RepositoryLocator = {
@@ -1753,13 +2926,18 @@ export type ResolveAgentPermissionInput = {
 };
 
 export type ResolveExecutionRequest = {
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
+	/**  Explicit human approve/decline decision; required. Generic answers never grant execution. */
 	decision: ExecutionDecision,
+	/**  Exact execution revision inspected before this decision, e.g. scope:3; required. Reconcile conflicts before retrying. */
 	expectedRevision: string,
 };
 
 export type ResolveFile = {
+	/**  Existing asset ID in this project, e.g. 01JASSET; required for asset-specific operations. */
 	assetId: string,
+	/**  Optional verified worktree directory, e.g. C:/game; must belong to the board repository. */
 	workingDirectory: string | null,
 };
 
@@ -1777,13 +2955,35 @@ export type Review = {
 };
 
 export type ReviewTask = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
+	/**  ID of the exact report inspected for review; required. Example: 01JREPORT. Re-read evidence after a conflict. */
 	expectedReportId: string,
+	/**  Opaque reviewContextRevision of the task/report/story/epic context inspected; required. Never blindly refresh a rejected review. */
 	expectedReviewContextRevision: string,
-	verdict: string,
+	/**  Enumerated independent review decision. Example: changes_requested. Null clears a reference verdict when supported. */
+	verdict: ReviewVerdict,
+	/**  Reason for a review decision in Markdown; required. Example: Repeated input still fails. */
 	commentsMd: string,
+	/**  Failed test names from the matching report; omitted means none. Example: ["repeated input"]. */
 	failedTests: string[] | null,
 };
+
+/**  Independent review decision on the exact report inspected. */
+export type ReviewVerdict =
+/**  Accept the submitted evidence. */
+"accept" |
+/**  Return the task to Ready with requested changes. */
+"changes_requested";
+
+/**  Human review schedule; default none. This does not grant execution permission. */
+export type Reviewer =
+/**  Default; no scheduled human review. */
+"none" |
+/**  One human review at the end. */
+"final" |
+/**  Review after each stage. */
+"stages";
 
 export type RuntimeInfo = {
 	dataDir: string,
@@ -1793,9 +2993,34 @@ export type RuntimeInfo = {
 export type RuntimeKind = "acp" | "terminal" | "api";
 
 export type Scope = {
-	type: string,
+	/**  Operation-specific enumerated kind, e.g. note for a text reference or story for a question scope; required unless stated otherwise. */
+	type: ScopeKind,
+	/**  Stable object ID or accepted scope key, e.g. JB-S3; required for ID-specific operations. */
 	id: string,
 };
+
+export type ScopeFile = {
+	id: string,
+	jamId: string,
+	assetId: string,
+	targetType: string,
+	targetId: string,
+	role: string,
+	position: number | null,
+	createdBy: string,
+	createdAt: string,
+};
+
+/**  Scope kind for questions and status; supply its project ID or entity ID. */
+export type ScopeKind =
+/**  The connected project. */
+"project" |
+/**  One epic in the connected project. */
+"epic" |
+/**  One story in the connected project. */
+"story" |
+/**  One task in the connected project. */
+"task";
 
 export type SecretKey = {
 	key: string,
@@ -1813,6 +3038,11 @@ export type SendAgentPromptInput = {
 	content: PromptPart[],
 };
 
+export type SendReferenceReviewInput = {
+	/**  Active nonempty moodboard frame in this project; humans only. */
+	frameId: string,
+};
+
 export type SessionStatus = "starting" | "ready" | "running" | "awaiting_permission" | "stopped" | "failed";
 
 export type SetAgentConfigOptionInput = {
@@ -1822,8 +3052,11 @@ export type SetAgentConfigOptionInput = {
 };
 
 export type SetExecution = {
+	/**  Exact project/epic/story/task scope; required where requested. Example: {"type":"story","id":"JB-S3"}. Questions never grant execution. */
 	scope: ExecutionScope,
+	/**  Explicit execution action: start or pause; required. Only a human may grant execution. */
 	action: ExecutionAction,
+	/**  Exact execution revision inspected before this decision, e.g. scope:3; required. Reconcile conflicts before retrying. */
 	expectedRevision: string,
 };
 
@@ -1848,12 +3081,12 @@ export type SettingsPatch = {
 	workingDirectory?: string | null,
 	projectFolder: string | null,
 	expectedProjectId: string | null,
-	colorBy: string | null,
+	colorBy: BoardColorBy | null,
 	estimatesEnabled: boolean | null,
 	wipLimit: number | null,
-	assetsView: string | null,
-	collapsedAssetKinds: string[] | null,
-	theme: string | null,
+	assetsView: AssetsView | null,
+	collapsedAssetKinds: FileKind[] | null,
+	theme: ThemePreference | null,
 	soundEnabled: boolean | null,
 };
 
@@ -1889,6 +3122,13 @@ export type SnapshotComparison = {
 	error: string | null,
 };
 
+/**  Task-table sort direction; required when a sort is supplied. */
+export type SortDirection =
+/**  Ascending values. */
+"asc" |
+/**  Descending values. */
+"desc";
+
 export type StartAgentSessionInput = StartAgentSessionInput_Serialize | StartAgentSessionInput_Deserialize;
 
 export type StartAgentSessionInput_Deserialize = {
@@ -1907,7 +3147,81 @@ export type StartAgentSessionInput_Serialize = {
 	effort?: string | null,
 };
 
-export type Story = {
+export type Story = Story_Serialize | Story_Deserialize;
+
+export type StoryEditInput = StoryEditInput_Serialize | StoryEditInput_Deserialize;
+
+export type StoryEditInput_Deserialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
+	key: string,
+} & StoryPatch_Deserialize;
+
+export type StoryEditInput_Serialize = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
+	key: string,
+} & StoryPatch_Serialize;
+
+export type StoryPatch = StoryPatch_Serialize | StoryPatch_Deserialize;
+
+export type StoryPatch_Deserialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title?: string | null,
+	/**  Human-readable story outcome in Markdown, e.g. Players can cross the bridge. Defaults to empty; omitted updates preserve it. */
+	outcomeMd?: string | null,
+	/**  Story sources and rationale in Markdown, e.g. The current Godot prototype. Defaults to empty; omitted updates preserve it. */
+	basisMd?: string | null,
+	/**  Behavior to preserve in Markdown, e.g. Keep the jump arc. Defaults to empty; omitted updates preserve it. */
+	preserveMd?: string | null,
+	/**  Expected scale in Markdown, e.g. Extend one scene. Defaults to empty; omitted updates preserve it. */
+	scaleMd?: string | null,
+	/**  Concrete rejection risks in Markdown, e.g. Cues rely only on color. Defaults to empty; omitted updates preserve it. */
+	rejectionRisksMd?: string | null,
+	/**  Unresolved story decisions in Markdown, e.g. Ask before replacing the title image. Defaults to empty; omitted updates preserve it. */
+	openDecisionsMd?: string | null,
+	/**  Story acceptance criteria with stable IDs and observable checks. Defaults to empty on create; omitted updates preserve it. */
+	acceptance?: Acceptance[] | null,
+};
+
+export type StoryPatch_Serialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
+	title?: string | null,
+	/**  Human-readable story outcome in Markdown, e.g. Players can cross the bridge. Defaults to empty; omitted updates preserve it. */
+	outcomeMd?: string | null,
+	/**  Story sources and rationale in Markdown, e.g. The current Godot prototype. Defaults to empty; omitted updates preserve it. */
+	basisMd?: string | null,
+	/**  Behavior to preserve in Markdown, e.g. Keep the jump arc. Defaults to empty; omitted updates preserve it. */
+	preserveMd?: string | null,
+	/**  Expected scale in Markdown, e.g. Extend one scene. Defaults to empty; omitted updates preserve it. */
+	scaleMd?: string | null,
+	/**  Concrete rejection risks in Markdown, e.g. Cues rely only on color. Defaults to empty; omitted updates preserve it. */
+	rejectionRisksMd?: string | null,
+	/**  Unresolved story decisions in Markdown, e.g. Ask before replacing the title image. Defaults to empty; omitted updates preserve it. */
+	openDecisionsMd?: string | null,
+	/**  Story acceptance criteria with stable IDs and observable checks. Defaults to empty on create; omitted updates preserve it. */
+	acceptance?: Acceptance[] | null,
+};
+
+export type StoryTree = StoryTree_Serialize | StoryTree_Deserialize;
+
+export type StoryTree_Deserialize = {
+	story: Story_Deserialize,
+	tasks: TaskReady[],
+	scopeFiles?: ScopeFile[],
+};
+
+export type StoryTree_Serialize = {
+	story: Story_Serialize,
+	tasks: TaskReady[],
+	scopeFiles: ScopeFile[],
+};
+
+export type Story_Deserialize = {
+	replayed?: boolean,
+	externalRef?: string | null,
 	key: string,
 	epicId: string,
 	title: string,
@@ -1921,52 +3235,36 @@ export type Story = {
 	acceptance: Acceptance[],
 } & Audit;
 
-export type StoryEditInput = StoryEditInput_Serialize | StoryEditInput_Deserialize;
-
-export type StoryEditInput_Deserialize = {
+export type Story_Serialize = {
+	replayed?: boolean,
+	externalRef: string | null,
 	key: string,
-} & StoryPatch_Deserialize;
-
-export type StoryEditInput_Serialize = {
-	key: string,
-} & StoryPatch_Serialize;
-
-export type StoryPatch = StoryPatch_Serialize | StoryPatch_Deserialize;
-
-export type StoryPatch_Deserialize = {
-	title?: string | null,
-	outcomeMd?: string | null,
-	basisMd?: string | null,
-	preserveMd?: string | null,
-	scaleMd?: string | null,
-	rejectionRisksMd?: string | null,
-	openDecisionsMd?: string | null,
-	acceptance?: Acceptance[] | null,
-};
-
-export type StoryPatch_Serialize = {
-	title?: string | null,
-	outcomeMd?: string | null,
-	basisMd?: string | null,
-	preserveMd?: string | null,
-	scaleMd?: string | null,
-	rejectionRisksMd?: string | null,
-	openDecisionsMd?: string | null,
-	acceptance?: Acceptance[] | null,
-};
-
-export type StoryTree = {
-	story: Story,
-	tasks: TaskReady[],
-};
+	epicId: string,
+	title: string,
+	status: string,
+	outcomeMd: string,
+	basisMd: string,
+	preserveMd: string,
+	scaleMd: string,
+	rejectionRisksMd: string,
+	openDecisionsMd: string,
+	acceptance: Acceptance[],
+} & Audit;
 
 export type SubmitReport = {
+	/**  Stable board key of the item inspected, e.g. JB-12 or JB-E2; required for item operations. */
 	key: string,
+	/**  Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3. */
 	expectedClaimGeneration: string,
+	/**  Report summary in Markdown, e.g. Pickup is debounced; required. */
 	summaryMd: string,
+	/**  Changed paths, e.g. game/lantern.gd; explicit list, which may be empty. */
 	changedFiles: string[],
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
 	tests: ReportTest[],
+	/**  Deviations from the brief in Markdown; omitted means none. Example: Fixture uses a synthetic picker. */
 	deviationsMd: string | null,
+	/**  Unverified checks and surfaces in Markdown; omitted means no additional note. Example: Native picker not run. */
 	notVerifiedMd: string | null,
 };
 
@@ -1976,19 +3274,28 @@ export type TagCount = {
 };
 
 export type TaskBrief = {
+	/**  Task or epic goal in Markdown; defaults to empty on create. Example: Keep snow edges visible. Omitted updates preserve it. */
 	goalMd?: string,
+	/**  Task context in Markdown, e.g. Existing lantern shader. Defaults to empty; omitted updates preserve it. */
 	contextMd?: string,
+	/**  Files and locations in Markdown, e.g. game/player.gd. Defaults to empty; omitted updates preserve it. */
 	whereMd?: string,
+	/**  Concrete requested changes recording current and required behavior. Defaults to empty; omitted updates preserve them. */
 	changes?: Change[],
+	/**  Named brief checks or reported evidence. Example: one pickup per keypress. Briefs default to empty; reports require explicit results. */
 	tests?: BriefTest[],
+	/**  Task boundaries in Markdown, e.g. No scene rewrite. Defaults to empty; omitted updates preserve it. */
 	boundariesMd?: string,
+	/**  Required deliverable in Markdown, e.g. Patch and check results. Defaults to empty; omitted updates preserve it. */
 	resultMd?: string,
+	/**  Relevant exact human quotations in Markdown; preserve their language. Defaults to empty; omitted updates preserve it. */
 	userQuotesMd?: string,
 };
 
 export type TaskDetail = TaskDetail_Serialize | TaskDetail_Deserialize;
 
 export type TaskDetail_Deserialize = {
+	replayed?: boolean,
 	files?: TaskFile[],
 	assets: Asset[],
 	comments: Comment[],
@@ -1997,15 +3304,16 @@ export type TaskDetail_Deserialize = {
 	brief: TaskBrief,
 	/**  Binds the current report to the task, story and epic versions reviewed. */
 	reviewContextRevision?: string | null,
-	ancestorQuestions?: Question[],
-	story: Story,
-	epic: Epic,
+	ancestorQuestions?: Question_Deserialize[],
+	story: Story_Deserialize,
+	epic: Epic_Deserialize,
 	reports: Report[],
 	reviews: Review[],
 	references: RefItem_Deserialize[],
 } & TaskSummary;
 
 export type TaskDetail_Serialize = {
+	replayed?: boolean,
 	files?: TaskFile[],
 	assets: Asset[],
 	comments: Comment[],
@@ -2014,9 +3322,9 @@ export type TaskDetail_Serialize = {
 	brief: TaskBrief,
 	/**  Binds the current report to the task, story and epic versions reviewed. */
 	reviewContextRevision: string | null,
-	ancestorQuestions: Question[],
-	story: Story,
-	epic: Epic,
+	ancestorQuestions: Question_Serialize[],
+	story: Story_Serialize,
+	epic: Epic_Serialize,
 	reports: Report[],
 	reviews: Review[],
 	references: RefItem_Serialize[],
@@ -2041,14 +3349,30 @@ export type TaskFile = {
 };
 
 export type TaskFileInput = {
+	/**  Task key for a file association, e.g. JB-12. Omitted registration is unlinked; task links require captured validators. */
 	taskKey: string,
+	/**  Existing asset ID in this project, e.g. 01JASSET; required for asset-specific operations. */
 	assetId: string,
-	role: string | null,
+	/**  File association purpose; task roles are to_edit, reference or result. Defaults to reference for task files. */
+	role: TaskFileRole | null,
+	/**  Relative parent order, e.g. 1024; omitted appends or preserves current order. */
 	position: number | null,
+	/**  Opaque claimGeneration from the inspected task; required for covered writes. Preserve the exact captured token, e.g. generation:task:3. */
 	expectedClaimGeneration: string,
+	/**  Exact updatedAt captured before deciding this mutation, e.g. 2026-10-31T00:00:00Z. Never refresh it merely to replay a rejection. */
 	expectedUpdatedAt: string,
+	/**  Stable retry ID for this logical operation; 1–100 characters, e.g. ls-S0.1.1. Reuse only for the same payload. */
 	requestId: string,
 };
+
+/**  File purpose on an individual task; default reference. */
+export type TaskFileRole =
+/**  Input file to edit. */
+"to_edit" |
+/**  Supporting reference. */
+"reference" |
+/**  Task output or result. */
+"result";
 
 export type TaskListPage = {
 	tasks: TaskSummary[],
@@ -2058,26 +3382,48 @@ export type TaskListPage = {
 export type TaskPatch = TaskPatch_Serialize | TaskPatch_Deserialize;
 
 export type TaskPatch_Deserialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Replacement structured work brief; omitted preserves it. Example: a complete goal/context/change/test record. */
 	brief?: TaskBrief | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
+	/**  Human task description in Markdown; omitted preserves it. Example: Debounce lantern pickup. */
 	descriptionMd?: string | null,
-	status?: string | null,
-	priority?: string | null,
+	/**  Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it. */
+	status?: TaskStatus | null,
+	/**  Scheduling priority; default medium on create. Example: high. Omitted updates preserve it. */
+	priority?: Priority | null,
+	/**  Existing project member ID, e.g. 01JMEMBER; omitted preserves it, null unassigns it. Does not launch a session. */
 	assigneeId?: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags?: string[] | null,
+	/**  Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates. */
 	estimate?: number | null,
+	/**  Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted preserves it and null clears it. */
 	dueAt?: string | null,
 };
 
 export type TaskPatch_Serialize = {
+	/**  Source reference, 1–120 characters, e.g. ls/S0.1; omitted preserves it and null clears it. */
+	externalRef?: string | null,
+	/**  Replacement structured work brief; omitted preserves it. Example: a complete goal/context/change/test record. */
 	brief?: TaskBrief | null,
+	/**  Short human-readable title; tasks, epics and stories allow 1–140 characters. Example: Add lantern pickup. Omitted updates keep it. */
 	title?: string | null,
+	/**  Human task description in Markdown; omitted preserves it. Example: Debounce lantern pickup. */
 	descriptionMd?: string | null,
-	status?: string | null,
-	priority?: string | null,
+	/**  Enumerated workflow state or state filter. Creates default to backlog for tasks and draft for planning scopes; omitted updates preserve it. */
+	status?: TaskStatus | null,
+	/**  Scheduling priority; default medium on create. Example: high. Omitted updates preserve it. */
+	priority?: Priority | null,
+	/**  Existing project member ID, e.g. 01JMEMBER; omitted preserves it, null unassigns it. Does not launch a session. */
 	assigneeId?: string | null,
+	/**  1–24 chars each; stored lowercase (size-M → size-m); order is kept as given. Omitted creates have no tags; omitted updates preserve tags. */
 	tags?: string[] | null,
+	/**  Story points (relative effort), not hours: 1, 2, 3, 5 or 8. Omitted creates are unestimated; null clears an estimate in updates. */
 	estimate?: number | null,
+	/**  Optional UTC due date, e.g. 2026-11-01T12:00:00Z; omitted preserves it and null clears it. */
 	dueAt?: string | null,
 };
 
@@ -2087,7 +3433,7 @@ export type TaskQuery = {
 	ready: boolean | null,
 	changesRequested: boolean | null,
 	needsInfo: boolean | null,
-	status: string[] | null,
+	status: TaskStatus[] | null,
 	assignee: string | null,
 	tags: string[] | null,
 	text: string | null,
@@ -2101,11 +3447,42 @@ export type TaskReady = {
 };
 
 export type TaskSort = {
-	field: string,
-	dir: string,
+	field: TaskSortField,
+	dir: SortDirection,
 };
 
+/**  Stable task-table sort column; default numeric key order when omitted. */
+export type TaskSortField =
+/**  Numeric board key. */
+"key" |
+/**  Case-insensitive title. */
+"title" |
+/**  Workflow status order. */
+"status" |
+/**  Scheduling priority order. */
+"priority" |
+/**  Assignee display name. */
+"assignee" |
+/**  Story-point estimate. */
+"estimate" |
+/**  Monotonic update timestamp. */
+"updatedAt";
+
+/**  Task planning/workflow status; creating Ready work does not authorize execution. */
+export type TaskStatus =
+/**  Unscheduled draft work; default on create. */
+"backlog" |
+/**  Planned work with readiness validation; separate from execution permission. */
+"ready" |
+/**  Claimed work under an explicit human execution grant. */
+"in_progress" |
+/**  Submitted evidence awaiting independent review. */
+"review" |
+/**  Accepted work. */
+"done";
+
 export type TaskSummary = {
+	externalRef?: string | null,
 	id: string,
 	jamId: string,
 	key: string,
@@ -2151,9 +3528,44 @@ export type TerminalWriteInput = {
 	data: string,
 };
 
+/**  Desktop color mode preference; default system. */
+export type ThemePreference =
+/**  Follow the operating system. */
+"system" |
+/**  Light palette. */
+"light" |
+/**  Dark palette. */
+"dark";
+
 export type Transcription = {
 	text: string,
 	durationMs: number,
+};
+
+export type UndoImportInput = {
+	/**  Batch ID returned by import_plan or list_import_batches; required. Example: 01JBATCH. */
+	batchId: string,
+	/**  Stable undo request ID, 1–100 nonblank characters, e.g. undo-ls-1; required. */
+	requestId: string,
+};
+
+export type UndoImportReport = {
+	batchId: string,
+	undone: number,
+	kept: ImportKept[],
+};
+
+export type UnlinkFileInput = {
+	/**  Exact association scope; required. Example: {"type":"epic","key":"JB-E2"}. */
+	scope: FileScope,
+	/**  Asset to unlink, e.g. 01JASSET; required. Its bytes remain untouched. */
+	assetId: string,
+	/**  Optional stable retry ID, 1–100 chars, e.g. unlink-design-E2; recommended. */
+	requestId: string | null,
+	/**  Exact task updatedAt captured before deciding; required only for task scope. */
+	expectedUpdatedAt: string | null,
+	/**  Exact task claimGeneration captured before deciding; required only for task scope. */
+	expectedClaimGeneration: string | null,
 };
 
 export type UsageCost = {

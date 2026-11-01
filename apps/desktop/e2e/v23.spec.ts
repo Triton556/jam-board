@@ -8,6 +8,7 @@ test("references persist files, links, notes, parenting, edges, undo and agent a
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.getByRole("button", { name: "Load demo jam" }).click();
+  await page.evaluate(() => window.__jamMock.seedBulkReferences(0, 0, 0));
   await page.goto("/references");
   await expect(
     page.getByText("Double-click anywhere to jot an idea"),

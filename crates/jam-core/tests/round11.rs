@@ -22,7 +22,7 @@ fn register(path: &Path, storage: FileStorageType, request: &str) -> RegisterFil
         name: None,
         notes: None,
         companions: None,
-        request_id: request.into(),
+        request_id: Some(request.into()),
         task_key: None,
         role: None,
         expected_claim_generation: None,
@@ -233,7 +233,7 @@ fn fi_request_payload_conflict() {
     input.name = Some("Changed".into());
     assert!(matches!(
         h.store.register_file(&actor, input),
-        Err(Error::Conflict)
+        Err(Error::IdempotencyConflict(_))
     ));
 }
 #[test]
@@ -390,10 +390,10 @@ fn sn_recovery_refuses_truncated_newer_and_escaping_snapshots_without_replacing_
     let mut snapshot: BoardSnapshot = serde_json::from_slice(&original).unwrap();
     std::fs::write(&path, b"{truncated").unwrap();
     assert!(m.recover(&h.folder, false).is_err());
-    snapshot.format_version = 4;
+    snapshot.format_version = 5;
     std::fs::write(&path, serde_json::to_vec(&snapshot).unwrap()).unwrap();
     assert!(m.recover(&h.folder, false).is_err());
-    snapshot.format_version = 3;
+    snapshot.format_version = 4;
     snapshot.tables.get_mut("assets").unwrap()[0].insert(
         "stored_path".into(),
         serde_json::json!("files/../../outside.txt"),
@@ -504,7 +504,7 @@ fn fi_task_roles_stale_context_unlink_and_companions() {
         relative_uri: "buffers/Ship.bin".into(),
     }]);
     req.task_key = Some(task.task.key.clone());
-    req.role = Some("to_edit".into());
+    req.role = Some("to_edit".parse::<jam_core::TaskFileRole>().unwrap());
     req.expected_updated_at = Some(task.task.updated_at.clone());
     req.expected_claim_generation = Some(task.task.claim_generation.clone());
     let result = s.register_file(&actor, req.clone()).unwrap();
@@ -536,7 +536,7 @@ fn fi_task_roles_stale_context_unlink_and_companions() {
     let mut input = TaskFileInput {
         task_key: task.task.key.clone(),
         asset_id: asset.asset.id.clone(),
-        role: Some("result".into()),
+        role: Some("result".parse::<jam_core::TaskFileRole>().unwrap()),
         position: Some(12.),
         expected_claim_generation: task.task.claim_generation.clone(),
         expected_updated_at: task.task.updated_at,
@@ -848,7 +848,7 @@ fn fi_roles_are_per_task_and_cross_project_files_are_refused() {
                 TaskFileInput {
                     task_key: t.task.key.clone(),
                     asset_id: file.asset.id.clone(),
-                    role: Some(role.into()),
+                    role: Some(role.parse::<jam_core::TaskFileRole>().unwrap()),
                     position: None,
                     expected_claim_generation: t.task.claim_generation.clone(),
                     expected_updated_at: t.task.updated_at.clone(),
@@ -887,7 +887,7 @@ fn fi_roles_are_per_task_and_cross_project_files_are_refused() {
                 TaskFileInput {
                     task_key: task.task.key,
                     asset_id: file.asset.id,
-                    role: Some("reference".into()),
+                    role: Some("reference".parse::<jam_core::TaskFileRole>().unwrap()),
                     position: None,
                     expected_claim_generation: task.task.claim_generation,
                     expected_updated_at: task.task.updated_at,
@@ -1082,18 +1082,17 @@ fn fi_restart_reconciles_cancelled_verified_orphans_after_grace_without_deleting
     c.execute_batch("DROP TRIGGER fail_import;").unwrap();
     let stored: String = c
         .query_row(
-            "SELECT result_json FROM file_operations WHERE request_id='orphan-request'",
+            "SELECT json_extract(result_json,'$.fileOperation.path') FROM write_receipts WHERE tool='register_file' AND request_id='orphan-request'",
             [],
             |r| r.get(0),
         )
         .unwrap();
-    let stored: String = serde_json::from_str(&stored).unwrap();
     let target = h.folder.join(stored);
     assert!(target.is_file());
     h.store
         .cancel_file_operation(&actor, "orphan-request")
         .unwrap();
-    c.execute("UPDATE file_operations SET created_at='2000-01-01T00:00:00Z' WHERE request_id='orphan-request'",[]).unwrap();
+    c.execute("UPDATE write_receipts SET created_at='2000-01-01T00:00:00Z' WHERE tool='register_file' AND request_id='orphan-request'",[]).unwrap();
     let unrelated = h.folder.join("files/other/keep-owner-data.txt");
     std::fs::write(&unrelated, b"never operation-owned").unwrap();
     m.open(&h.folder, false, false).unwrap();

@@ -179,7 +179,7 @@ export class MockTaskFiles implements TaskFilesApi {
     command: string,
     input: RegisterFile | TaskFileInput,
   ) {
-    const receipt = state.receipts[input.requestId];
+    const receipt = state.receipts[`${command}:${input.requestId ?? ""}`];
     const payload = JSON.stringify({ command, input });
     if (receipt && receipt.payload !== payload)
       throw Object.assign(new Error("Request ID payload conflict"), {
@@ -219,6 +219,8 @@ export class MockTaskFiles implements TaskFilesApi {
     input: RegisterFile,
   ): Promise<FileMutationResult> {
     const state = await this.check(context);
+    input = { ...input, requestId: input.requestId ?? crypto.randomUUID() };
+    const requestId = input.requestId ?? crypto.randomUUID();
     const replay = this.replay(state, "register_file", input);
     this.calls.push({
       command: "register_file",
@@ -230,15 +232,15 @@ export class MockTaskFiles implements TaskFilesApi {
       throw new Error("Use an http:// or https:// URL");
     if (!source) throw new Error("Choose a file");
     if (input.storageType === "board_file") {
-      if (this.operations.get(input.requestId)?.state === "cancelled")
+      if (this.operations.get(input.requestId ?? "")?.state === "cancelled")
         throw new Error("Copy cancelled. Start a new copy request.");
-      this.operations.set(input.requestId, {
-        requestId: input.requestId,
+      this.operations.set(input.requestId ?? "", {
+        requestId: input.requestId ?? crypto.randomUUID(),
         state: "copying",
         canCancel: true,
       });
       await new Promise((resolve) => setTimeout(resolve, this.copyDelay));
-      if (this.operations.get(input.requestId)?.state === "cancelled")
+      if (this.operations.get(input.requestId ?? "")?.state === "cancelled")
         throw new Error("Copy cancelled");
       await this.check(context);
     }
@@ -323,7 +325,7 @@ export class MockTaskFiles implements TaskFilesApi {
         role: input.role ?? "reference",
         expectedUpdatedAt: input.expectedUpdatedAt,
         expectedClaimGeneration: input.expectedClaimGeneration,
-        requestId: input.requestId,
+        requestId: input.requestId ?? crypto.randomUUID(),
         position: null,
       });
     }
@@ -336,7 +338,7 @@ export class MockTaskFiles implements TaskFilesApi {
       asset,
       taskFile: null,
       taskVersion: null,
-      operationId: input.requestId,
+      operationId: requestId,
       unlinked: false,
       warnings: [],
     };
@@ -350,9 +352,12 @@ export class MockTaskFiles implements TaskFilesApi {
       result.taskFile = taskFile;
       result.taskVersion = taskVersion;
     }
-    state.receipts[input.requestId] = { payload: replay.payload, result };
-    this.operations.set(input.requestId, {
-      requestId: input.requestId,
+    state.receipts[`register_file:${requestId}`] = {
+      payload: replay.payload,
+      result,
+    };
+    this.operations.set(input.requestId ?? "", {
+      requestId: input.requestId ?? crypto.randomUUID(),
       state: "committed",
       canCancel: false,
     });
@@ -399,11 +404,14 @@ export class MockTaskFiles implements TaskFilesApi {
       asset,
       taskFile: command === "unlink_task_file" ? null : row,
       taskVersion,
-      operationId: input.requestId,
+      operationId: input.requestId ?? null,
       unlinked: command === "unlink_task_file",
       warnings: [],
     };
-    state.receipts[input.requestId] = { payload: replay.payload, result };
+    state.receipts[`${command}:${input.requestId}`] = {
+      payload: replay.payload,
+      result,
+    };
     this.persist();
     this.bridge.filesChanged(input.taskKey);
     return structuredClone(result);
@@ -467,10 +475,12 @@ export class MockTaskFiles implements TaskFilesApi {
   async usages(context: FileContext) {
     const state = await this.check(context);
     const result: Record<string, FileUsage[]> = {};
-    for (const task of Object.values(await this.bridge.listBoardTasks()).flat())
-      await this.taskFiles(context, task.key);
+    const tasks = new Map(
+      this.bridge.fileInventory().tasks.map((task) => [task.key, task]),
+    );
     for (const [taskKey, rows] of Object.entries(state.links)) {
-      const task = await this.bridge.getTask(taskKey);
+      const task = tasks.get(taskKey);
+      if (!task) continue;
       for (const row of rows) {
         const usages = result[row.asset.id] ?? [];
         result[row.asset.id] = usages;

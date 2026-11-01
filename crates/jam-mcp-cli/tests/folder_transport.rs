@@ -88,7 +88,7 @@ async fn mc_folder_context_exact_id_and_eof_snapshot() {
             .as_array()
             .unwrap()
             .len(),
-        7
+        8
     );
     client.tool("register_file",json!({"storageType":"url","url":"https://example.invalid/document","requestId":"stdio-url"})).await;
     client.close().await;

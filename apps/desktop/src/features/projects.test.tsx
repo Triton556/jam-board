@@ -20,7 +20,7 @@ const blank = (name: string) => ({
   startsAt: "",
   endsAt: "",
   timezone: "UTC",
-  template: "custom",
+  template: "custom" as const,
   milestoneAt: null,
 });
 
@@ -127,10 +127,10 @@ it("all connection snippets explicitly pin the current project", () => {
     },
     "test-token",
   );
-  expect(snippets.codexStdio).toContain('JAM_BOARD_PROJECT = "JB2"');
-  expect(snippets.claudeStdio).toContain("JAM_BOARD_PROJECT='JB2'");
-  expect(snippets.codexHttp).toContain('"X-Jam-Project" = "JB2"');
-  expect(snippets.claudeHttp).toContain("X-Jam-Project: JB2");
+  expect(snippets.codex.stdio).toContain('JAM_BOARD_PROJECT = "JB2"');
+  expect(snippets.claude.stdio.powershell).toContain("JAM_BOARD_PROJECT='JB2'");
+  expect(snippets.codex.http).toContain('"X-Jam-Project" = "JB2"');
+  expect(snippets.claude.http.powershell).toContain("X-Jam-Project: JB2");
 });
 
 it("project picker opens a chosen board, clears stale UI feedback but preserves planning drafts", async () => {

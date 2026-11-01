@@ -94,7 +94,7 @@ Names are exact `invoke` names; arguments camelCase; existing `Result<T, ApiErro
 
 | Command | Args | Returns |
 |---|---|---|
-| `set_reference_verdict` | `input: { itemId, verdict: "keep" \| "reject" \| null }` | `RefItem` |
+| `set_reference_verdict` | `input: { itemId, verdict?: "keep" \| "reject" \| null, verdictNote?: string \| null }` | `RefItem` |
 | `link_ref_frame` | `input: { frameId, targetKey }` | `RefFrame` |
 | `unlink_ref_frame` | `input: { frameId, targetKey }` | `RefFrame` |
 
@@ -105,20 +105,17 @@ Names are exact `invoke` names; arguments camelCase; existing `Result<T, ApiErro
   the frame ID/title, exactly like the epic-frame inheritance.
 - The mock bridge implements the same commands and fields.
 
-### Moodboard loop (documented in the agent guide)
 
-1. `create_frame` "Moodboard — <topic>" next to the related work; link it to the
-   story or epic it serves.
-2. Find candidates with your own web tools; download them into your workspace.
-3. `add_reference { kind: "asset", filePath, copy: true, frameId, caption }` —
-   caption = source URL and one line on why it fits.
-4. `arrange_references` with `layout: "grid"`.
-5. After the person reviews: `get_canvas { frameId, includeArchived: true }`.
-   Keep = `verdict: "keep"`; rejected = `verdict: "reject"` or archived by a
-   human; notes in `attachedTo` are comments on that item.
-6. Search again using that feedback, say what changed, and never re-add a
-   rejected source.
+## 8. Moodboard review (round 12)
 
-Built-in API chat has no web tools, so a web moodboard needs an agent
-connection (Claude Code, Codex). API chat can still organise images the person
-attaches.
+Use one frame per section and link it to the relevant work. Agents obtain candidate images with their own authorized tools and add up to 50 at a time with add_references, copy:true, sourceUrl and origin. Partial failures preserve valid items; retry only failed items with a new requestId. Generated variations name derivedFrom (an existing original or an earlier successful #index). Variations have a dashed arrow; they are a field, not a deletable edge.
+
+Humans choose Keep / Not this and **Add a reason** on each non-note item. Reasons are plain text, at most 500 characters; Enter saves, Shift+Enter inserts a newline, Escape cancels. Empty Save clears the reason. A bounded reason chip stays visible on rejected items. Source URL and Found/Generated/Own attribution remain separate from captions.
+
+Frame **Review** or **Review items** starts keyboard review, defaulting to Unrated if any remain. All / Unrated / Keep / Not this filter the frame; the bar shows N of M rated. Arrows/J/K navigate, 1 toggles Keep, 2 toggles Not this, C opens the reason, Enter opens the current image, Escape closes the reason before exiting review. Input typing never triggers canvas shortcuts; arrows never nudge while reviewing. Setting a rating advances to the next matching item; clearing does not. Exit restores the prior viewport. Controls wrap on narrow screens; the hint hides below 1000px.
+
+**Done, send to brain** stores the human review hash and appends reference.review_sent. The tab shows Sent time, then Changed since sent after an edit; Send again produces another event. Sending exits review. It is feedback, not execution permission. Agents wait_for_changes with the saved cursor/actions filter, read get_canvas verdict filters and inspect verdictNote/attachedTo/archivedBy rather than polling. Never re-add a rejected sourceUrl; derive new variants from Keep.
+
+**Collect Keep into new frame…** supports 1–20 ordered source frames, title and optional work link. It creates one section per nonempty source, copies in rows of four, shares existing assets and records copiedFrom. Copied ratings/reasons start clear. Archiving a copy leaves the original and asset intact. Zero Keep items disables Create. Single-frame menus expose review/send/collect in the existing one actions menu.
+
+Desktop commands: set_reference_verdict {input:{itemId,verdict?,verdictNote?}}, send_reference_review {input:{frameId}}, collect_kept_references {input:{requestId,sourceFrameIds,title?,linkTo?}}; generated DTOs are authoritative. Review is human-only, collection is available to both actors. Agent download/network authority is unchanged. See [round-12 verification](verification/round12.md) for fixture, browser and NOT RUN boundaries.

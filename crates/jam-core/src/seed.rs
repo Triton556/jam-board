@@ -20,7 +20,7 @@ impl Store {
         let alex = self.add_human(&danil.id, "Alex", MEMBER_COLORS[2], Some("🎨"))?;
         let codex = self.identify_agent("Codex", "codex")?;
         let claude = self.identify_agent("Claude", "claude-code")?;
-        let lantern=self.create_epic(&danil.id,NewEpic{title:"Lantern levels".into(),goal_md:Some("Build a ten-minute cozy lantern game for keyboard and controller players. A fresh player should understand the snowy bridge without guessing.".into()),done_when_md:Some("The player reaches the cabin and completes the bridge on keyboard/controller. Mandatory story checks have recorded results.".into()),not_included_md:Some("No combat, online services, procedural worlds, inventory or new art direction.".into()),decided_md:Some("Preserve Danil's Godot prototype and paper palette. Keep one snowy route. Danil checks the first coherent sketch; Claude plans and reviews. The user chose gpt-6.1-sol for workers.".into()),participation:Some("first_sketch".into()),reviewer:Some("final".into()),worker_model:Some("gpt-6.1-sol".into()),..Default::default()})?;
+        let lantern=self.create_epic(&danil.id,NewEpic{title:"Lantern levels".into(),goal_md:Some("Build a ten-minute cozy lantern game for keyboard and controller players. A fresh player should understand the snowy bridge without guessing.".into()),done_when_md:Some("The player reaches the cabin and completes the bridge on keyboard/controller. Mandatory story checks have recorded results.".into()),not_included_md:Some("No combat, online services, procedural worlds, inventory or new art direction.".into()),decided_md:Some("Preserve Danil's Godot prototype and paper palette. Keep one snowy route. Danil checks the first coherent sketch; Claude plans and reviews. The user chose gpt-6.1-sol for workers.".into()),participation:Some(Participation::FirstSketch),reviewer:Some(Reviewer::Final),worker_model:Some("gpt-6.1-sol".into()),..Default::default()})?;
         self.set_brain(&danil.id, &lantern.key, &claude.handle)?;
         self.set_epic_status(&danil.id, &lantern.key, "active", None)?;
         let menus = self.create_epic(
@@ -256,7 +256,7 @@ impl Store {
             } else {
                 "ready"
             };
-            let task=self.create_task(&danil.id,CreateTask{title:(*title).into(),story_key:Some(stories[parent].key.clone()),description:Some("Keep free-form playtest notes here. The implementation contract is in the brief.".into()),status:Some(status.into()),priority:Some(if i==1{"critical"}else if i%5==0{"high"}else{"medium"}.into()),tags:Some(vec![(*tag).into()]),estimate:Some([1,2,3,5,8][i%5]),brief:TaskBrief{
+            let task=self.create_task(&danil.id,CreateTask{title:(*title).into(),story_key:Some(stories[parent].key.clone()),description:Some("Keep free-form playtest notes here. The implementation contract is in the brief.".into()),status:Some(status.parse()?),priority:Some(if i==1{Priority::Critical}else if i%5==0{Priority::High}else{Priority::Medium}),tags:Some(vec![(*tag).into()]),estimate:Some([Estimate::One,Estimate::Two,Estimate::Three,Estimate::Five,Estimate::Eight][i%5]),brief:TaskBrief{
                 goal_md:format!("{required} Serve the cozy lantern route rather than building a separate prototype."),
                 context_md:"The Godot project already has a cabin, snowy bridge and lantern prototype. Follow the story intent and preserve Danil's accepted visual direction.".into(),where_md:(*file).into(),
                 changes:vec![Change{title:(*title).into(),now:"The prototype path exists but does not meet the named acceptance check.".into(),cause:"The jam needs a bounded change the reviewer can verify.".into(),required:(*required).into(),r#where:(*file).into(),follow:"Use adjacent scene/script conventions and the existing local test harness.".into(),keep:"Preserve input bindings, level geometry and the paper palette unless explicitly named in this change.".into()}],
@@ -289,14 +289,14 @@ impl Store {
                             command: "godot --headless --script tests/lantern_smoke.gd".into(),
                             expected: rows[index].4.into(),
                             actual: "The first interaction matches the expected result.".into(),
-                            result: "PASS".into(),
+                            result: ReportResult::Pass,
                         },
                         ReportTest {
                             name: "2".into(),
                             command: "Manual checkpoint reload and repeated-input playtest".into(),
                             expected: "No duplicate burst or collision snag.".into(),
                             actual: "The repeated interaction fails at the second step.".into(),
-                            result: "FAIL".into(),
+                            result: ReportResult::Fail,
                         },
                     ],
                     deviations_md: Some("No scope or dependency changes.".into()),
@@ -305,13 +305,14 @@ impl Store {
             )?;
         }
         let observed = self.get_task(&keys[6])?;
-        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),expected_report_id:observed.reports.last().unwrap().id.clone(),expected_review_context_revision:observed.review_context_revision.unwrap(),verdict:"changes_requested".into(),comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
-        self.ask_user(&claude.id,AskUser{scope:Scope{kind:"epic".into(),id:lantern.key.clone()},title:"Should the safe tile cue stay steady?".into(),body_md:Some("A steady outline works without motion. A pulse needs an equivalent reduced-motion cue.".into()),options:Some(vec![QuestionOption{label:"Steady outline".into(),description:"Readable without movement; the smaller change.".into()},QuestionOption{label:"Gentle pulse".into(),description:"Adds motion with a steady fallback.".into()}]),recommended_index:Some(0),allow_free_text:Some(true),round_label:Some("Round 2".into())})?;
+        self.review_task(&claude.id,ReviewTask{key:keys[6].clone(),expected_report_id:observed.reports.last().unwrap().id.clone(),expected_review_context_revision:observed.review_context_revision.unwrap(),verdict:ReviewVerdict::ChangesRequested,comments_md:"Preserve the first burst. Ignore repeated input until the pickup is consumed, then rerun test 2.".into(),failed_tests:Some(vec!["2".into()])})?;
+        self.ask_user(&claude.id,AskUser{request_id:None,scope:Scope{kind:ScopeKind::Epic,id:lantern.key.clone()},title:"Should the safe tile cue stay steady?".into(),body_md:Some("A steady outline works without motion. A pulse needs an equivalent reduced-motion cue.".into()),options:Some(vec![QuestionOption{label:"Steady outline".into(),description:"Readable without movement; the smaller change.".into()},QuestionOption{label:"Gentle pulse".into(),description:"Adds motion with a steady fallback.".into()}]),recommended_index:Some(0),allow_free_text:Some(true),round_label:Some("Round 2".into())})?;
         self.ask_user(
             &codex.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "task".into(),
+                    kind: ScopeKind::Task,
                     id: keys[11].clone(),
                 },
                 title: "Which checkpoint owns a consumed pickup?".into(),
@@ -328,7 +329,7 @@ impl Store {
             &codex.id,
             "implementing JB-12",
             Some(Scope {
-                kind: "task".into(),
+                kind: ScopeKind::Task,
                 id: keys[11].clone(),
             }),
         )?;
@@ -336,7 +337,7 @@ impl Store {
             &claude.id,
             "reviewing JB-9",
             Some(Scope {
-                kind: "task".into(),
+                kind: ScopeKind::Task,
                 id: keys[8].clone(),
             }),
         )?;

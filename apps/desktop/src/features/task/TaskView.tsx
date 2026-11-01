@@ -39,6 +39,7 @@ import { useUiStore } from "../../lib/ui-store";
 import { useProjectWrite } from "../../lib/use-project-write";
 import { AgentPlan } from "../plan/AgentPlan";
 import { BrainHandoff } from "../plan/BrainHandoff";
+import { TaskMoveEntry, taskMoveBlockedReason } from "../plan/MovePlanDialog";
 import { ReferencesSection } from "../references/ReferencesSection";
 import { BriefEditor } from "./BriefEditor";
 import { historyText } from "./history-text";
@@ -68,8 +69,10 @@ export function TaskView({
   returnFocus,
   frame: Frame = Drawer,
   Files = TaskFiles,
+  focusSection,
 }: {
   task: TaskDetail;
+  focusSection?: "review";
   Files?: React.ComponentType<TaskFilesSlotProps>;
   close(): void;
   returnFocus?: ModalFocusReturn;
@@ -119,12 +122,20 @@ export function TaskView({
     !saveOwner.current.invalidated &&
     client.getQueryData<Awaited<ReturnType<typeof api.appState>>>(["app"])?.jam
       ?.id === task.jamId;
+  const reviewSection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusSection !== "review") return;
+    const target = reviewSection.current?.querySelector<HTMLElement>("h2");
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [focusSection]);
   const [base, setBase] = useState(task);
   const seenVersions = useRef(new Set([task.updatedAt]));
   const [latest, setLatest] = useState<TaskDetail | null>(null);
   const [review, setReview] = useState(false);
   const [reviewError, setReviewError] = useState<Error | null>(null);
   const [menu, setMenu] = useState(false);
+  const [movingToStory, setMovingToStory] = useState(false);
   const menuRoot = useRef<HTMLDivElement>(null);
   const [archive, setArchive] = useState(false);
   const [reason, setReason] = useState("");
@@ -536,6 +547,12 @@ export function TaskView({
       }
       actions={
         <div className="task-menu task-heading-actions" ref={menuRoot}>
+          <TaskMoveEntry
+            task={task}
+            controlledOpen={movingToStory}
+            close={() => setMovingToStory(false)}
+            hideEntry
+          />
           <div
             className="task-refine-action"
             title="Save your description before asking the brain to read it."
@@ -556,6 +573,33 @@ export function TaskView({
           </IconButton>
           {menu && (
             <div className="menu-popup">
+              <Button
+                disabled={
+                  !["backlog", "ready"].includes(task.status) ||
+                  readonly ||
+                  isDirty ||
+                  markPending
+                }
+                title={
+                  !["backlog", "ready"].includes(task.status)
+                    ? taskMoveBlockedReason
+                    : isDirty
+                      ? "Save changes before moving."
+                      : undefined
+                }
+                onClick={() => {
+                  setMovingToStory(true);
+                  setMenu(false);
+                }}
+              >
+                Move to story…
+              </Button>
+              {!["backlog", "ready"].includes(task.status) && (
+                <p className="small muted">{taskMoveBlockedReason}</p>
+              )}
+              {isDirty && (
+                <p className="small muted">Save changes before moving.</p>
+              )}
               <Button
                 onClick={() => {
                   setArchive(true);
@@ -900,7 +944,7 @@ export function TaskView({
             </div>
           )}
         </div>
-        <div className="task-rounds">
+        <div className="task-rounds" ref={reviewSection}>
           <Rounds
             task={task}
             members={members.data ?? []}

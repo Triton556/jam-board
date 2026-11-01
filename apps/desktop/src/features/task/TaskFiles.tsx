@@ -50,6 +50,7 @@ import {
   storageLabel,
   taskFilesApi,
 } from "../../lib/task-files-api";
+import { useOpenFileViewer } from "../files/file-hooks";
 import type { TaskFilesSlotProps } from "./TaskView";
 import "./task-files.css";
 
@@ -78,6 +79,7 @@ export function TaskFiles({
   onChanged,
 }: TaskFilesSlotProps) {
   const client = useQueryClient();
+  const openViewer = useOpenFileViewer();
   const roleId = useId(),
     boardFileId = useId();
   const [rows, setRows] = useState<TaskFile[]>(task.files ?? []);
@@ -279,7 +281,7 @@ export function TaskFiles({
   ): TaskFileInput => ({
     taskKey: writeContext.taskKey,
     assetId,
-    role: nextRole,
+    role: nextRole as FileRole | null,
     position,
     expectedClaimGeneration: version.current.claimGeneration,
     expectedUpdatedAt: version.current.updatedAt,
@@ -582,7 +584,14 @@ export function TaskFiles({
                     <Icon size={22} />
                   </div>
                   <div className="task-file-main">
-                    <strong title={asset.name}>{asset.name}</strong>
+                    <button
+                      type="button"
+                      className="task-file-name"
+                      title={asset.name}
+                      onClick={() => openViewer(asset.id)}
+                    >
+                      {asset.name}
+                    </button>
                     <small className="task-file-path" title={asset.storedPath}>
                       {asset.storedPath}
                     </small>

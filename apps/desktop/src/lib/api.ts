@@ -16,7 +16,7 @@ import type {
   BoardSummary,
   BoardTasks,
   Comment,
-  ConfigSnippets,
+  ConnectSnippets,
   CreateInput,
   McpStatus,
   Member,
@@ -37,11 +37,38 @@ import type {
   Theme,
   UpdateInput,
 } from "./types";
+import { stablePayload } from "./types";
 export interface JamApi
   extends PlanningApi,
     ReferencesApi,
     ProjectsApi,
     ExecutionApi {
+  listInboxEvents(
+    input: import("./inbox-events-api").InboxEventsQuery,
+  ): Promise<import("../bindings").InboxEventsPage>;
+  markInboxEventsSeen(seq: number): Promise<number>;
+  fileViewer(): Promise<import("./file-viewer-api").FileViewerApi>;
+  moodboard(): Promise<import("./moodboard-api").MoodboardApi>;
+  importPlan(
+    context: import("./import-plan-api").PlanContext,
+    input: import("./import-plan-api").ImportPlanInput,
+  ): Promise<import("./import-plan-api").ImportReport>;
+  undoImport(
+    context: import("./import-plan-api").PlanContext,
+    batchId: string,
+    requestId: string,
+  ): Promise<import("./import-plan-api").UndoImportResult>;
+  listImportBatches(
+    context: import("./import-plan-api").PlanContext,
+  ): Promise<import("./import-plan-api").ImportBatch[]>;
+  moveStory(
+    context: import("./import-plan-api").PlanContext,
+    input: import("../bindings").MoveStoryInput,
+  ): Promise<import("../bindings").Story_Serialize>;
+  moveTaskToStory(
+    context: import("./import-plan-api").PlanContext,
+    input: import("../bindings").MoveTaskToStoryInput,
+  ): Promise<import("../bindings").TaskDetail_Serialize>;
   projectSelectionContext(): Promise<
     import("../bindings").FolderCommandContext | null
   >;
@@ -104,7 +131,7 @@ export interface JamApi
   setMcpHttpEnabled(enabled: boolean): Promise<void>;
   regenerateMcpToken(): Promise<void>;
   revealMcpToken(): Promise<string>;
-  mcpConfigSnippets(): Promise<ConfigSnippets>;
+  mcpConfigSnippets(): Promise<ConnectSnippets>;
   onMcpChanged(cb: () => void): () => void;
   onFileDrop(
     cb: (paths: string[], point?: { x: number; y: number }) => void,
@@ -161,4 +188,69 @@ const mockReferences =
         openReferenceFile: mockApi.openReferenceFile.bind(mockApi),
       }))
     : null;
-export const api = Object.assign(baseApi, mockReferences ?? nativeReferenceApi);
+// An uncertain failure keeps the captured ID; a confirmed success ends the intent.
+// Include the selection epoch so A→B→A can never reuse an old project's intent.
+const pendingCreates = new Map<string, string>();
+let selectionEpoch = 0;
+let observedProject: string | null | undefined;
+function selectionBoundary<A extends unknown[], R>(
+  run: (...args: A) => Promise<R>,
+) {
+  return (...args: A) => {
+    selectionEpoch++;
+    pendingCreates.clear();
+    return run(...args);
+  };
+}
+const readApp = baseApi.appState.bind(baseApi);
+function withRequestId<T extends { requestId?: string | null }, R>(
+  tool: string,
+  run: (input: T) => Promise<R>,
+) {
+  return async (input: T): Promise<R> => {
+    // Dispatch synchronously after the caller's project fence; no read may
+    // insert an asynchronous selection gap before the native command captures it.
+    const key = stablePayload([observedProject, selectionEpoch, tool, input]);
+    const requestId =
+      input.requestId ?? pendingCreates.get(key) ?? crypto.randomUUID();
+    pendingCreates.set(key, requestId);
+    const result = await run({ ...input, requestId });
+    pendingCreates.delete(key);
+    return result;
+  };
+}
+export const api = Object.assign(
+  baseApi,
+  mockReferences ?? nativeReferenceApi,
+  {
+    appState: async () => {
+      const state = await readApp();
+      const project = state.jam?.id ?? null;
+      if (project !== observedProject) {
+        observedProject = project;
+        selectionEpoch++;
+        pendingCreates.clear();
+      }
+      return state;
+    },
+    selectProject: selectionBoundary(baseApi.selectProject.bind(baseApi)),
+    restoreProject: selectionBoundary(baseApi.restoreProject.bind(baseApi)),
+    createJam: selectionBoundary(baseApi.createJam.bind(baseApi)),
+    loadDemoJam: selectionBoundary(baseApi.loadDemoJam.bind(baseApi)),
+    resetJam: selectionBoundary(baseApi.resetJam.bind(baseApi)),
+    importJamJson: selectionBoundary(baseApi.importJamJson.bind(baseApi)),
+    createProjectFolder: selectionBoundary(
+      baseApi.createProjectFolder.bind(baseApi),
+    ),
+    openProjectFolder: selectionBoundary(
+      baseApi.openProjectFolder.bind(baseApi),
+    ),
+    createTask: withRequestId("create_task", baseApi.createTask.bind(baseApi)),
+    createEpic: withRequestId("create_epic", baseApi.createEpic.bind(baseApi)),
+    createStory: withRequestId(
+      "create_story",
+      baseApi.createStory.bind(baseApi),
+    ),
+    askUser: withRequestId("ask_user", baseApi.askUser.bind(baseApi)),
+  },
+);

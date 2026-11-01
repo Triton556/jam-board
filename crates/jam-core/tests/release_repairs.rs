@@ -109,7 +109,7 @@ fn direct_return_to_work_preserves_evidence_and_can_report_again() {
                 &h.id,
                 &key,
                 TaskPatch {
-                    status: Some("in_progress".into()),
+                    status: Some("in_progress".parse::<jam_core::TaskStatus>().unwrap()),
                     ..Default::default()
                 },
             )
@@ -134,7 +134,9 @@ fn direct_return_to_work_preserves_evidence_and_can_report_again() {
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: key.clone(),
-                verdict: "changes_requested".into(),
+                verdict: "changes_requested"
+                    .parse::<jam_core::ReviewVerdict>()
+                    .unwrap(),
                 ..Default::default()
             },
         )
@@ -152,7 +154,7 @@ fn direct_return_to_work_preserves_evidence_and_can_report_again() {
                 expected_report_id: String::new(),
                 expected_review_context_revision: String::new(),
                 key: key.clone(),
-                verdict: "accept".into(),
+                verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
                 ..Default::default()
             },
         )
@@ -217,7 +219,7 @@ fn worker_creation_ownership_and_privileged_planning_are_consistent() {
                 CreateTask {
                     title: "Bypass".into(),
                     story_key: Some(story.key.clone()),
-                    status: Some(status.into()),
+                    status: Some(status.parse::<jam_core::TaskStatus>().unwrap()),
                     ..Default::default()
                 }
             )
@@ -266,7 +268,7 @@ fn worker_creation_ownership_and_privileged_planning_are_consistent() {
         &brain.id,
         ReviewTask {
             key,
-            verdict: "accept".into(),
+            verdict: "accept".parse::<jam_core::ReviewVerdict>().unwrap(),
             ..Default::default()
         },
     )

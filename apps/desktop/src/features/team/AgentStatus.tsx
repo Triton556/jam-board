@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { memo, useState } from "react";
 import { Avatar, Button } from "../../components/ui";
 import { useDismissible } from "../../components/ui/useDismissible";
+import { inboxSummaryQuery } from "../../lib/inbox-events-api";
 import { epicsQuery, storiesQuery } from "../../lib/planning-queries";
 import { tasksQuery } from "../../lib/queries";
 import { relativeTime } from "../../lib/time";
@@ -124,14 +125,18 @@ export const AgentStatus = memo(function AgentStatus({
   );
 });
 export function InboxBadge({ count }: { count: number }) {
-  return count > 0 ? (
+  const summary = useQuery(inboxSummaryQuery);
+  const total =
+    count + (summary.isError ? 0 : (summary.data?.openActions ?? 0));
+  const unread = summary.isError ? 0 : (summary.data?.unread ?? 0);
+  return total > 0 || unread > 0 ? (
     <span
       className="inbox-badge"
       role="img"
-      aria-label={`${count} open inbox items`}
+      aria-label={total > 0 ? `${total} open inbox items` : "New inbox events"}
     >
       <i />
-      {count > 9 ? "9+" : count}
+      {total > 0 ? (total > 9 ? "9+" : total) : null}
     </span>
   ) : null;
 }

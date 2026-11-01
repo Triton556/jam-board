@@ -133,6 +133,7 @@ pub async fn reference_media(
         app.asset_protocol_scope()
             .allow_file(&path)
             .map_err(|e| ApiError {
+                data: None,
                 code: crate::commands::ApiErrorCode::Internal,
                 message: e.to_string(),
                 field: None,

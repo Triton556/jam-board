@@ -17,6 +17,7 @@ import {
   GripHorizontal,
   Image,
   Link,
+  ListChecks,
   MoreHorizontal,
   StickyNote,
   Type,
@@ -35,7 +36,6 @@ import {
 import type { RefFrame, RefItem } from "../../bindings";
 import { Markdown } from "../../components/Markdown";
 import { Tooltip } from "../../components/ui";
-import type { VerdictItem } from "../../lib/api";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/ui-store";
 import { frameHeaderLayout } from "./frame-layout";
@@ -46,7 +46,7 @@ import { ReferencePopover } from "./ReferencePopover";
 import { useCanvas } from "./runtime";
 import { StickyEditor } from "./StickyEditor";
 import { useSummaryTooltip } from "./use-summary-tooltip";
-import { VerdictBadge, VerdictToolbar } from "./VerdictToolbar";
+import { ReasonChip, VerdictBadge, VerdictToolbar } from "./VerdictToolbar";
 export type TargetChip = { key: string; viaFrame: boolean; color?: string };
 export type ItemData = {
   item: RefItem;
@@ -59,6 +59,7 @@ export type ItemData = {
   expanded?: boolean;
   missing?: boolean;
   fitContent?: boolean;
+  reviewCurrent?: boolean;
 };
 export type FrameData = { frame: RefFrame; dim: boolean };
 export type ItemNode = Node<ItemData, "reference">;
@@ -232,6 +233,32 @@ export function ReferenceActions({
         >
           Tags
         </button>
+        {item.sourceUrl && (
+          <button
+            type="button"
+            onClick={() =>
+              activate(() => {
+                if (item.sourceUrl) void api.openUrl(item.sourceUrl);
+              })
+            }
+          >
+            Open source
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => activate(() => runtime.variation?.(item))}
+        >
+          Mark as variation of…
+        </button>
+        {item.derivedFrom && (
+          <button
+            type="button"
+            onClick={() => activate(() => runtime.clearVariation?.(item))}
+          >
+            Clear variation link
+          </button>
+        )}
         <button
           type="button"
           onClick={() => activate(() => runtime.edit(item.id, "link"))}
@@ -344,7 +371,7 @@ export const ReferenceNode = memo(function ReferenceNode({
   }
   return (
     <article
-      className={`reference-card kind-${kind} ${headingless ? "note-without-heading" : ""} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
+      className={`reference-card ${item.verdict === "reject" ? "reference-rejected" : ""} kind-${kind} ${headingless ? "note-without-heading" : ""} ${selected ? "selected" : ""} ${data.connect ? "connecting" : ""}`}
       onDoubleClick={(event) => {
         if (
           (event.target as HTMLElement).closest(
@@ -363,15 +390,12 @@ export const ReferenceNode = memo(function ReferenceNode({
         else if (kind !== "audio") void api.openReferenceFile(path);
       }}
       data-reference-id={item.id}
+      data-review-current={data.reviewCurrent || undefined}
       data-highlighted={!!data.highlight}
       aria-label={`${kind} reference: ${referenceLabel(item)}, linked to ${links.map((l) => l.key).join(", ") || "nothing"}`}
       style={
         {
-          opacity: data.dim
-            ? 0.15
-            : (item as VerdictItem).verdict === "reject"
-              ? 0.45
-              : 1,
+          opacity: data.dim ? 0.25 : 1,
           "--reference-color": data.color,
           "--reference-highlight": data.highlight ?? "transparent",
         } as React.CSSProperties
@@ -414,6 +438,16 @@ export const ReferenceNode = memo(function ReferenceNode({
           {actions}
         </header>
       }
+      {item.origin && (
+        <small className="reference-origin-tag">
+          {item.origin === "found"
+            ? "Found"
+            : item.origin === "generated"
+              ? "Generated"
+              : "Own"}
+        </small>
+      )}
+      <ReasonChip item={item} />
       <div className="reference-content">
         {item.kind === "asset" ? (
           <LocalMedia item={item} path={path} />
@@ -530,8 +564,53 @@ export const ReferenceFrame = memo(function ReferenceFrame({
   const zoom = useStore((s) => s.transform[2]);
   const overview = zoom < 0.4;
   const links = frameTargets(frame);
-  const header = frameHeaderLayout(frameWidth, zoom, links.length > 0);
+  const header = frameHeaderLayout(
+    frameWidth,
+    zoom,
+    links.length > 0,
+    !!frame.review,
+  );
   const visibleLinks = header.compact ? 1 : 2;
+  const reviewActions = (close: () => void) => (
+    <>
+      {frame.review && (
+        <>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              close();
+              c.review?.(frame);
+            }}
+          >
+            Review items
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              close();
+              c.sendReview?.(frame);
+            }}
+          >
+            {frame.review.changedSinceSent
+              ? "Send again"
+              : "Send review to brain"}
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              close();
+              c.collectKept?.([frame]);
+            }}
+          >
+            Collect Keep into new frame…
+          </button>
+        </>
+      )}
+    </>
+  );
   return (
     <div
       className={`reference-frame ${overview && !selected ? "reference-frame-overview" : ""} ${selected ? "selected" : ""} ${frame.collapsed ? "collapsed" : ""}`}
@@ -587,6 +666,34 @@ export const ReferenceFrame = memo(function ReferenceFrame({
           </span>
         </div>
         <div className="reference-frame-actions">
+          {frame.review && (
+            <>
+              {!!(frame.review.keep + frame.review.reject) && (
+                <small
+                  className="moodboard-frame-counter"
+                  title={`${frame.review.keep + frame.review.reject} of ${frame.review.total} rated`}
+                >
+                  ✓ {frame.review.keep + frame.review.reject}/
+                  {frame.review.total}
+                </small>
+              )}
+              {frame.review.sentAt && (
+                <small className="moodboard-sent-chip">
+                  {frame.review.changedSinceSent
+                    ? "Changed since sent"
+                    : `Sent ${new Date(frame.review.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                </small>
+              )}
+              <button
+                className="nodrag"
+                type="button"
+                aria-label={`Review ${frame.title}`}
+                onClick={() => c.review?.(frame)}
+              >
+                <ListChecks size={16} />
+              </button>
+            </>
+          )}
           {header.overflow ? (
             <ReferencePopover
               label={`Frame actions for ${frame.title}`}
@@ -594,6 +701,7 @@ export const ReferenceFrame = memo(function ReferenceFrame({
             >
               {(close) => (
                 <>
+                  {reviewActions(close)}
                   <button
                     role="menuitem"
                     type="button"
@@ -689,16 +797,39 @@ export const ReferenceFrame = memo(function ReferenceFrame({
                   )}
                 </button>
               </Tooltip>
-              <Tooltip text={`Edit frame ${frame.title}`}>
-                <button
-                  type="button"
-                  className="nodrag"
-                  aria-label={`Edit frame ${frame.title}`}
-                  onClick={() => c.editFrame(frame)}
+              {frame.review ? (
+                <ReferencePopover
+                  label={`Frame actions for ${frame.title}`}
+                  trigger={<MoreHorizontal size={15} />}
                 >
-                  <MoreHorizontal size={15} />
-                </button>
-              </Tooltip>
+                  {(close) => (
+                    <>
+                      {reviewActions(close)}
+                      <button
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          close();
+                          c.editFrame(frame);
+                        }}
+                      >
+                        Edit frame {frame.title}
+                      </button>
+                    </>
+                  )}
+                </ReferencePopover>
+              ) : (
+                <Tooltip text={`Edit frame ${frame.title}`}>
+                  <button
+                    type="button"
+                    className="nodrag"
+                    aria-label={`Edit frame ${frame.title}`}
+                    onClick={() => c.editFrame(frame)}
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                </Tooltip>
+              )}
               <Tooltip text={`Archive frame ${frame.title}`}>
                 <button
                   type="button"

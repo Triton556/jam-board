@@ -72,7 +72,7 @@ fn create(s: &Store, a: &Member, name: &str) -> TaskDetail {
             story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
             brief: fixture_brief(),
             title: name.into(),
-            status: Some("ready".into()),
+            status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
             ..Default::default()
         },
     )
@@ -87,7 +87,7 @@ fn numbering_tags_and_idempotency() {
         story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
         brief: fixture_brief(),
         title: "One".into(),
-        idempotency_key: Some("external-1".into()),
+        request_id: "external-1".into(),
         tags: Some(vec![" Art ".into(), "ART".into(), " ui ".into()]),
         ..Default::default()
     };
@@ -173,7 +173,7 @@ fn claim_release_all_branches() {
                     story_key: Some(format!("{}-S1", s.active_jam().unwrap().key_prefix)),
                     brief: fixture_brief(),
                     title: status.into(),
-                    status: Some(status.into()),
+                    status: Some(status.parse::<jam_core::TaskStatus>().unwrap()),
                     ..Default::default()
                 },
             )
@@ -274,7 +274,7 @@ fn validation_nullable_updates_pagination_and_activity() {
         UpdateTask {
             key: t.task.key.clone(),
             title: Some("Changed".into()),
-            estimate: Some(Some(5)),
+            estimate: Some(Some(Estimate::Five)),
             due_at: Some(Some("2026-11-01T10:00:00Z".into())),
             ..Default::default()
         },
@@ -287,17 +287,8 @@ fn validation_nullable_updates_pagination_and_activity() {
     let t = s.update_task_fresh(&h.id, input).unwrap();
     assert!(t.task.estimate.is_none());
     assert!(t.task.due_at.is_none());
-    assert!(
-        s.update_task_fresh(
-            &h.id,
-            UpdateTask {
-                key: t.task.key.clone(),
-                priority: Some("urgent".into()),
-                ..Default::default()
-            }
-        )
-        .is_err()
-    );
+    let invalid_priority=serde_json::from_value::<UpdateTask>(serde_json::json!({"key":t.task.key,"expectedClaimGeneration":t.task.claim_generation,"expectedUpdatedAt":t.task.updated_at,"priority":"urgent"})).unwrap_err();
+    assert!(invalid_priority.to_string().contains("expected one of"));
     assert!(
         s.add_comment(&h.id, &t.task.key, &"x".repeat(4001))
             .is_err()

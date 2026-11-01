@@ -402,7 +402,10 @@ for (const theme of ["light", "dark"] as const) {
           }),
         )
         .toBeCloseTo(reduced ? 0 : -0.65, 2);
-      const directory = resolve(process.cwd(), "../../test-visuals");
+      const directory = resolve(
+        process.cwd(),
+        "../../test-visuals/round12/R12-B/regression",
+      );
       await mkdir(directory, { recursive: true });
       await page.screenshot({
         path: resolve(
@@ -461,7 +464,10 @@ for (const theme of ["light", "dark"] as const) {
       }),
     ).toMatchObject({ font: 13, fits: true });
     await help.scrollIntoViewIfNeeded();
-    const directory = resolve(process.cwd(), "../../test-visuals");
+    const directory = resolve(
+      process.cwd(),
+      "../../test-visuals/round12/R12-B/regression",
+    );
     await mkdir(directory, { recursive: true });
     await page.screenshot({
       path: resolve(directory, `readability-instructions-${theme}.png`),

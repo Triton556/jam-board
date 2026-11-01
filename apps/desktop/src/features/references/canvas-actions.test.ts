@@ -97,8 +97,16 @@ it("mixed frame/item group link undo retains pre-existing associations", async (
   expect(data.links.filter((row) => !row.archivedAt)).toHaveLength(2);
 });
 it("group feedback undo restores each item's own previous verdict", async () => {
-  const a = await mockApi.addReference({ kind: "note", text: "A" });
-  const b = await mockApi.addReference({ kind: "note", text: "B" });
+  const a = await mockApi.addReference({
+    kind: "link",
+    url: "https://example.test/a",
+    title: "A",
+  });
+  const b = await mockApi.addReference({
+    kind: "link",
+    url: "https://example.test/b",
+    title: "B",
+  });
   const rejected = await mockApi.setReferenceVerdict(b.id, "reject");
   const history = new CanvasHistory();
   await history.perform("Feedback", verdictActions([a, rejected], "keep"));

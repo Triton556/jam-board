@@ -15,6 +15,7 @@ struct Connections {
 }
 #[derive(Clone)]
 pub struct Store {
+    activity_client: Option<String>,
     connections: Arc<Connections>,
     pub(crate) project_id: Option<String>,
     pub path: PathBuf,
@@ -45,7 +46,7 @@ pub(crate) fn connect(path: &Path) -> Result<Connection> {
     let c = Connection::open(sqlite_path(path)?)?;
     c.busy_timeout(std::time::Duration::from_millis(5000))?;
     c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;
-CREATE TEMP TABLE jam_project_context(project_id TEXT); INSERT INTO jam_project_context VALUES (NULL);")?;
+CREATE TEMP TABLE jam_project_context(project_id TEXT,client TEXT); INSERT INTO jam_project_context VALUES (NULL,NULL);")?;
     if crate::project_folders::folder_for_db(path).is_some() {
         c.execute_batch("PRAGMA synchronous=FULL;")?;
     }
@@ -74,6 +75,9 @@ pub(crate) fn sqlite_path(path: &Path) -> Result<PathBuf> {
     }
 }
 impl Store {
+    pub fn schema_version(&self) -> Result<i64> {
+        self.read(|c| Ok(c.query_row("PRAGMA user_version", [], |r| r.get(0))?))
+    }
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -86,10 +90,10 @@ impl Store {
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
             )?;
             let version: i64 = existing.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-            if version > 9 {
+            if version > 10 {
                 return Err(invalid("database", "Newer schema: writable open refused"));
             }
-            if (1..9).contains(&version) {
+            if (1..10).contains(&version) {
                 let backup = if let Some(folder) = crate::project_folders::folder_for_db(path) {
                     let root = folder
                         .join(".state/backups")
@@ -97,7 +101,7 @@ impl Store {
                     std::fs::create_dir_all(&root)?;
                     root.join("board.db")
                 } else {
-                    path.with_extension(format!("pre-v9-{}.backup.db", id()))
+                    path.with_extension(format!("pre-v10-{}.backup.db", id()))
                 };
                 crate::storage_io::backup(&existing, &backup)?;
             }
@@ -122,6 +126,7 @@ impl Store {
             rusqlite_migration::M::up(include_str!("migration_v7.sql")),
             rusqlite_migration::M::up(include_str!("migration_v8.sql")),
             rusqlite_migration::M::up(include_str!("migration_v9.sql")).foreign_key_check(),
+            rusqlite_migration::M::up(include_str!("migration_v10.sql")).foreign_key_check(),
         ]);
         writer.pragma_update(None, "foreign_keys", "OFF")?;
         let migrated = migrations.to_latest(&mut writer);
@@ -132,7 +137,8 @@ impl Store {
             writer.query_row("SELECT database_generation FROM board_meta", [], |r| {
                 r.get(0)
             })?;
-        Ok(Self {
+        let store = Self {
+            activity_client: None,
             expected_generation,
             app_data_dir: None,
             connections: Arc::new(Connections {
@@ -142,7 +148,9 @@ impl Store {
             }),
             project_id: None,
             path: path.into(),
-        })
+        };
+        store.recover_asset_io()?;
+        Ok(store)
     }
     pub(crate) fn read<T>(&self, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
         self.check_physical_generation()?;
@@ -164,11 +172,26 @@ impl Store {
         tx.commit()?;
         Ok(value)
     }
+    /// Capture transport identity on this store clone; connection context is set under its mutex.
+    pub fn with_activity_client(&self, client: Option<String>) -> Self {
+        let mut scoped = self.clone();
+        scoped.activity_client = client;
+        scoped
+    }
     pub(crate) fn write<T>(
         &self,
         f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
-        self.write_internal(f, false)
+        self.write_internal(f, false, |_| true)
+    }
+    /// Atomic operation whose result determines whether board publication is needed.
+    /// Imports use this to keep dry runs, true no-ops and sync-only links free of publication writes.
+    pub(crate) fn write_publishing_if<T>(
+        &self,
+        f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>,
+        publish: impl FnOnce(&T) -> bool,
+    ) -> Result<T> {
+        self.write_internal(f, false, publish)
     }
     pub(crate) fn write_control<T>(
         &self,
@@ -180,12 +203,13 @@ impl Store {
                     .into(),
             ));
         }
-        self.write_internal(f, true)
+        self.write_internal(f, true, |_| true)
     }
     fn write_internal<T>(
         &self,
         f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>,
         control: bool,
+        publish: impl FnOnce(&T) -> bool,
     ) -> Result<T> {
         self.check_physical_generation()?;
         let mut c = self
@@ -194,8 +218,8 @@ impl Store {
             .lock()
             .map_err(|_| invalid("database", "writer lock poisoned"))?;
         c.execute(
-            "UPDATE temp.jam_project_context SET project_id=?",
-            [&self.project_id],
+            "UPDATE temp.jam_project_context SET project_id=?,client=?",
+            rusqlite::params![self.project_id, self.activity_client],
         )?;
         let tx = c.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         if self.project_id.is_some() {
@@ -205,8 +229,9 @@ impl Store {
             crate::project_move::check_writable(&tx)?;
         }
         let value = f(&tx)?;
+        let should_publish = publish(&value);
         tx.commit()?;
-        if let Some(folder) = crate::project_folders::folder_for_db(&self.path) {
+        if should_publish && let Some(folder) = crate::project_folders::folder_for_db(&self.path) {
             crate::board_snapshot::schedule(&folder);
         }
         Ok(value)
@@ -311,7 +336,7 @@ pub(crate) fn activity(
     task_id: Option<&str>,
     limit: Option<i64>,
 ) -> Result<Vec<ActivityEvent>> {
-    let mut stmt = c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>?1 AND (?2 IS NULL OR a.task_id=?2) ORDER BY a.seq ASC")?;
+    let mut stmt = c.prepare("SELECT a.seq,a.action,m.id,m.kind,m.name,m.handle,m.color,t.key,a.payload,a.created_at,a.epic_id,a.client FROM activity a JOIN members m ON m.id=a.actor_id LEFT JOIN tasks t ON t.id=a.task_id WHERE a.seq>?1 AND (?2 IS NULL OR a.task_id=?2) ORDER BY a.seq ASC")?;
     let rows = stmt.query_map(rusqlite::params![after, task_id], activity_row)?;
     let mut events = rows.collect::<std::result::Result<Vec<_>, _>>()?;
     if let Some(limit) = limit {
@@ -333,6 +358,7 @@ pub(crate) fn activity_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEv
     let task_key: Option<String> = r.get(7)?;
     let sentence = crate::activity_sentence(&action, &actor_name, task_key.as_deref(), &payload);
     Ok(ActivityEvent {
+        client: r.get("client")?,
         seq: r.get(0)?,
         action,
         actor: MemberRef {
@@ -485,7 +511,7 @@ mod v9_migration_tests {
                 CreateTask {
                     title: "Scoped idempotent fixture".into(),
                     story_key: Some(story.key),
-                    idempotency_key: Some("v8-fixture-idempotency".into()),
+                    request_id: "v8-fixture-idempotency".into(),
                     ..Default::default()
                 },
             )
@@ -581,7 +607,7 @@ mod v9_migration_tests {
             check
                 .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            9
+            10
         );
         for (table, (columns, rows)) in before {
             assert_eq!(

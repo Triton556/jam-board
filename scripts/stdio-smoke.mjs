@@ -74,12 +74,12 @@ try {
 	);
 	checks.exactVersionAndRequiredSchemas = true;
 	const session = await client.tool("get_session_context");
-	const epic = await client.tool("create_epic", epicFixture());
+	const epic = await client.tool("create_epic", {...epicFixture(), requestId:"smoke-epic"});
 	await client.tool("become_brain", { epicKey: epic.key });
 	await client.tool("set_epic_status", { key: epic.key, status: "active" });
-	const story = await client.tool("create_story", storyFixture(epic.key));
+	const story = await client.tool("create_story", {...storyFixture(epic.key), requestId:"smoke-story"});
 	await client.tool("set_story_status", { key: story.key, status: "active" });
-	const created = await client.tool("create_task", taskFixture(story.key));
+	const created = await client.tool("create_task", {...taskFixture(story.key), requestId:"smoke-task"});
 	assert.equal(
 		(await client.tool("check_ready", { key: created.key })).ready,
 		true,

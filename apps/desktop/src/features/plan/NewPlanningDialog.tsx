@@ -5,6 +5,7 @@ import { Button, Dialog } from "../../components/ui";
 import { api } from "../../lib/api";
 import { invalidatePlanning } from "../../lib/planning-queries";
 import { appQuery } from "../../lib/queries";
+import { EpicPalette } from "./EpicPalette";
 import { StoryPicker } from "./PlanningControls";
 import { usePlanningDraft } from "./planning-draft";
 
@@ -47,6 +48,10 @@ export function NewPlanningDialog({
     draftIdentity,
   );
   const { title, story } = draft.value;
+  const colorDraft = usePlanningDraft<
+    import("../../bindings").EpicColor | undefined
+  >(undefined, draftIdentity ? `${draftIdentity}:color` : undefined);
+  const color = colorDraft.value;
   const mounted = useRef(true),
     locked = useRef(false),
     invalidated = useRef(false);
@@ -81,7 +86,10 @@ export function NewPlanningDialog({
     }) => {
       if (invalidated.current) throw new Error("The current project changed.");
       if (capturedTarget.kind === "epic")
-        return api.createEpic({ title: input.title });
+        return api.createEpic({
+          title: input.title,
+          ...(color ? { color } : {}),
+        });
       if (capturedTarget.kind === "story")
         return api.createStory({
           epicKey: capturedTarget.epicKey,
@@ -98,6 +106,10 @@ export function NewPlanningDialog({
       const cached = client.getQueryData<{ draft: typeof input.draft }>(key);
       if (JSON.stringify(cached?.draft) === JSON.stringify(input.draft))
         client.removeQueries({ queryKey: key, exact: true });
+      client.removeQueries({
+        queryKey: ["planning-draft", `${draftIdentity}:color`],
+        exact: true,
+      });
       invalidatePlanning(client);
       locked.current = false;
       if (
@@ -125,6 +137,10 @@ export function NewPlanningDialog({
     if (!locked.current) {
       client.removeQueries({
         queryKey: ["planning-draft", draftIdentity],
+        exact: true,
+      });
+      client.removeQueries({
+        queryKey: ["planning-draft", `${draftIdentity}:color`],
         exact: true,
       });
       close();
@@ -176,6 +192,13 @@ export function NewPlanningDialog({
             disabled={save.isPending || projectChanged}
           />
         </label>
+        {kind === "epic" && (
+          <EpicPalette
+            value={color}
+            choose={(value) => colorDraft.change(value, false)}
+            disabled={save.isPending || projectChanged}
+          />
+        )}
         {kind === "task" && (
           <>
             <div className="field">

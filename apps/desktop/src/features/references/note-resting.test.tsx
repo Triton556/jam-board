@@ -26,7 +26,7 @@ afterEach(() => {
   document.head.querySelector("[data-note-resting-test]")?.remove();
   delete document.documentElement.dataset.theme;
 });
-async function mount(title = "") {
+async function mount(title = "", rateable = false) {
   const style = document.createElement("style");
   style.dataset.noteRestingTest = "";
   style.textContent = readFileSync(
@@ -37,7 +37,8 @@ async function mount(title = "") {
   const app = await mockApi.appState();
   const item = await mockApi.addReference(
     {
-      kind: "note",
+      kind: rateable ? "link" : "note",
+      ...(rateable ? { url: "https://example.test/image" } : {}),
       title,
       text: "Идея без пустой полосы",
     },
@@ -133,13 +134,13 @@ it("a note heading occupies its header row once; media/link headers stay intact"
   expect(paper.querySelector("header .reference-menu")).toBeInTheDocument();
 });
 it("feedback lives left of the actions menu in the header and badges persist without hover", async () => {
-  const { rerender, view, item } = await mount("Candidate");
+  const { rerender, view, item } = await mount("Candidate", true);
   const paper = screen.getByRole("article");
   const header = paper.querySelector("header") as HTMLElement;
   const toolbar = screen.getByRole("group", { name: "Reference feedback" });
   expect(toolbar.parentElement).toBe(header);
   expect(toolbar.nextElementSibling).toHaveClass("reference-menu");
-  expect(getComputedStyle(toolbar).position).toBe("static");
+  expect(getComputedStyle(toolbar).position).toBe("relative");
   expect(getComputedStyle(toolbar).opacity).toBe("0");
   const keep = screen.getByRole("button", { name: "Keep" });
   expect(getComputedStyle(keep).width).toBe("28px");
@@ -162,7 +163,9 @@ it("feedback lives left of the actions menu in the header and badges persist wit
   expect(badge).toBeVisible();
   rerender(view(false, { ...item, verdict: "reject" } as VerdictItem));
   expect(screen.getByRole("img", { name: "Not this" })).toBeVisible();
-  expect(paper).toHaveStyle({ opacity: "0.45" });
+  expect(paper.querySelector(".reference-content")).toHaveStyle({
+    opacity: "0.45",
+  });
   expect(paper.querySelector("footer .reference-verdict-toolbar")).toBeNull();
 });
 it("Actions and note finish controls show one tooltip on focus and finish has a 28 px target", async () => {

@@ -162,13 +162,17 @@ export function EditReferenceDialog({
     title?: string;
     caption?: string;
     tags?: string[];
+    sourceUrl?: string | null;
+    origin?: "found" | "generated" | "own" | null;
   }): Promise<unknown>;
   link(key: string): Promise<unknown>;
 }) {
   const [title, setTitle] = useState(item.title),
     [caption, setCaption] = useState(item.captionMd),
     [tags, setTags] = useState(item.tags),
-    [key, setKey] = useState("");
+    [key, setKey] = useState(""),
+    [sourceUrl, setSourceUrl] = useState(item.sourceUrl ?? ""),
+    [origin, setOrigin] = useState(item.origin ?? "");
   const write = useProjectWrite(`reference:${item.id}:${mode}`),
     form = useRef<HTMLFormElement>(null);
   useReferenceDialogFocus(form, write.ready);
@@ -193,7 +197,20 @@ export function EditReferenceDialog({
             () =>
               mode === "link"
                 ? link(key)
-                : save(mode === "tags" ? { tags } : { title, caption }),
+                : save(
+                    mode === "tags"
+                      ? { tags }
+                      : {
+                          title,
+                          caption,
+                          sourceUrl: sourceUrl || null,
+                          origin: (origin || null) as
+                            | "found"
+                            | "generated"
+                            | "own"
+                            | null,
+                        },
+                  ),
             close,
           );
         }}
@@ -236,6 +253,29 @@ export function EditReferenceDialog({
                 onChange={(e) => setCaption(e.target.value)}
                 rows={6}
               />
+            </label>
+            <label className="field">
+              Source URL
+              <input
+                type="url"
+                value={sourceUrl}
+                disabled={!write.ready}
+                maxLength={2048}
+                onChange={(event) => setSourceUrl(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              Origin
+              <select
+                value={origin}
+                disabled={!write.ready}
+                onChange={(event) => setOrigin(event.target.value)}
+              >
+                <option value="">—</option>
+                <option value="found">Found</option>
+                <option value="generated">Generated</option>
+                <option value="own">Own</option>
+              </select>
             </label>
           </>
         )}

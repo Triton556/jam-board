@@ -39,6 +39,7 @@ export function TaskDrawer({
   close(): void;
   returnFocus?: ModalFocusReturn;
   Files?: ComponentType<TaskFilesSlotProps>;
+  focusSection?: "review";
   presentation?: TaskPresentation;
   onPresentationChange?(presentation: TaskPresentation): void;
 }) {
@@ -63,11 +64,13 @@ function TaskSession({
   presentation = "drawer",
   onPresentationChange,
   Files,
+  focusSection,
 }: {
   taskKey: string;
   close(): void;
   returnFocus?: ModalFocusReturn;
   modal: boolean;
+  focusSection?: "review";
   Files?: ComponentType<TaskFilesSlotProps>;
   presentation?: TaskPresentation;
   onPresentationChange?(presentation: TaskPresentation): void;
@@ -157,6 +160,7 @@ function TaskSession({
               >
                 <Editor
                   task={task.data}
+                  focusSection={focusSection}
                   close={finish}
                   frame={TaskEditorSurface}
                   Files={Files}

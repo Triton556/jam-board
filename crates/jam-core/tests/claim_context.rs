@@ -84,7 +84,7 @@ fn task_input(story: &Story) -> CreateTask {
     CreateTask {
         title: "Task".into(),
         story_key: Some(story.key.clone()),
-        status: Some("ready".into()),
+        status: Some("ready".parse::<jam_core::TaskStatus>().unwrap()),
         brief: TaskBrief {
             goal_md: "Goal".into(),
             where_md: "src/feature".into(),
@@ -135,7 +135,7 @@ fn review(s: &Store, key: &str, verdict: &str) -> ReviewTask {
             .id
             .clone(),
         expected_review_context_revision: d.review_context_revision.unwrap(),
-        verdict: verdict.into(),
+        verdict: verdict.parse::<jam_core::ReviewVerdict>().unwrap(),
         comments_md: "Inspected this exact report and context".into(),
         failed_tests: None,
     }
@@ -421,6 +421,79 @@ fn stale_review_never_accepts_a_later_report_even_for_the_same_task_and_worker()
     s.review_task(&f.brain.id, review(s, &f.key, "accept"))
         .unwrap();
     assert_eq!(s.get_task(&f.key).unwrap().task.status, "done");
+}
+
+#[test]
+fn review_context_fences_scoped_file_links_and_replacements() {
+    let f = fixture();
+    let s = &f.store;
+    let claimed = claim(&f, &f.worker.id);
+    s.submit_report(&f.worker.id, report(&f.key, &claimed.task.claim_generation))
+        .unwrap();
+    let old = review(s, &f.key, "accept");
+    let source = f.dir.path().join("plan.md");
+    std::fs::write(&source, "Inspected design").unwrap();
+    let asset = s
+        .register_file(
+            &f.human.id,
+            RegisterFile {
+                storage_type: FileStorageType::BoardFile,
+                source_path: Some(display_path(&source)),
+                url: None,
+                path_base: None,
+                file_kind: None,
+                name: None,
+                notes: None,
+                companions: None,
+                request_id: Some("review-file".into()),
+                task_key: None,
+                role: None,
+                expected_claim_generation: None,
+                expected_updated_at: None,
+                working_directory: None,
+            },
+        )
+        .unwrap()
+        .asset
+        .unwrap();
+    s.link_file(
+        &f.human.id,
+        LinkFileInput {
+            scope: FileScope {
+                kind: ScopeKind::Epic,
+                key: Some(f.epic.key),
+            },
+            asset_id: asset.asset.id.clone(),
+            role: None,
+            request_id: Some("review-link".into()),
+            expected_updated_at: None,
+            expected_claim_generation: None,
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        s.review_task(&f.brain.id, old),
+        Err(Error::Conflict)
+    ));
+    let old = review(s, &f.key, "accept");
+    let next = f.dir.path().join("revised.md");
+    std::fs::write(&next, "New design changes the review").unwrap();
+    s.replace_asset(
+        &f.human.id,
+        ReplaceAssetInput {
+            asset_id: asset.asset.id,
+            source_path: Some(display_path(&next)),
+            url: None,
+            request_id: Some("review-replace".into()),
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        s.review_task(&f.brain.id, old),
+        Err(Error::Conflict)
+    ));
+    s.review_task(&f.brain.id, review(s, &f.key, "accept"))
+        .unwrap();
 }
 
 #[test]

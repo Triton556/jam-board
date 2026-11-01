@@ -70,7 +70,7 @@ fn assert_tools(tools: &[Tool]) {
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual.len(), expected.len());
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 57);
+    assert_eq!(actual.len(), 74);
     assert!(!actual.iter().any(|name| name == "set_reference_verdict"));
     let wait = tools.iter().find(|t| t.name == "wait_for_changes").unwrap();
     assert_eq!(wait.input_schema["required"], json!(["cursor"]));
@@ -98,14 +98,15 @@ fn assert_tools(tools: &[Tool]) {
     let create = tools.iter().find(|t| t.name == "create_task").unwrap();
     assert_eq!(
         create.input_schema["properties"]["storyKey"]["type"],
-        "string"
+        json!(["string", "null"])
     );
     let questions = tools.iter().find(|t| t.name == "list_questions").unwrap();
     assert!(
-        questions.input_schema["properties"]["status"]["enum"]
+        questions.input_schema["$defs"]["QuestionStatus"]["oneOf"]
             .as_array()
             .unwrap()
-            .contains(&json!("open"))
+            .iter()
+            .any(|choice| choice["const"] == "open")
     );
 }
 fn fixture() -> (tempfile::TempDir, Arc<Store>, jam_core::Member) {
@@ -183,8 +184,30 @@ async fn call_fresh(
 async fn call_raw(
     c: &RunningService<RoleClient, ClientConfig>,
     tool: &str,
-    args: Value,
+    mut args: Value,
 ) -> CallToolResult {
+    // Historical workflow fixtures intentionally read all evidence. Round-12
+    // contract tests separately exercise compact defaults and missing requestId.
+    if tool == "get_task" && args.get("include").is_none() {
+        args["include"] = json!([
+            "story",
+            "epic",
+            "references",
+            "reports",
+            "reviews",
+            "comments",
+            "activity"
+        ]);
+    }
+    if ["create_epic", "create_story", "create_task"].contains(&tool)
+        && args.get("requestId").is_none()
+    {
+        static REQUEST: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        args["requestId"] = json!(format!(
+            "fixture-{tool}-{}",
+            REQUEST.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+    }
     c.call_tool(
         CallToolRequestParams::new(tool.to_string())
             .with_arguments(args.as_object().unwrap().clone()),
@@ -318,10 +341,13 @@ async fn full_stdio_contract_and_errors() {
     let mut input = task_input(&story, "Add jump buffer");
     input["priority"] = json!("high");
     input["tags"] = json!([" GAMEPLAY ", "gameplay"]);
-    input["idempotencyKey"] = json!("m2-1");
+    input["requestId"] = json!("m2-1");
     let t = data(call_fresh(&c, "create_task", input.clone()).await);
     let key = t["key"].as_str().unwrap();
-    assert_eq!(t["tags"], json!(["gameplay"]));
+    assert_eq!(
+        data(call_fresh(&c, "get_task", json!({"key":key})).await)["tags"],
+        json!(["gameplay"])
+    );
     let n = s.activity_count().unwrap();
     assert_eq!(
         data(call_fresh(&c, "create_task", input).await)["id"],
@@ -383,18 +409,21 @@ async fn full_stdio_contract_and_errors() {
         )
         .await,
     );
-    assert_eq!(updated["estimate"], 5);
-    assert!(
-        data(
-            call_fresh(
-                &c,
-                "update_task",
-                json!({"key":key,"estimate":null,"dueAt":null})
-            )
-            .await
-        )["estimate"]
-            .is_null()
+    assert_eq!(updated["kind"], "task");
+    assert_eq!(
+        data(call_fresh(&c, "get_task", json!({"key":key})).await)["estimate"],
+        5
     );
+    data(
+        call_fresh(
+            &c,
+            "update_task",
+            json!({"key":key,"estimate":null,"dueAt":null}),
+        )
+        .await,
+    );
+    let cleared = data(call_fresh(&c, "get_task", json!({"key":key})).await);
+    assert!(cleared["estimate"].is_null() && cleared["dueAt"].is_null());
     assert_eq!(
         data(call_fresh(&c, "release_task", json!({"key":key})).await)["status"],
         "backlog"
@@ -418,7 +447,7 @@ async fn full_stdio_contract_and_errors() {
             .len(),
         1
     );
-    assert_eq!(c.list_all_resources().await.unwrap().len(), 3);
+    assert_eq!(c.list_all_resources().await.unwrap().len(), 5);
     assert_eq!(
         c.list_all_resource_templates()
             .await
@@ -494,6 +523,14 @@ async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
     let source = dir.path().join("candidate.png");
     std::fs::write(&source, b"local asset fixture").unwrap();
     let item=data(call_raw(&c,"add_reference",json!({"kind":"asset","filePath":source,"copy":true,"frameId":frame["id"],"caption":"https://example.test/candidate — composition"})).await);
+    let item = serde_json::to_value(
+        s.list_references(None, None, None)
+            .unwrap()
+            .into_iter()
+            .find(|r| Some(r.audit.id.as_str()) == item["id"].as_str())
+            .unwrap(),
+    )
+    .unwrap();
     let asset = s
         .list_assets(None, None)
         .unwrap()
@@ -519,7 +556,17 @@ async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
         )
         .await,
     );
-    assert_eq!(linked["links"][0]["targetKey"], e["key"]);
+    assert_eq!(linked["kind"], "reference");
+    assert_eq!(
+        s.list_ref_frames()
+            .unwrap()
+            .into_iter()
+            .find(|f| Some(f.id.as_str()) == frame["id"].as_str())
+            .unwrap()
+            .links[0]
+            .target_key,
+        e["key"]
+    );
     let refs = data(call_raw(&c, "list_references", json!({"epicKey":e["key"]})).await);
     assert_eq!(refs[0]["via"], "frame");
     assert_eq!(refs[0]["frameTitle"], "Moodboard candidates");
@@ -536,7 +583,8 @@ async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
         &h.id,
         jam_core::ReferenceVerdictInput {
             item_id: item["id"].as_str().unwrap().into(),
-            verdict: Some(jam_core::ReferenceVerdict::Keep),
+            verdict: Some(Some(jam_core::ReferenceVerdict::Keep)),
+            verdict_note: None,
         },
     )
     .unwrap();
@@ -545,7 +593,7 @@ async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
     s.canvas_archive(
         &h.id,
         jam_core::CanvasArchive {
-            kind: "item".into(),
+            kind: "item".parse::<jam_core::CanvasEntityKind>().unwrap(),
             id: item["id"].as_str().unwrap().into(),
             archived: true,
         },
@@ -569,7 +617,16 @@ async fn ac14_frame_links_feedback_and_copied_assets_through_stdio() {
         )
         .await,
     );
-    assert!(unlinked["links"].as_array().unwrap().is_empty());
+    assert_eq!(unlinked["kind"], "reference");
+    assert!(
+        s.list_ref_frames()
+            .unwrap()
+            .into_iter()
+            .find(|f| Some(f.id.as_str()) == frame["id"].as_str())
+            .unwrap()
+            .links
+            .is_empty()
+    );
     let (other, other_h) = s
         .create_jam("Other moodboard", None, None, None, "UTC", "Other human")
         .unwrap();
@@ -1027,7 +1084,7 @@ async fn every_v2_tool_success_and_error_through_stdio() {
         (
             "review_task",
             json!({"key":key,"verdict":"invalid","commentsMd":""}),
-            "wrong_status",
+            "validation",
         ),
         (
             "ask_user",
@@ -1772,7 +1829,9 @@ async fn agent_done_needs_independent_review_and_archived_claims_can_be_released
     );
     let released = data(call_fresh(&worker, "release_task", json!({"key":key})).await);
     assert_eq!(released["status"], "backlog");
-    assert!(released["assigneeId"].is_null());
+    assert!(
+        data(call_fresh(&worker, "get_task", json!({"key":key})).await)["assigneeId"].is_null()
+    );
     let scope = data(
         call_fresh(
             &brain,
@@ -1800,7 +1859,14 @@ async fn caller_captured_context_fences_every_task_write_and_missing_arguments_f
     input["status"] = json!("ready");
     let ready = data(call_raw(&worker, "create_task", input).await);
     let key = ready["key"].as_str().unwrap();
-    data(call_raw(&brain, "become_brain", json!({"epicKey":ready["epicKey"]})).await);
+    data(
+        call_raw(
+            &brain,
+            "become_brain",
+            json!({"epicKey":s.get_task(key).unwrap().task.epic_key}),
+        )
+        .await,
+    );
     let tools = worker.list_all_tools().await.unwrap();
     for name in [
         "claim_task",
@@ -1911,7 +1977,9 @@ async fn caller_captured_context_fences_every_task_write_and_missing_arguments_f
                 .as_str()
                 .unwrap()
                 .into(),
-            verdict: "changes_requested".into(),
+            verdict: "changes_requested"
+                .parse::<jam_core::ReviewVerdict>()
+                .unwrap(),
             comments_md: "New round".into(),
             failed_tests: None,
         },

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { TaskFileInput } from "../../bindings";
 import { commands } from "../../bindings";
 import { mockApi } from "../../lib/mock-bridge";
+import { mockFilesV2 } from "../../lib/mock-files-v2";
 import { mockTaskFiles } from "../../lib/mock-task-files";
 import {
   registration,
@@ -22,12 +23,17 @@ import { AssetLinkDialog } from "../assets/AssetLinkDialog";
 import { AssetsPage } from "../assets/AssetsPage";
 import { TaskFiles } from "./TaskFiles";
 
+const fileNavigate = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", async (original) => ({
   ...(await original<typeof import("@tanstack/react-router")>()),
   useBlocker: () => ({}),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => fileNavigate,
 }));
+vi.hoisted(() => {
+  vi.stubEnv("VITE_MOCK_BRIDGE", "1");
+});
 beforeEach(async () => {
+  mockFilesV2.reset();
   mockApi.setLatency(0);
   await mockApi.resetDemo();
   mockTaskFiles.reset();
@@ -54,7 +60,7 @@ async function file(
 }
 async function link(
   assetId: string,
-  role = "reference",
+  role: "reference" | "to_edit" | "result" = "reference",
   taskKey = "JB-7",
   position = 0,
 ) {
@@ -144,9 +150,9 @@ it("FI-T03: cancel an in-flight copy leaves no registered file or mock bytes", a
     const rejected = expect(pending).rejects.toThrow(/cancelled/);
     await vi.advanceTimersByTimeAsync(0);
     expect(
-      (await taskFilesApi.status(context, request.requestId)).canCancel,
+      (await taskFilesApi.status(context, request.requestId ?? "")).canCancel,
     ).toBe(true);
-    await taskFilesApi.cancel(context, request.requestId);
+    await taskFilesApi.cancel(context, request.requestId ?? "");
     await vi.advanceTimersByTimeAsync(50);
     await rejected;
     expect(mockTaskFiles.bytes.size).toBe(0);
@@ -760,4 +766,22 @@ it("P-T05: Assets filters storage and task role, and marks a missing linked card
   expect(
     screen.queryByRole("heading", { name: missing.name }),
   ).not.toBeInTheDocument();
+});
+it("R12-F: file name opens the in-app route while Open still uses the external opener", async () => {
+  const asset = await file("board_file", "C:/source/viewer-plan.md");
+  await link(asset.id);
+  const open = vi.spyOn(taskFilesApi, "open");
+  await mount();
+  await userEvent.click(
+    await screen.findByRole("button", { name: "viewer-plan.md" }),
+  );
+  const route = fileNavigate.mock.calls.at(-1)?.[0];
+  expect(route.search({ task: "JB-7" })).toMatchObject({
+    task: "JB-7",
+    file: asset.id,
+  });
+  expect(open).not.toHaveBeenCalled();
+  const row = screen.getByRole("article", { name: "viewer-plan.md" });
+  await userEvent.click(within(row).getByRole("button", { name: /Open/ }));
+  expect(open).toHaveBeenCalledWith(expect.anything(), asset.id, false);
 });

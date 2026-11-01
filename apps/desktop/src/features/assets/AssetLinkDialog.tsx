@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
+import type { FileScope } from "../../bindings";
 import { Button, Dialog, Select } from "../../components/ui";
 import { ProjectWriteFeedback } from "../../components/ui/ProjectWriteFeedback";
 import { api } from "../../lib/api";
@@ -10,7 +11,29 @@ import {
   taskFilesApi,
 } from "../../lib/task-files-api";
 import { useProjectWrite } from "../../lib/use-project-write";
+import { ScopeLinkDialog } from "../files/ScopeLinkDialog";
 export function AssetLinkDialog({
+  scope,
+  registerDocument,
+  ...props
+}: {
+  scope?: FileScope;
+  registerDocument?: boolean;
+  assetId?: string;
+  taskKey?: string;
+  close(): void;
+}) {
+  return scope ? (
+    <ScopeLinkDialog
+      scope={scope}
+      register={registerDocument}
+      close={props.close}
+    />
+  ) : (
+    <TaskAssetLinkDialog {...props} />
+  );
+}
+function TaskAssetLinkDialog({
   assetId,
   taskKey,
   close,

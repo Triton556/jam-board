@@ -34,7 +34,7 @@ impl ProjectManager {
         }
         if let Some(entry) = self
             .registry
-            .entries()?
+            .canonical_entries()?
             .into_iter()
             .find(|e| e.project_id == project)
         {
@@ -129,7 +129,7 @@ impl ProjectManager {
                 h.store.clone()
             } else if self
                 .registry
-                .entries()?
+                .canonical_entries()?
                 .iter()
                 .any(|e| e.project_id == input.project_id)
             {
@@ -229,7 +229,7 @@ impl ProjectManager {
         let _guard = self.selection_guard()?;
         let entry = self
             .registry
-            .entries()?
+            .canonical_entries()?
             .into_iter()
             .find(|e| e.instance_id == instance)
             .ok_or_else(|| Error::NotFound("Recent project instance".into()))?;

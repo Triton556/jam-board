@@ -23,10 +23,10 @@ const blank = (name: string) => ({
   startsAt: "",
   endsAt: "",
   timezone: "UTC",
-  template: "custom",
+  template: "custom" as const,
   milestoneAt: null,
 });
-const query = { sort: { field: "key", dir: "asc" } };
+const query = { sort: { field: "key" as const, dir: "asc" as const } };
 beforeEach(async () => {
   await mockApi.resetDemo();
   // Explicit synthetic viewport for deterministic virtual-window tests. This is

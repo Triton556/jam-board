@@ -28,6 +28,7 @@ pub fn default_folder_rules() -> BTreeMap<String, String> {
     [
         ("sprite", "files/images"),
         ("audio", "files/audio"),
+        ("video", "files/videos"),
         ("model", "files/models"),
         ("document", "files/docs"),
         ("level", "files/other"),
@@ -56,7 +57,11 @@ pub fn check_wal_runtime() -> Result<()> {
 }
 pub fn read_manifest(folder: &Path) -> Result<(ProjectManifest, String)> {
     let bytes = std::fs::read(folder.join("jamboard.json"))?;
-    let m: ProjectManifest = serde_json::from_slice(&bytes)?;
+    let mut m: ProjectManifest = serde_json::from_slice(&bytes)?;
+    // The v1 manifest's seven-kind rules remain readable after adding video.
+    if m.folder_rules.len() == 7 && !m.folder_rules.contains_key("video") {
+        m.folder_rules.insert("video".into(), "files/videos".into());
+    }
     if m.schema_version != 1 {
         return Err(invalid(
             "schemaVersion",
@@ -283,7 +288,7 @@ impl ProjectHandle {
             last_snapshot_at: self.store.setting("local.last_snapshot_at")?,
             instance_id: self.instance_id.clone(),
             project_id: self.project_id.clone(),
-            folder: self.folder.to_string_lossy().into(),
+            folder: display_path(&self.folder),
             selection_epoch: self.selection_epoch,
             database_generation: self.database_generation.clone(),
             manifest,
@@ -495,7 +500,7 @@ impl ProjectManager {
                 crate::db::sqlite_path(&existing_db)?,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
             )?;
-            if c.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))? == 9 {
+            if (9..=10).contains(&c.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))?) {
                 let moved: Option<String> = c.query_row(
                     "SELECT moved_to FROM jams WHERE id=?",
                     [&manifest.id],
@@ -542,7 +547,7 @@ impl ProjectManager {
                 }
             }
         }
-        for e in self.registry.entries()? {
+        for e in self.registry.canonical_entries()? {
             if relocated_instance.is_some_and(|(instance, _)| instance == e.instance_id) {
                 continue;
             }
@@ -750,6 +755,7 @@ pub(crate) fn initialize_layout(folder: &Path) -> Result<()> {
         "files/images",
         "files/audio",
         "files/models",
+        "files/videos",
         "files/docs",
         "files/other",
     ] {
@@ -1032,10 +1038,10 @@ impl Store {
                 .map(repository_context)
                 .transpose()?
                 .flatten()
-                .map(|(root, _)| root.to_string_lossy().into_owned());
+                .map(|(root, _)| display_path(&root));
             let project = crate::projects::selected_jam(c)?;
             use rusqlite::OptionalExtension;
-            let working_directory = c
+            let working_directory: Option<String> = c
                 .query_row(
                     "SELECT value FROM settings WHERE key=?",
                     [format!("board.{}.working_directory", project.id)],
@@ -1046,9 +1052,9 @@ impl Store {
                 project_instance_id: instance,
                 database_generation: generation,
                 board_revision: revision,
-                project_folder: folder.map(|p| p.to_string_lossy().into()),
+                project_folder: folder.map(|p| display_path(&p)),
                 repository_root: root,
-                working_directory,
+                working_directory: working_directory.map(|p| display_path(Path::new(&p))),
                 folder_rules: manifest
                     .as_ref()
                     .map(|(m, _)| m.folder_rules.clone())
@@ -1110,6 +1116,10 @@ impl Store {
                 "task_idempotency",
                 "execution_states",
                 "execution_requests",
+                "scope_files",
+                "write_receipts",
+                "external_sync",
+                "import_batches",
             ] {
                 let col = if table == "jams" { "id" } else { "jam_id" };
                 c.execute(
@@ -1119,6 +1129,10 @@ impl Store {
             }
             c.execute(
                 "UPDATE questions SET scope_id=? WHERE scope_type='project' AND scope_id=?",
+                [new, old],
+            )?;
+            c.execute(
+                "UPDATE scope_files SET target_id=? WHERE target_type='project' AND target_id=?",
                 [new, old],
             )?;
             for table in ["file_operations", "project_moves"] {

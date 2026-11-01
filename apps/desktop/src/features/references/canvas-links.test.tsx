@@ -53,7 +53,7 @@ beforeEach(async () => {
   canvasPick.set(null);
 });
 afterEach(() => vi.restoreAllMocks());
-async function fixture() {
+async function fixture(rateable = false) {
   const app = await mockApi.appState();
   const frame = await mockApi.createRefFrame({
     title: "Moodboard",
@@ -61,7 +61,8 @@ async function fixture() {
     y: 0,
   });
   const item = await mockApi.addReference({
-    kind: "note",
+    kind: rateable ? "link" : "note",
+    ...(rateable ? { url: "https://example.test/candidate" } : {}),
     title: "Candidate",
     text: "Warm light",
     frameId: frame.id,
@@ -182,7 +183,7 @@ it("drawer picker selects frames and items across tabs, links them and removes l
     ).toHaveFocus(),
   );
   await userEvent.click(
-    within(dialog).getByRole("checkbox", { name: /Moodboard/ }),
+    within(dialog).getByRole("checkbox", { name: f.frame.title }),
   );
   await userEvent.click(within(dialog).getByRole("tab", { name: "Items" }));
   await userEvent.type(within(dialog).getByRole("textbox"), "Source");
@@ -263,7 +264,11 @@ it("canvas target picker searches by key, groups work and links mixed selection"
   await userEvent.click(screen.getByRole("button", { name: "Link 2" }));
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
   expect(
-    frameTargets((await mockApi.referenceCanvas()).frames[0] ?? f.frame),
+    frameTargets(
+      (await mockApi.referenceCanvas()).frames.find(
+        (row) => row.id === f.frame.id,
+      ) ?? f.frame,
+    ),
   ).toMatchObject([{ targetKey: target.key }]);
 });
 it("board-ref-drop emits exact URIs and links drawer references without geometry writes", async () => {
@@ -318,7 +323,7 @@ function VerdictHarness({ id }: { id: string }) {
   return item ? <VerdictToolbar item={item} /> : null;
 }
 it("verdict buttons have 28px computed hit areas in unchanged 24px layout slots", async () => {
-  const f = await fixture();
+  const f = await fixture(true);
   render(
     <QueryClientProvider client={f.client}>
       <style>
@@ -348,7 +353,7 @@ it("verdict buttons have 28px computed hit areas in unchanged 24px layout slots"
   }
 });
 it("verdict toggles are mutually exclusive and clear on second click", async () => {
-  const f = await fixture();
+  const f = await fixture(true);
   render(
     <QueryClientProvider client={f.client}>
       <VerdictHarness id={f.item.id} />
@@ -371,7 +376,7 @@ it("verdict toggles are mutually exclusive and clear on second click", async () 
   ).toMatchObject({ verdict: null });
 });
 it("verdict is optimistic and restores only its own field when the command fails", async () => {
-  const f = await fixture();
+  const f = await fixture(true);
   let reject!: (reason: Error) => void;
   vi.spyOn(mockApi, "setReferenceVerdict").mockImplementationOnce(
     () =>

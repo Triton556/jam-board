@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — round 12
+
+- Independent Board column scrolling with pinned controls and 192-card drag/anchor checks.
+- File viewer deep links, scoped project/epic/story documents, usage-aware deletion, archive, replacement/history and video metadata.
+- Contract v2: per-tool retry receipts, external references, dry-run plan imports/history/guarded undo, compact reads, enums, moves and prompt resources.
+- Human moodboard reasons, keyboard review, Send feedback events, variations and Collect Keep; Inbox Questions/Events with per-project seen state.
+- Per-shell connection snippets and integrated shared mock/project state. No version bump, release, native or real-agent acceptance is implied; see docs/verification/round12.md.
+
+
 All notable changes to Jam Board are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 

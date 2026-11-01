@@ -18,3 +18,59 @@
   gap: 16px;
   padding-top: 16px;
 }
+
+.connect-shells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.connect-shells button {
+  padding: 7px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: inherit;
+  background: var(--card);
+  cursor: pointer;
+}
+.connect-shells button[aria-selected="true"] {
+  font-weight: 650;
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.connect-snippet {
+  min-width: 0;
+  max-width: 100%;
+}
+.connect-snippet .code-block {
+  min-width: 0;
+}
+.connect-snippet pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.connect-presence {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.connect-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-soft);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: connect-spin 1s linear infinite;
+}
+@keyframes connect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .connect-spinner {
+    animation: none;
+  }
+}

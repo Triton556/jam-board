@@ -559,6 +559,55 @@ pub async fn set_reference_verdict(
     })
     .await
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn send_reference_review(
+    input: SendReferenceReviewInput,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<RefFrame, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.send_reference_review(&s.current_member()?.id, &input.frame_id)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn collect_kept_references(
+    input: CollectKeptInput,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<CollectKeptResult, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.collect_kept_references(&s.current_member()?.id, input)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn list_inbox_events(
+    input: InboxEventsQuery,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<InboxEventsPage, ApiError> {
+    execute(&state, app, false, move |s| {
+        s.list_inbox_events(&s.current_member()?.id, input)
+    })
+    .await
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn mark_inbox_events_seen(
+    seq: i64,
+    state: State<'_, DesktopState>,
+    app: tauri::AppHandle,
+) -> Result<i64, ApiError> {
+    execute(&state, app, true, move |s| {
+        s.mark_inbox_events_seen(&s.current_member()?.id, seq)
+    })
+    .await
+}
 #[tauri::command]
 #[specta::specta]
 pub async fn link_ref_frame(

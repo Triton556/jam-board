@@ -104,10 +104,9 @@ fn reference(
                     .is_none_or(|r| t.changes_requested == r)
                 && filter.needs_info.is_none_or(|r| t.needs_info == r)
                 && (filter.include_archived.unwrap_or(false) || t.archived_at.is_none())
-                && filter
-                    .status
-                    .as_ref()
-                    .is_none_or(|statuses| statuses.contains(&t.status))
+                && filter.status.as_ref().is_none_or(|statuses| {
+                    statuses.iter().any(|status| status.as_str() == t.status)
+                })
                 && filter.assignee.as_ref().is_none_or(|a| match a.as_str() {
                     "me" => actor.is_some() && t.assignee_id.as_deref() == actor,
                     "unassigned" => t.assignee_id.is_none(),
@@ -214,8 +213,9 @@ fn list_page_matches_full_field_reference_for_all_defined_filters_and_actor_mode
         .ask_user(
             &p.human.id,
             AskUser {
+                request_id: None,
                 scope: Scope {
-                    kind: "task".into(),
+                    kind: "task".parse::<jam_core::ScopeKind>().unwrap(),
                     id: p.tasks[0].key.clone(),
                 },
                 title: "Fictional clarification".into(),
@@ -270,7 +270,6 @@ fn list_page_matches_full_field_reference_for_all_defined_filters_and_actor_mode
     for input in [
         json!({"limit":0}),
         json!({"limit":201}),
-        json!({"status":["unknown"]}),
         json!({"cursor":"-1"}),
         json!({"cursor":"broken"}),
     ] {
@@ -280,6 +279,7 @@ fn list_page_matches_full_field_reference_for_all_defined_filters_and_actor_mode
             Err(Error::Validation { .. })
         ));
     }
+    assert!(serde_json::from_value::<TaskFilter>(json!({"status":["unknown"]})).is_err());
     assert_eq!(
         logical_snapshot(&f.path),
         before,
@@ -473,8 +473,9 @@ fn needs_info_only_counts_open_task_questions_in_the_pinned_project() {
             .ask_user(
                 &project.human.id,
                 AskUser {
+                    request_id: None,
                     scope: Scope {
-                        kind: kind.into(),
+                        kind: kind.parse::<jam_core::ScopeKind>().unwrap(),
                         id: id.into(),
                     },
                     title: "Fictional question".into(),

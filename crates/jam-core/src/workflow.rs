@@ -58,7 +58,7 @@ pub(crate) fn readiness_for(c: &Connection, t: &TaskSummary) -> Result<Readiness
             b.result_md.trim().is_empty(),
         ),
         (
-            "story_active",
+            "story_inactive",
             "The story is still draft",
             s.status != "active",
         ),
@@ -194,14 +194,7 @@ pub(crate) fn scope(c: &Connection, s: &Scope) -> Result<(Scope, Option<String>,
     if jam_id != j.id {
         return Err(invalid("scope", "Choose a scope in the active project"));
     }
-    Ok((
-        Scope {
-            kind: s.kind.clone(),
-            id,
-        },
-        eid,
-        tid,
-    ))
+    Ok((Scope { kind: s.kind, id }, eid, tid))
 }
 impl Store {
     pub fn check_ready(&self, key: &str) -> Result<Readiness> {
@@ -266,60 +259,85 @@ impl Store {
         if report.id != input.expected_report_id || crate::context::review_revision(c,&t)?.as_deref() != Some(input.expected_review_context_revision.as_str()) { return Err(Error::Conflict); }
         if !["accept","changes_requested"].contains(&input.verdict.as_str()){return Err(invalid("verdict","Choose accept or changes_requested"));}
         let failed=input.failed_tests.unwrap_or_default();for name in &failed{if !report.tests.iter().any(|t|t.name==*name){return Err(invalid("failedTests",&format!("Unknown report test {name}")));}}
-        let review=Review{id:id(),task_id:t.id.clone(),round:t.review_round,reviewer_id:actor.into(),verdict:input.verdict.clone(),comments_md:input.comments_md,failed_tests:failed.clone(),created_at:now()};insert(c,"reviews",&review)?;
+        let review=Review{id:id(),task_id:t.id.clone(),round:t.review_round,reviewer_id:actor.into(),verdict:input.verdict.into(),comments_md:input.comments_md,failed_tests:failed.clone(),created_at:now()};insert(c,"reviews",&review)?;
         let requested=input.verdict=="changes_requested";let target=if requested{"ready"}else{"done"};c.execute("UPDATE tasks SET status=?,changes_requested=?,review_round=review_round+?,position=(SELECT coalesce(max(position),0)+1024 FROM tasks WHERE jam_id=? AND status=? AND archived_at IS NULL) WHERE id=?",params![target,requested,i64::from(requested),t.jam_id,target,t.id])?;touch(c,&t.id,actor)?;
         v2_event(c,actor,Some(&t.epic_id),"review.recorded",Some(&t.id),json!({"key":t.key,"round":review.round,"verdict":review.verdict,"failedTests":failed,"reviewId":review.id}))?;Ok(review)
     })
     }
     pub fn ask_user(&self, actor: &str, input: AskUser) -> Result<Question> {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
         self.write(|c| {
-            member(c, actor)?;
-            let (scope, eid, tid) = scope(c, &input.scope)?;
-            crate::m5::validate_name("title", &input.title, 140)?;
-            let options = input.options.unwrap_or_default();
-            if options.len() > 6 || options.iter().any(|o| o.label.trim().is_empty()) {
-                return Err(invalid("options", "Use zero to six named options"));
-            }
-            if input.recommended_index.is_some_and(|i| i >= options.len()) {
-                return Err(invalid("recommendedIndex", "Choose an existing option"));
-            }
-            let allow = input.allow_free_text.unwrap_or(true);
-            if options.is_empty() && !allow {
-                return Err(invalid(
-                    "allowFreeText",
-                    "A question must allow at least one answer",
-                ));
-            }
-            let q = Question {
-                id: id(),
-                jam_id: crate::service::jam(c)?.id,
-                epic_id: eid.clone(),
-                scope_type: scope.kind,
-                scope_id: scope.id,
-                asked_by: actor.into(),
-                round_label: input.round_label,
-                title: input.title,
-                body_md: input.body_md.unwrap_or_default(),
-                options,
-                recommended_index: input.recommended_index,
-                allow_free_text: allow,
-                status: "open".into(),
-                answer_index: None,
-                answer_text: None,
-                answered_by: None,
-                answered_at: None,
-                created_at: now(),
-            };
-            insert(c, "questions", &q)?;
-            v2_event(
+            Ok(crate::receipts::with_receipt(
                 c,
                 actor,
-                eid.as_deref(),
-                "question.asked",
-                tid.as_deref(),
-                json!({"questionId":q.id,"title":q.title,"roundLabel":q.round_label}),
-            )?;
-            Ok(q)
+                request.as_deref(),
+                "ask_user",
+                "question",
+                &payload,
+                || {
+                    member(c, actor)?;
+                    let (scope, eid, tid) = scope(c, &input.scope)?;
+                    crate::m5::validate_name("title", &input.title, 140)?;
+                    let options = input.options.unwrap_or_default();
+                    if options.len() > 6 || options.iter().any(|o| o.label.trim().is_empty()) {
+                        return Err(invalid("options", "Use zero to six named options"));
+                    }
+                    if input.recommended_index.is_some_and(|i| i >= options.len()) {
+                        return Err(invalid("recommendedIndex", "Choose an existing option"));
+                    }
+                    let allow = input.allow_free_text.unwrap_or(true);
+                    if options.is_empty() && !allow {
+                        return Err(invalid(
+                            "allowFreeText",
+                            "A question must allow at least one answer",
+                        ));
+                    }
+                    let q = Question {
+                        replayed: false,
+                        updated_at: String::new(),
+                        id: id(),
+                        jam_id: crate::service::jam(c)?.id,
+                        epic_id: eid.clone(),
+                        scope_type: scope.kind.into(),
+                        scope_id: scope.id,
+                        asked_by: actor.into(),
+                        round_label: input.round_label,
+                        title: input.title,
+                        body_md: input.body_md.unwrap_or_default(),
+                        options,
+                        recommended_index: input.recommended_index,
+                        allow_free_text: allow,
+                        status: "open".into(),
+                        answer_index: None,
+                        answer_text: None,
+                        answered_by: None,
+                        answered_at: None,
+                        created_at: now(),
+                    };
+                    insert(c, "questions", &q)?;
+                    v2_event(
+                        c,
+                        actor,
+                        eid.as_deref(),
+                        "question.asked",
+                        tid.as_deref(),
+                        json!({"questionId":q.id,"title":q.title,"roundLabel":q.round_label}),
+                    )?;
+                    Ok(q)
+                },
+                |receipt| {
+                    crate::planning::fetch(
+                        c,
+                        "questions",
+                        "id",
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing ID"))?,
+                    )
+                },
+            )?
+            .value)
         })
     }
     pub fn answer_question(&self, actor: &str, input: AnswerQuestion) -> Result<Question> {
@@ -377,7 +395,7 @@ if input.answer_index.is_none()&&text.is_none(){return Err(invalid("answer","Cho
                 status.is_none_or(|s| q.status == s)
                     && scope_filter
                         .as_ref()
-                        .is_none_or(|s| q.scope_id == s.id && q.scope_type == s.kind)
+                        .is_none_or(|s| q.scope_id == s.id && q.scope_type == s.kind.as_str())
             });
             Ok(rows)
         })

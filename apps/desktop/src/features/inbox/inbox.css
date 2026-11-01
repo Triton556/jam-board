@@ -1,3 +1,17 @@
+.inbox-page > .page-heading,
+.inbox-tabs,
+.inbox-scroll {
+  width: 100%;
+  max-width: 900px;
+  margin-inline: auto;
+}
+.inbox-page > .inbox-scroll {
+  padding-right: 0;
+}
+.inbox-page .hand-note {
+  transform-origin: top left;
+  transform: rotate(-5deg) translateY(2px);
+}
 .inbox-scroll > section {
   max-width: 900px;
   margin-inline: auto;
@@ -15,4 +29,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+@media (max-width: 500px) {
+  .inbox-page > .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .inbox-page > .page-heading .segmented {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  .inbox-page .question-option > span {
+    flex-wrap: wrap;
+  }
 }

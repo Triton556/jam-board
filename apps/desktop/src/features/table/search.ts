@@ -81,14 +81,23 @@ export function tableQuery(search: TableSearch): TaskQuery {
     changesRequested: search.changes ? true : null,
     needsInfo: search.info ? true : null,
     text: search.q || null,
-    status: search.status?.split(",") ?? null,
+    status:
+      search.status
+        ?.split(",")
+        .filter((v): v is (typeof statuses)[number] =>
+          statuses.some((status) => status === v),
+        ) ?? null,
     assignee: search.assignee || null,
     tags: search.tags?.split(",") ?? null,
     includeArchived: search.archived === "1",
     sort:
       field === "none"
         ? null
-        : { field: field ?? "updatedAt", dir: dir ?? "desc" },
+        : {
+            field: (field ??
+              "updatedAt") as import("../../bindings").TaskSortField,
+            dir: (dir ?? "desc") as import("../../bindings").SortDirection,
+          },
   };
 }
 export function nextSort(current: string | undefined, field: string) {

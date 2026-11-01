@@ -105,6 +105,60 @@ fn save(c: &Connection, r: &MoveReceipt) -> Result<()> {
 fn digest(s: &BoardSnapshot) -> Result<String> {
     Ok(crate::storage_io::hash(&serde_json::to_vec(&s.tables)?))
 }
+fn copy_retained_files(source: &Store, stage: &Path, receipt: &mut MoveReceipt) -> Result<()> {
+    let (state, _) = source.asset_state_root(&receipt.project_id)?;
+    for folder in ["revisions", "trash"] {
+        let root = state.join(folder);
+        if !root.is_dir() {
+            continue;
+        }
+        let root = root.canonicalize()?;
+        let mut pending = vec![PathBuf::new()];
+        let mut visited = std::collections::BTreeSet::new();
+        while let Some(relative) = pending.pop() {
+            let directory = root.join(&relative);
+            if !visited.insert(directory.canonicalize()?) {
+                return Err(invalid("move", "Retained files contain a directory cycle"));
+            }
+            for entry in std::fs::read_dir(directory)? {
+                let entry = entry?;
+                let child = relative.join(entry.file_name());
+                let portable = child.to_string_lossy().replace('\\', "/");
+                let from = crate::storage_io::contained(&root, &portable)?;
+                if entry.file_type()?.is_dir() {
+                    pending.push(child);
+                    continue;
+                }
+                if !entry.file_type()?.is_file() {
+                    return Err(invalid("move", "Retained files must be regular files"));
+                }
+                let target_relative = format!(".state/{folder}/{portable}");
+                let target = crate::storage_io::contained(stage, &target_relative)?;
+                std::fs::create_dir_all(
+                    target
+                        .parent()
+                        .ok_or_else(|| invalid("move", "Missing retained-file parent"))?,
+                )?;
+                let source_hash = crate::storage_io::hash_reader(File::open(&from)?)?;
+                if target.exists() {
+                    if crate::storage_io::hash_reader(File::open(&target)?)? != source_hash {
+                        return Err(Error::Conflict);
+                    }
+                } else {
+                    crate::storage_io::atomic_copy(&from, &target)?;
+                }
+                if receipt
+                    .file_hashes
+                    .insert(target_relative, source_hash.0)
+                    .is_none()
+                {
+                    receipt.byte_total += source_hash.1;
+                }
+            }
+        }
+    }
+    Ok(())
+}
 fn prune(c: &mut Connection, project: &str) -> Result<()> {
     let original_projects: i64 = c.query_row("SELECT count(*) FROM jams", [], |r| r.get(0))?;
     if original_projects > 1
@@ -163,12 +217,16 @@ fn prune(c: &mut Connection, project: &str) -> Result<()> {
         "DELETE FROM ref_frame_links WHERE frame_id NOT IN (SELECT id FROM ref_frames)",
         [],
     )?;
-    for table in ["asset_components", "file_previews"] {
+    for table in ["asset_components", "file_previews", "asset_revisions"] {
         tx.execute(
             &format!("DELETE FROM {table} WHERE asset_id NOT IN (SELECT id FROM assets)"),
             [],
         )?;
     }
+    tx.execute(
+        "DELETE FROM import_batch_items WHERE batch_id NOT IN (SELECT id FROM import_batches)",
+        [],
+    )?;
     tx.execute("DELETE FROM jams WHERE id!=?", [project])?;
     tx.execute(
         "DELETE FROM work_contexts WHERE task_id IS NOT NULL AND task_id NOT IN (SELECT id FROM tasks)",
@@ -340,7 +398,7 @@ impl ProjectManager {
             }
             r.state = "frozen".into();
             let tx = c.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            if tx.query_row("SELECT EXISTS(SELECT 1 FROM file_operations WHERE project_id=? AND state='copying')",[&r.project_id],|row|row.get::<_,bool>(0))?{return Err(invalid("move","Finish or cancel pending file operations before moving"));}
+            if tx.query_row("SELECT EXISTS(SELECT 1 FROM file_operations WHERE project_id=?1 AND state='copying' UNION ALL SELECT 1 FROM write_receipts WHERE jam_id=?1 AND tool IN ('register_file','add_reference') AND json_extract(result_json,'$.fileOperation.state')='copying')",[&r.project_id],|row|row.get::<_,bool>(0))?{return Err(invalid("move","Finish or cancel pending file operations before moving"));}
             save(&tx, &r)?;
             tx.commit()?;
         }
@@ -363,7 +421,8 @@ impl ProjectManager {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.len()))
                 .collect();
-            let stage = Path::new(&r.staging);
+            let staging = r.staging.clone();
+            let stage = Path::new(&staging);
             if !stage.exists() {
                 std::fs::create_dir(stage)?;
                 initialize_layout(stage)?;
@@ -421,7 +480,10 @@ impl ProjectManager {
                 .ok();
             for file in source
                 .for_project(&r.project_id)?
-                .list_file_assets(FileAssetQuery::default())?
+                .list_file_assets(FileAssetQuery {
+                    include_archived: Some(true),
+                    ..Default::default()
+                })?
             {
                 let path = PathBuf::from(&file.asset.location);
                 let physical = path.canonicalize();
@@ -502,6 +564,7 @@ impl ProjectManager {
                     r.unresolved_links.push(file.asset.location);
                 }
             }
+            copy_retained_files(source, stage, &mut r)?;
             set_folder_metadata(&store, stage)?;
             r.destination_digest = digest(&store.board_snapshot()?)?;
             // Capture a second source fingerprint from a freshly scoped online backup before publication.

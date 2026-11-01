@@ -8,6 +8,9 @@ use tauri_specta::Event;
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorCode {
+    AlreadyUndone,
+    InUse,
+    IdempotencyConflict,
     NotFound,
     ClaimConflict,
     StaleClaim,
@@ -26,10 +29,16 @@ pub struct ApiError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(type=Option<jam_core::JsonPayload>)]
+    pub data: Option<Box<serde_json::Value>>,
 }
 impl From<jam_core::Error> for ApiError {
     fn from(error: jam_core::Error) -> Self {
         let (code, field) = match &error {
+            Error::AlreadyUndone(_) => (ApiErrorCode::AlreadyUndone, None),
+            Error::InUse { .. } => (ApiErrorCode::InUse, None),
+            Error::IdempotencyConflict(_) => (ApiErrorCode::IdempotencyConflict, None),
             Error::NotFound(_) => (ApiErrorCode::NotFound, None),
             Error::ClaimConflict { .. } => (ApiErrorCode::ClaimConflict, None),
             Error::StaleClaim => (ApiErrorCode::StaleClaim, None),
@@ -43,14 +52,19 @@ impl From<jam_core::Error> for ApiError {
             _ => (ApiErrorCode::Internal, None),
         };
         Self {
+            data: match &error {
+                Error::InUse { usage } => Some(Box::new(serde_json::json!({"usage":usage}))),
+                _ => None,
+            },
             code,
-            message: error.to_string(),
+            message: error.protocol_message(),
             field,
         }
     }
 }
 pub(crate) fn internal(e: impl std::fmt::Display) -> ApiError {
     ApiError {
+        data: None,
         code: ApiErrorCode::Internal,
         message: e.to_string(),
         field: None,
@@ -496,6 +510,28 @@ pub fn app_ready(state: State<'_, DesktopState>, app: tauri::AppHandle) -> Resul
 #[cfg(test)]
 mod project_command_tests {
     use super::*;
+    #[test]
+    fn typed_errors_serialize_usage_and_one_prefix_without_an_app() {
+        let error: ApiError = Error::InUse {
+            usage: Box::default(),
+        }
+        .into();
+        let wire = serde_json::to_value(error).unwrap();
+        assert_eq!(wire["code"], "in_use");
+        assert_eq!(wire["data"]["usage"]["tasks"], serde_json::json!([]));
+        assert_eq!(
+            wire["message"].as_str().unwrap().matches("in_use:").count(),
+            1
+        );
+        let error: ApiError = Error::Validation {
+            field: "name".into(),
+            reason: "Choose a name".into(),
+        }
+        .into();
+        assert_eq!(error.message, "validation: name: Choose a name");
+        assert_eq!(error.field.as_deref(), Some("name"));
+        assert!(error.data.is_none());
+    }
     #[test]
     fn ordinary_commands_never_fall_back_to_unbound_after_the_last_project_is_archived() {
         let directory = std::env::temp_dir().join(format!(

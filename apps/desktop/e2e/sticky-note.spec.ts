@@ -12,6 +12,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: 1180, height: 812 });
     await page.goto("/");
     await page.getByRole("button", { name: "Load demo jam" }).click();
+    await page.evaluate(() => window.__jamMock.seedBulkReferences(0, 0, 0));
     await page.goto("/references");
     await expect(
       page.getByRole("region", { name: "References canvas", exact: true }),

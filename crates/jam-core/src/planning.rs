@@ -103,6 +103,10 @@ pub(crate) fn fetch<T: DeserializeOwned>(
         crate::projects::ensure_scope(c, project)?;
     }
     if table == "ref_frames" {
+        value["review"] = serde_json::to_value(crate::moodboard::frame_review(
+            c,
+            value["id"].as_str().unwrap_or(""),
+        )?)?;
         value["links"] = serde_json::to_value(crate::references::frame_targets(
             c,
             value["id"].as_str().unwrap_or(""),
@@ -130,6 +134,10 @@ pub(crate) fn records<T: DeserializeOwned>(
                 crate::projects::ensure_scope(c, project)?;
             }
             if table == "ref_frames" {
+                value["review"] = serde_json::to_value(crate::moodboard::frame_review(
+                    c,
+                    value["id"].as_str().unwrap_or(""),
+                )?)?;
                 value["links"] = serde_json::to_value(crate::references::frame_targets(
                     c,
                     value["id"].as_str().unwrap_or(""),
@@ -162,6 +170,7 @@ pub(crate) fn insert(c: &Connection, table: &str, data: &impl Serialize) -> Resu
     if let Some(fields) = object.as_object_mut() {
         if table == "ref_frames" {
             fields.remove("links");
+            fields.remove("review");
         }
         if table == "ref_items" {
             fields.remove("file");
@@ -260,6 +269,7 @@ pub(crate) fn require_privileged(c: &Connection, actor: &str, e: &Epic) -> Resul
     }
 }
 pub(crate) fn validate_epic(e: &Epic) -> Result<()> {
+    crate::external_refs::validate_external_ref(e.external_ref.as_deref())?;
     crate::m5::validate_name("title", &e.title, 140)?;
     if e.status == "active" && (e.goal_md.trim().is_empty() || e.done_when_md.trim().is_empty()) {
         return Err(invalid(
@@ -282,6 +292,7 @@ pub(crate) fn validate_epic(e: &Epic) -> Result<()> {
     Ok(())
 }
 pub(crate) fn validate_story(s: &Story) -> Result<()> {
+    crate::external_refs::validate_external_ref(s.external_ref.as_deref())?;
     crate::m5::validate_name("title", &s.title, 140)?;
     if s.status == "active"
         && (s.outcome_md.trim().is_empty() || !s.acceptance.iter().any(|a| a.mandatory))
@@ -346,7 +357,7 @@ pub(crate) fn v2_event(
     }
     event(c, Some(&project), actor, action, task_id, payload)
 }
-fn next(c: &Connection, kind: &str) -> Result<(String, i64)> {
+pub(crate) fn next(c: &Connection, kind: &str) -> Result<(String, i64)> {
     let j = jam(c)?;
     let counter = format!("{kind}_seq");
     let n: i64 = c.query_row(
@@ -400,7 +411,7 @@ impl Store {
         self.edit_project(
             actor,
             ProjectEditInput {
-                template: template.into(),
+                template: template.parse()?,
                 milestone_at: milestone.map(str::to_owned),
                 ..Default::default()
             },
@@ -444,39 +455,76 @@ impl Store {
         self.get_project()
     }
     pub fn create_epic(&self, actor: &str, input: NewEpic) -> Result<Epic> {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
         self.write(|c| {
-            let mut a = audit(c, actor)?;
-            let (key, n) = next(c, "epic")?;
-            a.position = n as f64 * 1024.;
-            let e = Epic {
-                audit: a,
-                key,
-                title: input.title,
-                color: input
-                    .color
-                    .unwrap_or_else(|| format!("m{}", (n - 1) % 6 + 1)),
-                status: "draft".into(),
-                goal_md: input.goal_md.unwrap_or_default(),
-                done_when_md: input.done_when_md.unwrap_or_default(),
-                not_included_md: input.not_included_md.unwrap_or_default(),
-                decided_md: input.decided_md.unwrap_or_default(),
-                open_questions_md: input.open_questions_md.unwrap_or_default(),
-                participation: input.participation.unwrap_or_else(|| "first_sketch".into()),
-                reviewer: input.reviewer.unwrap_or_else(|| "none".into()),
-                worker_model: input.worker_model,
-                brain_member_id: None,
-            };
-            validate_epic(&e)?;
-            insert(c, "epics", &e)?;
-            v2_event(
+            Ok(crate::receipts::with_receipt(
                 c,
                 actor,
-                Some(&e.audit.id),
-                "epic.created",
-                None,
-                json!({"key":e.key,"title":e.title}),
-            )?;
-            Ok(e)
+                Some(&request),
+                "create_epic",
+                "epic",
+                &payload,
+                || {
+                    let mut a = audit(c, actor)?;
+                    let (key, n) = next(c, "epic")?;
+                    a.position = n as f64 * 1024.;
+                    let e = Epic {
+                        replayed: false,
+                        external_ref: input.external_ref,
+                        audit: a,
+                        key,
+                        title: input.title,
+                        color: input
+                            .color
+                            .map(String::from)
+                            .unwrap_or_else(|| format!("m{}", (n - 1) % 6 + 1)),
+                        status: "draft".into(),
+                        goal_md: input.goal_md.unwrap_or_default(),
+                        done_when_md: input.done_when_md.unwrap_or_default(),
+                        not_included_md: input.not_included_md.unwrap_or_default(),
+                        decided_md: input.decided_md.unwrap_or_default(),
+                        open_questions_md: input.open_questions_md.unwrap_or_default(),
+                        participation: input
+                            .participation
+                            .map(String::from)
+                            .unwrap_or_else(|| "first_sketch".into()),
+                        reviewer: input
+                            .reviewer
+                            .map(String::from)
+                            .unwrap_or_else(|| "none".into()),
+                        worker_model: input.worker_model,
+                        brain_member_id: None,
+                    };
+                    validate_epic(&e)?;
+                    crate::external_refs::unique_external_ref(
+                        c,
+                        RecordKind::Epic,
+                        &e.audit.jam_id,
+                        None,
+                        e.external_ref.as_deref(),
+                    )?;
+                    insert(c, "epics", &e)?;
+                    v2_event(
+                        c,
+                        actor,
+                        Some(&e.audit.id),
+                        "epic.created",
+                        None,
+                        json!({"key":e.key,"title":e.title}),
+                    )?;
+                    Ok(e)
+                },
+                |receipt| {
+                    epic(
+                        c,
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing ID"))?,
+                    )
+                },
+            )?
+            .value)
         })
     }
     pub fn update_epic(&self, actor: &str, key: &str, input: EpicPatch) -> Result<Epic> {
@@ -491,6 +539,7 @@ impl Store {
             }
             let e: Epic = serde_json::from_value(merged)?;
             validate_epic(&e)?;
+            crate::external_refs::unique_external_ref(c,RecordKind::Epic,&e.audit.jam_id,Some(&old.audit.id),e.external_ref.as_deref())?;
             patch_record(c, "epics", &old.audit.id, &patch)?;
             patch_record(
                 c,
@@ -521,40 +570,70 @@ impl Store {
         })
     }
     pub fn create_story(&self, actor: &str, input: NewStory) -> Result<Story> {
+        let payload = serde_json::to_value(&input)?;
+        let request = input.request_id.clone();
         self.write(|c| {
-            let mut a = audit(c, actor)?;
-            let e = epic(c, &input.epic_key)?;
-            editable_audit(&e.audit)?;
-            if e.audit.jam_id != a.jam_id {
-                return Err(invalid("epicKey", "Choose an epic in the active project"));
-            }
-            let (key, n) = next(c, "story")?;
-            a.position = n as f64 * 1024.;
-            let s = Story {
-                audit: a,
-                key,
-                epic_id: e.audit.id.clone(),
-                title: input.title,
-                status: "draft".into(),
-                outcome_md: input.outcome_md.unwrap_or_default(),
-                basis_md: input.basis_md.unwrap_or_default(),
-                preserve_md: input.preserve_md.unwrap_or_default(),
-                scale_md: input.scale_md.unwrap_or_default(),
-                rejection_risks_md: input.rejection_risks_md.unwrap_or_default(),
-                open_decisions_md: input.open_decisions_md.unwrap_or_default(),
-                acceptance: input.acceptance.unwrap_or_default(),
-            };
-            validate_story(&s)?;
-            insert(c, "stories", &s)?;
-            v2_event(
+            Ok(crate::receipts::with_receipt(
                 c,
                 actor,
-                Some(&e.audit.id),
-                "story.created",
-                None,
-                json!({"key":s.key,"title":s.title}),
-            )?;
-            Ok(s)
+                Some(&request),
+                "create_story",
+                "story",
+                &payload,
+                || {
+                    let mut a = audit(c, actor)?;
+                    let e = epic(c, &input.epic_key)?;
+                    editable_audit(&e.audit)?;
+                    if e.audit.jam_id != a.jam_id {
+                        return Err(invalid("epicKey", "Choose an epic in the active project"));
+                    }
+                    let (key, n) = next(c, "story")?;
+                    a.position = n as f64 * 1024.;
+                    let s = Story {
+                        replayed: false,
+                        external_ref: input.external_ref,
+                        audit: a,
+                        key,
+                        epic_id: e.audit.id.clone(),
+                        title: input.title,
+                        status: "draft".into(),
+                        outcome_md: input.outcome_md.unwrap_or_default(),
+                        basis_md: input.basis_md.unwrap_or_default(),
+                        preserve_md: input.preserve_md.unwrap_or_default(),
+                        scale_md: input.scale_md.unwrap_or_default(),
+                        rejection_risks_md: input.rejection_risks_md.unwrap_or_default(),
+                        open_decisions_md: input.open_decisions_md.unwrap_or_default(),
+                        acceptance: input.acceptance.unwrap_or_default(),
+                    };
+                    validate_story(&s)?;
+                    crate::external_refs::unique_external_ref(
+                        c,
+                        RecordKind::Story,
+                        &s.audit.jam_id,
+                        None,
+                        s.external_ref.as_deref(),
+                    )?;
+                    insert(c, "stories", &s)?;
+                    v2_event(
+                        c,
+                        actor,
+                        Some(&e.audit.id),
+                        "story.created",
+                        None,
+                        json!({"key":s.key,"title":s.title}),
+                    )?;
+                    Ok(s)
+                },
+                |receipt| {
+                    story(
+                        c,
+                        receipt["id"]
+                            .as_str()
+                            .ok_or_else(|| invalid("receipt", "Missing ID"))?,
+                    )
+                },
+            )?
+            .value)
         })
     }
     pub fn update_story(&self, actor: &str, key: &str, input: StoryPatch) -> Result<Story> {
@@ -570,6 +649,7 @@ impl Store {
             }
             let s: Story = serde_json::from_value(merged)?;
             validate_story(&s)?;
+            crate::external_refs::unique_external_ref(c,RecordKind::Story,&s.audit.jam_id,Some(&old.audit.id),s.external_ref.as_deref())?;
             patch_record(c, "stories", &old.audit.id, &patch)?;
             patch_record(
                 c,
@@ -714,6 +794,12 @@ if !missing.is_empty(){return Err(invalid("story",&format!("Missing {}",missing.
                 &[&e.audit.id],
             )?;
             Ok(EpicTree {
+                scope_files: records(
+                    c,
+                    "scope_files",
+                    "target_type='epic' AND target_id=? ORDER BY position,id",
+                    &[&e.audit.id],
+                )?,
                 epic: e,
                 stories,
                 journal,
@@ -787,6 +873,12 @@ fn story_tree(c: &Connection, s: &Story) -> Result<StoryTree> {
     Ok(StoryTree {
         story: s.clone(),
         tasks,
+        scope_files: records(
+            c,
+            "scope_files",
+            "target_type='story' AND target_id=? ORDER BY position,id",
+            &[&s.audit.id],
+        )?,
     })
 }
 fn journal(c: &Connection, epic_id: &str, limit: usize) -> Result<Vec<ActivityEvent>> {
@@ -811,6 +903,11 @@ pub fn activity_sentence(action: &str, actor: &str, key: Option<&str>, payload: 
         .or_else(|| payload["status"].as_str())
         .unwrap_or("");
     match action {
+        "story_moved" | "task_moved_to_story" => format!(
+            "{actor} moved {key} from {} to {}",
+            payload["fromKey"].as_str().unwrap_or(""),
+            payload["toKey"].as_str().unwrap_or("")
+        ),
         "epic.created" => format!("{actor} created epic {key} · {title}"),
         "story.created" => format!("{actor} created story {key} · {title}"),
         "epic.status" | "story.status" => format!("{actor} set {key} to {status}"),
@@ -892,6 +989,14 @@ pub fn activity_sentence(action: &str, actor: &str, key: Option<&str>, payload: 
             payload["text"].as_str().unwrap_or("Status cleared")
         ),
         "reference.added" => format!("{actor} added reference {title}"),
+        "reference.review_sent" => format!(
+            "{actor} sent the review of {}: {} keep, {} not this, {} unrated, {} comments",
+            payload["frameTitle"].as_str().unwrap_or(""),
+            payload["keep"],
+            payload["reject"],
+            payload["unrated"],
+            payload["comments"]
+        ),
         "reference.linked" => format!("{actor} linked a reference to {key}"),
         "reference.updated" => format!("{actor} updated a reference"),
         "comment.added" => format!("{actor} commented on {key}"),

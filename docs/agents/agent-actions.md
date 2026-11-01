@@ -22,20 +22,20 @@ release or native-acceptance exception.
 
 | ID | Actor / entry → depth and actions | Result / authority boundary | Failure/recovery and human counterpart |
 |---|---|---|---|
-| AG01 | New client → initialized or discovery-first binding → get_session_context → scoped baseline | Connection captures project and identity once; current desktop project is not retargeting |Wrong/archived project fails closed. Identity precedence: X-Jam-Agent, JAM_AGENT_NAME, initialized client, request metadata, Agent. Verify immutable ID before reads; H-G04/S01 Round 11: verify canonical projectFolder/projectInstanceId/databaseGeneration/boardRevision plus repositoryRoot/workingDirectory/rules/capabilities, AF01/AF02; reconnect rather than retarget. |
+| AG01 | New client → initialized or discovery-first binding → get_session_context → scoped baseline | Connection captures project and identity once; current desktop project is not retargeting |Wrong/archived project fails closed. Identity precedence: X-Jam-Agent, JAM_AGENT_NAME, initialized client, request metadata, Agent. Verify immutable ID before reads; H-G04/S01 Round 11: verify canonical projectFolder/projectInstanceId/databaseGeneration/boardRevision plus repositoryRoot/workingDirectory/rules/capabilities, AF01/AF02; reconnect rather than retarget.  Round 12 server/schema versions, 12 capabilities and prompt resources; verify live catalog before writes. |
 | AG02 | Human Refine heading action -> scoped prompt -> stage in dock composer or secondary copy -> inspect scope/sources -> refine | Compose/copy is guidance, not Send, execution or proof of connection | Alpha31 candidate: explicit First / new chat or Continue in this chat, with scoped local request. Never auto-detect conversational memory; [mode contract](refinement-modes.md); H-P07 |
-| AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04 |
-| AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06 |
-| AG05 | Agent prepares brief → check_ready → mark_ready | Backlog → Ready when valid/authorized override; no work launch | Missing codes lead to brief repair; capture claim generation + updatedAt from inspected task; H-D02/D07 |
+| AG03 | Human appoints Brain → unassigned become_brain or authorized set_brain → plan epic/story/tasks | Brain can coordinate assigned epic, not override an occupied appointment arbitrarily | Preserve human edits; array fields replace whole lists; active hierarchy and readiness separate from Start; H-P01–P04  externalRef/find and dry-run import/conflict/explicit-overwrite/history/undo; planning only, no grant. Stable requestId per actor/project/tool. |
+| AG04 | Agent missing board decision → ask_user → human Inbox choice/free text → wait/list answer → reconcile | Question persisted with exact scope; human-only answer | Tool success/question ID proves creation; arbitrary chat is not automatically Inbox. Client permissions/connection dialogue may remain chat. Ordinary answer never grants execution; H-I01/P06  ask_user retry ID; Questions distinct from Events, answer never Start. |
+| AG05 | Agent prepares brief → check_ready → mark_ready | Backlog → Ready when valid/authorized override; no work launch | Missing codes lead to brief repair; capture claim generation + updatedAt from inspected task; H-D02/D07  Compact get_task retains validators/brief, request includes needed evidence; imported task status never executes. |
 | AG06 | Brain request_execution → human typed Inbox confirmation / direct Start → effective scope running | Human-only native authorization; MCP has no approve/Start/Pause tool | Exact revision and scope; stale request blocks; declined/superseded not grants; H-I02/P08 |
-| AG07 | Worker reads running scope + Ready task → get_task → claim_task → implementation | Accepted claim sets holder and ordinarily In progress atomically; claim response supplies new generation | Conflicting claim, stale token or paused scope stops new work. A board claim never launches a filesystem/process action; explicit dock startup is separate (AG15); H-B02/D08 |
-| AG08 | Holder submits report → Review → human/brain reviews captured report/context → accept or changes requested | Accept → Done; changes requested → Ready, same worker retained; next round needs current permission | Evidence names test setup/command/expected/actual/PASS/FAIL/NOT_RUN; stale context reread/reconcile, not token substitution; H-D09 |
+| AG07 | Worker reads running scope + Ready task → get_task → claim_task → implementation | Accepted claim sets holder and ordinarily In progress atomically; claim response supplies new generation | Conflicting claim, stale token or paused scope stops new work. A board claim never launches a filesystem/process action; explicit dock startup is separate (AG15); H-B02/D08  Opt into task evidence; preserve returned claimGeneration; move/import safeguards do not relax claims. |
+| AG08 | Holder submits report → Review → human/brain reviews captured report/context → accept or changes requested | Accept → Done; changes requested → Ready, same worker retained; next round needs current permission | Evidence names test setup/command/expected/actual/PASS/FAIL/NOT_RUN; stale context reread/reconcile, not token substitution; H-D09  Read reports/reviews/context explicitly under compact defaults; Inbox report action focuses review section without accepting. |
 | AG09 | Human Pause / holder or human release → tracking recovery | Pause blocks new rounds/claims, existing holder may report; release clears holder, returns Backlog/Ready | Neither kills process; no Done via release. Archive retains evidence/flags; project archive refuses In-progress work; H-D08/S03 |
-| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate from board activity; bounded replay and optional persisted history are described in AG15; H-M02/H01 |
-| AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent |Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 Round 11: preserved original source DB/generation required; moved/missing/changed-generation history requires reconnect, no fallback DB; AF04. |
-| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets |File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 Round 11: additive add_reference ownership/file inputs; canvas links separate from Files roles; register_file owns copies, AF03/AF05. |
+| AG10 | Agent set_status / domain mutations → persisted activity → ordered reads/waits | Short scoped status and heartbeat are different signals | Preserve checkpoint, inspect bounded pages, checkpoint after handling; default filters may omit relevant history. Dock transcript events are separate from board activity; bounded replay and optional persisted history are described in AG15; H-M02/H01  Activity.client attribution and reference.review_sent wait cursor; per-project inbox seen state is human bookkeeping. |
+| AG11 | Replacement client read-only recovery → verify project → read full relevant history → summarize → separate role handover | Stored reports/reviews survive ordinary same-database restart; role transfer is independent |Include Done/archived tasks if relevant, answered questions and all report rounds. No claim/reassign/start implied; H-G04/P02 Round 11: preserved original source DB/generation required; moved/missing/changed-generation history requires reconnect, no fallback DB; AF04.  Replay historical task/file receipts, file_legacy mismatch conflict; full resources/explicit includes for recovery, not default compact tails. |
+| AG12 | Agent adds/reads/links/edits reference → human canvas observes | Stored URL/note/registered file path and exact project links; no implicit network preview; copy:true explicitly retains local assets |File must be readable; project mismatch fails; arrays replace; canvas organization is exposed under AG14; preview/restore remain human-only; H-R01–R08 Round 11: additive add_reference ownership/file inputs; canvas links separate from Files roles; register_file owns copies, AF03/AF05.  Batch partial success, sourceUrl/origin/derivedFrom, human reason/verdict guard; agents cannot send review. |
 | AG13 | Agent searches/reads tasks/assets/members; comments or allowed task edits | Reads do not authorize mutations; comments append, update fields use current contract |Foreign-project addresses rejected; pages/tails are not complete history; capture validators before overwrites; H-D03/A01/M01 Round 11: get_task.files and jam://task Files include role/order/ownership/status; list_assets adds storage/task/role/paging, AF05. |
-| AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch |Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 Round 11 phase hooks are metadata only, no renderers/previews/git badges or canvas authorization. |
+| AG14 | Agent reads get_canvas -> explicitly requested frame/connection/layout edits -> reread | Project-pinned canvas services and activity; no execution grant, role change or process launch |Atomic arrange rejects the entire batch on invalid/foreign IDs or insufficient grid space; reconcile uncertain responses; H-R01/R02/R06 and AC14 Round 11 phase hooks are metadata only, no renderers/previews/git badges or canvas authorization.  get_canvas verdict filters/review counts; event-driven feedback, ordered Collect Keep and archive-safe shared assets. |
 | AG15 | Explicit dock profile start -> starting -> ready -> running / awaiting_permission -> ready or stopped/failed | ACP/API chat and PTY are dock sessions, not execution grants; model reply, plan, tool permission and chat text never approve board Start |First context visible; Stop turn cancels pending requests; close only hides UI; bounded in-memory replay and, when enabled, persisted history with supported resume after restart; H-BD01/BD02/BD05/BD06  Package preparation precedes initialize with 180 s / 60 s budgets; status and command routing follow the Round-8 brain-dock contract. Starting/running terminal history focuses existing sessions; load/startup recovery relinks alpha.44 empty records without launching or rewriting transcripts. R10-A only changes session-option presentation; configuring/busy/turn guards, explicit setConfigOption and execution grants are unchanged. Round 11: capture source/locator + lease → validate cwd → Starting → Ready/Running → Stop/Failed → release lease; A fixtures, shared mock parity G1 integrated; G3 fixture/mock verified. |
 | AG16 | Dock session startup -> project-pinned jam-board MCP and cwd -> ordinary agent calls | In-app agent is an ordinary MCP client with stable profile JAM_AGENT_NAME; exact project/data dir/cwd captured before dispatch |Navigation cannot retarget; same normalized name shares a member, not independent worker identity; custom terminal needs compatible CLI wiring; H-BD01/BD03 Round 11: explicit cwd → workingDirectory → repository root → canonical anchor; unavailable configured cwd fails before launch; legacy no-location retains isolated workspace; AF04. |
 | AG17 | Explicit dock Stop / app exit -> owned process cleanup; error -> explicit Restart/Connections | Dock lifecycle is distinct from board Pause/Release; stopping a runtime neither revokes grants nor releases claims |Startup cancellation/descendant cleanup are required; packaged-app cleanup remains unverified; retained launch logs are bounded in memory, while enabled history is stored separately; H-BD03/BD08  Startup timeout offers explicit Retry / Show logs; recovery relinks missing/stale transcript references on load/reconciliation, preserving native transcript bytes. Session status is evidence, never proof of task work or a grant. Round 11: unique lease IDs prevent late cleanup releasing resumed lease; stop/crash/startup failure release ownership; bound move refuses, old-source resume needs reconnect; AF04. |
@@ -55,69 +55,86 @@ release --------------------------------------------> Backlog or permitted Ready
 
 An epic running grant is inherited only by inheriting stories. Explicit story pause wins. Pausing epic clears explicit child running grants; a later explicitly started story can run under a paused epic. Closing/archiving revokes grants; reopening does not silently resurrect them. Consult [inheritance matrix](../mcp.md#inheritance-and-pause-matrix) rather than guessing from one badge.
 
-## Complete current tool inventory (57; round 11)
+## Complete current tool inventory (74; round 12)
 
-This is an indexed copy of the current MCP inventory (52 prior tools plus five Files tools) for map completeness; argument evolution must update this table and `docs/mcp.md` together. Tools are grouped into AG paths above, not exposed as invented UI actions. Human-only native `set_execution`, `resolve_execution_request`, `answer_question`, preview/restore and application settings actions are represented in the human map. AG14 exposes the listed canvas geometry/frame/edge tools; dock lifecycle invokes remain native commands, not additional MCP tools.
+Generated from R12-M/mcp-tools.json. Arguments ending in ? are optional. The live schema and [MCP contract](../mcp.md#round-12-contract-v2-unreleased) define types, limits and compact output. Human Inbox listing/seen and Send review are desktop commands, not extra MCP tools.
 
 | Tool | Arguments | structuredContent |
 |---|---|---|
-| get_session_context | {} | { projectId, keyPrefix, projectName, binding: "session", canSwitchProject: false, latestActivityCursor, projectInstanceId, databaseGeneration, boardRevision, projectFolder, repositoryRoot, workingDirectory, folderRules, manifestRevision, fileCapabilities } |
-| get_execution | scope: { type: "epic" or "story", id } | ExecutionState, including effectiveState, ownState, revision and scope identity |
-| list_execution | {} | ExecutionState[] for the pinned project |
-| request_execution | scope: { type: "epic" or "story", id }, reason | ExecutionRequest (pending); appointed epic brain only |
-| list_execution_requests | status? (pending/approved/declined/superseded) | ExecutionRequest[] for the pinned project |
-| get_project | {} | { jam, template, templateLabel, milestoneAt, tagSuggestions, epics, stories, tasks, openQuestions } |
-| get_board | {} | { jam, columns, inProgress, myTasks, onlineAgents, tagSuggestions, openQuestionCount } |
-| list_epics | {} | Epic[] in position order, excluding archived |
-| get_epic | key | { epic, stories: [{ story, tasks: [{ task, readiness }] }], journal, openQuestions } |
-| create_epic | title; color?, goalMd?, doneWhenMd?, notIncludedMd?, decidedMd?, openQuestionsMd?, participation?, reviewer?, workerModel? | Epic (draft) |
-| update_epic | key; any create field except title may be omitted, title? | Epic |
-| set_epic_status | key, status; overrideReason? | Epic |
-| become_brain | epicKey | Epic; claims an unappointed brain slot |
-| set_brain | epicKey, memberHandle | Epic; human/current brain only |
-| create_story | epicKey, title; outcomeMd?, basisMd?, preserveMd?, scaleMd?, rejectionRisksMd?, openDecisionsMd?, acceptance? | Story (draft) |
-| update_story | key; title?, any intent field?, acceptance? | Story |
-| set_story_status | key, status; overrideReason? | Story |
-| create_task | storyKey, title; description?, status?=backlog, priority?=medium, tags?, estimate?, dueAt?, idempotencyKey?, all brief fields? | TaskDetail |
-| update_task | key, expectedClaimGeneration, expectedUpdatedAt; title?, description?, priority?, tags?, estimate?, dueAt? | TaskDetail; non-brief fields |
-| update_task_brief | key, expectedClaimGeneration, expectedUpdatedAt; goalMd?, contextMd?, whereMd?, changes?, tests?, boundariesMd?, resultMd?, userQuotesMd? | TaskDetail |
-| check_ready | key | { ready, missing: [{ code, message }] } |
-| mark_ready | key, expectedClaimGeneration, expectedUpdatedAt; overrideReason? | TaskSummary |
-| list_tasks | status?: string[], assignee?, tag?, query?, includeArchived?=false, limit?=50, cursor?, epic?, story?, ready?, changesRequested?, needsInfo? | { tasks, nextCursor? } |
-| get_task | key | TaskDetail with hierarchy/context, brief, references, assets, files, all reports/reviews, comments/history |
-| claim_task | key, expectedClaimGeneration, expectedUpdatedAt | TaskDetail; assigns caller and moves Ready > In progress |
-| release_task | key, expectedClaimGeneration; status?=backlog | TaskSummary; current holder/human only |
-| move_task | key, status, expectedClaimGeneration, expectedUpdatedAt; beforeKey?, afterKey?, overrideReason? | TaskSummary |
-| submit_report | key, expectedClaimGeneration, summaryMd, changedFiles, tests; deviationsMd?, notVerifiedMd? | Report |
-| add_comment | key, body | Comment |
-| review_task | key, expectedReportId, expectedReviewContextRevision, verdict, commentsMd; failedTests? | Review |
-| archive_task | key, expectedClaimGeneration, expectedUpdatedAt; reason? | TaskSummary; reason is an atomic comment |
-| ask_user | scope, title; bodyMd?, options?, recommendedIndex?, allowFreeText?=true, roundLabel? | Question |
-| wait_for_answer | questionIds, timeoutSeconds (0..60) | { answered: Question[], pending: Question[] } |
-| list_questions | status? (open/answered/withdrawn), scope? | Question[] |
-| withdraw_question | id | Question; asker or human only |
-| set_status | text (0..120), scope? | Member; empty text clears the status/scope |
-| list_changes_since | cursor (nonnegative seq), epicKey? | ActivityEvent[] after cursor, chronological |
-| wait_for_changes | cursor; epicKey?, includeProject?=false, actions?, actorKind?, excludeSelf?=true, timeoutSeconds?=30 (1..60) | { events: ActivityEvent[] (max 100, ascending), nextCursor, timedOut } |
-| add_reference | storageType?, fileKind?, requestId?, fileRole?, expectedClaimGeneration?, expectedUpdatedAt?; kind (asset/link/note); filePath? / url? / text?, copy? (asset only, max 50 MiB), title?, caption?, tags?, frameEpicKey? or frameId?, linkTo?, x?, y? | RefItem |
-| list_references | epicKey?, storyKey?, taskKey? | RefItem[]; multiple target filters form a union |
-| link_reference | exactly one of itemId or frameId; targetKey | RefItem or RefFrame |
-| unlink_reference | exactly one of itemId or frameId; targetKey | { unlinked: true } for an item; RefFrame for a frame; leaves content intact |
-| update_reference | itemId; caption?, tags?, title? | RefItem |
-| get_canvas | epicKey?, frameId?, includeArchived?=false, limit?=100 (1..200), cursor? (nonnegative offset) | { frames, references, edges, total, truncated, nextCursor }; world x/y, text capped at 200 characters, linkedKeys capped at 50 with linkedKeysTruncated |
-| create_frame | title; epicKey?, x?, y?, w?=900, h?=600 | RefFrame; omitted x is placed right of content with 80 units clearance, omitted y=0 |
-| update_frame | id; title?, epicKey? (null unlinks), x?, y?, w?, h? | RefFrame; omitted fields unchanged |
-| connect_references | from, to (item IDs); label? | RefEdge; directed duplicates/self-edges refused, label max 240 characters |
-| update_connection | id, label | RefEdge; empty label clears it, max 240 characters |
-| remove_connection | id | { archived: true }; retains the connection record |
-| arrange_references | items: [{ itemId, x?, y? }] (1..100); frameId? (null detaches), layout? (grid) | RefItem[] with world x/y and w, h, frameId matching get_canvas; one atomic batch |
-| list_members | {} | MemberStats[] including counts, online, workingOn and stale status indicator |
-| list_assets | kind?, query?, storageType?, taskKey?, role?, limit?, cursor? | Without limit/cursor legacy array; paging {assets,nextCursor}; per-task role differs from asset role |
-| register_file | storageType, requestId; companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, role?, sourcePath?, taskKey?, url?, workingDirectory? | FileMutationResult; task version/request identity |
-| link_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
-| set_task_file_role | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId, role; position? | FileMutationResult; task version/request identity |
-| unlink_task_file | taskKey, assetId, expectedClaimGeneration, expectedUpdatedAt, requestId; position?, role? | FileMutationResult; task version/request identity |
-| resolve_file | assetId; workingDirectory? | FileResolution; read-only, no launch |
+| get_session_context | {} | SessionContext |
+| get_board | {} | Generated structured content |
+| list_tasks | assignee?, changesRequested?, cursor?, epic?, externalRef?, fields?, includeArchived?, limit?, needsInfo?, query?, ready?, status?, story?, tag? | ProjectedTaskPage |
+| get_task | activityLimit?, include?, key | CompactTask |
+| create_task | boundariesMd?, changes?, contextMd?, description?, dueAt?, estimate?, externalRef?, goalMd?, priority?, requestId, resultMd?, status?, storyKey, tags?, tests?, title, userQuotesMd?, whereMd? | CompactMutation |
+| update_task | description?, dueAt?, estimate?, expectedClaimGeneration, expectedUpdatedAt, externalRef?, key, priority?, tags?, title? | CompactMutation |
+| move_task | afterKey?, beforeKey?, expectedClaimGeneration, expectedUpdatedAt, key, overrideReason?, status | CompactMutation |
+| claim_task | expectedClaimGeneration, expectedUpdatedAt, key | CompactMutation |
+| release_task | expectedClaimGeneration, key, status? | CompactMutation |
+| add_comment | body, key | Comment |
+| archive_task | expectedClaimGeneration, expectedUpdatedAt, key, reason? | CompactMutation |
+| list_members | {} | Generated structured content |
+| list_assets | cursor?, includeArchived?, kind?, limit?, query?, role?, scope?, storageType?, taskKey?, workingDirectory? | Array_of_FileAsset |
+| register_file | companions?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, name?, notes?, pathBase?, requestId?, role?, sourcePath?, storageType, taskKey?, url?, workingDirectory? | CompactMutation |
+| link_task_file | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role, taskKey | CompactMutation |
+| set_task_file_role | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role, taskKey | CompactMutation |
+| unlink_task_file | assetId, expectedClaimGeneration, expectedUpdatedAt, position?, requestId, role?, taskKey | CompactMutation |
+| resolve_file | assetId, workingDirectory? | FileResolution |
+| get_canvas | cursor?, epicKey?, frameId?, includeArchived?, limit?, verdict? | CanvasPage |
+| create_frame | epicKey?, h?, requestId?, title, w?, x?, y? | CompactMutation |
+| update_frame | epicKey?, h?, id, title?, w?, x?, y? | CompactMutation |
+| connect_references | from, label?, to | RefEdge |
+| update_connection | id, label | CompactMutation |
+| remove_connection | id | Generated structured content |
+| arrange_references | frameId?, items, layout? | Generated structured content |
+| get_execution | scope | ExecutionState |
+| list_execution | {} | Generated structured content |
+| list_execution_requests | status? | Generated structured content |
+| request_execution | reason, scope | ExecutionRequest |
+| get_project | {} | Project |
+| list_epics | externalRef? | Generated structured content |
+| find | externalRefs?, keys?, kind? | Array_of_RecordVersion |
+| import_plan | dryRun?, epics, overwrite?, requestId | ImportPlanReport |
+| undo_import | batchId, requestId | UndoImportReport |
+| list_import_batches | limit? | Array_of_ImportBatchSummary |
+| move_story | afterKey?, beforeKey?, expectedUpdatedAt?, key, requestId, toEpicKey | CompactMutation |
+| move_task_to_story | expectedClaimGeneration, expectedUpdatedAt, key, requestId, toStoryKey | CompactMutation |
+| link_file | assetId, expectedClaimGeneration?, expectedUpdatedAt?, requestId?, role?, scope | CompactMutation |
+| unlink_file | assetId, expectedClaimGeneration?, expectedUpdatedAt?, requestId?, scope | CompactMutation |
+| asset_usage | assetId | AssetUsage |
+| archive_asset | assetId, requestId? | CompactMutation |
+| unarchive_asset | assetId, requestId? | CompactMutation |
+| rename_asset | assetId, name, requestId? | CompactMutation |
+| delete_asset | assetId, force?, requestId? | CompactMutation |
+| replace_asset | assetId, requestId?, sourcePath?, url? | CompactMutation |
+| list_asset_revisions | assetId | Array_of_AssetRevision |
+| get_epic | depth?, include?, journalLimit?, key | CompactEpic |
+| create_epic | color?, decidedMd?, doneWhenMd?, externalRef?, goalMd?, notIncludedMd?, openQuestionsMd?, participation?, requestId, reviewer?, title, workerModel? | CompactMutation |
+| update_epic | color?, decidedMd?, doneWhenMd?, externalRef?, goalMd?, key, notIncludedMd?, openQuestionsMd?, participation?, reviewer?, title?, workerModel? | CompactMutation |
+| set_epic_status | key, overrideReason?, status | CompactMutation |
+| become_brain | epicKey | CompactMutation |
+| set_brain | epicKey, memberHandle | CompactMutation |
+| create_story | acceptance?, basisMd?, epicKey, externalRef?, openDecisionsMd?, outcomeMd?, preserveMd?, rejectionRisksMd?, requestId, scaleMd?, title | CompactMutation |
+| update_story | acceptance?, basisMd?, externalRef?, key, openDecisionsMd?, outcomeMd?, preserveMd?, rejectionRisksMd?, scaleMd?, title? | CompactMutation |
+| set_story_status | key, overrideReason?, status | CompactMutation |
+| update_task_brief | boundariesMd?, changes?, contextMd?, expectedClaimGeneration, expectedUpdatedAt, goalMd?, key, resultMd?, tests?, userQuotesMd?, whereMd? | CompactMutation |
+| check_ready | key | Readiness |
+| mark_ready | expectedClaimGeneration, expectedUpdatedAt, key, overrideReason? | CompactMutation |
+| submit_report | changedFiles, deviationsMd?, expectedClaimGeneration, key, notVerifiedMd?, summaryMd, tests | Report |
+| review_task | commentsMd, expectedReportId, expectedReviewContextRevision, failedTests?, key, verdict | Review |
+| ask_user | allowFreeText?, bodyMd?, options?, recommendedIndex?, requestId?, roundLabel?, scope, title | CompactMutation |
+| wait_for_answer | questionIds, timeoutSeconds | AnswerWait |
+| list_questions | scope?, status? | Generated structured content |
+| withdraw_question | id | CompactMutation |
+| set_status | scope?, text | Member |
+| list_changes_since | cursor, epicKey? | Generated structured content |
+| wait_for_changes | actions?, actorKind?, cursor, epicKey?, excludeSelf?, includeProject?, timeoutSeconds? | ChangesWait |
+| add_reference | caption?, copy?, derivedFrom?, expectedClaimGeneration?, expectedUpdatedAt?, fileKind?, filePath?, fileRole?, frameEpicKey?, frameId?, kind, linkTo?, origin?, requestId?, sourceUrl?, storageType?, tags?, text?, title?, url?, x?, y? | CompactMutation |
+| add_references | frameId?, items, requestId | AddReferencesResult |
+| collect_kept_references | linkTo?, requestId, sourceFrameIds, title? | CollectKeptResult |
+| list_references | epicKey?, storyKey?, taskKey? | Generated structured content |
+| link_reference | frameId?, itemId?, targetKey | CompactMutation |
+| unlink_reference | frameId?, itemId?, targetKey | CompactMutation |
+| update_reference | caption?, derivedFrom?, itemId, origin?, sourceUrl?, tags?, title? | CompactMutation |
 
 ## Freshness and recovery
 
@@ -352,9 +369,9 @@ fixtures' explicit Start actions remain fixture authorization, not an agent gran
 |---|---|---|---|
 | AF01 | Connect → get_session_context → verify identity | projectFolder is canonical anchor for folder boards; legacy may remain unverified hint. projectInstanceId/databaseGeneration identify local state, boardRevision differs from activity cursor. repositoryRoot/workingDirectory/folderRules/manifestRevision/fileCapabilities explain resolution/copy rules | No cross-project read on missing/ambiguous identity; H-PF02/PF11, AG01 |
 | AF02 | Stdio --project-folder / JAM_BOARD_PROJECT_FOLDER; HTTP X-Jam-Project-Folder | Explicit CLI location → explicit environment location → exact registry ID → legacy default; conflicting explicit selectors fail. Folder + project must match exact ID. HTTP accepts UTF-8 or utf8: plus percent-encoded UTF-8 bytes; binds once | Missing/ambiguous folder never creates fallback DB; later headers cannot retarget. Token/JAM_BOARD_DATA_DIR app-local and separate from cwd; H-S01/PF03 |
-| AF03 | register_file → link_task_file / set_task_file_role / unlink_task_file → reread | board_file copies, linked_file retains source, url never fetches. to_edit/reference/result per task; position orders association; inspect expectedClaimGeneration/expectedUpdatedAt and retain requestId for identical retry | Optional registration+task link needs validators; separate UI register/link failure may leave reusable registered asset; unlink keeps bytes/evidence; reconcile uncertainty/CAS, H-TF01–TF07 |
+| AF03 | register_file → link_task_file / set_task_file_role / unlink_task_file → reread | board_file copies, linked_file retains source, url never fetches. to_edit/reference/result per task; position orders association; inspect expectedClaimGeneration/expectedUpdatedAt and retain requestId for identical retry | Optional registration+task link needs validators; separate UI register/link failure may leave reusable registered asset; unlink keeps bytes/evidence; reconcile uncertainty/CAS, H-TF01–TF07  Round 12 scopes, archive/usage/force-delete, replacements/revisions; request IDs per tool and file_legacy replay; native preview remains separate. |
 | AF04 | In-app explicit start → capture locator/store/lease → validate cwd → launch → stop/crash | Explicit cwd → workingDirectory → repository root → anchor; legacy no-location isolated workspace. JAM_BOARD_PROJECT_FOLDER and exact ID independent of cwd. Original StoredHistory.cwd and private source binding retained for resume | A→B never retargets. Unavailable configured cwd fails before startup. Moved/missing DB or generation mismatch needs reconnect. Bound agent/MCP owner blocks move; stop/failure/crash release lease; H-BD01/BD03/PF06 |
-| AF05 | get_task.files / jam://task Files / list_assets → resolve_file in caller worktree | Ordered role associations expose ownership/resolution. Board files anchor; repo links use verified caller worktree; absolute paths retain outside-scope identity. Resolution is read-only, no launch/download | Missing/unreadable/unknown distinct; outside scope is pathBase absolute, not availability enum or filesystem permission; reference is not edit authority; H-D10/A01/TF05 |
+| AF05 | get_task.files / jam://task Files / list_assets → resolve_file in caller worktree | Ordered role associations expose ownership/resolution. Board files anchor; repo links use verified caller worktree; absolute paths retain outside-scope identity. Resolution is read-only, no launch/download | Missing/unreadable/unknown distinct; outside scope is pathBase absolute, not availability enum or filesystem permission; reference is not edit authority; H-D10/A01/TF05  Round 12 rich file metadata, scoped documents/usage and revision reads; resolve never launches; JSON other/video distinct. |
 | AF06 | Read jam://guide and jam://guide/operations → boat example | Read task/to_edit → resolve at cwd → explicitly authorized edit/export → register owned result → reread validators → link result; same board-owned sources, no retired bundled playbook | Instructions/roles do not grant Start/claim/tool/filesystem permission; H five Node checks are fixture evidence; H-S02 |
 
 ### Frozen round 11 MCP schemas
@@ -492,3 +509,7 @@ Mutation returns FileMutationResult; uncertain outcomes need reconciliation, not
 | output.worktreeRoot | string or null | No | Verified caller worktree when applicable. |
 
 Read-only; never Open/Reveal/download.
+
+## Round 12 current contract
+
+The current inventory is 74 tools; the canonical additions, enum/request identity/compact/file/import/moodboard contracts are in [MCP](../mcp.md#round-12-contract-v2-unreleased). Existing action IDs retain their authority boundaries. [Verification](../verification/round12.md) separates integration evidence from NOT RUN native/live checks.

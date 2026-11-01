@@ -120,14 +120,12 @@ test("MCP config display is masked, Copy includes token, regeneration is confirm
   );
   expect(configuration).toContain(token);
   expect(configuration).toContain(captured.jam?.id ?? "missing project");
-  const receipt = page
-    .getByRole("status")
-    .and(page.locator(".settings-notice"));
+  const receipt = page.getByRole("status", {
+    name: "Connection setup feedback",
+  });
   await expect(receipt).toBeVisible();
   // This page-local status has implicit polite live semantics, not a toast.
-  await expect(receipt).toHaveText(
-    `Configuration copied for ${captured.jam?.name} · ${captured.jam?.keyPrefix} (includes your token; keep it private)`,
-  );
+  await expect(receipt).toHaveText("Configuration copied.");
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
   await expect(
     page.getByText("Existing HTTP connections will stop working."),

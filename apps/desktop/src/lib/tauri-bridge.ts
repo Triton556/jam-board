@@ -3,6 +3,7 @@ import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ApiError_Serialize } from "../bindings";
 import { commands, events } from "../bindings";
 import type { JamApi } from "./api";
+import { makeSnippets } from "./mcp-config";
 import { emptyBoard, JamError, statuses } from "./types";
 
 async function unwrap<T>(
@@ -20,6 +21,48 @@ async function unwrap<T>(
   return result.data;
 }
 export const tauriApi: JamApi = {
+  listInboxEvents: (input) =>
+    unwrap(
+      commands.listInboxEvents({
+        beforeSeq: null,
+        limit: null,
+        filter: null,
+        ...input,
+      }),
+    ),
+  markInboxEventsSeen: (seq) => unwrap(commands.markInboxEventsSeen(seq)),
+  fileViewer: async () =>
+    (await import("./file-viewer-api")).nativeFileViewerApi,
+  moodboard: async () => (await import("./moodboard-api")).nativeMoodboardApi,
+  importPlan: async (context, input) =>
+    unwrap(
+      commands.importPlan(context.folder ?? (await requireContext()), {
+        ...input,
+        requestId: input.requestId ?? crypto.randomUUID(),
+      }),
+    ),
+  undoImport: async (context, batchId, requestId) =>
+    unwrap(
+      commands.undoImport(context.folder ?? (await requireContext()), {
+        batchId,
+        requestId,
+      }),
+    ),
+  listImportBatches: async (context) =>
+    unwrap(
+      commands.listImportBatches(context.folder ?? (await requireContext()), 5),
+    ),
+  moveStory: async (context, input) =>
+    unwrap(
+      commands.moveStory(context.folder ?? (await requireContext()), input),
+    ),
+  moveTaskToStory: async (context, input) =>
+    unwrap(
+      commands.moveTaskToStory(
+        context.folder ?? (await requireContext()),
+        input,
+      ),
+    ),
   fileOperationStatus: (context, id) =>
     unwrap(commands.fileOperationStatus(context, id)),
   cancelFileOperation: (context, id) =>
@@ -195,6 +238,7 @@ export const tauriApi: JamApi = {
         reviewer: null,
         workerModel: null,
         ...input,
+        requestId: input.requestId ?? crypto.randomUUID(),
       }),
     ),
   updateEpic: (key, patch) =>
@@ -217,7 +261,7 @@ export const tauriApi: JamApi = {
     unwrap(
       commands.setEpicStatus({
         key,
-        status,
+        status: status as import("../bindings").PlanningStatus,
         overrideReason: overrideReason ?? null,
       }),
     ),
@@ -236,6 +280,7 @@ export const tauriApi: JamApi = {
         openDecisionsMd: null,
         acceptance: null,
         ...input,
+        requestId: input.requestId ?? crypto.randomUUID(),
       }),
     ),
   updateStory: (key, patch) => unwrap(commands.updateStory({ key, ...patch })),
@@ -243,7 +288,7 @@ export const tauriApi: JamApi = {
     unwrap(
       commands.setStoryStatus({
         key,
-        status,
+        status: status as import("../bindings").PlanningStatus,
         overrideReason: overrideReason ?? null,
       }),
     ),
@@ -261,7 +306,11 @@ export const tauriApi: JamApi = {
     ),
   listQuestions: (status, scope) =>
     unwrap(
-      commands.listQuestions({ status: status ?? null, scope: scope ?? null }),
+      commands.listQuestions({
+        status:
+          (status as import("../bindings").QuestionStatus | undefined) ?? null,
+        scope: scope ?? null,
+      }),
     ),
   answerQuestion: (input) => unwrap(commands.answerQuestion(input)),
   withdrawQuestion: (id) => unwrap(commands.withdrawQuestion(id)),
@@ -275,11 +324,13 @@ export const tauriApi: JamApi = {
   appReady: async () => {
     await unwrap(commands.appReady());
   },
-  listAssets: (input) =>
+  listAssets: async (input) =>
     unwrap(
-      commands.listAssets({
-        kind: input?.kind ?? null,
+      commands.listAssets(await requireContext(), {
+        kind:
+          (input?.kind as import("../bindings").FileKind | undefined) ?? null,
         text: input?.text ?? null,
+        scope: null,
       }),
     ),
   createAsset: (input) =>
@@ -340,7 +391,8 @@ export const tauriApi: JamApi = {
     await unwrap(commands.regenerateMcpToken());
   },
   revealMcpToken: () => unwrap(commands.revealMcpToken()),
-  mcpConfigSnippets: () => unwrap(commands.mcpConfigSnippets()),
+  mcpConfigSnippets: async () =>
+    makeSnippets(await tauriApi.mcpStatus(), await tauriApi.revealMcpToken()),
   onMcpChanged: (cb) => subscribe(events.mcpCallsChanged.listen(() => cb())),
   onFileDrop: (cb, onActive) =>
     subscribe(
@@ -407,7 +459,8 @@ export const tauriApi: JamApi = {
         tags: input.tags ?? null,
         estimate: input.estimate ?? null,
         dueAt: input.dueAt ?? null,
-        idempotencyKey: null,
+        requestId: input.requestId ?? crypto.randomUUID(),
+        externalRef: input.externalRef ?? null,
         storyKey: input.storyKey ?? null,
         ...input.brief,
       }),
@@ -460,4 +513,10 @@ function subscribe(promise: Promise<() => void>) {
     disposed = true;
     stop?.();
   };
+}
+
+async function requireContext() {
+  const context = await tauriApi.projectSelectionContext();
+  if (!context) throw new JamError("not_found", "Select a project first");
+  return context;
 }

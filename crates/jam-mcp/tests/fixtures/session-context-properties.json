@@ -2,6 +2,7 @@
   "binding",
   "boardRevision",
   "canSwitchProject",
+  "capabilities",
   "databaseGeneration",
   "fileCapabilities",
   "folderRules",
@@ -13,5 +14,7 @@
   "projectInstanceId",
   "projectName",
   "repositoryRoot",
+  "schemaVersion",
+  "serverVersion",
   "workingDirectory"
 ]

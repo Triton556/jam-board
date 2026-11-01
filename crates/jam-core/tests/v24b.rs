@@ -18,7 +18,7 @@ fn templates_onboard_atomically_with_the_right_dates() {
                 ends_at: "2026-10-22T00:00:00Z".into(),
                 timezone: "UTC".into(),
                 your_name: "Danil".into(),
-                template: Some(template.into()),
+                template: Some(template.parse::<jam_core::ProjectTemplate>().unwrap()),
                 milestone_at: Some("2026-11-30T12:00:00Z".into()),
             })
             .unwrap();
@@ -50,7 +50,7 @@ fn switch_keeps_used_tags_and_records_exactly_one_project_event() {
         .edit_project(
             &actor.id,
             ProjectEditInput {
-                template: "webapp".into(),
+                template: "webapp".parse::<jam_core::ProjectTemplate>().unwrap(),
                 name: Some("Lantern web".into()),
                 milestone_at: Some("2026-11-30T12:00:00Z".into()),
                 ..Default::default()
@@ -77,20 +77,13 @@ fn switch_keeps_used_tags_and_records_exactly_one_project_event() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].action, "project.updated");
     assert!(
-        s.edit_project(
-            &actor.id,
-            ProjectEditInput {
-                template: "bad".into(),
-                ..Default::default()
-            }
-        )
-        .is_err()
+        serde_json::from_value::<ProjectEditInput>(serde_json::json!({"template":"bad"})).is_err()
     );
     assert!(
         s.edit_project(
             &actor.id,
             ProjectEditInput {
-                template: "game_jam".into(),
+                template: "game_jam".parse::<jam_core::ProjectTemplate>().unwrap(),
                 ..Default::default()
             }
         )

@@ -12,7 +12,7 @@ fn fixture() -> (tempfile::TempDir, Store, String, RefItem) {
         .add_reference(
             &human,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("A small human idea".into()),
                 ..Default::default()
             },
@@ -306,7 +306,7 @@ fn note_creation_accepts_explicit_heading_or_body_but_not_both_blank() {
             .add_reference(
                 &human,
                 AddReference {
-                    kind: "note".into(),
+                    kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                     title: Some(heading.into()),
                     text: Some(String::new()),
                     ..Default::default()
@@ -324,7 +324,7 @@ fn note_creation_accepts_explicit_heading_or_body_but_not_both_blank() {
                 .add_reference(
                     &human,
                     AddReference {
-                        kind: "note".into(),
+                        kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                         title,
                         text: Some(" \n ".into()),
                         ..Default::default()
@@ -345,7 +345,7 @@ fn native_untitled_mode_does_not_relax_legacy_title_validation() {
         .add_reference_untitled(
             &human,
             AddReference {
-                kind: "note".into(),
+                kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                 text: Some("No heading chosen".into()),
                 ..Default::default()
             },
@@ -371,7 +371,7 @@ fn native_untitled_mode_does_not_relax_legacy_title_validation() {
             .add_reference_untitled(
                 &human,
                 AddReference {
-                    kind: "link".into(),
+                    kind: "link".parse::<jam_core::ReferenceKind>().unwrap(),
                     url: Some("https://example.com".into()),
                     ..Default::default()
                 }
@@ -383,7 +383,7 @@ fn native_untitled_mode_does_not_relax_legacy_title_validation() {
             .add_reference_untitled(
                 &human,
                 AddReference {
-                    kind: "note".into(),
+                    kind: "note".parse::<jam_core::ReferenceKind>().unwrap(),
                     title: Some("Contradictory heading".into()),
                     text: Some("Body".into()),
                     ..Default::default()

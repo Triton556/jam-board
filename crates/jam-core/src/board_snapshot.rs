@@ -22,20 +22,20 @@ pub(crate) const TABLES: &[(&str, &str)] = &[
     ("project_members", "jam_id,member_id"),
     (
         "epics",
-        "id,jam_id,key,title,color,status,goal_md,done_when_md,not_included_md,decided_md,open_questions_md,participation,reviewer,worker_model,brain_member_id,position,created_by,updated_by,created_at,updated_at,archived_at",
+        "id,jam_id,key,title,color,status,goal_md,done_when_md,not_included_md,decided_md,open_questions_md,participation,reviewer,worker_model,brain_member_id,position,created_by,updated_by,created_at,updated_at,archived_at,external_ref",
     ),
     (
         "stories",
-        "id,jam_id,key,epic_id,title,status,outcome_md,basis_md,preserve_md,scale_md,rejection_risks_md,open_decisions_md,acceptance_json,position,created_by,updated_by,created_at,updated_at,archived_at",
+        "id,jam_id,key,epic_id,title,status,outcome_md,basis_md,preserve_md,scale_md,rejection_risks_md,open_decisions_md,acceptance_json,position,created_by,updated_by,created_at,updated_at,archived_at,external_ref",
     ),
     (
         "tasks",
-        "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,goal_md,context_md,where_md,changes_json,tests_json,boundaries_md,result_md,user_quotes_md,changes_requested,review_round,claim_generation,metadata_json",
+        "id,jam_id,key,title,description_md,status,priority,estimate,due_at,position,assignee_id,created_by,updated_by,created_at,updated_at,archived_at,idempotency_key,story_id,goal_md,context_md,where_md,changes_json,tests_json,boundaries_md,result_md,user_quotes_md,changes_requested,review_round,claim_generation,metadata_json,external_ref",
     ),
-    ("task_tags", "task_id,tag"),
+    ("task_tags", "task_id,tag,position"),
     (
         "assets",
-        "id,jam_id,kind,name,location,notes,created_by,created_at,role,storage_type,path_base,stored_path,original_name,mime_type,byte_size,content_hash,content_revision,metadata_json",
+        "id,jam_id,kind,name,location,notes,created_by,created_at,role,storage_type,path_base,stored_path,original_name,mime_type,byte_size,content_hash,content_revision,metadata_json,archived_at,archived_by",
     ),
     (
         "task_assets",
@@ -44,7 +44,7 @@ pub(crate) const TABLES: &[(&str, &str)] = &[
     ("comments", "id,task_id,author_id,body_md,created_at"),
     (
         "activity",
-        "seq,id,jam_id,actor_id,action,task_id,payload,created_at,epic_id",
+        "seq,id,jam_id,actor_id,action,task_id,payload,created_at,epic_id,client",
     ),
     (
         "reports",
@@ -60,11 +60,11 @@ pub(crate) const TABLES: &[(&str, &str)] = &[
     ),
     (
         "ref_frames",
-        "id,jam_id,epic_id,title,x,y,w,h,color,archived_at,collapsed",
+        "id,jam_id,epic_id,title,x,y,w,h,color,archived_at,collapsed,review_sent_at,review_sent_by,review_hash",
     ),
     (
         "ref_items",
-        "id,jam_id,kind,asset_id,url,link_preview,title,caption_md,tags_json,x,y,w,h,z,frame_id,position,created_by,updated_by,created_at,updated_at,archived_at,metadata,verdict,archived_by",
+        "id,jam_id,kind,asset_id,url,link_preview,title,caption_md,tags_json,x,y,w,h,z,frame_id,position,created_by,updated_by,created_at,updated_at,archived_at,metadata,verdict,archived_by,verdict_note,source_url,origin,derived_from,copied_from",
     ),
     ("ref_edges", "id,jam_id,from_item,to_item,label,archived_at"),
     ("ref_links", "item_id,target_type,target_id,archived_at"),
@@ -88,6 +88,14 @@ pub(crate) const TABLES: &[(&str, &str)] = &[
     (
         "task_presentation",
         "task_id,cover_asset_id,cover_mode,metadata_json",
+    ),
+    (
+        "scope_files",
+        "id,jam_id,asset_id,target_type,target_id,role,position,created_by,created_at",
+    ),
+    (
+        "asset_revisions",
+        "asset_id,revision,stored_path,byte_size,content_hash,mime_type,created_by,created_at",
     ),
 ];
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,7 +221,7 @@ pub(crate) fn capture(c: &Connection) -> Result<BoardSnapshot> {
         }
     }
     Ok(BoardSnapshot {
-        format_version: 3,
+        format_version: 4,
         project_id,
         board_revision: c.query_row("SELECT board_revision FROM board_meta", [], |r| r.get(0))?,
         tables,
@@ -231,7 +239,9 @@ impl Store {
             .ok_or_else(|| invalid("snapshot", "Folder project required"))?;
         let live = self.board_snapshot()?;
         let external = std::fs::read(folder.join("board.json"))?;
-        let parsed = serde_json::from_slice::<BoardSnapshot>(&external);
+        let parsed = serde_json::from_slice::<BoardSnapshot>(&external)
+            .map_err(Error::from)
+            .and_then(upgrade_snapshot);
         let mut result = SnapshotComparison {
             live_hash: crate::storage_io::hash(&bytes(&live)?),
             external_hash: crate::storage_io::hash(&external),
@@ -243,7 +253,7 @@ impl Store {
         };
         match parsed {
             Ok(snapshot)
-                if snapshot.format_version == 3 && snapshot.project_id == live.project_id =>
+                if snapshot.format_version == 4 && snapshot.project_id == live.project_id =>
             {
                 result.external_valid = true;
                 result.external_revision = Some(snapshot.board_revision);
@@ -625,9 +635,82 @@ fn rotate(folder: &Path, store: &Store) -> Result<()> {
     }
     Ok(())
 }
+fn upgrade_snapshot(mut snapshot: BoardSnapshot) -> Result<BoardSnapshot> {
+    if snapshot.format_version == 3 {
+        for (table, fields) in [
+            ("epics", &["external_ref"][..]),
+            ("stories", &["external_ref"][..]),
+            ("tasks", &["external_ref"][..]),
+            ("assets", &["archived_at", "archived_by"][..]),
+            ("activity", &["client"][..]),
+        ] {
+            for row in snapshot
+                .tables
+                .get_mut(table)
+                .ok_or_else(|| invalid("snapshot", "Missing durable table"))?
+            {
+                for field in fields {
+                    if row.insert((*field).into(), Value::Null).is_some() {
+                        return Err(invalid("snapshot", "Unexpected v3 field"));
+                    }
+                }
+            }
+        }
+        let mut positions = HashMap::<String, i64>::new();
+        for row in snapshot
+            .tables
+            .get_mut("task_tags")
+            .ok_or_else(|| invalid("snapshot", "Missing tags"))?
+        {
+            let task = row
+                .get("task_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("snapshot", "Invalid tag task"))?
+                .to_owned();
+            let position = positions.entry(task).or_default();
+            if row.insert("position".into(), json!(*position)).is_some() {
+                return Err(invalid("snapshot", "Unexpected v3 tag position"));
+            }
+            *position += 1;
+        }
+        for table in ["scope_files", "asset_revisions"] {
+            if snapshot.tables.insert(table.into(), vec![]).is_some() {
+                return Err(invalid("snapshot", "Unexpected v3 table"));
+            }
+        }
+        snapshot.format_version = 4;
+    }
+    // Unreleased v10 extends the v4 durable rows; v9/v3 sources have no feedback metadata.
+    for (table, fields) in [
+        (
+            "ref_items",
+            &[
+                "verdict_note",
+                "source_url",
+                "origin",
+                "derived_from",
+                "copied_from",
+            ][..],
+        ),
+        (
+            "ref_frames",
+            &["review_sent_at", "review_sent_by", "review_hash"][..],
+        ),
+    ] {
+        if let Some(rows) = snapshot.tables.get_mut(table) {
+            for row in rows {
+                for field in fields {
+                    row.entry((*field).into()).or_insert(Value::Null);
+                }
+            }
+        }
+    }
+    Ok(snapshot)
+}
 pub(crate) fn restore_into(snapshot: &BoardSnapshot, path: &Path) -> Result<Store> {
-    if snapshot.format_version != 3 {
-        return Err(invalid("formatVersion", "Recovery requires snapshot v3"));
+    let snapshot = upgrade_snapshot(snapshot.clone())?;
+    if snapshot.format_version != 4 {
+        return Err(invalid("formatVersion", "Recovery requires snapshot v4"));
     }
     if snapshot.tables.len() != TABLES.len()
         || snapshot
@@ -746,7 +829,10 @@ impl ProjectManager {
         let stage = folder.join(format!(".state/recovery-{}.db", id()));
         let restored = restore_into(&snapshot, &stage)?;
         // Validate all file authorities without opening or executing anything.
-        for a in restored.list_file_assets(FileAssetQuery::default())? {
+        for a in restored.list_file_assets(FileAssetQuery {
+            include_archived: Some(true),
+            ..Default::default()
+        })? {
             if a.storage_type == "board_file" {
                 crate::storage_io::contained(folder, &a.stored_path)?;
             }
