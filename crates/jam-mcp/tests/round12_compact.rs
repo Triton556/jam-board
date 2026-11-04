@@ -278,6 +278,7 @@ async fn client_identity_mapping_and_activity_client_keep_the_raw_session_name()
             "Header custom",
         ),
         ("claude-code", Some("Header Claude"), "Header Claude"),
+        ("codex-cli", Some("Header Codex"), "Header Codex"),
     ] {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
@@ -302,6 +303,35 @@ async fn client_identity_mapping_and_activity_client_keep_the_raw_session_name()
         .serve(transport)
         .await
         .unwrap();
+        let prompt = client
+            .get_prompt(GetPromptRequestParams::new("plan_epic"))
+            .await
+            .unwrap();
+        let prompt = serde_json::to_value(prompt).unwrap();
+        let prompt = prompt["messages"][0]["content"]["text"].as_str().unwrap();
+        let resource = client
+            .read_resource(ReadResourceRequestParams::new("jam://prompts/plan_epic"))
+            .await
+            .unwrap();
+        let resource = serde_json::to_value(resource).unwrap();
+        let resource = resource["contents"][0]["text"].as_str().unwrap();
+        assert_eq!(
+            prompt.contains("native subagent tools"),
+            name == "codex-cli"
+        );
+        assert_eq!(
+            resource.contains("native subagent tools"),
+            name == "codex-cli"
+        );
+        let worker = client
+            .get_prompt(GetPromptRequestParams::new("work_on_next_task"))
+            .await
+            .unwrap();
+        assert!(
+            !serde_json::to_string(&worker)
+                .unwrap()
+                .contains("native subagent tools")
+        );
         let result=call(&client,"create_epic",json!({"title":format!("Identity {name} {expected}"),"requestId":format!("identity-{expected}")})).await;
         assert_ne!(result.is_error, Some(true));
         let epic = result.structured_content.unwrap();

@@ -5,6 +5,7 @@ import { Button, Dialog, SegmentedControl } from "../../components/ui";
 import { api } from "../../lib/api";
 import {
   brainHandoff,
+  type HandoffClient,
   type HandoffMode,
   type HandoffProject,
   type HandoffScope,
@@ -19,9 +20,14 @@ type Snapshot = {
   title: string;
   projectLabel: string;
 };
-const emptyRequest: { request: string; mode: HandoffMode } = {
+const emptyRequest: {
+  request: string;
+  mode: HandoffMode;
+  client: HandoffClient;
+} = {
   request: "",
   mode: "setup",
+  client: "standard",
 };
 
 export function BrainHandoff({
@@ -256,6 +262,16 @@ function HandoffDialog({
           </p>
         )}
         <div>
+          <SegmentedControl<HandoffClient>
+            label="Brain client"
+            value={draft.value.client}
+            onChange={(client) => edit({ ...draft.value, client })}
+            disabled={busy}
+            options={[
+              { value: "standard", label: "Claude / other" },
+              { value: "codex", label: "Codex" },
+            ]}
+          />
           <SegmentedControl<HandoffMode>
             label="Conversation context"
             value={draft.value.mode}

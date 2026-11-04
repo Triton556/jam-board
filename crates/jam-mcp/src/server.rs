@@ -958,6 +958,7 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
         let actor = self.heartbeat(&ctx).await?;
+        let is_codex = self.identity(&ctx).1 == "codex";
         let store = self.session_store().map_err(internal)?;
         let uri = request.uri;
         let text = tokio::task::spawn_blocking({
@@ -965,7 +966,7 @@ impl ServerHandler for JamServer {
             move || -> jam_core::Result<String> {
                 if let Some(name)=uri.strip_prefix("jam://prompts/") {
                     if !["plan_epic","work_on_next_task"].contains(&name) { return Err(jam_core::Error::NotFound(uri)); }
-                    let mut text=crate::v2::prompt_with_args(name,Some("{epicKey}"),(name=="work_on_next_task").then_some("{tag}")).ok_or_else(||jam_core::Error::NotFound(uri.clone()))?;
+                    let mut text=crate::v2::prompt_with_args(name,Some("{epicKey}"),(name=="work_on_next_task").then_some("{tag}"),is_codex).ok_or_else(||jam_core::Error::NotFound(uri.clone()))?;
                     text.push_str("\n\nArguments: {epicKey} is an optional epic key, e.g. JB-E2; {tag} is an optional task tag filter for work_on_next_task.");
                     Ok(text)
                 } else if uri == "jam://guide" {
@@ -1074,6 +1075,7 @@ impl ServerHandler for JamServer {
             &request.name,
             args.and_then(|a| a.get("epicKey")).and_then(Value::as_str),
             args.and_then(|a| a.get("tag")).and_then(Value::as_str),
+            self.identity(&ctx).1 == "codex",
         )
         .ok_or_else(|| ErrorData::invalid_params("Unknown prompt", None))?;
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(Role::User, instruction)]).into())

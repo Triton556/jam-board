@@ -12,6 +12,8 @@ All notable changes to Jam Board are documented here. The format follows
   Start and Inbox approval flow.
 - The bundled skill covers native Codex workers, separate board identities and
   brief updates that preserve the human Description.
+- Refine with brain offers separate Codex and standard prompts. The MCP epic
+  planning prompt includes native delegation guidance for Codex clients.
 
 ## [0.3.0-alpha.48] - 2026-11-01
 

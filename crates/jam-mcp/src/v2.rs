@@ -732,6 +732,7 @@ pub(crate) fn prompt_with_args(
     name: &str,
     epic_key: Option<&str>,
     tag: Option<&str>,
+    is_codex: bool,
 ) -> Option<String> {
     let mut text = prompt(name)?;
     if let Some(epic_key) = epic_key {
@@ -742,6 +743,10 @@ pub(crate) fn prompt_with_args(
     }
     if let Some(tag) = tag.filter(|_| name == "work_on_next_task") {
         text.push_str(&format!(" Filter tasks by tag={}", serde_json::json!(tag)));
+    }
+    if name == "plan_epic" && is_codex {
+        text.push_str("\n\n");
+        text.push_str(include_str!("../../../apps/desktop/src/lib/codex-brain-prompt.txt").trim());
     }
     Some(text)
 }

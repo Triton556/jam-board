@@ -68,7 +68,7 @@ release browser failures stay recorded in the version verification record.
 | ID | Sequence | Observable acceptance (functional, not a hash) |
 |---|---|---|
 | AC01 | AG01 wrong project → verified exact project → read | Wrong binding fails before scoped content; desktop switch does not retarget session |
-| AC02 | AG02 same scope Refine twice → copy failure | Stable prompt explains current retrieval; no launch/write; selectable text survives clipboard failure |
+| AC02 | AG02 same scope Refine twice → choose client and context → copy failure | Stable prompt and draft; Codex guidance in both modes and in the matching MCP epic prompt/resource; standard text preserved; no launch/write; selectable text survives clipboard failure |
 | AC03 | AG03 human correction → agent brief/story update | Intended fields reconciled; omitted fields preserved; whole-list replacement understood; no role takeover |
 | AC04 | AG04 board question → human answer → agent wait/read | Question ID and persisted answer match scope; ordinary answer creates no execution grant; chat-only question not counted as Inbox event |
 | AC05 | AG05 complete brief Ready under paused scope → attempted claim | Readiness can pass; execution_required prevents work; task/history unchanged by refusal |

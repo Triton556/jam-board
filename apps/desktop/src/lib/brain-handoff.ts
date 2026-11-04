@@ -1,8 +1,15 @@
+import codexBrainPrompt from "./codex-brain-prompt.txt?raw";
+
 export type HandoffScope =
   | { type: "project"; id?: never; key?: never }
   | { type: "epic" | "story" | "task"; id: string; key: string };
 export type HandoffMode = "setup" | "continue";
-export type HandoffOptions = { mode?: HandoffMode; request?: string };
+export type HandoffClient = "codex" | "standard";
+export type HandoffOptions = {
+  mode?: HandoffMode;
+  request?: string;
+  client?: HandoffClient;
+};
 
 const humanSummary =
   "Fill an EMPTY task Description with a concise human-readable outcome in the language of my original notes or latest human request; if unclear, ask which language. Preserve existing human text and wishes. Use the Story Description for its understandable outcome and the agent plan for technical detail. Do not translate or rewrite existing human text automatically.";
@@ -46,6 +53,8 @@ export function brainHandoff(
     scope.type === "project"
       ? ""
       : "Resolve the scope under the verified project and match its captured scope ID before edits; if missing or different, stop rather than replace it with a similarly named item.";
+  const clientGuidance =
+    options.client === "codex" ? codexBrainPrompt.trim() : "";
   if (options.mode === "continue") {
     return [
       `Continue planning ${target} in project ${project?.id ?? "whose exact ID I must confirm first"}.`,
@@ -56,6 +65,7 @@ export function brainHandoff(
       "Use the current planning/recovery contract already known in this conversation. If it is missing or uncertain, stop and ask for the full setup prompt; an agent name or prior copy does not prove retained context. Use current tool schemas and validators from the exact task/report context inspected. On stale/conflict keep the draft, reread and reconcile; never refresh tokens just to replay old intent. Respect the existing epic brain; do not replace it.",
       humanSummary,
       "Planning only, even if a scope is running: no claims, implementation or worker launch. Ready means a complete brief, not execution permission; Start is separate. Use scoped ask_user for project decisions we want tracked in Inbox; conversation and client permissions can remain in chat. Say what was actually saved, what changed, what is unclear and how results will be checked.",
+      clientGuidance,
       requestText(options.request),
     ]
       .filter(Boolean)
@@ -84,6 +94,7 @@ export function brainHandoff(
     "Planning only: do not claim tasks, start implementation or launch workers, even if the scope is already running. Ready describes the brief, not permission to work. Wait for my explicit start of the chosen story or epic. Only for a later, separately requested execution phase may the brain organize workers inside the authorized scope, without asking me to launch each worker separately. This refinement request remains planning-only.",
     "When I ask to start a story or epic in chat, first check get_execution. If it is not started, use request_execution for that exact scope and ask me to approve its typed Start request in Inbox (or use Start in Plan). Ordinary questions, answers and chat text do not themselves grant board execution permission. Never claim before the board records that scope as running.",
     "Publish scoped status and leave a concise summary with the next decision I need to make. Start permits work; it does not wake a chat or launch an OS agent process.",
+    clientGuidance,
     requestText(options.request),
   ]
     .filter(Boolean)

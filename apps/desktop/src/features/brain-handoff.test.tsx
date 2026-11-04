@@ -307,6 +307,15 @@ it("H-P07 remembers an explicitly chosen mode and local request across modes and
   ).toHaveAttribute("aria-checked", "true");
   const request = screen.getByRole("textbox", { name: "What should change?" });
   await user.type(request, "Keep the simple outcome; explain the empty state.");
+  const preview = screen.getByRole<HTMLTextAreaElement>("textbox", {
+    name: "Planning prompt",
+  });
+  const standard = preview.value;
+  await user.click(screen.getByRole("radio", { name: "Codex" }));
+  expect(preview.value).toContain("native subagent tools");
+  await user.click(screen.getByRole("radio", { name: "Claude / other" }));
+  expect(preview).toHaveValue(standard);
+  await user.click(screen.getByRole("radio", { name: "Codex" }));
   await user.click(
     screen.getByRole("radio", { name: "Continue in this chat" }),
   );
@@ -318,6 +327,8 @@ it("H-P07 remembers an explicitly chosen mode and local request across modes and
   expect(short).toContain(
     '"Keep the simple outcome; explain the empty state."',
   );
+  expect(short).toContain("native subagent tools");
+  expect(short).toContain("Planning only");
   await user.click(screen.getByRole("radio", { name: "First / new chat" }));
   expect(request).toHaveValue(
     "Keep the simple outcome; explain the empty state.",
@@ -327,6 +338,10 @@ it("H-P07 remembers an explicitly chosen mode and local request across modes and
   );
   await user.keyboard("{Escape}");
   await user.click(screen.getByRole("button", { name: "Refine with brain" }));
+  expect(screen.getByRole("radio", { name: "Codex" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
   expect(
     screen.getByRole("textbox", { name: "What should change?" }),
   ).toHaveValue("Keep the simple outcome; explain the empty state.");
