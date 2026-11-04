@@ -150,7 +150,7 @@ An unknown agent handle is registered with `member.joined`, taking the first unu
 - V2.2 refines needsInfo: a task flag and the list_tasks needsInfo filter cover only open questions scoped to that task. Story and epic questions stay at their own level. get_task adds ancestorQuestions (open story/epic questions); jam://task/{key} renders them under "Open questions above this task". Project questions remain Inbox items. This prevents an epic interview from flagging every card.
 - JSON exports use version 2 to retain hierarchy, briefs, reports, reviews, questions and references. Version-1 imports remain supported.
 
-## Tool contract (74 tools)
+## Tool contract (75 standard tools)
 
 All argument objects use camelCase, reject unknown properties and have schemars JSON Schemas. Entity addresses use project keys: JB-E1, JB-S1, JB-12. Scope is { type: "project" | "epic" | "story" | "task", id: string }; id can be the entity key or ULID, and an empty project id means this session’s pinned project, not the board currently displayed in the UI. Reference items/questions use their returned IDs.
 
@@ -237,11 +237,23 @@ Success contains structuredContent plus a one-line content summary. Failures are
 
 **Ready is a planning state, not permission to start.** Drafting, questions, references, decomposition, human edits and brief reconciliation can happen while execution is paused. A human explicitly starts an exact **story or epic**, not each individual worker. A Start allows work within that scope; it does not launch a process, activate a draft story, mark tasks Ready, or modify task assignments.
 
-The native UI has `get_execution`, `list_execution`, `set_execution`, `list_execution_requests` and `resolve_execution_request` commands. Only the native human bridge exposes Start, Pause and approval. MCP has the four read/request tools above, **no Start, Pause or approval tool**. The human identity is resolved by the native backend, never accepted as an input flag.
+The native UI has `get_execution`, `list_execution`, `set_execution`, `list_execution_requests` and `resolve_execution_request` commands. The native human bridge owns Pause and Inbox approval. Default MCP connections expose the four read/request tools above.
 
 ### A command in brain chat
 
-The appointed epic brain can call `request_execution` with an exact epic/story and a reason. This creates a separate typed Inbox request; it does not authorize work. The human reviews the project and scope, then chooses **Approve and start** in the app. A generic `ask_user` answer, free text such as “start”, a tool's `userApproved` field, or the brain's role cannot manufacture a grant. Unknown arguments are rejected. A trusted chat-to-human-approval bridge is not implemented in this alpha: chat requests still need that one Inbox confirmation.
+The appointed epic brain can call `request_execution` with an exact epic/story and a reason. The human reviews the typed Inbox request, then chooses **Approve and start**.
+
+A trusted local stdio connection can opt into delegated Start by configuring
+`JAM_ALLOW_BRAIN_START=1` and a fixed `JAM_AGENT_NAME` for the brain. Keep this
+setting on a brain-only connection and leave it off for workers and shared
+connections. HTTP and default stdio keep the Inbox route. The opt-in advertises
+`execution.brainStart` and exposes
+`brain_start_execution({scope, expectedRevision})`. It trusts the brain to act
+only on a direct human request naming the exact story or epic. MCP cannot
+authenticate the chat instruction. The server checks the current appointment,
+bound project, scope and execution revision and records the brain as the actor.
+Planning, generic answers, quoted text and payload approval flags confer no
+authority. Workers do not inherit the right to call Start.
 
 A pending request is idempotent for the same scope and revision. Start/Pause supersedes affected pending requests. A request records immutable project/scope IDs and the execution revision; a stale approval fails with `conflict`. Titles and keys in responses reflect the current canonical entities. Switching the human's selected project cannot redirect a captured request or connection.
 
@@ -263,6 +275,16 @@ A pending request is idempotent for the same scope and revision. Start/Pause sup
 `ExecutionState` returns `projectId`, canonical `scope`, `scopeKey`, `scopeTitle`, `ownState`, `effectiveState`, `source` (scope/epic/none), opaque `revision`, `canStart`, nullable `blockedReason`, `inProgressCount`, `readyCount`, `runningStoryCount`, nullable `changedBy` and `changedAt`. In-progress counts include archived cards; Ready counts exclude archived cards. The revision includes the ancestor for stories and child grant revisions for epics. Treat it as an opaque token; native `set_execution` requires `expectedRevision`.
 
 `ExecutionRequest` returns `id`, `projectId`, canonical `scope`, `scopeKey`, `scopeTitle`, `requestedBy`, `reason`, `status`, `revision`, `createdAt`, nullable `resolvedBy` and `resolvedAt`. Native resolution requires `id`, `decision` (approve/decline), and `expectedRevision`. An approval verifies the request and current scope revision and starts the exact scope in one transaction. Decline does not start work.
+
+### Agent identity and avatars
+
+`get_session_context({includeActor:true})` includes the member bound to the MCP
+connection as `actor`. Existing callers can continue with an empty input.
+Verify it before worker writes. On servers advertising `agent.avatar`, use
+`set_agent_avatar({avatar})` to update this actor's PNG (base64 data URL, at
+most 32 KiB decoded and 128×128 pixels, static) or pass explicit null to restore
+the provider default. The app bundles ChatGPT and Claude icons for those clients.
+An avatar update emits `member.updated` without changing task state or presence.
 
 ### Work already underway
 

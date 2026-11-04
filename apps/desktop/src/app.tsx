@@ -360,7 +360,10 @@ function Root() {
           void queryClient.invalidateQueries({
             queryKey: ["task", event.taskKey],
           });
-        if (event.action === "member.joined")
+        if (
+          event.action === "member.joined" ||
+          event.action === "member.updated"
+        )
           void queryClient.invalidateQueries({ queryKey: ["members"] });
       }
       for (const queryKey of [

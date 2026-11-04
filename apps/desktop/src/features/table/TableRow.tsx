@@ -7,6 +7,7 @@ import {
 } from "../../components/ui/AgentWorking";
 import { Priority } from "../../components/ui/Priority";
 import type { WorkingState } from "../../lib/agent-working";
+import { avatarImage } from "../../lib/avatar-image";
 import type { Member, TaskSummary } from "../../lib/types";
 import { labels } from "../../lib/types";
 
@@ -62,6 +63,8 @@ export const TableRow = memo(function TableRow({
   exactTime,
   working = null,
 }: TableRowProps) {
+  const image =
+    assignee && avatarImage(assignee.kind, assignee.avatar, assignee.client);
   return (
     <tr
       ref={watchWorkingVisibility}
@@ -123,7 +126,11 @@ export const TableRow = memo(function TableRow({
                   background: `color-mix(in srgb, ${assignee.color} 18%, var(--card))`,
                 }}
               >
-                {initials}
+                {image ? (
+                  <img className="avatar-image" src={image} alt="" />
+                ) : (
+                  initials
+                )}
                 {assignee.kind === "agent" && (
                   <Bot className="table-antenna" size={10} aria-label="agent" />
                 )}

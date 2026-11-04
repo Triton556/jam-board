@@ -70,7 +70,7 @@ fn assert_tools(tools: &[Tool]) {
         serde_json::from_str(include_str!("../../jam-mcp/tests/fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual.len(), expected.len());
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 74);
+    assert_eq!(actual.len(), 75);
     assert!(!actual.iter().any(|name| name == "set_reference_verdict"));
     let wait = tools.iter().find(|t| t.name == "wait_for_changes").unwrap();
     assert_eq!(wait.input_schema["required"], json!(["cursor"]));
@@ -120,12 +120,21 @@ fn fixture() -> (tempfile::TempDir, Arc<Store>, jam_core::Member) {
     (d, s, h)
 }
 async fn client(db: &Path, name: &str) -> RunningService<RoleClient, ClientConfig> {
+    client_with_start(db, name, name, false).await
+}
+async fn client_with_start(
+    db: &Path,
+    name: &str,
+    client_name: &str,
+    allow_start: bool,
+) -> RunningService<RoleClient, ClientConfig> {
     let mut cmd = tokio::process::Command::new(env!("CARGO_BIN_EXE_jam-board-mcp"));
     cmd.arg("--db").arg(db).env("JAM_AGENT_NAME", name);
+    cmd.env("JAM_ALLOW_BRAIN_START", if allow_start { "1" } else { "0" });
     let transport = TokioChildProcess::new(cmd).unwrap();
     ClientConfig::new(
         ClientCapabilities::default(),
-        Implementation::new(name, "1"),
+        Implementation::new(client_name, "1"),
     )
     .with_protocol_version(ProtocolVersion::V_2025_06_18)
     .serve(transport)
@@ -1615,7 +1624,7 @@ async fn execution_requires_exact_native_human_approval_not_mcp_text_or_role() {
     let tools = brain.list_all_tools().await.unwrap();
     assert!(!tools.iter().any(|t| matches!(
         t.name.as_ref(),
-        "set_execution" | "resolve_execution_request" | "start_execution"
+        "set_execution" | "resolve_execution_request" | "brain_start_execution"
     )));
     data(
         call_fresh(
@@ -1760,6 +1769,161 @@ async fn execution_requires_exact_native_human_approval_not_mcp_text_or_role() {
     );
     worker.cancel().await.unwrap();
     brain.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn delegated_start_requires_opt_in_appointment_and_current_exact_scope() {
+    let (_dir, store, human) = fixture();
+    let key = planning_with_human_start(&store, &human);
+    let story = store.get_story(&key).unwrap().story;
+    let scope = jam_core::ExecutionScope {
+        kind: jam_core::ExecutionScopeType::Story,
+        id: story.audit.id,
+    };
+    let pause = || {
+        store
+            .set_execution(
+                &human.id,
+                jam_core::SetExecution {
+                    scope: scope.clone(),
+                    action: jam_core::ExecutionAction::Pause,
+                    expected_revision: store.get_execution(&scope).unwrap().revision,
+                },
+            )
+            .unwrap()
+    };
+    let paused = pause();
+    let brain = client_with_start(&store.path, "Start brain", "codex", true).await;
+    let ordinary = client(&store.path, "Start brain").await;
+    let worker = client_with_start(&store.path, "Start worker", "codex", true).await;
+    let context = data(call_raw(&brain, "get_session_context", json!({"includeActor":true})).await);
+    assert_eq!(context["actor"]["name"], "Start brain");
+    assert!(
+        context["capabilities"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("execution.brainStart"))
+    );
+    assert!(
+        brain
+            .list_all_tools()
+            .await
+            .unwrap()
+            .iter()
+            .any(|tool| tool.name == "brain_start_execution")
+    );
+    let args = json!({"scope":scope,"expectedRevision":paused.revision});
+    error(
+        call_raw(&brain, "brain_start_execution", args.clone()).await,
+        "forbidden",
+    );
+    data(call_fresh(&brain, "become_brain", json!({"epicKey":story.epic_id})).await);
+    error(
+        call_raw(&ordinary, "brain_start_execution", args.clone()).await,
+        "forbidden",
+    );
+    error(
+        call_raw(&worker, "brain_start_execution", args.clone()).await,
+        "forbidden",
+    );
+    let started = data(call_raw(&brain, "brain_start_execution", args.clone()).await);
+    assert_eq!(started["effectiveState"], "running");
+    assert_eq!(started["changedBy"], context["actor"]["id"]);
+    let epic = store
+        .get_execution(&jam_core::ExecutionScope {
+            kind: jam_core::ExecutionScopeType::Epic,
+            id: story.epic_id,
+        })
+        .unwrap();
+    assert_eq!(
+        epic.effective_state,
+        jam_core::ExecutionEffectiveState::Paused
+    );
+    pause();
+    error(
+        call_raw(&brain, "brain_start_execution", args).await,
+        "conflict",
+    );
+    assert_eq!(
+        store.get_execution(&scope).unwrap().effective_state,
+        jam_core::ExecutionEffectiveState::Paused
+    );
+    let current_epic = store.get_execution(&epic.scope).unwrap();
+    let started_epic = data(
+        call_raw(
+            &brain,
+            "brain_start_execution",
+            json!({"scope":current_epic.scope,"expectedRevision":current_epic.revision}),
+        )
+        .await,
+    );
+    assert_eq!(started_epic["effectiveState"], "running");
+    assert_eq!(
+        store.get_execution(&scope).unwrap().effective_state,
+        jam_core::ExecutionEffectiveState::Paused
+    );
+    brain.cancel().await.unwrap();
+    ordinary.cancel().await.unwrap();
+    worker.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn worker_png_avatar_is_self_scoped_persists_and_can_be_cleared() {
+    const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4J2j8HwAFlQJC8Q1l3gAAAABJRU5ErkJggg==";
+    let (_dir, store, _) = fixture();
+    let worker = client_with_start(&store.path, "coddx-worker-jb-12", "codex", false).await;
+    let other = store.identify_agent("Other worker", "claude-code").unwrap();
+    let actor = data(call_raw(&worker, "get_session_context", json!({"includeActor":true})).await)
+        ["actor"]
+        .clone();
+    let id = actor["id"].as_str().unwrap();
+    error(
+        call_raw(&worker, "set_agent_avatar", json!({})).await,
+        "validation",
+    );
+    error(
+        call_raw(
+            &worker,
+            "set_agent_avatar",
+            json!({"avatar":"https://example.org/avatar.png"}),
+        )
+        .await,
+        "validation",
+    );
+    error(
+        call_raw(
+            &worker,
+            "set_agent_avatar",
+            json!({"avatar":"data:image/png;base64,AAAA"}),
+        )
+        .await,
+        "validation",
+    );
+    error(
+        call_raw(
+            &worker,
+            "set_agent_avatar",
+            json!({"avatar":PNG,"memberId":other.id}),
+        )
+        .await,
+        "validation",
+    );
+    assert_eq!(
+        data(call_raw(&worker, "set_agent_avatar", json!({"avatar":PNG})).await)["avatar"],
+        PNG
+    );
+    assert_eq!(store.get_member(id).unwrap().avatar.as_deref(), Some(PNG));
+    assert_eq!(store.get_member(&other.id).unwrap().avatar, None);
+    worker.cancel().await.unwrap();
+    let worker = client_with_start(&store.path, "coddx-worker-jb-12", "codex", false).await;
+    assert_eq!(
+        data(call_raw(&worker, "get_session_context", json!({"includeActor":true})).await)["actor"]
+            ["id"],
+        id
+    );
+    data(call_raw(&worker, "set_agent_avatar", json!({"avatar":null})).await);
+    assert_eq!(store.get_member(id).unwrap().avatar, None);
+    worker.cancel().await.unwrap();
 }
 
 #[tokio::test]

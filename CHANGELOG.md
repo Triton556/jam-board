@@ -5,6 +5,14 @@ All notable changes to Jam Board are documented here. The format follows
 
 ## [Unreleased]
 
+- Agent avatars accept a custom PNG through MCP. Codex and Claude show bundled
+  provider icons when an agent has no custom avatar.
+- Appointed brains can start the exact requested story or epic on trusted,
+  explicitly opted-in stdio connections. Standard connections use the existing
+  Start and Inbox approval flow.
+- The bundled skill covers native Codex workers, separate board identities and
+  brief updates that preserve the human Description.
+
 ## [0.3.0-alpha.48] - 2026-11-01
 
 Moodboard review lets you rate references and send feedback to an agent.

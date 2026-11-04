@@ -28,10 +28,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import laptop from "../../assets/chibi/danil-laptop-256.webp";
-import type { MemberRef } from "../../bindings";
+import type { Member, MemberRef } from "../../bindings";
+import { avatarImage } from "../../lib/avatar-image";
 import { avatarInitials } from "../../lib/avatar-initials";
 import { scheduleIdle } from "./idle";
-export const AvatarMembersContext = createContext<readonly MemberRef[]>([]);
+
+type AvatarMember = MemberRef & Partial<Pick<Member, "avatar" | "client">>;
+export const AvatarMembersContext = createContext<readonly AvatarMember[]>([]);
 export function Button({
   variant = "secondary",
   className = "",
@@ -179,11 +182,17 @@ export function Avatar({
   size = 28,
   allMembers,
 }: {
-  member: MemberRef & { avatar?: string | null };
+  member: AvatarMember;
   size?: number;
-  allMembers?: readonly MemberRef[];
+  allMembers?: readonly AvatarMember[];
 }) {
   const contextMembers = useContext(AvatarMembersContext);
+  const profile = contextMembers.find(
+    (candidate) => candidate.id === member.id,
+  );
+  const avatar = profile?.avatar === undefined ? member.avatar : profile.avatar;
+  const client = profile?.client ?? member.client;
+  const image = avatarImage(member.kind, avatar, client);
   return (
     <Tooltip
       text={`${member.name}${member.kind === "agent" ? " · agent" : ""}`}
@@ -199,9 +208,13 @@ export function Avatar({
           background: `color-mix(in srgb, ${member.color} 18%, var(--card))`,
         }}
       >
-        {member.avatar && !member.avatar.includes("/")
-          ? member.avatar
-          : avatarInitials(member, allMembers ?? contextMembers)}
+        {image ? (
+          <img className="avatar-image" src={image} alt="" />
+        ) : avatar && !avatar.includes("/") ? (
+          avatar
+        ) : (
+          avatarInitials(member, allMembers ?? contextMembers)
+        )}
         {member.kind === "agent" && (
           <Bot className="agent-badge" data-testid="agent-badge" size={10} />
         )}

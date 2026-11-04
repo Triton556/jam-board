@@ -52,6 +52,7 @@
   "request_execution",
   "resolve_file",
   "review_task",
+  "set_agent_avatar",
   "set_brain",
   "set_epic_status",
   "set_status",

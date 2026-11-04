@@ -16,7 +16,7 @@ project records, assignment, questions, execution permission and reports.
 | --- | --- | --- |
 | Connect or resume | Call `get_session_context` and match the intended exact project ID before board reads. Use the bootstrap/recovery section in [operations](references/operations.md). | Correct project and handled checkpoint, or a named connection mismatch. |
 | Plan or refine an epic, story or task | Read the selected records and relevant human descriptions, comments, questions and assets. Use the server's `plan_epic` prompt for the current protocol. | Preserved human intent, resolved or visible questions, actionable briefs. Planning does not execute work. |
-| Coordinate started board work | Check the selected scope with `get_execution`. Organize permitted worker assignments using the client's existing capabilities and the user's selected settings. | Actual worker IDs and board assignments, or an honest launch blocker. |
+| Start or coordinate work | Read “Execution permission and workers” in [operations](references/operations.md), then check the exact scope with `get_execution`. | A confirmed board Start and real worker assignments, or a named blocker. |
 | Work on a task | Use `work_on_next_task`, read the task and scope, then claim with the inspected validators. | Implementation within the brief and `submit_report` with actual observations. |
 | Review a report | Use `review_task`; compare the exact current report to task tests and story acceptance. | Accept or specific changes requested against the inspected report/context. Never accept your own worker submission. |
 | A decision is missing | Ask through `ask_user` when the decision belongs in board history; use chat for client permission or conversation clarification. | A saved answer or a visible unanswered question, not invented consent. |
@@ -60,18 +60,17 @@ See [operations](references/operations.md) for examples and link-only results.
 
 ## Human-facing work and completion
 
-Keep the human Description understandable and preserve their text. Put execution
-detail in the structured brief and changes in comments. State actual progress on
-the selected scope. For UI work, report the user steps and reached states you
-actually inspected, including readability, hidden surfaces and recovery; passing
-unit tests or a build is not visual acceptance.
+Read the latest Description before briefing, claiming or changing a task. Carry
+human wishes and corrections into the brief, and resolve any conflict with the
+current plan before affected work. Preserve the human's wording. When creating a
+task, write a short Description in the human's language explaining the goal and
+expected result. Keep implementation detail and checks in the structured brief.
 
-A human Start of a story/epic grants board execution; it does not launch or wake a
-client session. A question answer, Ready, heartbeat or copied prompt is not Start.
-Pause prevents new claims but does not stop external processes. Finish at the
-requested result and report checks and limits. Do not start ongoing monitoring
-solely because a wait tool exists. Reports persist on the board; they do not
-contain all conversation or source files.
+After a worker returns, inspect the result, update the board and give a short
+chat recap of what was accepted and verified, what remains open or unverified,
+and the next step or needed decision. For UI, check the actual user steps and
+states reached. Keep current worker IDs, decisions and the next step in the
+working record so the brain can resume without repeating setup or launches.
 
 ## Project folders and task files
 

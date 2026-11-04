@@ -79,8 +79,11 @@ release browser failures stay recorded in the version verification record.
 | AC10 | AG10 reconnect with checkpoint → bounded events incl relevant filters | No checkpoint reset/lost unprocessed events; cursor advanced only after handling; no endless unauthorized wait |
 | AC11 | AG11 replacement brain read-only recovery | Includes relevant Done/archive reports, rejected rounds and answered questions; tails/resource omissions disclosed; no appointment/claim mutation |
 | AC12 | AG12 references across project/frame/file cases | Same-project binding enforced; no implicit preview network fetch/file copy; unreadable input produces useful failure |
-| AC13 | AG02 new/refined task → human reads Description | Concise user-language outcome in an empty description; existing wishes preserved, technical detail secondary; prompt strings alone do not establish model compliance |
+| AC13 | AG02 new/refined task → human reads Description | New tasks explain the goal and expected result in the human's language. Existing wishes are reread before briefing or claiming, preserved verbatim and reconciled with the brief. Prompt fixtures do not establish live model compliance. |
 | AC14 | AG14 read canvas -> create epic frame -> connect notes -> arrange grid -> reread/archive -> foreign-ID and failed-batch recovery | Seven tools use pinned project/actor/activity. Directed duplicates/self-edges fail. Grid fits without overlaps or touching unselected occupants; insufficient space or invalid/foreign IDs roll back the entire batch. World/frame-local conversion, archive defaults, filters and explicit paging markers match the contract. `crates/jam-mcp/src/canvas_tests.rs` exercises dispatcher/core behavior; stdio smoke verifies transport. Desktop visual/live-human acceptance remains unrun.  Round 12 human reason/keys/filters/Send, changed-since hash, ancestry and Collect Keep; partial batches and human-only guards. See R12-M/fix1 and R12-G. |
+
+| AC15 | AG06 explicit delegated Start → scoped running or refusal | Stdio fixture verifies opt-in, appointment, scope and stale revision after Pause. The connection trusts the brain to recognize the human request. Live model compliance is separate. |
+| AC16 | M03 worker updates or clears icon → visible profile changes | Stdio fixture verifies actor binding, invalid payload rejection, persistence and clearing. DOM tests exercise custom icon, both provider defaults and the human emoji. |
 
 ## Test mapping and evidence levels
 

@@ -82,7 +82,7 @@ async fn http_auth_origin_identity_port_and_tools() {
         .map(|t| t.name.to_string())
         .collect::<Vec<_>>();
     actual.sort();
-    assert_eq!(actual.len(), 74);
+    assert_eq!(actual.len(), 75);
     let expected: Vec<String> =
         serde_json::from_str(include_str!("fixtures/tools-v2.json")).unwrap();
     assert_eq!(actual, expected);
@@ -174,7 +174,8 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Authorization", format!("Bearer {bearer}").parse().unwrap());
     headers.insert("X-Jam-Project", first.key_prefix.parse().unwrap());
-    headers.insert("X-Jam-Agent", "Pinned HTTP worker".parse().unwrap());
+    let worker_name = "Pinned HTTP worker";
+    headers.insert("X-Jam-Agent", worker_name.parse().unwrap());
     let http = reqwest::Client::builder()
         .default_headers(headers)
         .build()
@@ -209,6 +210,22 @@ async fn http_sessions_pin_the_requested_project_not_later_human_selection() {
     let result = client.call_tool(read()).await.unwrap();
     let context = result.structured_content.unwrap();
     assert_eq!(context["projectId"], first.id);
+    assert!(context.get("actor").is_none());
+    let with_actor = client
+        .call_tool(
+            CallToolRequestParams::new("get_session_context").with_arguments(
+                serde_json::json!({"includeActor":true})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap()
+        .structured_content
+        .unwrap();
+    assert_eq!(with_actor["actor"]["name"], worker_name);
+    assert_eq!(with_actor["projectId"], first.id);
     let expected = s
         .for_project(&first.id)
         .unwrap()

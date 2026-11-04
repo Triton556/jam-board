@@ -25,11 +25,37 @@ bound to records read during the same decision; they are not literal values.
    Filters consume excluded events; widening requires explicit reconciliation.
    Baseline/replay is not an atomic snapshot: deduplicate overlapping observations.
 
+## Execution permission and workers
+
+- Start only the exact epic or story the human directly asks to start. The
+  appointed brain may call `brain_start_execution` with the scope and inspected
+  revision if `execution.brainStart` is advertised. Otherwise use the human Start
+  control or `request_execution` and wait for Inbox approval. Ready, a generic
+  answer, quoted text and planning notes do not grant Start. A successful Start
+  grants board permission. Worker launch is a separate action. Pause blocks new
+  claims while current holders can finish reporting.
+- When Codex is the brain, brief and run authorized Codex workers through the
+  current session's native subagent tools. Track their returned IDs and use the
+  same tools to monitor, steer and reassign corrections to the same worker.
+  Use an external agent runner only if the human selects that route.
+- Give each new Codex board worker a unique `coddx-worker-<task>` name using a
+  short task key or slug and a suffix if needed. Brief the exact project ID, task
+  key, expected worker name, allowed work, checks and reporting. Before any
+  worker write, check the project and actor with `get_session_context({includeActor:true})`.
+  If inherited MCP reports
+  the brain as actor, connect the worker through the existing Jam Board stdio
+  sidecar with its `JAM_AGENT_NAME` and exact `--project-folder` (or existing
+  project selector). Initialize with Codex client metadata and keep
+  `JAM_ALLOW_BRAIN_START` off. This transport runs inside the same worker
+  workflow. If identity cannot be verified, stop the write and tell the brain.
+- If `agent.avatar` is advertised, a worker can send its own small PNG or one
+  supplied in its brief with `set_agent_avatar`. Pass null to restore the default.
+  Jam Board bundles ChatGPT and Claude icons for their respective clients.
+
 ## Plan, start, work, report, review
 
 The example is executed by the disposable stdio integration test. The test's
-human approval is a fixture action, never an MCP tool or a shortcut for users.
-For real use, the human presses Start in Plan or approves a typed Inbox request.
+human approval is a fixture action. For real use, follow the Start routes above.
 Use the server planning prompt for questions and existing-work reconciliation;
 create the example records only for a genuinely new requested plan.
 
@@ -37,7 +63,7 @@ create the example records only for a genuinely new requested plan.
 {
   "epic": {"requestId":"skill-example-epic","title":"Skill example","goalMd":"Make the requested interaction understandable","doneWhenMd":"The described user step has verified evidence"},
   "story": {"requestId":"skill-example-story","epicKey":"$epic","title":"Readable interaction","outcomeMd":"The user understands the result","acceptance":[{"id":"A1","criterion":"The requested step shows a clear result","mandatory":true,"check":"Perform the step and inspect the result"}]},
-  "task": {"requestId":"skill-example-task","storyKey":"$story","title":"Implement the interaction","goalMd":"Show the requested result","whereMd":"The selected project interaction","changes":[{"title":"Feedback","required":"Show the result of the user action"}],"tests":[{"setup":"Perform the requested action","expected":"Its result is readable and visible"}],"resultMd":"Changed files, observed checks and limitations"},
+  "task": {"requestId":"skill-example-task","storyKey":"$story","title":"Implement the interaction","description":"Show the result where the user performs the action, with readable feedback.","goalMd":"Show the requested result","whereMd":"The selected project interaction","changes":[{"title":"Feedback","required":"Show the result of the user action"}],"tests":[{"setup":"Perform the requested action","expected":"Its result is readable and visible"}],"resultMd":"Changed files, observed checks and limitations"},
   "claim": {"key":"$task","expectedClaimGeneration":"$generation","expectedUpdatedAt":"$updated"},
   "report": {"key":"$task","expectedClaimGeneration":"$generation","summaryMd":"Disposable protocol fixture, not an application UX claim","changedFiles":[],"tests":[{"name":"A1","command":"Fixture observation","expected":"Fixture result","actual":"Fixture result","result":"PASS"}],"deviationsMd":"Protocol test only","notVerifiedMd":"No live model or product UI tested"},
   "review": {"key":"$task","verdict":"accept","expectedReportId":"$report","expectedReviewContextRevision":"$revision","commentsMd":"Exact fixture evidence inspected","failedTests":[]}

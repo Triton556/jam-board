@@ -95,6 +95,14 @@ pub struct SetExecution {
     /// Exact execution revision inspected before this decision, e.g. scope:3; required. Reconcile conflicts before retrying.
     pub expected_revision: String,
 }
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BrainStartExecution {
+    /// Exact epic or story explicitly named by the human.
+    pub scope: ExecutionScope,
+    /// Execution revision inspected for this request.
+    pub expected_revision: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestExecution {
@@ -395,7 +403,7 @@ pub(crate) fn require_execution(c: &Connection, story_id: &str) -> Result<()> {
     }
     if s.effective_state != ExecutionEffectiveState::Running {
         return Err(Error::ExecutionRequired(format!(
-            "Work on {} has not been started, or is paused. A human must start this story or its epic; Ready does not authorize execution.",
+            "Work on {} has not been started, or is paused. An explicit Start of this story or its epic is required; Ready does not authorize execution.",
             s.scope_key
         )));
     }
@@ -450,6 +458,33 @@ impl Store {
                 return Err(Error::Conflict);
             }
             change(c, &t, actor, input.action)
+        })
+    }
+    /// Called only by a trusted, explicitly enabled brain connection.
+    pub fn brain_start_execution(
+        &self,
+        actor: &str,
+        input: BrainStartExecution,
+    ) -> Result<ExecutionState> {
+        self.write(|c| {
+            let t = target(c, &input.scope)?;
+            if crate::service::member(c, actor)?.kind != "agent"
+                || t.epic.brain_member_id.as_deref() != Some(actor)
+            {
+                return Err(Error::Forbidden(
+                    "Only this epic's appointed brain may use delegated Start".into(),
+                ));
+            }
+            let current = state(c, &t)?;
+            if input.expected_revision != current.revision {
+                return Err(Error::Conflict);
+            }
+            if current.own_state == ExecutionOwnState::Running
+                && current.effective_state == ExecutionEffectiveState::Running
+            {
+                return Ok(current);
+            }
+            change(c, &t, actor, ExecutionAction::Start)
         })
     }
     pub fn request_execution(

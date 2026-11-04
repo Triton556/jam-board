@@ -2239,6 +2239,8 @@ dependencies = [
 name = "jam-core"
 version = "0.3.0-alpha.48"
 dependencies = [
+ "base64 0.22.1",
+ "png 0.18.1",
  "rusqlite",
  "rusqlite_migration",
  "schemars 1.2.3",

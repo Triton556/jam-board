@@ -36,6 +36,14 @@ fn raw_client(ctx: &RequestContext<RoleServer>) -> String {
     )
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionContextInput {
+    /// Include the connection's member identity. Defaults to false for older clients.
+    #[serde(default)]
+    include_actor: bool,
+}
+
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct SessionContext {
@@ -45,6 +53,8 @@ struct SessionContext {
     project_id: String,
     key_prefix: String,
     project_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    actor: Option<jam_core::MemberRef>,
     /// Verified folder anchor; legacy stores can return an unverified hint. Never a filesystem grant.
     project_folder: Option<String>,
     project_instance_id: String,
@@ -70,6 +80,7 @@ pub struct JamServer {
     session_client: Arc<OnceLock<String>>,
     project_hint: Option<String>,
     agent_name: Option<String>,
+    allow_brain_start: bool,
     recent: RecentCalls,
     report_stdio: bool,
     project_manager: Option<Arc<jam_core::ProjectManager>>,
@@ -90,10 +101,19 @@ impl JamServer {
             session_client: Arc::new(OnceLock::new()),
             project_hint: None,
             agent_name,
+            allow_brain_start: false,
             recent,
             report_stdio: false,
             project_manager: None,
         }
+    }
+    /// Enable delegated Start for a trusted stdio connection with a fixed actor.
+    pub fn with_brain_start(mut self) -> Self {
+        self.allow_brain_start = self
+            .agent_name
+            .as_deref()
+            .is_some_and(|n| !n.trim().is_empty());
+        self
     }
     pub fn with_project_manager(mut self, manager: Arc<jam_core::ProjectManager>) -> Self {
         self.project_manager = Some(manager);
@@ -307,7 +327,7 @@ impl JamServer {
         }
         match name {
             "get_session_context" => {
-                parse::<Empty>(args)?;
+                let input = parse::<SessionContextInput>(args)?;
                 let (project, latest_activity_cursor) = store.project_activity_context()?;
                 let folder = store.folder_session_context()?;
                 value(SessionContext {
@@ -326,9 +346,12 @@ impl JamServer {
                         "prompts.resources",
                         "references.batch",
                         "references.collect",
+                        "agent.avatar",
                     ]
+                    .into_iter()
+                    .chain(self.allow_brain_start.then_some("execution.brainStart"))
                     .map(str::to_owned)
-                    .into(),
+                    .collect(),
                     project_instance_id: folder.project_instance_id,
                     database_generation: folder.database_generation,
                     board_revision: folder.board_revision,
@@ -340,6 +363,7 @@ impl JamServer {
                     project_id: project.id,
                     key_prefix: project.key_prefix,
                     project_name: project.name,
+                    actor: input.include_actor.then(|| actor.into()),
                     project_folder: folder
                         .project_folder
                         .or(store.get_settings()?.project_folder)
@@ -348,6 +372,18 @@ impl JamServer {
                     can_switch_project: false,
                     latest_activity_cursor,
                 })
+            }
+            "set_agent_avatar" => {
+                let input = parse::<jam_core::AgentAvatarInput>(args)?;
+                value(store.set_agent_avatar(&actor.id, input)?)
+            }
+            "brain_start_execution" => {
+                if !self.allow_brain_start {
+                    return Err(jam_core::Error::Forbidden(
+                        "Delegated Start is disabled for this connection".into(),
+                    ));
+                }
+                value(store.brain_start_execution(&actor.id, parse(args)?)?)
             }
             "get_board" => {
                 parse::<Empty>(args)?;
@@ -623,7 +659,7 @@ pub(crate) fn tool<T: JsonSchema>(
             Some(schema::<jam_core::FileMutationResult>())
         }
         "resolve_file" => Some(schema::<jam_core::FileResolution>()),
-        "get_execution" => Some(schema::<jam_core::ExecutionState>()),
+        "get_execution" | "brain_start_execution" => Some(schema::<jam_core::ExecutionState>()),
         "get_canvas" => Some(schema::<jam_core::CanvasPage>()),
         "create_frame" | "update_frame" => Some(schema::<jam_core::RefFrame>()),
         "connect_references" | "update_connection" => Some(schema::<jam_core::RefEdge>()),
@@ -646,7 +682,7 @@ pub(crate) fn tool<T: JsonSchema>(
         "ask_user" | "withdraw_question" => Some(schema::<jam_core::Question>()),
         "wait_for_answer" => Some(schema::<jam_core::AnswerWait>()),
         "wait_for_changes" => Some(schema::<jam_core::ChangesWait>()),
-        "set_status" => Some(schema::<jam_core::Member>()),
+        "set_status" | "set_agent_avatar" => Some(schema::<jam_core::Member>()),
         "add_references" => Some(schema::<jam_core::AddReferencesResult>()),
         "collect_kept_references" => Some(schema::<jam_core::CollectKeptResult>()),
         "add_reference" | "link_reference" | "update_reference" => {
@@ -671,9 +707,9 @@ pub(crate) fn tool<T: JsonSchema>(
 }
 fn tools() -> Vec<Tool> {
     let mut list = vec![
-        tool::<Empty>(
+        tool::<SessionContextInput>(
             "get_session_context",
-            "Read this session's pinned project identity and project-filtered latestActivityCursor in one snapshot. Capture the cursor before fresh current-state reads; never replace an unprocessed saved recovery cursor. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
+            "Read this session's pinned project identity and project-filtered latestActivityCursor in one snapshot. Set includeActor to verify the connection's own member before worker writes. Capture the cursor before fresh current-state reads; never replace an unprocessed saved recovery cursor. Human project switching does not retarget this connection. Reconnect with JAM_BOARD_PROJECT or X-Jam-Project to change it.",
             true,
         ),
         tool::<Empty>(
@@ -708,7 +744,7 @@ fn tools() -> Vec<Tool> {
         ),
         tool::<Claim>(
             "claim_task",
-            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name. New work requires a human-started story/epic; Ready alone is not execution permission.",
+            "Claim a Ready task for yourself and move it to In progress. Workers cannot claim other statuses or bypass readiness. A task held by another member returns claim_conflict with the holder's name. New work requires a running story or epic; Ready alone is not execution permission.",
             false,
         ),
         tool::<Release>(
@@ -778,7 +814,7 @@ impl ServerHandler for JamServer {
         Ok(CompleteResult::default())
     }
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project on its first request; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story: a human must explicitly Start the story or epic before any new work. The appointed brain may request_execution for exact-scope approval in the app Inbox; generic questions and chat text cannot grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_prompts().build()).with_server_info(Implementation::new("jam-board",env!("CARGO_PKG_VERSION"))).with_instructions("Read jam://guide for this version’s standalone board workflow; no external playbook is required. This connection is pinned to one project on its first request; get_session_context identifies it. Switching projects in the app never retargets this session. Plan your project with your AI teammates. Use task keys such as JB-12. Ready describes planning, not execution authority. Check get_execution for the story. Follow the Start routes in jam://guide; generic questions and Ready do not grant authority. Never launch agent sessions merely because a request was created. When a scope is running, read get_task and claim a Ready task with its expectedClaimGeneration and expectedUpdatedAt; retain the returned claimGeneration for report/release. submit_report with that expectedClaimGeneration and results/test evidence. Covered task overwrites/status mutations require both captured validators; missing context fails closed. Review_task requires expectedReportId and expectedReviewContextRevision from the exact evidence inspected. Never blindly refresh validators and replay a rejected old payload. Pause blocks new work but preserves in-flight reports. A separate human or appointed brain reviews the report with review_task; never review your own work.")
     }
     async fn list_tools(
         &self,
@@ -786,8 +822,21 @@ impl ServerHandler for JamServer {
         ctx: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         self.heartbeat(&ctx).await?;
+        let mut tools = tools();
+        tools.push(tool::<jam_core::AgentAvatarInput>(
+            "set_agent_avatar",
+            "Set this connection's own agent avatar to a PNG data URL, or pass null to restore the provider default. PNG limit: 32 KiB decoded and 128 by 128 pixels.",
+            false,
+        ));
+        if self.allow_brain_start {
+            tools.push(tool::<jam_core::BrainStartExecution>(
+                "brain_start_execution",
+                "Appointed epic brain only. Start the exact story or epic only after the human directly requests Start for that scope in this conversation. Use the revision from get_execution. This trusted connection cannot verify chat text. Start grants board execution and does not launch workers.",
+                false,
+            ));
+        }
         Ok(ListToolsResult {
-            tools: tools(),
+            tools,
             ..Default::default()
         })
     }

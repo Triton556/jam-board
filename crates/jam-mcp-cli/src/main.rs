@@ -133,6 +133,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Arc::new(Mutex::new(Default::default())),
     )
     .with_project(project);
+    if std::env::var("JAM_ALLOW_BRAIN_START").as_deref() == Ok("1") {
+        server = server.with_brain_start();
+    }
     if let Some(manager) = manager {
         server = server.with_project_manager(manager);
     } else {

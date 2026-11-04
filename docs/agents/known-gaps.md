@@ -91,6 +91,7 @@ highlight and toast acceptance, which remains unrun for this delta.
 
 | Work | Dated checkpoint / current status | Completion evidence required |
 |---|---|---|
+| Delegated Start and worker avatars | Verified in a local Windows build | A live native Codex worker completed claim, avatar update, report and independent review on a disposable board. Existing data and ordinary MCP calls were checked across versions. Delegated Start uses trusted local stdio and relies on the brain to identify the human request. Packaged installer and macOS checks are pending. |
 | Brain-dock increment | Implemented source on feature/brain-dock; browser/native QA not yet run | BC01-BC11 / UX01-UX09; live providers, packaged cleanup and project/restart recovery |
 | Human-first Task/Story | Corrected alpha29 DOM closure and bounded native read-only evidence; native text entry blocked | HF01–HF06 functional + open-state visual evidence; preserve reports, readiness and drafts |
 | Reference frame grip/empty state | Alpha30 source/DOM; alpha32 source visual treatment; native pending | RF01, RF02 |

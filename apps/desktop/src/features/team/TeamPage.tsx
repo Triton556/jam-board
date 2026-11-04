@@ -36,7 +36,9 @@ export function MemberDialog({
   const [color, setColor] = useState(
     member?.color ?? memberColors[0] ?? "#5B8DEF",
   );
-  const [avatar, setAvatar] = useState(member?.avatar ?? "");
+  const [avatar, setAvatar] = useState(
+    member?.kind === "human" ? (member.avatar ?? "") : "",
+  );
   const valid = !!name.trim() && name.length <= 40 && avatar.length <= 16;
   const write = useProjectWrite(`member:${member?.id ?? "new"}`);
   const dispatched = useRef(false);

@@ -1,5 +1,7 @@
 //! Shared domain and SQLite storage. No desktop or MCP dependencies.
+mod agent_avatar;
 mod asset_io;
+pub use agent_avatar::AgentAvatarInput;
 mod canvas;
 mod canvas_tools;
 pub use canvas_tools::*;
